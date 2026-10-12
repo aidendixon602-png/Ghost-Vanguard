@@ -1,0 +1,218 @@
+/**
+ * Midtown Vanguard launcher for hosts that only let you pick a "main file" (Wispbyte).
+ * Startup:  cd /home/container && node launch.js
+ *
+ * 1. Installs dependencies if node_modules is missing.
+ * 2. One-time import: if data/import/vanguard.db exists, copies the servers listed in
+ *    IMPORT_GUILDS (default: Midtown Tower Cafe + MT | Human Resources) from it into
+ *    data/vanguard.db, keeping every other server. Runs once (data/import is renamed after).
+ * 3. Runs the bot, and restarts it if it stops unexpectedly (at most 5 times in 10 minutes).
+ * 4. Automatic updates from GitHub, when UPDATE_REPO and UPDATE_TOKEN are set in .env:
+ *    every 5 minutes it checks the main branch. A new commit is installed only when GitHub's
+ *    tests passed for it. The bot is then restarted on the new version; if that version
+ *    crashes within 2 minutes, the previous version is put back automatically.
+ *    .env and data/ are never touched by an update.
+ */
+import { spawn, spawnSync } from 'node:child_process';
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, copyFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const root = dirname(fileURLToPath(import.meta.url));
+process.chdir(root);
+const say = text => console.log(`[launch] ${text}`);
+const run = (cmd, args, opts = {}) => spawnSync(cmd, args, { stdio: 'inherit', cwd: root, shell: process.platform === 'win32', ...opts }).status === 0;
+const quiet = (cmd, args) => spawnSync(cmd, args, { cwd: root, encoding: 'utf8' });
+
+// ------------------------------------------------------------ settings from .env (without loading the bot)
+function envFile() {
+    const out = {};
+    try {
+        for (const line of readFileSync(join(root, '.env'), 'utf8').split(/\r?\n/)) {
+            const m = /^\s*([A-Z0-9_]+)\s*=\s*(.*?)\s*$/.exec(line);
+            if (m) out[m[1]] = m[2].replace(/^["']|["']$/g, '');
+        }
+    } catch { }
+    return out;
+}
+const env = { ...envFile(), ...process.env };
+const REPO = (env.UPDATE_REPO ?? '').trim();
+const TOKEN = (env.UPDATE_TOKEN ?? '').trim();
+const BRANCH = (env.UPDATE_BRANCH ?? 'main').trim();
+const WORKFLOW = 'CI';
+const CHECK_MS = Math.max(env.UPDATE_API_BASE ? 1000 : 60000, Number(env.UPDATE_INTERVAL_MINUTES ?? 5) * 60000);
+// Overridable only for testing the updater against a local copy.
+const API = (env.UPDATE_API_BASE || 'https://api.github.com').replace(/\/$/, '');
+const REMOTE = env.UPDATE_REMOTE_URL || `https://github.com/${REPO}.git`;
+const HEALTHY_MS = Number(env.UPDATE_HEALTHY_SECONDS ?? 120) * 1000;
+const updatesOn = /^[\w.-]+\/[\w.-]+$/.test(REPO) && TOKEN.length > 20;
+const hide = text => TOKEN ? String(text).split(TOKEN).join('[token hidden]') : String(text);
+
+// ------------------------------------------------------------ git, with the token passed per command (never saved to disk)
+const auth = () => ['-c', `http.extraHeader=Authorization: Basic ${Buffer.from(`x-access-token:${TOKEN}`).toString('base64')}`];
+const git = (...args) => { const r = quiet('git', [...auth(), ...args]); return { ok: r.status === 0, out: (r.stdout ?? '').trim(), err: hide(r.stderr ?? '').trim() }; };
+const head = () => quiet('git', ['rev-parse', 'HEAD']).stdout?.trim() || null;
+
+async function github(path) {
+    const res = await fetch(`${API}/repos/${REPO}${path}`, { headers: { Authorization: `Bearer ${TOKEN}`, Accept: 'application/vnd.github+json', 'User-Agent': 'midtown-vanguard-updater' } });
+    if (!res.ok) throw new Error(`GitHub ${res.status} on ${path}`);
+    return res.json();
+}
+
+/** Newest commit on the branch whose CI run succeeded, or null. */
+async function latestPassing() {
+    const branch = await github(`/branches/${encodeURIComponent(BRANCH)}`);
+    const sha = branch?.commit?.sha;
+    if (!sha) return null;
+    const runs = await github(`/actions/runs?head_sha=${sha}&per_page=20`);
+    const ci = (runs.workflow_runs ?? []).filter(r => r.name === WORKFLOW);
+    if (!ci.length || ci.some(r => r.status !== 'completed')) return { sha, ready: false, why: 'tests still running' };
+    return ci.every(r => r.conclusion === 'success') ? { sha, ready: true } : { sha, ready: false, why: 'tests failed' };
+}
+
+/** First time: turn this folder into a checkout of the repo, keeping .env, data/ and node_modules. */
+function ensureCheckout() {
+    if (existsSync(join(root, '.git'))) return true;
+    say(`Connecting this folder to github.com/${REPO} (first time)...`);
+    if (!git('init', '-q').ok) return false;
+    quiet('git', ['remote', 'add', 'origin', REMOTE]);
+    const fetched = git('fetch', '-q', 'origin', BRANCH);
+    if (!fetched.ok) { say(`Could not reach the repo: ${fetched.err}`); rmSync(join(root, '.git'), { recursive: true, force: true }); return false; }
+    git('reset', '-q', '--hard', 'FETCH_HEAD');
+    return true;
+}
+
+/** Install a commit. Only tracked files change; .env, data/ and node_modules are untouched. */
+function install(sha) {
+    const before = head();
+    if (!git('fetch', '-q', 'origin', BRANCH).ok) return false;
+    const lockChanged = before && quiet('git', ['diff', '--quiet', before, sha, '--', 'package-lock.json']).status !== 0;
+    if (!git('reset', '-q', '--hard', sha).ok) return false;
+    if (lockChanged || !existsSync(join(root, 'node_modules', 'discord.js'))) {
+        say('Dependencies changed; installing...');
+        if (!run('npm', ['ci', '--omit=dev', '--no-audit', '--no-fund'])) { say('npm install failed; going back.'); git('reset', '-q', '--hard', before); run('npm', ['ci', '--omit=dev', '--no-audit', '--no-fund']); return false; }
+    }
+    return true;
+}
+
+// ------------------------------------------------------------ one-time setup
+if (updatesOn) {
+    if (quiet('git', ['--version']).status !== 0) say('Automatic updates need git, which this host does not have. Updates are off.');
+    else if (ensureCheckout()) say(`Automatic updates are on: github.com/${REPO} (${BRANCH}), checked every ${CHECK_MS / 60000} minutes.`);
+}
+
+if (!existsSync(join(root, 'node_modules', 'discord.js'))) {
+    say('Installing dependencies (first start only) ...');
+    if (!run('npm', ['install', '--omit=dev', '--no-audit', '--no-fund'])) { say('npm install failed.'); process.exit(1); }
+}
+
+const data = join(root, 'data'), importDb = join(data, 'import', 'vanguard.db'), main = join(data, 'vanguard.db');
+if (existsSync(importDb)) {
+    if (!existsSync(main)) {
+        say('data/import/vanguard.db is here, but data/vanguard.db (the old Wispbyte database) is not.');
+        say('Upload the old server\'s data folder first, then start again. Nothing was changed.');
+        process.exit(1);
+    }
+    const guilds = (env.IMPORT_GUILDS ?? env.IMPORT_GUILD ?? '845678484276641842,1328761679714058331').split(',').map(s => s.trim()).filter(Boolean);
+    const stamp = new Date().toISOString().replace(/[-:]/g, '').replace('T', '-').slice(0, 15);
+    const work = join(data, `merge-work-${stamp}`);
+    mkdirSync(work, { recursive: true });
+    let current = data, ok = true;
+    for (const [i, guild] of guilds.entries()) {
+        const step = join(work, String(i));
+        mkdirSync(step, { recursive: true });
+        say(`Importing server ${guild} ...`);
+        if (!run(process.execPath, ['scripts/merge-guild.mjs', '--bot', '.', '--from', join(data, 'import'), '--into', current, '--guild', guild, '--out', join(step, 'vanguard.db')])) { ok = false; break; }
+        current = step;
+    }
+    if (ok) {
+        for (const s of ['', '-wal', '-shm']) if (existsSync(main + s)) renameSync(main + s, join(data, `vanguard-before-merge-${stamp}.db${s}`));
+        copyFileSync(join(current, 'vanguard.db'), main);
+        renameSync(join(data, 'import'), join(data, `import-done-${stamp}`));
+        say(`Import complete (${guilds.length} server(s)). Previous database kept as data/vanguard-before-merge-${stamp}.db`);
+    } else say('IMPORT FAILED (see above). Nothing was changed; starting with the existing database.');
+    rmSync(work, { recursive: true, force: true });
+}
+
+// ------------------------------------------------------------ run the bot, restart it, update it
+let child = null, stopping = false, updating = false;
+const crashes = [];
+let lastGood = head(), startedAt = 0;
+
+function startBot() {
+    startedAt = Date.now();
+    child = spawn(process.execPath, ['dist/index.js'], { stdio: 'inherit', cwd: root, env: process.env });
+    child.on('exit', (code, signal) => {
+        child = null;
+        if (stopping || updating) return;
+        const now = Date.now();
+        // A brand-new version that dies within 2 minutes is rolled back.
+        if (updatesOn && lastGood && head() !== lastGood && now - startedAt < HEALTHY_MS) {
+            const bad = head();
+            say(`The new version ${bad?.slice(0, 7)} stopped within 2 minutes (code ${code ?? signal}). Going back to ${lastGood.slice(0, 7)} and skipping it.`);
+            if (bad) rejected.add(bad);
+            install(lastGood);
+            return startBot();
+        }
+        crashes.push(now);
+        while (crashes.length && now - crashes[0] > 600000) crashes.shift();
+        if (code === 0 || crashes.length > 5) {
+            say(code === 0 ? 'The bot stopped.' : 'The bot keeps stopping; giving up so the panel shows the error.');
+            process.exit(code ?? 1);
+        }
+        say(`The bot stopped unexpectedly (code ${code ?? signal}); restarting in 5 seconds...`);
+        setTimeout(startBot, 5000);
+    });
+}
+
+function stopBot() {
+    return new Promise(resolve => {
+        if (!child) return resolve();
+        const c = child;
+        const force = setTimeout(() => c.kill('SIGKILL'), 20000);
+        c.once('exit', () => { clearTimeout(force); resolve(); });
+        c.kill('SIGTERM');
+    });
+}
+
+const rejected = new Set();
+let lastNote = '';
+async function checkForUpdate() {
+    if (updating || stopping) return;
+    try {
+        const latest = await latestPassing();
+        if (!latest || latest.sha === head() || rejected.has(latest.sha)) return;
+        if (!latest.ready) {
+            // Say it once per commit and reason, not every check.
+            const note = `${latest.sha}:${latest.why}`;
+            if (note !== lastNote) say(`Update ${latest.sha.slice(0, 7)} found, not installing yet: ${latest.why}.`);
+            lastNote = note;
+            return;
+        }
+        updating = true;
+        say(`Updating to ${latest.sha.slice(0, 7)}...`);
+        const previous = head();
+        await stopBot();
+        if (install(latest.sha)) { lastGood = previous; say(`Installed ${latest.sha.slice(0, 7)}. Starting the new version.`); }
+        else { rejected.add(latest.sha); say('The update could not be installed; staying on the current version.'); }
+        updating = false;
+        startBot();
+        // Once the new version has run for 2 minutes, it becomes the version to fall back to.
+        setTimeout(() => { if (child && Date.now() - startedAt >= HEALTHY_MS - 1000) lastGood = head(); }, HEALTHY_MS + 1000).unref();
+    } catch (error) {
+        updating = false;
+        say(`Update check failed: ${hide(error instanceof Error ? error.message : error)}`);
+        if (!child && !stopping) startBot();
+    }
+}
+
+for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, async () => {
+    stopping = true;
+    await stopBot();
+    process.exit(0);
+});
+
+startBot();
+if (updatesOn && existsSync(join(root, '.git'))) setInterval(checkForUpdate, CHECK_MS).unref?.();
+// Keep the launcher alive while the bot runs.
+setInterval(() => { }, 1 << 30);

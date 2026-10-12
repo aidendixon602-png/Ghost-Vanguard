@@ -1,0 +1,159 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {AuditLogEvent,Collection,PermissionFlagsBits} from 'discord.js';
+import {RULES,escalationAdded} from '../src/core.js';
+import {Security} from '../src/security/security.js';
+import {Store} from '../src/database/db.js';
+import {authorize} from './helpers.js';
+import enable from '../src/commands/antinuke/enable.js';
+import antinuke from '../src/commands/antinuke/antinuke.js';
+import { antinukeStatus } from '../src/ui/antinuke-status.js';
+
+test('status embed shows the fixed limits (saved custom limits are ignored) and only active anti-nuke bypasses in this guild',()=>{
+ const {store}=fixture();
+ try {
+  const s=store.settings('g');s.rules.mass_ban={count:7,seconds:120};store.save(s);
+  store.grant('g','111','trust','owner');store.grant('g','222','bot','owner');store.grant('g','333','trust','owner');
+  store.run('UPDATE grants SET expires=? WHERE guild_id=? AND user_id=?',Date.now()-1,'g','333');
+  const status=antinukeStatus(store,'g').toJSON();
+  assert.equal(status.title,'Antinuke Status');assert.equal(status.color,0x57F287);
+  assert.match(status.description!,/`Ban` – \*\*3 in 60s → ban\*\* `\[revert\]`/);assert.match(status.description!,/preset is fixed/);
+  assert.match(status.description!,/<@111>/);assert.doesNotMatch(status.description!,/<@222>|<@333>/);
+  assert.match(status.description!,/manage_webhooks/);assert.ok(status.description!.length<=3900);
+  s.enabled=false;store.save(s);assert.equal(antinukeStatus(store,'g').toJSON().color,0xED4245);
+  s.enabled=true;s.mode='observe';store.save(s);assert.match(antinukeStatus(store,'g').toJSON().description!,/observe mode/);
+ } finally {store.close();}
+});
+
+test('status and rules commands send the status embed without pinging trusted users',async()=>{
+ const {store}=fixture();
+ try {
+  for(const sub of ['status','rules']) {
+   let reply:any;await antinuke.execute({store,actor:{id:'owner'}} as any,{guildId:'g',user:{id:'owner'},options:{getSubcommand:()=>sub},editReply:async(value:any)=>{reply=value;}} as any);
+   assert.equal(reply.embeds[0].toJSON().title,'Antinuke Status');assert.deepEqual(reply.allowedMentions,{parse:[]});
+  }
+ } finally {store.close();}
+});
+
+function fixture(mode:'observe'|'enforce'='enforce') {
+ const store=new Store(':memory:');authorize(store);
+ const s=store.settings('g');s.enabled=true;s.mode=mode;store.save(s);
+ const security=new Security(store,{push:()=>{}} as any);
+ const guild:any={id:'g',ownerId:'owner',client:{user:{id:'vanguard'}}};
+ const entry=(id:string,targetId:string,action=AuditLogEvent.MemberBanAdd,changes:any[]=[],at=Date.now())=>({id,targetId,action,changes,executorId:'actor',createdTimestamp:at} as any);
+ return {store,security,guild,entry};
+}
+
+test('the twelve requested preset limits, actions and revert flags are exact',()=>{
+ const expected:any={mass_ban:[3,60,'ban',true],bot_add:[1,60,'ban',true],channel_create:[2,120,'kick',true],channel_delete:[2,120,'ban',false],mass_kick:[3,120,'ban',false],dangerous_grant:[1,60,'strip',true],role_create:[5,120,'strip',true],role_delete:[5,120,'strip',false],role_grant:[1,60,'strip',true],guild_update:[1,60,'strip',false],timeout:[5,120,'strip',true],webhook_change:[1,60,'kick',true]};
+ for(const [key,values] of Object.entries(expected)) {const r=RULES.find(r=>r.key===key)!;assert.deepEqual([r.count,r.seconds,r.punishment,r.revert],values);}
+});
+
+test('Permission Grant detects exactly the requested six permission bits',()=>{
+ for(const bit of [PermissionFlagsBits.Administrator,PermissionFlagsBits.BanMembers,PermissionFlagsBits.KickMembers,PermissionFlagsBits.ManageChannels,PermissionFlagsBits.ManageGuild,PermissionFlagsBits.ManageWebhooks])assert.equal(escalationAdded(0n,bit),bit);
+ assert.equal(escalationAdded(0n,PermissionFlagsBits.ManageRoles),0n);
+});
+
+test('/enable reloads the preset, clears shared limits, captures a baseline and persists enforce mode',async()=>{
+ const {store,guild}=fixture();
+ try {
+  const s=store.settings('g');s.enabled=false;s.mode='observe';s.logChannelId='log';s.ruleDefaults={count:99,seconds:5};s.rules.mass_ban={count:90,seconds:5};store.save(s);
+  let snapshots=0;const ctx:any={store,actor:{id:'actor'},snapshots:{numberOf:(_g:any,id:number)=>id,save:async()=>{snapshots++;return 1;}},logs:{push:()=>{}}};
+  guild.members={me:{permissions:{has:()=>true},roles:{highest:{id:'botrole',position:99}}}};guild.roles={cache:new Collection()};guild.channels={cache:new Collection([['log',{isTextBased:()=>true,permissionsFor:()=>({has:()=>true})}]]),fetch:async()=>null};
+  const i:any={guildId:'g',guild,user:{id:'actor'},options:{getSubcommand:()=>{throw new Error('Alias must choose enable.');}}};
+  await enable.execute(ctx,i);
+  const result=store.settings('g');assert.equal(result.enabled,true);assert.equal(result.mode,'enforce');assert.equal(result.ruleDefaults,undefined);assert.deepEqual(result.rules,{});assert.equal(snapshots,1);
+  assert.equal(store.antinukeStaffDisabled('g'),false);
+ } finally {store.close();}
+});
+
+test('three bans in sixty seconds ban the executor and revert every observed ban in that window',async()=>{
+ const {store,security,guild,entry}=fixture();
+ try {
+  const undone:string[]=[];let banned=0;
+  guild.members={fetch:async()=>({id:'actor',bannable:true,ban:async()=>{banned++;}})};
+  guild.bans={remove:async(id:string)=>{undone.push(id);}};
+  await security.audit(entry('old','older',AuditLogEvent.MemberBanAdd,[],Date.now()-61000),guild);
+  for(let n=1;n<=3;n++)await security.audit(entry(String(n),'target'+n),guild);
+  assert.equal(banned,1);assert.deepEqual(undone.sort(),['target1','target2','target3']);
+  assert.equal(store.all('SELECT * FROM incidents').length,1);
+ } finally {store.close();}
+});
+
+test('observe mode never bans an executor or undoes their bans',async()=>{
+ const {store,security,guild,entry}=fixture('observe');
+ try {security.punish=async()=>{throw new Error('Must not punish');};security.revert=async()=>{throw new Error('Must not revert');};for(let n=1;n<=3;n++)await security.audit(entry(String(n),'t'+n),guild);assert.match(store.get('SELECT result FROM incidents')!.result,/Observed only/);}finally{store.close();}
+});
+
+test('kick punishment respects hierarchy and trusted accounts',async()=>{
+ const {store,security,guild}=fixture();
+ try {let kicked=0;guild.members={fetch:async()=>({kickable:false,kick:async()=>{kicked++;}})};assert.match(await security.punish(guild,'actor','kick'),/cannot/);assert.equal(kicked,0);store.grant('g','actor','trust','owner');assert.match(await security.punish(guild,'actor','ban'),/Protected/);assert.equal(kicked,0);}finally{store.close();}
+});
+
+test('Role Invite detects additions but ignores removals and verification-bot updates',async()=>{
+ const {store,security,guild,entry}=fixture('observe');
+ try {
+  guild.roles={cache:new Collection()};
+  await security.audit(entry('remove','recipient',AuditLogEvent.MemberRoleUpdate,[{key:'$remove',new:[{id:'r'}]}]),guild);
+  await security.audit(entry('add','recipient',AuditLogEvent.MemberRoleUpdate,[{key:'$add',new:[{id:'r'}]}]),guild);
+  store.grant('g','actor','bot','owner');
+  await security.audit(entry('verify','recipient',AuditLogEvent.MemberRoleUpdate,[{key:'$add',new:[{id:'r'}]}]),guild);
+  assert.equal(store.all("SELECT * FROM incidents WHERE rule='role_grant'").length,1);assert.equal(store.all('SELECT * FROM observations').length,1);
+ }finally{store.close();}
+});
+
+test('Timeout fires on the fifth imposed timeout and preserves a subsequently changed timeout',async()=>{
+ const {store,security,guild,entry}=fixture();
+ try {
+  const until=new Date(Date.now()+600000).toISOString();let restored=0;
+  guild.members={fetch:async({user}:any)=>({id:user,moderatable:true,communicationDisabledUntilTimestamp:user==='t5'?Date.now()+500000:Date.parse(until),disableCommunicationUntil:async()=>{restored++;}})};
+  security.punish=async()=> 'Stripped actor.';
+  for(let n=1;n<=5;n++)await security.audit(entry(String(n),'t'+n,AuditLogEvent.MemberUpdate,[{key:'communication_disabled_until',old:null,new:until}]),guild);
+  assert.equal(restored,4);assert.equal(store.all("SELECT * FROM incidents WHERE rule='timeout'").length,1);
+ }finally{store.close();}
+});
+
+test('role creation reverts skip managed roles and hierarchy-protected roles',async()=>{
+ const {store,security,guild,entry}=fixture();
+ try {let deleted=0;guild.roles={fetch:async()=>({managed:true,editable:true,delete:async()=>{deleted++;}})};assert.match(await security.revert(entry('a','role',AuditLogEvent.RoleCreate),guild,RULES.find(r=>r.key==='role_create')!),/managed/);assert.equal(deleted,0);}finally{store.close();}
+});
+
+import { applyDefaultAntinuke, antinukeOptedOut } from '../src/security/locked-antinuke.js';
+test('every authorized server gets the fixed preset enabled in enforce mode automatically, with a baseline',async()=>{
+ const store=new Store(':memory:');authorize(store);
+ try {
+  const s=store.settings('g');s.enabled=false;s.mode='observe';s.rules.mass_ban={count:90,seconds:5,enabled:false};store.save(s);store.setKickBots('g',true);
+  const alerts:any[]=[];let baselines=0;const logs:any={push:(_g:any,e:any)=>alerts.push(e.toJSON())};
+  assert.equal(await applyDefaultAntinuke(store,{id:'g'} as any,logs,async()=>++baselines),'enabled');
+  const r=store.settings('g');assert.equal(r.enabled,true);assert.equal(r.mode,'enforce');assert.deepEqual(r.rules,{});assert.equal(store.kickBots('g'),false);
+  assert.equal(baselines,1);assert.match(alerts[0].description,/17-rule/);
+  assert.equal(await applyDefaultAntinuke(store,{id:'g'} as any,logs,async()=>++baselines),'unchanged');assert.equal(baselines,1);assert.equal(alerts.length,1);
+  authorize(store,'other');store.run("UPDATE guild_authorization SET state='DEAUTHORIZED' WHERE guild_id='other'");
+  assert.equal(await applyDefaultAntinuke(store,{id:'other'} as any,logs),'unchanged');assert.equal(store.settings('other').enabled,false);
+ } finally {store.close();}
+});
+test('/disable is remembered across restarts and /enable switches it back on',async()=>{
+ const store=new Store(':memory:');authorize(store);
+ const {config}=await import('../src/config.js');const DEV='1277709272041394187';config.developers.add(DEV);
+ const {Registry}=await import('../src/bot/registry.js');const {registerDangerConfirm}=await import('../src/ui/danger-ui.js');
+ try {
+  const logs:any={push:()=>{}};
+  await applyDefaultAntinuke(store,{id:'g'} as any,logs);assert.equal(store.settings('g').enabled,true);
+  const member:any={id:DEV,guild:{id:'g',ownerId:DEV},roles:{cache:new Map()},permissions:{has:()=>true}};
+  const mk=()=>{const replies:any[]=[];return {inCachedGuild:()=>true,member,guild:{name:'Test',members:{me:{permissions:{has:()=>true}},fetch:async()=>member}},user:{id:DEV},guildId:'g',customId:'',replies,options:{getSubcommand:()=> 'disable'},editReply:async(p:any)=>void replies.push(p)} as any;};
+  const ctx:any={store,actor:{id:DEV},logs};
+  const i=mk();await antinuke.execute(ctx,i);
+  assert.equal(store.settings('g').enabled,true,'nothing changes before the confirmation click');
+  const registry=new Registry();registerDangerConfirm(registry);
+  const click=mk();click.customId=String(i.replies[0].components[0].components[0].data.custom_id);
+  await registry.components.find(c=>c.prefix==='dangerconfirm:')!.execute(ctx,click);
+  assert.equal(store.settings('g').enabled,false);assert.equal(antinukeOptedOut(store,'g'),true);
+  // A restart must not switch it back on.
+  assert.equal(await applyDefaultAntinuke(store,{id:'g'} as any,logs),'opted-out');assert.equal(store.settings('g').enabled,false);
+  // /enable records the choice; the next restart keeps it on.
+  const g:any={id:'g',members:{me:{permissions:{has:()=>true},roles:{highest:{id:'botrole',position:99}}}},roles:{cache:new Collection()},channels:{cache:new Collection([['log',{isTextBased:()=>true,permissionsFor:()=>({has:()=>true})}]]),fetch:async()=>null}};
+  const s=store.settings('g');s.logChannelId='log';store.save(s);
+  await enable.execute({store,actor:{id:DEV},snapshots:{numberOf:(_g:any,id:number)=>id,save:async()=>1},logs} as any,{guildId:'g',guild:g,user:{id:DEV},options:{}} as any);
+  assert.equal(antinukeOptedOut(store,'g'),false);assert.equal(await applyDefaultAntinuke(store,{id:'g'} as any,logs),'unchanged');assert.equal(store.settings('g').enabled,true);
+ } finally {store.close();}
+});

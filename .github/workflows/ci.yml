@@ -1,0 +1,47 @@
+name: CI
+
+# The server only installs a commit when this whole workflow passed for it.
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Typecheck
+        run: npm run check
+      - name: Build
+        run: npm run build
+      - name: dist/ matches src/
+        run: |
+          if ! git diff --quiet -- dist || [ -n "$(git status --porcelain -- dist)" ]; then
+            echo "::error::dist/ is out of date. Run 'npm run build' and commit dist/."
+            git status --short -- dist | head -20
+            exit 1
+          fi
+      - name: Test
+        run: npm test
+
+  secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Refuse committed secrets and databases
+        run: |
+          set -e
+          if git ls-files | grep -E '(^|/)\.env$|\.db(-wal|-shm)?$|^data/' ; then
+            echo "::error::A .env file, database or data/ file is committed. Remove it: these hold tokens and server settings."
+            exit 1
+          fi
+          if git grep -nE '[MNO][A-Za-z0-9_-]{22,27}\.[A-Za-z0-9_-]{5,7}\.[A-Za-z0-9_-]{25,}|sk-(proj-)?[A-Za-z0-9_-]{30,}|github_pat_[A-Za-z0-9_]{30,}' -- ':!test/*' ':!dist/*' ; then
+            echo "::error::Something that looks like a Discord token or API key is committed."
+            exit 1
+          fi

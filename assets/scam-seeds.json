@@ -1,0 +1,26 @@
+[
+  {
+    "id": "seed-post",
+    "name": "MrBeast casino post",
+    "sha": "c893482a93974008d5a4b86b905c73e0358c640903b0e65e50794539b7a77fc6",
+    "pixels": "82575a1bbf671f60b72118ba30fe4eeb859e029d1fbed4f4a4c56041a1353191",
+    "dhash": "e34363636767276f",
+    "aspect": 2.462686567164179
+  },
+  {
+    "id": "seed-promo",
+    "name": "MrBeast giveaway panel",
+    "sha": "91927613bd47a2bccd0853f43246802cc713f77599a77c63c51e0b2036c1d363",
+    "pixels": "2085c5b4d2e3d4cf93c4f6a716bfd27716e829da3599fb65f3e7a6d06b17300a",
+    "dhash": "697a1a747b3e3dff",
+    "aspect": 1.0088235294117647
+  },
+  {
+    "id": "seed-withdraw",
+    "name": "Crypto withdrawal panel",
+    "sha": "a6913c7ac7239f9af9e8b9b1d875b9f4f7edc4e719e6575bb54f1f0b946d8725",
+    "pixels": "7e95be768cfb5a5f01f6b24889f5fe5ec1f07d59b1586a113cfa4e5cc28d023b",
+    "dhash": "0001211d1c2d1d99",
+    "aspect": 1.0058823529411764
+  }
+]

@@ -1,0 +1,69 @@
+import { ActionRowBuilder, ButtonBuilder, ButtonStyle, Colors, EmbedBuilder, PermissionFlagsBits } from 'discord.js';
+import { RULES } from '../core.js';
+import { VERSION } from '../config.js';
+import { antinukeOptedOut } from '../security/locked-antinuke.js';
+import { logChannels } from '../audit/log-setup.js';
+import { eventLogConfig } from '../audit/event-log.js';
+/**
+ * The welcome panel Vanguard posts when it joins a server: what is already running, a live
+ * checklist of what still needs doing, and buttons that do it (set up the log channels,
+ * re-check, open the command list). It is posted at most once every 6 hours per server, so
+ * kicking and re-adding the bot cannot spam a channel.
+ */
+export const WELCOME_COOLDOWN_MS = 6 * 3600000;
+export const WELCOME_PREFIX = 'vgwelcome:';
+export const WELCOME_HELP_ID = 'vgcommands:open';
+/** Whether the bot has Administrator, and where its highest role sits (1 = top). */
+export function setupStatus(guild) {
+    const me = guild.members?.me;
+    const admin = !!me?.permissions?.has(PermissionFlagsBits.Administrator);
+    const roles = [...(guild.roles?.cache?.values() ?? [])].filter(r => r.id !== guild.id).sort((a, b) => b.position - a.position);
+    const mine = me?.roles?.highest;
+    const rank = mine ? roles.findIndex(r => r.id === mine.id) + 1 : 0;
+    return { admin, top: rank === 1, rank, total: roles.length };
+}
+export function checklist(store, guild) {
+    const s = setupStatus(guild);
+    const audit = s.admin || !!guild.members?.me?.permissions?.has(PermissionFlagsBits.ViewAuditLog);
+    const logsReady = !!store && !!logChannels(store, guild.id).bansChannelId && !!eventLogConfig(store, guild.id).channelId;
+    const items = [
+        { ok: s.admin, label: 'Administrator permission', fix: 'Server Settings → Roles → Midtown Vanguard → turn on Administrator' },
+        { ok: s.top, label: `Role position ${s.rank ? `#${s.rank} of ${s.total}` : 'unknown'}`, fix: 'Drag the Midtown Vanguard role to the very top' },
+        { ok: audit, label: 'View Audit Log', fix: 'Needed to see who did what (anti-nuke and logs)' },
+        { ok: logsReady, label: 'Log channels', fix: 'Press **Set up logs** below' },
+    ];
+    return { items, ready: items.filter(i => i.ok).length, logsReady };
+}
+const bar = (done, total) => '🟩'.repeat(done) + '⬛'.repeat(total - done);
+/** The panel for a server Vanguard protects. `inviter` is the developer who added it, if known. */
+export function welcomePanel(store, guild, inviter = null) {
+    const c = checklist(store, guild);
+    const on = !store || !antinukeOptedOut(store, guild.id);
+    const all = c.ready === c.items.length;
+    const intro = inviter
+        ? `Authorized by approved developer <@${inviter}>, so **${guild.name}** is protected straight away.`
+        : `**${guild.name}** is authorized and protected.`;
+    const e = new EmbedBuilder().setColor(all ? Colors.Green : Colors.Gold)
+        .setTitle('🛡️ Midtown Vanguard is online')
+        .setDescription(`${intro}\nProtection starts automatically. There's nothing to switch on.`)
+        .addFields({ name: 'Protection', value: on ? `🟢 **Anti-nuke on** · ${RULES.length} rules · enforce mode` : '🔴 **Anti-nuke off** (switched off by staff) · `/antinuke enable`', inline: false }, { name: `Setup ${bar(c.ready, c.items.length)} ${c.ready}/${c.items.length}`, value: c.items.map(i => `${i.ok ? '✅' : '⚠️'} **${i.label}**${i.ok ? '' : `\n-# ${i.fix}`}`).join('\n') }, { name: 'Good to know', value: '`/help` lists every command you can use · `/antinuke status` shows the rules · `/role` gives roles safely' })
+        .setFooter({ text: `Midtown Vanguard v${VERSION} · ${all ? 'fully set up' : 'buttons below finish the setup'}` }).setTimestamp();
+    const row = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`${WELCOME_PREFIX}logs:${inviter ?? '0'}`).setLabel(c.logsReady ? 'Re-check logs' : 'Set up logs').setEmoji('🗂️').setStyle(c.logsReady ? ButtonStyle.Secondary : ButtonStyle.Primary), new ButtonBuilder().setCustomId(`${WELCOME_PREFIX}check:${inviter ?? '0'}`).setLabel('Re-check').setEmoji('🔄').setStyle(ButtonStyle.Secondary), new ButtonBuilder().setCustomId(WELCOME_HELP_ID).setLabel('Commands').setEmoji('📖').setStyle(ButtonStyle.Secondary));
+    return { embeds: [e], components: [row], allowedMentions: { parse: [] } };
+}
+/** Before authorization: a live countdown, no buttons (protected features are off until then). */
+export function pendingPanel(guild, deadline) {
+    const e = new EmbedBuilder().setColor(Colors.Blurple).setTitle('⏳ Waiting for a Midtown Vanguard developer')
+        .setDescription([
+        `An approved developer needs to run \`/dev authserver\` here **<t:${Math.floor(deadline / 1000)}:R>**, or Midtown Vanguard leaves on its own.`,
+        '',
+        'Until then protection, logs and moderation commands stay off.',
+        '-# If a developer invited the bot, this happens automatically when Vanguard can read the audit log.',
+    ].join('\n'))
+        .setFooter({ text: `Midtown Vanguard v${VERSION}` }).setTimestamp();
+    return { embeds: [e], allowedMentions: { parse: [] } };
+}
+/** Kept for older callers: the checklist embed without buttons. */
+export function setupTipsEmbed(guild) {
+    return welcomePanel(null, guild).embeds[0];
+}

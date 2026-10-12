@@ -1,0 +1,67 @@
+import { ActivityType, SlashCommandBuilder } from 'discord.js';
+import { config, VERSION } from '../../config.js';
+import { defineCommand } from '../../bot/registry.js';
+import { confirmDanger } from '../../ui/danger-ui.js';
+import { AppError } from '../../errors.js';
+import { broadcast, broadcastTargets, clearPresenceOverride, inspectGuild, setPresenceOverride } from '../../bot/dev-tools.js';
+import { presenceLines } from '../../security/protection-stats.js';
+export default defineCommand(new SlashCommandBuilder().setName('dev').setDescription('Developer tools: diagnostics, server lookup, announcements and bot status')
+    .addSubcommand(s => s.setName('diagnostics').setDescription('Inspect runtime health without secrets'))
+    .addSubcommand(s => s.setName('inspect').setDescription('Read-only overview of any server Vanguard knows')
+    .addStringOption(o => o.setName('guild_id').setDescription('Server ID').setRequired(true).setMinLength(17).setMaxLength(20)))
+    .addSubcommand(s => s.setName('broadcast').setDescription("Post an announcement to every authorized server's log channel")
+    .addStringOption(o => o.setName('message').setDescription('Announcement text').setRequired(true).setMaxLength(1500))
+    .addStringOption(o => o.setName('title').setDescription('Announcement title (default: Announcement)').setMaxLength(100))
+    .addStringOption(o => o.setName('confirm').setDescription('Type SEND to deliver; leave empty to preview')))
+    .addSubcommand(s => s.setName('status').setDescription('Show a custom bot status instead of the rotation')
+    .addStringOption(o => o.setName('text').setDescription('Status text, e.g. 🔧 Maintenance at 8pm UTC').setRequired(true).setMaxLength(128))
+    .addIntegerOption(o => o.setName('minutes').setDescription('Return to the rotation after this many minutes (default: until reset)').setMinValue(1).setMaxValue(10080))
+    .addStringOption(o => o.setName('presence').setDescription('Online indicator').addChoices({ name: 'Online', value: 'online' }, { name: 'Idle', value: 'idle' }, { name: 'Do not disturb', value: 'dnd' })))
+    .addSubcommand(s => s.setName('status-reset').setDescription('Return to the normal rotating status')), { responseKind: 'info', category: 'developer', developerOnly: true, requiresAuthorization: false }, async (ctx, i) => {
+    const sub = i.options.getSubcommand();
+    if (sub === 'inspect') {
+        const id = i.options.getString('guild_id', true);
+        if (!/^\d{17,20}$/.test(id))
+            throw new AppError('VALIDATION_ERROR', 'That is not a valid server ID.');
+        const guild = ctx.client.guilds.cache.get(id);
+        return inspectGuild(ctx.store, id, guild?.name ?? null, guild?.memberCount ?? null).join('\n');
+    }
+    if (sub === 'broadcast') {
+        const message = i.options.getString('message', true), title = i.options.getString('title') ?? 'Announcement';
+        const ids = [...ctx.client.guilds.cache.keys()];
+        if (i.options.getString('confirm') !== 'SEND') {
+            const { deliver, noChannel } = broadcastTargets(ctx.store, ids);
+            return `**Preview only, nothing was sent.**\n**Title:** 📢 ${title}\n**Message:** ${message}\n\nIt would reach **${deliver.length}** server log channel(s)${noChannel.length ? `; ${noChannel.length} authorized server(s) have no log channel and would be skipped` : ''}. Run again with \`confirm: SEND\` to deliver.`;
+        }
+        const { deliver, noChannel } = broadcastTargets(ctx.store, ids);
+        await confirmDanger(ctx, i, {
+            title: 'Send an announcement to every authorized server',
+            summary: `**${title}**\n${message}`,
+            consequences: [
+                `Posts in **${deliver.length}** server log channel(s).`,
+                noChannel.length ? `${noChannel.length} authorized server(s) have no log channel and are skipped.` : 'Every authorized server has a log channel.',
+                'Server staff see this immediately.',
+            ],
+            label: `Send to ${deliver.length} server(s)`,
+            reversal: 'None. Messages cannot be recalled once queued; they would have to be deleted by hand in each server.',
+            run: async (c, b) => {
+                const sent = await broadcast(c.store, c.logs, ids, title, message, b.user.id);
+                return `Announcement queued for **${sent}** server log channel(s). Delivery follows the normal log queue, usually within a few seconds.`;
+            },
+        });
+        return;
+    }
+    if (sub === 'status') {
+        const text = i.options.getString('text', true), minutes = i.options.getInteger('minutes');
+        const mode = (i.options.getString('presence') ?? 'online');
+        const override = setPresenceOverride(ctx.store, text, mode, minutes);
+        ctx.client.user?.setPresence({ activities: [{ name: 'Custom Status', type: ActivityType.Custom, state: text }], status: mode });
+        return `Status set to **${text}** (${mode})${override.until ? `, returning to the rotation <t:${Math.floor(override.until / 1000)}:R>` : ' until `/dev status-reset`'}. It survives restarts.`;
+    }
+    if (sub === 'status-reset') {
+        clearPresenceOverride(ctx.store);
+        ctx.client.user?.setPresence({ activities: [{ name: 'Custom Status', type: ActivityType.Custom, state: ctx.stats ? presenceLines(ctx.stats.get())[0] : 'Midtown Vanguard' }], status: 'online' });
+        return 'Back to the normal rotating status.';
+    }
+    return `**Database:** ${ctx.store.get('PRAGMA quick_check')?.quick_check}\n**Connected servers:** ${ctx.client.guilds.cache.size}\n**Loaded commands:** ${ctx.registry.commands.size}\n**Version:** ${VERSION}\n**RoVer configured:** ${!!config.roverKey}\n**Bloxlink configured:** ${!!config.bloxlinkKey}\n**AI configured:** ${config.aiEnabled && !!config.openaiKey}\n**Uptime:** ${Math.floor(process.uptime())} seconds`;
+});

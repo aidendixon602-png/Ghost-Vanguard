@@ -1,0 +1,13 @@
+node_modules/
+.env
+data/
+*.log
+*.db
+*.db-wal
+*.db-shm
+*.zip
+
+# Update backups.
+update-backups/
+
+# dist/ IS committed on purpose: the server runs it directly, and CI checks it matches src/.

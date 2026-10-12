@@ -1,0 +1,346 @@
+import { ActionRowBuilder, AuditLogEvent, ButtonBuilder, MessageFlags, ButtonStyle, Colors, EmbedBuilder, ModalBuilder, PermissionFlagsBits, TextInputBuilder, TextInputStyle, } from 'discord.js';
+import { clip, KeyedQueue } from '../core.js';
+import { developers } from '../bot/developers.js';
+import { activeBan, recordId, TAG } from '../security/network-ban.js';
+import { logChannels } from './log-setup.js';
+import { redact } from './redact.js';
+/**
+ * The ban log: one record per ban in the server's #bans channel, numbered per server (BAN-0001).
+ *
+ * Every ban is tracked, whoever made it: Vanguard commands, genrebans and hardbans, anti-nuke,
+ * other bots and bans done directly in Discord. A ban is detected from Discord's ban event, then
+ * Discord's audit log is checked to verify who did it. Nothing is guessed: when the audit log
+ * cannot be read, the moderator is shown as unavailable.
+ *
+ * Unbans (by command, by hand, or a temporary ban expiring) update the same record. The record
+ * keeps the original ban details and adds the current status, who changed it and when.
+ * Developers can Unban or Reban from the record; both ask to confirm, re-check the developer
+ * and the user's real ban status, and keep working after restarts (the record is in the database).
+ */
+export const REF = 'banrec';
+export const caseId = (r) => `BAN-${String(r.number).padStart(4, '0')}`;
+const BAN_SETTLE_MS = 4000;
+const KIND_LABEL = { ban: 'Ban', tempban: 'Temporary ban', softban: 'Softban', genreban: 'Genreban', hardban: 'Hardban', automatic: 'Automatic ban', manual: 'Ban' };
+export function getRecord(store, guildId, id) {
+    return store.get('SELECT * FROM ban_records WHERE guild_id=? AND id=?', guildId, id);
+}
+export function latestRecord(store, guildId, userId) {
+    return store.get('SELECT * FROM ban_records WHERE guild_id=? AND user_id=? ORDER BY id DESC LIMIT 1', guildId, userId);
+}
+const openRecord = (store, guildId, userId) => store.get("SELECT * FROM ban_records WHERE guild_id=? AND user_id=? AND status='banned' ORDER BY id DESC LIMIT 1", guildId, userId);
+/** The audit-log entry for this ban/unban, if Vanguard can read the audit log and it is recent. */
+export async function findAudit(guild, type, userId, now = Date.now()) {
+    if (!guild.members.me?.permissions.has(PermissionFlagsBits.ViewAuditLog))
+        return null;
+    const logs = await guild.fetchAuditLogs({ type, limit: 10 }).catch(() => null);
+    const entry = logs?.entries.find(e => e.targetId === userId && now - e.createdTimestamp < 120000);
+    if (!entry)
+        return null;
+    const executor = entry.executor ?? (entry.executorId ? guild.client.users.cache.get(entry.executorId) : null);
+    return { executorId: entry.executorId ?? null, executorIsBot: !!executor?.bot, reason: entry.reason ?? null, at: entry.createdTimestamp };
+}
+/** Work out who banned and why from the verified audit entry and Vanguard's own records. */
+export function explainBan(store, guild, userId, audit, fallbackReason, now = Date.now()) {
+    const botId = guild.client.user?.id;
+    const raw = audit?.reason ?? fallbackReason ?? null;
+    const d = { kind: 'ban', reason: raw, evidence: null, moderatorId: null, moderatorRole: 'unverified', approved: null, duration: 'Permanent', expiresAt: null };
+    // Genreban / hardban: "[Vanguard genreban] GB-00001 <developer id>: reason"
+    for (const kind of ['hardban', 'genreban']) {
+        if (!raw?.startsWith(TAG[kind]))
+            continue;
+        const m = /^\S+ \S+ (?:[GH]B-\d+ )?(\d{17,20}): ([\s\S]*)$/.exec(raw);
+        const record = activeBan(store, kind, userId);
+        d.kind = kind;
+        d.reason = record?.reason ?? m?.[2] ?? raw;
+        d.evidence = [record?.evidence, record?.evidence_file].filter(Boolean).join('\n') || null;
+        d.moderatorId = record?.moderator_id ?? m?.[1] ?? null;
+        d.moderatorRole = audit?.executorId === botId ? 'via-bot' : 'unverified';
+        d.approved = record ? `Midtown Vanguard developer <@${record.moderator_id}> · ${recordId(record)}` : null;
+        d.duration = kind === 'hardban' ? 'Permanent (re-applied until a developer lifts it)' : 'Permanent (every Midtown server)';
+        return d;
+    }
+    if (audit && audit.executorId === botId) {
+        const staff = /^(\d{17,20}): ([\s\S]*)$/.exec(raw ?? '');
+        if (staff) {
+            d.moderatorId = staff[1];
+            d.moderatorRole = 'via-bot';
+            d.reason = staff[2];
+            const temp = /^tempban ([^:]+): ([\s\S]*)$/.exec(d.reason);
+            if (temp) {
+                d.kind = 'tempban';
+                d.duration = temp[1];
+                d.reason = temp[2];
+            }
+            const soft = /^softban: ([\s\S]*)$/.exec(d.reason);
+            if (soft) {
+                d.kind = 'softban';
+                d.duration = 'None (unbanned straight away)';
+                d.reason = soft[1];
+            }
+        }
+        else {
+            d.kind = 'automatic';
+            d.moderatorId = botId ?? null;
+            d.moderatorRole = 'automatic';
+            d.reason = raw?.replace(/^Midtown Vanguard: /, '') ?? null;
+        }
+    }
+    else if (audit?.executorId) {
+        d.moderatorId = audit.executorId;
+        d.moderatorRole = 'manual';
+        d.kind = 'manual';
+    }
+    const tempban = store.get('SELECT until FROM tempbans WHERE guild_id=? AND user_id=?', guild.id, userId);
+    if (tempban) {
+        d.kind = 'tempban';
+        d.expiresAt = Number(tempban.until);
+    }
+    // Evidence attached to the case the command recorded (within the last two minutes).
+    const kase = store.get("SELECT evidence FROM cases WHERE guild_id=? AND user_id=? AND at>=? AND (action LIKE '%ban%') ORDER BY id DESC LIMIT 1", guild.id, userId, now - 120000);
+    if (kase?.evidence)
+        d.evidence = String(kase.evidence);
+    return d;
+}
+// ---------------------------------------------------------------- creating and updating records
+function pushHistory(record, entry) {
+    const list = JSON.parse(record.history || '[]');
+    list.push(entry);
+    return JSON.stringify(list.slice(-20));
+}
+export function createRecord(store, guildId, user, d, at = Date.now()) {
+    const history = JSON.stringify([{ action: 'banned', by: d.moderatorId, role: d.moderatorRole, at, reason: null }]);
+    const id = Number(store.run(`INSERT INTO ban_records(guild_id,number,user_id,username,avatar_url,kind,reason,evidence,moderator_id,moderator_role,approved,duration,expires_at,banned_at,status,history)
+        VALUES(?, (SELECT COALESCE(MAX(number),0)+1 FROM ban_records WHERE guild_id=?), ?,?,?,?,?,?,?,?,?,?,?,?,'banned',?)`, guildId, guildId, user.id, user.tag ?? user.username ?? null, user.avatar ?? null, d.kind, redact(d.reason) ?? null, redact(d.evidence) ?? null, d.moderatorId, d.moderatorRole, d.approved, d.duration, d.expiresAt, at, history).lastInsertRowid);
+    return getRecord(store, guildId, id);
+}
+export function setStatus(store, record, status, by, role, reason, at = Date.now()) {
+    const history = pushHistory(record, { action: status === 'banned' ? 'rebanned' : status, by, role, at, reason: redact(reason) });
+    store.run('UPDATE ban_records SET status=?,status_by=?,status_by_role=?,status_at=?,status_reason=?,history=? WHERE guild_id=? AND id=?', status, by, role, at, redact(reason) ?? null, history, record.guild_id, record.id);
+    return getRecord(store, record.guild_id, record.id);
+}
+/** Post a new record to #bans, or refresh the message it already has. */
+export function publish(store, logs, record, isNew) {
+    if (!isNew)
+        return logs.refreshRef(record.guild_id, REF, record.id);
+    const channel = logChannels(store, record.guild_id).bansChannelId;
+    if (channel)
+        logs.pushRef(record.guild_id, channel, REF, record.id);
+}
+/** Lets the log queue render records from the database when it posts or edits them. */
+export function registerBanLogRenderer(store, logs) {
+    // Reads are scoped to the record's own server, inside or outside a server context.
+    const find = (guildId, id) => store.get('SELECT * FROM ban_records WHERE guild_id=? AND id=?', guildId, id);
+    logs.refs.set(REF, {
+        render: (guildId, id) => { const r = find(guildId, id); return r ? renderRecord(r) : null; },
+        location: (guildId, id) => { const r = find(guildId, id); return r?.channel_id && r.message_id ? { channelId: r.channel_id, messageId: r.message_id } : null; },
+        posted: (guildId, id, channelId, messageId) => {
+            void store.withAuthorized(guildId, async () => store.run('UPDATE ban_records SET channel_id=?,message_id=? WHERE guild_id=? AND id=?', channelId, messageId, guildId, id));
+        },
+    });
+}
+const queue = new KeyedQueue();
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+export const timing = { settleMs: BAN_SETTLE_MS };
+/** Discord reported a ban. Wait briefly for the audit log and Vanguard's case, then record it once. */
+export async function onBanAdd(store, logs, guild, user, fetchedReason = null) {
+    await sleep(timing.settleMs);
+    return queue.run(`${guild.id}:${user.id}`, async () => {
+        const audit = await findAudit(guild, AuditLogEvent.MemberBanAdd, user.id);
+        const reason = audit?.reason ?? fetchedReason ?? (await guild.bans.fetch({ user: user.id, force: true }).catch(() => null))?.reason ?? null;
+        return store.withAuthorized(guild.id, async () => {
+            // Already tracked: a reban from the ban log, or a duplicate event.
+            if (openRecord(store, guild.id, user.id))
+                return null;
+            const record = createRecord(store, guild.id, { id: user.id, tag: user.tag, username: user.username, avatar: user.displayAvatarURL() }, explainBan(store, guild, user.id, audit, reason));
+            publish(store, logs, record, true);
+            return record;
+        });
+    });
+}
+/** Discord reported an unban: update the user's open record, or start one if the ban predates the log. */
+export async function onBanRemove(store, logs, guild, user) {
+    await sleep(timing.settleMs);
+    return queue.run(`${guild.id}:${user.id}`, async () => {
+        const audit = await findAudit(guild, AuditLogEvent.MemberBanRemove, user.id);
+        return store.withAuthorized(guild.id, async () => {
+            const botId = guild.client.user?.id;
+            let by = null, role = 'unverified', reason = audit?.reason ?? null, status = 'unbanned';
+            if (audit?.executorId === botId) {
+                const staff = /^(\d{17,20}): ([\s\S]*)$/.exec(reason ?? '');
+                if (staff) {
+                    by = staff[1];
+                    role = 'via-bot';
+                    reason = staff[2];
+                }
+                else {
+                    by = botId ?? null;
+                    role = 'automatic';
+                    reason = reason?.replace(/^Midtown Vanguard: /, '') ?? null;
+                    if (/temporary ban expired/i.test(reason ?? ''))
+                        status = 'expired';
+                }
+            }
+            else if (audit?.executorId) {
+                by = audit.executorId;
+                role = 'manual';
+            }
+            const open = openRecord(store, guild.id, user.id);
+            if (open) {
+                const updated = setStatus(store, open, status, by, role, reason);
+                publish(store, logs, updated, false);
+                return updated;
+            }
+            // Recently updated by the ban log's own Unban button: nothing to add.
+            const latest = latestRecord(store, guild.id, user.id);
+            if (latest && latest.status !== 'banned' && (latest.status_at ?? 0) > Date.now() - 120000)
+                return latest;
+            // A ban from before the ban log existed: keep a record of the unban, details marked unavailable.
+            const record = createRecord(store, guild.id, { id: user.id, tag: user.tag, username: user.username, avatar: user.displayAvatarURL() }, { kind: 'ban', reason: null, evidence: null, moderatorId: null, moderatorRole: 'unverified', approved: null, duration: null, expiresAt: null }, 0);
+            const updated = setStatus(store, record, status, by, role, reason);
+            publish(store, logs, updated, true);
+            return updated;
+        });
+    });
+}
+// ---------------------------------------------------------------- how a record looks
+const who = (id, role) => {
+    if (!id || role === 'unverified')
+        return 'Unavailable (could not be verified)';
+    if (role === 'automatic')
+        return `Midtown Vanguard (automatic)`;
+    return `<@${id}> (\`${id}\`)`;
+};
+const moderatorHeading = (r) => r.moderator_role === 'via-bot' ? 'Moderator (via bot)' : 'Banned By';
+const ts = (ms, style = 'f') => `<t:${Math.floor(ms / 1000)}:${style}>`;
+export function renderRecord(r) {
+    const banned = r.status === 'banned';
+    const statusWord = banned ? 'Banned' : r.status === 'expired' ? 'Ban expired' : 'Unbanned';
+    const e = new EmbedBuilder().setColor(banned ? Colors.Red : Colors.Green)
+        .setAuthor({ name: `${r.username ?? r.user_id} - ${statusWord}`, iconURL: r.avatar_url ?? undefined })
+        .setFooter({ text: `User ID: ${r.user_id} • ${caseId(r)}` });
+    if (r.banned_at)
+        e.setTimestamp(r.banned_at);
+    const fields = [
+        { name: 'User', value: `<@${r.user_id}> (\`${r.user_id}\`)`, inline: true },
+        { name: r.banned_at ? moderatorHeading(r) : 'Banned By', value: r.banned_at ? who(r.moderator_id, r.moderator_role) : 'Unavailable (banned before ban logging started)', inline: true },
+        { name: 'Reason', value: clip(r.reason || (r.banned_at ? 'No reason provided' : 'Unavailable'), 1024) },
+    ];
+    if (r.evidence)
+        fields.push({ name: 'Evidence', value: clip(r.evidence, 1024) });
+    if (r.approved)
+        fields.push({ name: 'Approved by', value: clip(r.approved, 1024) });
+    if (r.duration && r.kind !== 'ban' && r.kind !== 'manual')
+        fields.push({ name: 'Type', value: KIND_LABEL[r.kind] ?? r.kind, inline: true });
+    if (r.duration)
+        fields.push({ name: 'Duration', value: r.duration, inline: true });
+    if (r.expires_at)
+        fields.push({ name: banned ? 'Expires' : 'Was due to expire', value: `${ts(r.expires_at)} (${ts(r.expires_at, 'R')})`, inline: true });
+    if (r.banned_at)
+        fields.push({ name: 'Banned', value: ts(r.banned_at), inline: true });
+    if (r.status_at) {
+        const action = r.status === 'banned' ? 'Rebanned' : r.status === 'expired' ? 'Expired' : 'Unbanned';
+        fields.push({ name: 'Status', value: clip(`**${action}** by ${who(r.status_by, r.status_by_role)} · ${ts(r.status_at)}${r.status_reason ? `\n**Reason:** ${r.status_reason}` : ''}`, 1024) });
+    }
+    const history = JSON.parse(r.history || '[]');
+    if (history.length > 2)
+        fields.push({ name: 'History', value: clip(history.slice(-6).map(h => `${ts(h.at, 'd')} ${h.action} · ${h.role === 'unverified' || !h.by ? 'unverified' : h.role === 'automatic' ? 'automatic' : `<@${h.by}>`}`).join('\n'), 1024) });
+    e.addFields(fields);
+    const row = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`${REF}:unban:${r.id}`).setLabel('Unban').setStyle(ButtonStyle.Success).setDisabled(!banned), new ButtonBuilder().setCustomId(`${REF}:reban:${r.id}`).setLabel('Reban').setStyle(ButtonStyle.Danger).setDisabled(banned));
+    return { embeds: [e.toJSON()], components: [row.toJSON()] };
+}
+const NOT_DEVELOPER = 'Only Midtown Vanguard developers can use the ban log buttons.';
+const confirmRow = (id, action) => new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`${REF}:c${action}:${id}`).setLabel(action === 'unban' ? 'Confirm unban' : 'Confirm reban').setStyle(action === 'unban' ? ButtonStyle.Success : ButtonStyle.Danger), new ButtonBuilder().setCustomId(`${REF}:cancel:${id}`).setLabel('Cancel').setStyle(ButtonStyle.Secondary));
+/** Is this user banned right now? true / false, or null when Discord could not be asked. */
+async function bannedNow(guild, userId) {
+    try {
+        await guild.bans.fetch({ user: userId, force: true });
+        return true;
+    }
+    catch (error) {
+        return error?.code === 10026 ? false : null;
+    }
+}
+/** Handles every ban-log button and form. The developer is checked on every single interaction. */
+export async function handleBanLogInteraction(i, deps) {
+    const [, action, raw] = i.customId.split(':');
+    const reply = (content) => i.replied || i.deferred ? i.followUp({ content, flags: MessageFlags.Ephemeral }) : i.reply({ content, flags: MessageFlags.Ephemeral });
+    if (!developers.has(i.user.id))
+        return reply(NOT_DEVELOPER);
+    if (action === 'cancel')
+        return i.isButton() ? i.update({ content: 'Cancelled. Nothing was changed.', embeds: [], components: [] }) : undefined;
+    const id = Number(raw);
+    const { store, logs } = deps;
+    return store.withAuthorized(i.guildId, async () => {
+        const record = getRecord(store, i.guildId, id);
+        if (!record)
+            return reply('That ban record no longer exists.');
+        const live = await bannedNow(i.guild, record.user_id);
+        if (live === null)
+            return reply('Discord could not confirm whether they are banned right now (Vanguard may be missing Ban Members). Nothing was changed.');
+        const label = `**${record.username ?? record.user_id}** (\`${record.user_id}\`) · ${caseId(record)}`;
+        // The record and Discord disagree (an event was missed): fix the record first, without guessing who did it.
+        if (live !== (record.status === 'banned')) {
+            const fixed = setStatus(store, record, live ? 'banned' : 'unbanned', null, 'unverified', 'Status corrected from Discord: the change was made while it was not being tracked.');
+            publish(store, logs, fixed, false);
+            return reply(`${label} is ${live ? 'already banned' : 'no longer banned'} on Discord, so the record was corrected. Nothing else was changed.`);
+        }
+        if (action === 'unban') {
+            if (!live)
+                return reply(`${label} is not banned.`);
+            return i.reply({ flags: MessageFlags.Ephemeral, embeds: [new EmbedBuilder().setColor(Colors.Green).setTitle('Unban this user?')
+                        .setDescription(`${label}\n**Original reason:** ${clip(record.reason ?? 'none', 500)}\n\nThey will be able to rejoin. The ban record is kept and updated.`)], components: [confirmRow(id, 'unban')] });
+        }
+        if (action === 'reban') {
+            if (live)
+                return reply(`${label} is already banned.`);
+            if (!i.isButton())
+                return;
+            return i.showModal(new ModalBuilder().setCustomId(`${REF}:rebanform:${id}`).setTitle(`Reban ${caseId(record)}`).addComponents(new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('reason').setLabel('Reason for the reban (required)')
+                .setStyle(TextInputStyle.Paragraph).setRequired(true).setMinLength(3).setMaxLength(450))));
+        }
+        if (action === 'rebanform' && i.isModalSubmit()) {
+            const reason = i.fields.getTextInputValue('reason').trim();
+            if (reason.length < 3)
+                return reply('A reason is required.');
+            return i.reply({ flags: MessageFlags.Ephemeral, embeds: [new EmbedBuilder().setColor(Colors.Red).setTitle('Reban this user?')
+                        .setDescription(`${label}`).addFields({ name: 'Reban reason', value: clip(reason, 1024) })], components: [confirmRow(id, 'reban')] });
+        }
+        if (action === 'cunban' && i.isButton()) {
+            if (!live)
+                return i.update({ content: `${label} is not banned any more. Nothing was changed.`, embeds: [], components: [] });
+            try {
+                await deps.assertLocalUnban(i.guild, record.user_id);
+            }
+            catch (error) {
+                return i.update({ content: error instanceof Error ? error.message : 'This ban cannot be lifted here.', embeds: [], components: [] });
+            }
+            const reason = `Unbanned from the ban log (${caseId(record)})`;
+            await i.guild.members.unban(record.user_id, clip(`${i.user.id}: ${reason}`, 500));
+            const updated = setStatus(store, record, 'unbanned', i.user.id, 'via-bot', reason);
+            publish(store, logs, updated, false);
+            return i.update({ content: `✅ Unbanned ${label}. The record now shows who unbanned them and when.`, embeds: [], components: [] });
+        }
+        if (action === 'creban' && i.isButton()) {
+            const reason = i.message.embeds[0]?.fields.find(f => f.name === 'Reban reason')?.value;
+            if (!reason)
+                return i.update({ content: 'The reban reason was missing. Press Reban again.', embeds: [], components: [] });
+            if (live)
+                return i.update({ content: `${label} is already banned. Nothing was changed.`, embeds: [], components: [] });
+            if (record.user_id === i.guild.ownerId)
+                return i.update({ content: 'The server owner cannot be banned.', embeds: [], components: [] });
+            // Update the record first so the ban event that follows does not start a second record.
+            const updated = setStatus(store, record, 'banned', i.user.id, 'via-bot', reason);
+            try {
+                await i.guild.members.ban(record.user_id, { reason: clip(`${i.user.id}: Reban (${caseId(record)}): ${reason}`, 500) });
+            }
+            catch (error) {
+                const reverted = setStatus(store, updated, 'unbanned', null, 'unverified', `Reban by <@${i.user.id}> failed: ${error instanceof Error ? error.message : 'unknown error'}`);
+                publish(store, logs, reverted, false);
+                return i.update({ content: `❌ The reban failed: ${error instanceof Error ? error.message : 'unknown error'}. Check Vanguard's role is above theirs and it has Ban Members.`, embeds: [], components: [] });
+            }
+            publish(store, logs, updated, false);
+            return i.update({ content: `✅ Rebanned ${label}. The record now shows the reban, your reason, and when.`, embeds: [], components: [] });
+        }
+        return reply('That button is no longer valid.');
+    });
+}
