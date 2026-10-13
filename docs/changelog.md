@@ -1,5 +1,8 @@
 # Changelog
 
+## 2.27.4
+- **`/dev restart`** (developers only): restarts the bot from Discord after a confirmation. About 10 seconds offline; settings are kept. `launch.js` stops the bot cleanly and starts it again, so no Wispbyte panel is needed.
+
 ## 2.27.3
 - **Cleaner system notices.** "Back online", "Saved protection loaded", "Anti-nuke protection on" and snapshot messages use fields instead of a block of text, and snapshots say who made them ("Midtown Vanguard (automatic)") instead of a raw ID.
 - "Back online" counts the whole whitelist (users, roles and per-rule entries), not only full-bypass users.

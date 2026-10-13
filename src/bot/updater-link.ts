@@ -46,3 +46,16 @@ export function describeUpdate(s: UpdateStatus | null, op: 'status' | 'now'): st
     }
     return lines.join('\n');
 }
+
+/** Ask launch.js to restart the bot. Resolves true when it accepted (the bot stops a few seconds later). */
+export function askRestart(by: string, timeoutMs = 5000, proc: NodeJS.Process = process): Promise<boolean | null> {
+    if (typeof proc.send !== 'function' || !proc.connected) return Promise.resolve(null);
+    const id = randomUUID();
+    return new Promise(resolve => {
+        const done = (value: boolean | null) => { clearTimeout(timer); proc.off('message', listen); resolve(value); };
+        const listen = (message: any) => { if (message?.type === 'vg-restart-result' && message.id === id) done(!!message.ok); };
+        const timer = setTimeout(() => done(null), timeoutMs);
+        proc.on('message', listen);
+        proc.send!({ type: 'vg-restart', id, by });
+    });
+}

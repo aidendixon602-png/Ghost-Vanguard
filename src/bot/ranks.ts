@@ -107,7 +107,7 @@ export const COMMAND_RANK: Record<string, number> = {
     // Bot Manager
     authorizedservers: 5, serverauth: 5, 'dev/diagnostics': 5, 'dev/status': 5, 'dev/status-reset': 5, 'dev/broadcast': 5, 'staff/list': 1, 'staff/check': 1,
     // Overseer
-    'dev/inspect': 6, authserver: 6, 'dev/update': 7,
+    'dev/inspect': 6, authserver: 6, 'dev/update': 7, 'dev/restart': 7,
     // Bot Developer
     dev: 7, database: 7, autoreact: 7, deauthserver: 7, banserver: 7, unbanserver: 7,
     // Bans across every authorized server: Bot Developers and Supreme Leaders only.

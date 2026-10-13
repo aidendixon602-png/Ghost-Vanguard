@@ -259,3 +259,4 @@ Protected roles: any role with Administrator, Ban, Kick, Timeout, Manage Roles, 
 | `/mod bans recent` | The latest 10 records | Moderator+, Ban Members |
 | `/mod bans stats` | Last 30 days: bans, unbans, types, top moderators | Moderator+, Ban Members |
 | `/dev update` | Auto-update status, or check and install now | Developers |
+| `/dev restart` | Restart the bot (about 10 seconds), after a confirmation | Developers |

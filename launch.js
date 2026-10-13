@@ -247,6 +247,18 @@ async function checkForUpdate(beforeInstall) {
 
 /** /dev update asks the launcher (over the bot's IPC channel) for status, or to check now. */
 async function answerBot(c, message) {
+    // /dev restart: confirm, then stop the bot cleanly and start it again (the launcher stays up).
+    if (message?.type === 'vg-restart' && c?.connected) {
+        try { c.send({ type: 'vg-restart-result', id: message.id, ok: !updating && !stopping }); } catch { }
+        if (updating || stopping) return;
+        say(`Restart requested from Discord by ${String(message.by ?? 'a developer').replace(/[^\d]/g, '') || 'a developer'}.`);
+        updating = true;
+        await new Promise(r => setTimeout(r, 2000));
+        await stopBot();
+        updating = false;
+        startBot();
+        return;
+    }
     if (!message || message.type !== 'vg-update' || !c?.connected) return;
     const reply = data => { try { if (c.connected) c.send({ type: 'vg-update-result', id: message.id, ...data }); } catch { } };
     const status = { enabled: updatesOn && existsSync(join(root, '.git')), repo: REPO || null, branch: BRANCH, running: head(), fallback: lastGood, intervalMinutes: CHECK_MS / 60000, lastCheck, rejected: [...rejected] };

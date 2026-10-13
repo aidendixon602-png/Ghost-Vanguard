@@ -58,3 +58,12 @@ test('/dev update talks to launch.js, and explains when it is not available', as
     assert.equal(await askLauncher('status', 50, silent), null, 'no answer → null, never hangs');
     assert.match(describeUpdate({ enabled: false } as any, 'status'), /Automatic updates are off/);
 });
+
+test('/dev restart asks launch.js and reports when it cannot', async () => {
+    const { askRestart } = await import('../src/bot/updater-link.js');
+    const proc: any = new EventEmitter(); proc.connected = true;
+    proc.send = (m: any) => setImmediate(() => proc.emit('message', { type: 'vg-restart-result', id: m.id, ok: true }));
+    assert.equal(await askRestart('1', 1000, proc), true);
+    const noLauncher: any = new EventEmitter();
+    assert.equal(await askRestart('1', 50, noLauncher), null, 'not started by launch.js');
+});
