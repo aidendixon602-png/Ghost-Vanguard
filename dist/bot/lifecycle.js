@@ -62,20 +62,57 @@ export class GuildLifecycle {
     }
     async notice(guild, message) {
         try {
-            const me = guild.members.me;
-            const channel = [guild.systemChannel, ...guild.channels.cache.values()].find(c => c?.isSendable() && (!me || c.permissionsFor(me)?.has([PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages])));
+            const channel = this.postChannel(guild, false);
             if (channel?.isSendable())
                 await channel.send({ content: message, allowedMentions: { parse: [] } });
+            else
+                await this.dmOwner(guild, { content: message });
         }
         catch {
             logEvent('authorization_notice_unavailable', { guildId: guild.id });
         }
     }
     /** A channel Vanguard can post in, preferring the system channel; `embeds` also needs Embed Links. */
+    /**
+     * Where Vanguard's own setup messages go: only a staff-only channel that @everyone cannot see.
+     * In order: the server's Vanguard logging channel, its security log channel, then a private
+     * channel named like admin/staff/mod/logs, then any private text channel. Never a public one.
+     */
     postChannel(guild, embeds) {
         const me = guild.members.me;
         const need = embeds ? [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.EmbedLinks] : [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages];
-        return [guild.systemChannel, ...guild.channels.cache.values()].find(c => c?.isSendable() && (!me || c.permissionsFor(me)?.has(need)));
+        const usable = (c) => !!c?.isSendable?.() && (!me || !!c.permissionsFor?.(me)?.has(need));
+        const everyone = guild.roles?.everyone ?? guild.id;
+        const isPrivate = (c) => !c.permissionsFor?.(everyone)?.has(PermissionFlagsBits.ViewChannel);
+        const ok = (c) => usable(c) && isPrivate(c);
+        const configured = this.isAuthorizedSafe(guild.id)
+            ? [this.store.readGuild(guild.id, () => this.store.get('SELECT channel_id FROM event_log_config WHERE guild_id=?', guild.id)?.channel_id), this.store.settings(guild.id).logChannelId].filter(Boolean)
+            : [];
+        for (const id of configured) {
+            const c = guild.channels.cache.get(String(id));
+            if (ok(c))
+                return c;
+        }
+        const channels = [...guild.channels.cache.values()].filter(ok).sort((a, b) => (a.rawPosition ?? 0) - (b.rawPosition ?? 0));
+        return channels.find((c) => /admin|staff|mod|management|log|vanguard|bot|owner|hr\b/i.test(c.name ?? '')) ?? channels[0];
+    }
+    isAuthorizedSafe(id) { try {
+        return this.store.isAuthorized(id);
+    }
+    catch {
+        return false;
+    } }
+    /** No staff-only channel at all: DM the server owner instead of posting in public. */
+    async dmOwner(guild, payload) {
+        try {
+            const owner = await guild.fetchOwner();
+            await owner.send({ ...payload, content: [`**${guild.name}:**`, payload.content].filter(Boolean).join(' '), allowedMentions: { parse: [] } });
+            return { id: null, channelId: '' };
+        }
+        catch {
+            logEvent('owner_dm_unavailable', { guildId: guild.id });
+            return null;
+        }
     }
     messageKey = (guild) => `welcome:message:${guild}`;
     /** The countdown message posted for this join, if it is still there. */
@@ -114,14 +151,21 @@ export class GuildLifecycle {
                 const deadline = this.store.authorization(guild.id)?.deadline ?? now + 120000;
                 sent = await channel.send(kind === 'pending' ? pendingPanel(guild, deadline) : welcomePanel(this.store, guild, inviter));
             }
-            else {
-                // No channel allows embeds: a short plain-text version instead.
+            else if (this.postChannel(guild, false)?.isSendable()) {
+                // A staff-only channel without Embed Links: a short plain-text version instead.
                 const plain = this.postChannel(guild, false);
-                if (!plain?.isSendable())
+                if (!plain.isSendable())
                     return false;
                 sent = await plain.send({ content: kind === 'pending'
                         ? 'Midtown Vanguard is waiting for an approved developer to run /dev authserver within 120 seconds of joining; otherwise it leaves.'
                         : 'Midtown Vanguard is online and anti-nuke protection is running. Give it Embed Links to see the setup panel, then run /setup logs setup.', allowedMentions: { parse: [] } });
+            }
+            else {
+                // No staff-only channel: tell the owner privately rather than posting in public.
+                const deadline = this.store.authorization(guild.id)?.deadline ?? now + 120000;
+                const panel = kind === 'pending' ? pendingPanel(guild, deadline) : welcomePanel(this.store, guild, inviter);
+                if (!await this.dmOwner(guild, { embeds: panel.embeds, content: 'No staff-only channel was found, so this was sent to you instead.' }))
+                    return false;
             }
             this.store.run('INSERT INTO runtime_meta(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value', key, String(now));
             if (kind === 'pending' && sent?.id)

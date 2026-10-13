@@ -1,5 +1,8 @@
 # Changelog
 
+## 2.27.1
+- **Setup messages are staff-only.** The welcome panel, the authorization countdown and the "left" note only go to a channel `@everyone` can't see: the Vanguard logging channel first, then the security log channel, then a private channel named like admin/staff/mod/logs, then any private channel. With no private channel, the server owner gets a DM instead. Nothing is posted publicly.
+
 ## 2.27.0
 - **`/mod bans`** searches the ban log without scrolling `#bans`:
   - `lookup user` shows every ban record for someone here, plus any active genreban/hardban

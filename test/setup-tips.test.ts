@@ -8,15 +8,16 @@ import { setupStatus, welcomePanel, WELCOME_COOLDOWN_MS } from '../src/ui/setup-
 
 const title = (m: any) => m.embeds?.[0]?.data?.title ?? m.embeds?.[0]?.toJSON?.().title;
 
-function fakeGuild(id: string, { admin = false, rank = 3, canEmbed = true } = {}) {
+function fakeGuild(id: string, { admin = false, rank = 3, canEmbed = true, isPublic = false } = {}) {
     const sent: any[] = [];
     const edits: any[] = [];
+    const dms: any[] = [];
     const roles = new Collection<string, any>([[id, { id, position: 0 }]]);
     for (let n = 1; n <= 5; n++)
         roles.set(`r${n}`, { id: `r${n}`, position: 6 - n });
     const highest = roles.get(`r${rank}`);
     const messages = new Map<string, any>();
-    const channel: any = { id: 'system', isSendable: () => true, isTextBased: () => true, permissionsFor: () => ({ has: (p: any[]) => canEmbed || !p.includes(PermissionFlagsBits.EmbedLinks) }),
+    const channel: any = { id: 'system', isSendable: () => true, isTextBased: () => true, permissionsFor: (who: any) => ({ has: (p: any) => who === id ? isPublic : canEmbed || !p.includes(PermissionFlagsBits.EmbedLinks) }),
         send: async (m: any) => {
             sent.push(m);
             const msg = { id: `m${sent.length}`, channelId: 'system', edit: async (e: any) => { edits.push(e); } };
@@ -28,8 +29,9 @@ function fakeGuild(id: string, { admin = false, rank = 3, canEmbed = true } = {}
         id, name: 'Test Guild', systemChannel: channel, channels: { cache: new Collection([['system', channel]]), fetch: async () => channel }, roles: { cache: roles },
         members: { me: { joinedTimestamp: Date.now(), permissions: { has: (p: bigint) => admin && p === PermissionFlagsBits.Administrator }, roles: { highest } } },
         leave: async () => { },
+        fetchOwner: async () => ({ send: async (m: any) => { dms.push(m); } }),
     };
-    return { guild, sent, edits };
+    return { guild, sent, edits, dms };
 }
 
 const settle = () => new Promise(r => setTimeout(r, 30));
@@ -144,4 +146,32 @@ test('a restart is silent: known servers get no welcome, countdown or panel, onl
     assert.equal(sent.length, 0);
     lifecycle.close();
     store.close();
+});
+
+test('setup messages only go to a staff-only channel; with none, the owner gets a DM instead', async () => {
+    const store = new Store(':memory:');
+    const { guild, sent, dms } = fakeGuild('623456789012345678', { isPublic: true });
+    authorize(store, guild.id);
+    const lifecycle = new GuildLifecycle(store, { guilds: { cache: new Collection([[guild.id, guild]]) } } as any, () => { }, async () => { });
+    try {
+        await lifecycle.joined(guild, true);
+        await settle();
+        assert.equal(sent.length, 0, 'never posted in a channel everyone can see');
+        assert.equal(dms.length, 1);
+        assert.match(dms[0].content, /No staff-only channel was found/);
+        assert.equal(dms[0].embeds[0].toJSON().title, '🛡️ Midtown Vanguard is online');
+    } finally { lifecycle.close(); store.close(); }
+});
+
+test('the server\'s Vanguard logging channel is preferred over other private channels', async () => {
+    const store = new Store(':memory:');
+    const { guild } = fakeGuild('723456789012345678');
+    authorize(store, guild.id);
+    const logChannel = { ...guild.channels.cache.get('system'), id: 'logs', name: 'midtown-vanguard-logging' };
+    guild.channels.cache.set('logs', logChannel);
+    await store.withAuthorized(guild.id, async () => store.run('INSERT INTO event_log_config(guild_id,enabled,channel_id,categories) VALUES(?,1,?,?)', guild.id, 'logs', 'moderation'));
+    const lifecycle = new GuildLifecycle(store, { guilds: { cache: new Collection([[guild.id, guild]]) } } as any, () => { }, async () => { });
+    try {
+        assert.equal(lifecycle.postChannel(guild, true)?.id, 'logs');
+    } finally { lifecycle.close(); store.close(); }
 });
