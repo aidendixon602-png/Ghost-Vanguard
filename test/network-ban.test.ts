@@ -209,14 +209,17 @@ test('a genreban reports each server clearly and records every outcome', async (
     const results = await banEverywhere(deps, ban, 3600, done => void progress.push(done));
     assert.deepEqual(Object.fromEntries(results.map(r => [r.name, r.outcome])), {
         Alpha: 'success', Bravo: 'success', Charlie: 'missing-permissions', Delta: 'hierarchy',
-        Echo: 'not-allowed', Foxtrot: 'missing-permissions', Golf: 'failed', Hotel: 'already',
+        Echo: 'not-allowed', Foxtrot: 'missing-permissions', Golf: 'failed', Hotel: 'success',
     });
+    assert.match(results.find(r => r.name === 'Hotel')!.reason, /Already banned here; the genreban now covers that ban too/);
     assert.match(results.find(r => r.name === 'Alpha')!.reason, /by user ID/);
     assert.ok(results.find(r => r.name === 'Golf')!.reference, 'unexpected errors carry a log reference');
     assert.deepEqual(progress, [0, 1, 2, 3, 4, 5, 6, 7, 8]);
     assert.equal(ok.calls.banned[0].deleteMessageSeconds, 3600);
     assert.ok(String(ok.calls.banned[0].reason).startsWith(TAG.genreban), 'the bot tags its own bans with the ban type');
     assert.equal(staff.calls.banned.length, 0, 'an existing staff ban is not replaced');
+    const covered = store.readGuild(staff.guild.id, () => store.get('SELECT * FROM ban_records WHERE guild_id=? AND user_id=?', staff.guild.id, TARGET))!;
+    assert.deepEqual([covered.kind, covered.network_record, covered.status], ['genreban', 'GB-00001', 'banned'], 'its ban record now shows the genreban');
     assert.equal(logged.length, 2, 'only servers that actually banned are told');
     assert.match(logged[0]!, /\*\*Server:\*\* Alpha \(`100000000000000001`\)/, 'each log names its server and server ID');
     assert.match(logged[1]!, /\*\*Server:\*\* Bravo \(`100000000000000002`\)/);

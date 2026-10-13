@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.26.2
+- **Genrebans and hardbans work on users who are already banned.** Before, a server where the user was already banned by its own staff was skipped ("left as it is"). Now the existing ban stays, the genreban/hardban covers it (re-applied if anyone unbans them), a case is recorded, and the result counts as a success.
+- **The ban record is upgraded, not duplicated.** The same case (e.g. BAN-0004) now shows the hardban or genreban: type, record ID (also in the footer, e.g. `BAN-0004 • HB-00005`), approval and evidence, with an entry in its history. A ban from before the ban log gets a new record.
+- **Lifting the network ban puts the record back.** If the server's own ban was there first, it stays and the record shows that ban again, with a history entry saying the hardban was lifted.
+
 ## 2.26.1
 - **Cleaner ban log prompts.** Unban and Reban confirmations now look like the ban record: avatar, user, case, ban type, original reason and a short "What happens" list, with **🔓 Unban** / **🔓 Unban everywhere** / **🔨 Reban** buttons. Results show as matching cards instead of plain text.
 

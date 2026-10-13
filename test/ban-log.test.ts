@@ -302,3 +302,24 @@ test('a developer can lift a hardban straight from its record: it confirms, then
         assert.match(staff.replies[0].content, /Only Midtown Vanguard developers/, 'still developers only');
     } finally { config.developers.delete(DEV); w.store.close(); }
 });
+
+test('a normal ban that gets a hardban on top: the same record is upgraded, and goes back if the hardban is lifted', async () => {
+    const { coverWithNetwork, uncoverNetwork } = await import('../src/audit/ban-log.js');
+    const w = world();
+    try {
+        const record = (await w.discordBan(MANUAL, 'raid'))!;
+        const ban = { id: 5, kind: 'hardban' as const, reason: 'threats', moderator_id: DEV, evidence: 'ticket 9', evidence_file: null };
+        await w.store.withAuthorized(G, async () => coverWithNetwork(w.store, w.logs, G, { id: USER }, ban));
+        let r = getRecord(w.store, G, record.id)!;
+        assert.equal(w.store.get('SELECT COUNT(*) AS n FROM ban_records')!.n, 1, 'no second record');
+        assert.deepEqual([r.kind, r.network_record, r.number], ['hardban', 'HB-00005', 1], 'same case ID, now showing the hardban');
+        const f = fieldsOf(renderRecord(r));
+        assert.match(f['Approved by'], /HB-00005/); assert.equal(f.Type, 'Hardban'); assert.equal(f.Evidence, 'ticket 9');
+        assert.match(renderRecord(r).embeds[0].footer.text, /BAN-0001 • HB-00005/);
+        assert.equal(f.Reason, 'raid', 'the original reason is kept');
+        await w.store.withAuthorized(G, async () => uncoverNetwork(w.store, w.logs, G, USER, ban, DEV));
+        r = getRecord(w.store, G, record.id)!;
+        assert.deepEqual([r.kind, r.network_record, r.status], ['manual', null, 'banned'], "the server's own ban is shown again and stays");
+        assert.match(r.history, /HB-00005 lifted; this server's own ban stays/);
+    } finally { w.store.close(); }
+});

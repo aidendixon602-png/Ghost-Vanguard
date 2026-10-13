@@ -40,6 +40,7 @@ export async function findAudit(guild, type, userId, now = Date.now()) {
     return { executorId: entry.executorId ?? null, executorIsBot: !!executor?.bot, reason: entry.reason ?? null, at: entry.createdTimestamp };
 }
 /** Work out who banned and why from the verified audit entry and Vanguard's own records. */
+const NETWORK_DURATION = { hardban: 'Permanent (re-applied until a developer lifts it)', genreban: 'Permanent (every Midtown server)' };
 export function explainBan(store, guild, userId, audit, fallbackReason, now = Date.now()) {
     const botId = guild.client.user?.id;
     const raw = audit?.reason ?? fallbackReason ?? null;
@@ -56,7 +57,8 @@ export function explainBan(store, guild, userId, audit, fallbackReason, now = Da
         d.moderatorId = record?.moderator_id ?? m?.[1] ?? null;
         d.moderatorRole = audit?.executorId === botId ? 'via-bot' : 'unverified';
         d.approved = record ? `Midtown Vanguard developer <@${record.moderator_id}> · ${recordId(record)}` : null;
-        d.duration = kind === 'hardban' ? 'Permanent (re-applied until a developer lifts it)' : 'Permanent (every Midtown server)';
+        d.duration = NETWORK_DURATION[kind];
+        d.networkRecord = record ? recordId(record) : /\b([GH]B-\d+)\b/.exec(raw)?.[1] ?? null;
         return d;
     }
     if (audit && audit.executorId === botId) {
@@ -109,8 +111,8 @@ function pushHistory(record, entry) {
 }
 export function createRecord(store, guildId, user, d, at = Date.now()) {
     const history = JSON.stringify([{ action: 'banned', by: d.moderatorId, role: d.moderatorRole, at, reason: null }]);
-    const id = Number(store.run(`INSERT INTO ban_records(guild_id,number,user_id,username,avatar_url,kind,reason,evidence,moderator_id,moderator_role,approved,duration,expires_at,banned_at,status,history)
-        VALUES(?, (SELECT COALESCE(MAX(number),0)+1 FROM ban_records WHERE guild_id=?), ?,?,?,?,?,?,?,?,?,?,?,?,'banned',?)`, guildId, guildId, user.id, user.tag ?? user.username ?? null, user.avatar ?? null, d.kind, redact(d.reason) ?? null, redact(d.evidence) ?? null, d.moderatorId, d.moderatorRole, d.approved, d.duration, d.expiresAt, at, history).lastInsertRowid);
+    const id = Number(store.run(`INSERT INTO ban_records(guild_id,number,user_id,username,avatar_url,kind,reason,evidence,moderator_id,moderator_role,approved,duration,expires_at,banned_at,status,history,network_record)
+        VALUES(?, (SELECT COALESCE(MAX(number),0)+1 FROM ban_records WHERE guild_id=?), ?,?,?,?,?,?,?,?,?,?,?,?,'banned',?,?)`, guildId, guildId, user.id, user.tag ?? user.username ?? null, user.avatar ?? null, d.kind, redact(d.reason) ?? null, redact(d.evidence) ?? null, d.moderatorId, d.moderatorRole, d.approved, d.duration, d.expiresAt, at, history, d.networkRecord ?? null).lastInsertRowid);
     return getRecord(store, guildId, id);
 }
 export function setStatus(store, record, status, by, role, reason, at = Date.now()) {
@@ -202,6 +204,46 @@ export async function onBanRemove(store, logs, guild, user) {
         });
     });
 }
+/**
+ * A genreban or hardban reached a server where the user was already banned by the server's own
+ * staff. The existing ban stays (Discord keeps one ban per user) and the record is upgraded:
+ * it now shows the network ban, its record ID, approval and evidence, and is enforced by it
+ * (re-applied if anyone unbans them). A ban from before the ban log gets a new record.
+ */
+export function coverWithNetwork(store, logs, guildId, user, ban, at = Date.now()) {
+    const id = recordId(ban);
+    const open = openRecord(store, guildId, user.id);
+    const approved = `Midtown Vanguard developer <@${ban.moderator_id}> · ${id}`;
+    const evidence = [ban.evidence, ban.evidence_file].filter(Boolean).join('\n') || null;
+    if (open) {
+        if (open.network_record === id)
+            return open;
+        const history = pushHistory(open, { action: `now covered by ${ban.kind} ${id} (was ${KIND_LABEL[open.kind]?.toLowerCase() ?? open.kind})`, by: ban.moderator_id, role: 'via-bot', at, reason: open.kind });
+        store.run('UPDATE ban_records SET kind=?,network_record=?,approved=?,duration=?,evidence=COALESCE(evidence,?),expires_at=NULL,history=? WHERE guild_id=? AND id=?', ban.kind, id, approved, NETWORK_DURATION[ban.kind], redact(evidence) ?? null, history, guildId, open.id);
+        const updated = getRecord(store, guildId, open.id);
+        publish(store, logs, updated, false);
+        return updated;
+    }
+    const record = createRecord(store, guildId, { id: user.id, tag: user.tag ?? null }, { kind: ban.kind, reason: ban.reason, evidence, moderatorId: ban.moderator_id, moderatorRole: 'via-bot', approved, duration: NETWORK_DURATION[ban.kind], expiresAt: null, networkRecord: id }, at);
+    publish(store, logs, record, true);
+    return record;
+}
+/**
+ * The genreban/hardban was lifted, but the server's own ban stays: the record goes back to the
+ * kind of ban it was before, keeps every detail, and says what happened.
+ */
+export function uncoverNetwork(store, logs, guildId, userId, ban, by, at = Date.now()) {
+    const id = recordId(ban);
+    const open = openRecord(store, guildId, userId);
+    if (!open || open.network_record !== id)
+        return null;
+    const previous = [...JSON.parse(open.history || '[]')].reverse().find(h => h.action.startsWith(`now covered by ${ban.kind} ${id}`))?.reason ?? 'ban';
+    const history = pushHistory(open, { action: `${id} lifted; this server's own ban stays`, by, role: 'via-bot', at, reason: null });
+    store.run("UPDATE ban_records SET kind=?,network_record=NULL,approved=NULL,duration='Permanent',history=? WHERE guild_id=? AND id=?", previous, history, guildId, open.id);
+    const updated = getRecord(store, guildId, open.id);
+    publish(store, logs, updated, false);
+    return updated;
+}
 // ---------------------------------------------------------------- how a record looks
 const who = (id, role) => {
     if (!id || role === 'unverified')
@@ -217,7 +259,7 @@ export function renderRecord(r) {
     const statusWord = banned ? 'Banned' : r.status === 'expired' ? 'Ban expired' : 'Unbanned';
     const e = new EmbedBuilder().setColor(banned ? Colors.Red : Colors.Green)
         .setAuthor({ name: `${r.username ?? r.user_id} - ${statusWord}`, iconURL: r.avatar_url ?? undefined })
-        .setFooter({ text: `User ID: ${r.user_id} • ${caseId(r)}` });
+        .setFooter({ text: `User ID: ${r.user_id} • ${caseId(r)}${r.network_record ? ` • ${r.network_record}` : ''}` });
     if (r.banned_at)
         e.setTimestamp(r.banned_at);
     const fields = [
@@ -330,10 +372,16 @@ export async function handleBanLogInteraction(i, deps) {
             if (net && deps.network) {
                 const reason = `Lifted from the ban log (${caseId(record)})`;
                 await i.update({ embeds: [card(record, { title: `⏳ Unbanning ${record.username ?? record.user_id} everywhere…`, color: Colors.Blurple, ban: `${KIND_TITLE[net.kind]} · ${net.record}` })], components: [] });
+                // Is this server's ban the network ban itself, or the server's own ban that it covers?
+                const own = !TAG[net.kind] || !(await i.guild.bans.fetch({ user: record.user_id, force: true }).catch(() => null))?.reason?.startsWith(TAG[net.kind]);
                 // Recorded first, so the unban events that follow do not add a second entry.
-                const updated = setStatus(store, record, 'unbanned', i.user.id, 'via-bot', `${net.kind} ${net.record} lifted by a developer`);
-                publish(store, logs, updated, false);
+                if (!own)
+                    publish(store, logs, setStatus(store, record, 'unbanned', i.user.id, 'via-bot', `${net.kind} ${net.record} lifted by a developer`), false);
                 const result = await deps.network.lift(record.user_id, { id: i.user.id, tag: i.user.tag }, reason);
+                if (own)
+                    return i.editReply({ embeds: [card(getRecord(store, i.guildId, record.id) ?? record, { title: `✅ ${net.record} lifted everywhere`, color: Colors.Green, ban: `${KIND_TITLE[net.kind]} · ${net.record} (closed)`,
+                                fields: [{ name: 'Servers', value: `Unbanned in **${result.lifted} of ${result.servers}**` }, { name: 'This server', value: "Still banned: this server's own ban was there first and stays. Press **Unban** again to lift it too." }],
+                                footer: 'The ban record has been updated' })] });
                 return i.editReply({ embeds: [card(record, { title: `${result.failed ? '⚠️' : '✅'} ${record.username ?? record.user_id} unbanned`, color: result.failed ? Colors.Orange : Colors.Green, ban: `${KIND_TITLE[net.kind]} · ${net.record} (closed)`,
                             fields: [{ name: 'Servers', value: `Unbanned in **${result.lifted} of ${result.servers}**${result.failed ? `\n${result.failed} could not be reached: check Vanguard's Ban Members permission there` : ''}` }],
                             footer: 'The ban record has been updated' })] });

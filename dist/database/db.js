@@ -189,6 +189,9 @@ export class Store {
             CREATE INDEX IF NOT EXISTS ban_records_user ON ban_records(guild_id, user_id, status);`);
         if (!this.db.prepare('PRAGMA table_info(outbox)').all().some((c) => c.name === 'created_at'))
             this.db.exec('ALTER TABLE outbox ADD COLUMN created_at INTEGER');
+        // 2.26.2: which genreban/hardban (e.g. HB-00005) a ban record belongs to, if any.
+        if (!this.db.prepare('PRAGMA table_info(ban_records)').all().some((c) => c.name === 'network_record'))
+            this.db.exec('ALTER TABLE ban_records ADD COLUMN network_record TEXT');
         // 2.25: /role rules. kind 'allow': configured moderators may give/take the role.
         // kind 'grant': owner-approved rule letting a role or user grant a privileged role.
         this.db.exec(`CREATE TABLE IF NOT EXISTS role_rules (guild_id TEXT NOT NULL REFERENCES guild_data(guild_id) ON DELETE CASCADE, role_id TEXT NOT NULL,

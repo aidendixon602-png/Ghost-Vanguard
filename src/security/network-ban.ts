@@ -1,3 +1,4 @@
+import { coverWithNetwork, uncoverNetwork } from '../audit/ban-log.js';
 import { Colors, PermissionFlagsBits, type Client, type Guild, type User } from 'discord.js';
 import { developers } from '../bot/developers.js';
 import { isSupreme } from '../bot/ranks.js';
@@ -287,8 +288,15 @@ export async function banIn(deps: NetworkDeps, guild: Guild, ban: NetworkBan, wh
                 return { ...base, outcome: 'hierarchy', reason: BOT_BELOW_TARGET } as ServerResult;
             if (why === 'issued' && !member) {
                 const existing = await currentBan(guild, userId);
-                if (existing)
-                    return { ...base, outcome: 'already', reason: hasTag(existing.reason, ban.kind) ? `Already banned by this ${ban.kind}.` : 'Already banned here by the server’s own staff; that ban was left as it is.' } as ServerResult;
+                if (existing && hasTag(existing.reason, ban.kind))
+                    return { ...base, outcome: 'already', reason: `Already banned by this ${ban.kind}.` } as ServerResult;
+                if (existing) {
+                    // Already banned by the server's own staff (or another ban type): that ban stays, and from now
+                    // on this genreban/hardban covers it too (re-applied if anyone unbans them).
+                    deps.store.recordCase(guild.id, userId, ban.moderator_id, ban.kind, `${recordId(ban)}: ${ban.reason} (they were already banned here)`, { username: ban.username, evidence: ban.evidence });
+                    coverWithNetwork(deps.store, deps.logs, guild.id, { id: userId, tag: ban.username }, ban);
+                    return { ...base, outcome: 'success', reason: `Already banned here; the ${ban.kind} now covers that ban too.` } as ServerResult;
+                }
             }
             await guild.members.ban(userId, { reason: clip(`${TAG[ban.kind]} ${recordId(ban)} ${ban.moderator_id}: ${ban.reason}`, 500), deleteMessageSeconds: why === 'issued' ? deleteMessageSeconds : 0 });
             deps.store.recordCase(guild.id, userId, ban.moderator_id, ban.kind, `${recordId(ban)}: ${ban.reason}`, { username: ban.username, evidence: ban.evidence });
@@ -327,8 +335,11 @@ export async function unbanIn(deps: NetworkDeps, guild: Guild, ban: NetworkBan, 
             const existing = await currentBan(guild, ban.user_id);
             if (!existing)
                 return { ...base, outcome: 'skipped', reason: 'Not banned here.' } as ServerResult;
-            if (!hasTag(existing.reason, ban.kind))
+            if (!hasTag(existing.reason, ban.kind)) {
+                // The server's own ban stays; its record goes back to showing that ban.
+                uncoverNetwork(deps.store, deps.logs, guild.id, ban.user_id, ban, actorId);
                 return { ...base, outcome: 'skipped', reason: 'Banned here by something other than this ' + ban.kind + ' (local staff or another ban type), so left in place.' } as ServerResult;
+            }
             await guild.members.unban(ban.user_id, clip(`${actorId}: un${ban.kind} ${recordId(ban)}: ${reason}`, 500));
             deps.store.recordCase(guild.id, ban.user_id, actorId, `un${ban.kind}`, `${recordId(ban)}: ${reason}`, { username: ban.username });
             deps.logs.push(guild.id, embed(`${KIND_NAME[ban.kind]} lifted · ${recordId(ban)}`, `**Server:** ${guild.name} (\`${guild.id}\`)\n**User:** <@${ban.user_id}> \`${ban.user_id}\`\n**By:** Midtown Vanguard developer <@${actorId}>\n**Reason:** ${reason}`, Colors.Green));
