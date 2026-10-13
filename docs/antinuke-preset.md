@@ -9,15 +9,15 @@ confirmation and stop detection/enforcement. Settings, incidents and backups are
 |---|---:|---:|---|---|
 | Ban | 3 | 60 seconds | ban | Yes |
 | Bot Add | 1 | 60 seconds | ban | Yes |
-| Channel Create | 2 | 120 seconds | kick | Yes |
+| Channel Create | 4 | 120 seconds | kick | Yes |
 | Channel Delete | 2 | 120 seconds | ban | No |
 | Kick | 3 | 120 seconds | ban | No |
 | Permission Grant | 1 | 60 seconds | strip | Yes, including member role grants |
 | Role Create | 5 | 120 seconds | strip | Yes |
 | Role Delete | 5 | 120 seconds | strip | No |
-| Role Invite | 1 | 60 seconds | strip | Yes |
-| Server Update | 1 | 60 seconds | strip | No |
-| Timeout | 5 | 120 seconds | strip | Yes |
+| Role Invite | 6 | 60 seconds | strip | Yes |
+| Server Update | 3 | 120 seconds | strip | No |
+| Timeout | 8 | 120 seconds | strip | Yes |
 | Webhook | 1 | 60 seconds | kick | Creation; other events need manual review |
 
 Role Invite means adding a role to a member, not creating a server invitation.

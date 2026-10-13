@@ -207,28 +207,29 @@ function antinuke() {
     const guild: any = { id: G, ownerId: OWNER, client: { user: { id: BOT } }, roles: { cache: new Collection() }, members: { cache: new Collection() } };
     const roleUpdate = (id: string, op: '$add' | '$remove', roleId: string, reason: string, executor = BOT) =>
         ({ id, action: AuditLogEvent.MemberRoleUpdate, targetId: TARGET, executorId: executor, reason, createdTimestamp: Date.now(), changes: [{ key: op, new: [{ id: roleId }] }] }) as any;
-    return { store, security, guild, roleUpdate, incidents: () => store.all('SELECT * FROM incidents').length };
+    return { store, security, guild, roleUpdate, incidents: () => store.all('SELECT * FROM incidents').length, counted: () => store.all("SELECT * FROM observations WHERE rule='role_grant'").length };
 }
 
 test('an approved /role change does not create an anti-nuke incident; the approval is used once', async () => {
-    const { store, security, guild, roleUpdate, incidents } = antinuke();
+    const { store, security, guild, roleUpdate, incidents, counted } = antinuke();
     try {
         approveRoleChange(G, TARGET, R.helperish.id, 'add');
         await security.audit(roleUpdate('1', '$add', R.helperish.id, `${MANAGER}: /role add helper`), guild);
         assert.equal(incidents(), 0);
+        assert.equal(counted(), 0, 'the approved change is not counted toward Role Invite');
         await security.audit(roleUpdate('2', '$add', R.helperish.id, `${MANAGER}: /role add helper`), guild);
-        assert.equal(incidents(), 1, 'a second identical change without its own approval is checked normally');
+        assert.equal(counted(), 1, 'a second identical change without its own approval is checked normally');
     } finally { store.close(); }
 });
 
 test('no broad bypass: other roles, other members, the opposite operation and manual changes are still checked', async () => {
-    const { store, security, guild, roleUpdate, incidents } = antinuke();
+    const { store, security, guild, roleUpdate, counted } = antinuke();
     try {
         approveRoleChange(G, TARGET, R.helperish.id, 'add');
         await security.audit(roleUpdate('1', '$add', R.cosmetic.id, `${MANAGER}: /role add other`), guild);
-        assert.equal(incidents(), 1, 'a different role');
+        assert.equal(counted(), 1, 'a different role');
         await security.audit(roleUpdate('2', '$add', R.helperish.id, 'manual', MANAGER), guild);
-        assert.equal(incidents(), 1, 'already contained in this window, but it was not consumed as approved:');
+        assert.equal(counted(), 2, 'a manual change is counted and does not consume the approval');
         assert.equal(consumeApprovedRoleChange(roleUpdate('3', '$add', R.helperish.id, 'x', MANAGER), guild), false, 'only entries made by Vanguard can use an approval');
         assert.equal(consumeApprovedRoleChange(roleUpdate('4', '$remove', R.helperish.id, 'x'), guild), false, 'add approval does not cover remove');
         assert.equal(consumeApprovedRoleChange(roleUpdate('5', '$add', R.helperish.id, 'x'), guild), true, 'the real one still matches');

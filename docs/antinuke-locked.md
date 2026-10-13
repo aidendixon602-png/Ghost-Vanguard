@@ -6,18 +6,18 @@ Every authorized server runs the same 17-rule anti-nuke preset in **enforce** mo
 |---|---|---|
 | Ban | 3 in 60s | ban + revert |
 | Bot Add | 1 in 60s | ban + revert |
-| Channel Create | 2 in 120s | kick + revert |
+| Channel Create | 4 in 120s | kick + revert |
 | Channel Delete | 2 in 120s | ban |
 | Kick | 3 in 120s | ban |
 | Permission Grant (administrator, ban/kick members, manage channels/server/webhooks) | 1 in 60s | strip + revert, including the recipient |
 | Role Create | 5 in 120s | strip + revert |
 | Role Delete | 5 in 120s | strip |
-| Role Invite | 1 in 60s | strip + revert |
-| Server Update | 1 in 60s | strip |
-| Timeout | 5 in 120s | strip + revert |
+| Role Invite | 6 in 60s | strip + revert |
+| Server Update | 3 in 120s | strip |
+| Timeout | 8 in 120s | strip + revert |
 | Webhook | 1 in 60s | kick + revert |
-| Channel Update | 5 in 20s | strip |
-| Role Update | 5 in 20s | strip |
+| Channel Update | 10 in 60s | strip |
+| Role Update | 10 in 60s | strip |
 | Member Prune | 1 in 60s | strip |
 | AutoMod | 1 in 60s | strip |
 | Join Flood | 12 in 15s | alert only |

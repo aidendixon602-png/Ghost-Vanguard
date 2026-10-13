@@ -110,7 +110,7 @@ test('a newly self-assigned bypass role does not exempt its own assignment',asyn
  const member:any={id:'actor',roles:{cache:new Collection([['staff',{}]])}};guild.members.cache.set('actor',member);guild.members.fetch=async()=>member;
  guild.roles.cache.set('staff',{id:'staff',managed:false,permissions:{bitfield:0n}});store.grant('g','staff','trust_role','owner');
  await security.audit({id:'selfgrant',executorId:'actor',targetId:'actor',createdTimestamp:Date.now(),action:AuditLogEvent.MemberRoleUpdate,changes:[{key:'$add',new:[{id:'staff'}]}]} as any,guild);
- assert.equal(store.all('SELECT * FROM incidents WHERE guild_id=?','g').length,1);
+ assert.equal(store.all("SELECT * FROM observations WHERE guild_id=? AND rule='role_grant'",'g').length,1);
  }finally{store.close();}
 });
 

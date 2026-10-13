@@ -5,7 +5,7 @@ export function parseIds(value = ''): Set<string> {
     return new Set(value.split(',').map(v => v.trim()).filter(v => /^\d{17,20}$/.test(v)));
 }
 
-export const VERSION = '2.28.0';
+export const VERSION = '2.28.1';
 export const CONFIG_VERSION = 3;
 
 export const config = {

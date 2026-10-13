@@ -45,7 +45,7 @@ function fixture(mode:'observe'|'enforce'='enforce') {
 }
 
 test('the twelve requested preset limits, actions and revert flags are exact',()=>{
- const expected:any={mass_ban:[3,60,'ban',true],bot_add:[1,60,'ban',true],channel_create:[2,120,'kick',true],channel_delete:[2,120,'ban',false],mass_kick:[3,120,'ban',false],dangerous_grant:[1,60,'strip',true],role_create:[5,120,'strip',true],role_delete:[5,120,'strip',false],role_grant:[1,60,'strip',true],guild_update:[1,60,'strip',false],timeout:[5,120,'strip',true],webhook_change:[1,60,'kick',true]};
+ const expected:any={mass_ban:[3,60,'ban',true],bot_add:[1,60,'ban',true],channel_create:[4,120,'kick',true],channel_delete:[2,120,'ban',false],mass_kick:[3,120,'ban',false],dangerous_grant:[1,60,'strip',true],role_create:[5,120,'strip',true],role_delete:[5,120,'strip',false],role_grant:[6,60,'strip',true],guild_update:[3,120,'strip',false],timeout:[8,120,'strip',true],webhook_change:[1,60,'kick',true]};
  for(const [key,values] of Object.entries(expected)) {const r=RULES.find(r=>r.key===key)!;assert.deepEqual([r.count,r.seconds,r.punishment,r.revert],values);}
 });
 
@@ -98,18 +98,18 @@ test('Role Invite detects additions but ignores removals and verification-bot up
   await security.audit(entry('add','recipient',AuditLogEvent.MemberRoleUpdate,[{key:'$add',new:[{id:'r'}]}]),guild);
   store.grant('g','actor','bot','owner');
   await security.audit(entry('verify','recipient',AuditLogEvent.MemberRoleUpdate,[{key:'$add',new:[{id:'r'}]}]),guild);
-  assert.equal(store.all("SELECT * FROM incidents WHERE rule='role_grant'").length,1);assert.equal(store.all('SELECT * FROM observations').length,1);
+  assert.equal(store.all("SELECT * FROM incidents WHERE rule='role_grant'").length,0,'one ordinary role grant is below the limit');assert.equal(store.all('SELECT * FROM observations').length,1);
  }finally{store.close();}
 });
 
-test('Timeout fires on the fifth imposed timeout and preserves a subsequently changed timeout',async()=>{
+test('Timeout fires on the eighth imposed timeout and preserves a subsequently changed timeout',async()=>{
  const {store,security,guild,entry}=fixture();
  try {
   const until=new Date(Date.now()+600000).toISOString();let restored=0;
   guild.members={fetch:async({user}:any)=>({id:user,moderatable:true,communicationDisabledUntilTimestamp:user==='t5'?Date.now()+500000:Date.parse(until),disableCommunicationUntil:async()=>{restored++;}})};
   security.punish=async()=> 'Stripped actor.';
-  for(let n=1;n<=5;n++)await security.audit(entry(String(n),'t'+n,AuditLogEvent.MemberUpdate,[{key:'communication_disabled_until',old:null,new:until}]),guild);
-  assert.equal(restored,4);assert.equal(store.all("SELECT * FROM incidents WHERE rule='timeout'").length,1);
+  for(let n=1;n<=8;n++)await security.audit(entry(String(n),'t'+n,AuditLogEvent.MemberUpdate,[{key:'communication_disabled_until',old:null,new:until}]),guild);
+  assert.equal(restored,7);assert.equal(store.all("SELECT * FROM incidents WHERE rule='timeout'").length,1);
  }finally{store.close();}
 });
 
@@ -181,4 +181,15 @@ test('reverting that grant deletes the new role when Vanguard can, and keeps it 
   assert.match(await security.revertGrant({action:AuditLogEvent.RoleCreate,targetId:'r9',changes:[]} as any,guild),/kept it/);
   assert.equal(deleted,1);
  } finally {store.close();}
+});
+
+test('Role Invite allows normal role giving: five grants pass, the sixth in a minute triggers',async()=>{
+ const {store,security,guild,entry}=fixture();
+ try {
+  guild.roles={cache:new Collection()};let punished=0;security.punish=async()=>{punished++;return 'Stripped actor.';};security.revert=async()=>'Removed 1 assigned role(s).';
+  for(let n=1;n<=5;n++)await security.audit(entry('g'+n,'m'+n,AuditLogEvent.MemberRoleUpdate,[{key:'$add',new:[{id:'r'}]}]),guild);
+  assert.equal(punished,0);assert.equal(store.all("SELECT * FROM incidents WHERE rule='role_grant'").length,0);
+  await security.audit(entry('g6','m6',AuditLogEvent.MemberRoleUpdate,[{key:'$add',new:[{id:'r'}]}]),guild);
+  assert.equal(punished,1);assert.equal(store.all("SELECT * FROM incidents WHERE rule='role_grant'").length,1);
+ }finally{store.close();}
 });

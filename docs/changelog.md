@@ -1,5 +1,20 @@
 # Changelog
 
+## 2.28.1: anti-nuke is less trigger-happy
+Staff were being stripped for normal work. The everyday rules now allow more before acting:
+
+| Rule | Before | Now |
+|---|---|---|
+| Role Invite (giving roles) | 1 in 60s | **6 in 60s** |
+| Server Update | 1 in 60s | **3 in 120s** |
+| Channel Create | 2 in 120s | **4 in 120s** |
+| Timeout | 5 in 120s | **8 in 120s** |
+| Channel Update | 5 in 20s | **10 in 60s** |
+| Role Update | 5 in 20s | **10 in 60s** |
+
+- **Still strict:** giving or adding Administrator or other dangerous permissions (Permission Grant) is still stripped and reverted on the first try. Ban, Kick, Bot Add, Channel/Role Delete, Webhook, Member Prune and AutoMod are unchanged.
+- Approved `/role` changes still don't count toward Role Invite at all.
+
 ## 2.28.0: commands reorganized
 - **`/antinuke`:** `status · enable · disable · check · scan · settings · whitelist`. `rules` and `test` are gone (`status` shows the rules and limits); `audit` is now **`scan`**, `extras` is now **`settings`**.
 - **`/network`** (new, developers): `genreban · ungenreban · hardban · unhardban`, instead of four separate top-level commands.
