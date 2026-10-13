@@ -6,7 +6,7 @@ export default defineCommand(new SlashCommandBuilder().setName('note').setDescri
     .addSubcommand(s => s.setName('add').setDescription('Write a note about a member').addUserOption(o => o.setName('user').setDescription('Member').setRequired(true))
     .addStringOption(o => o.setName('text').setDescription('Note').setRequired(true).setMaxLength(1000)))
     .addSubcommand(s => s.setName('list').setDescription('Read the notes on a member').addUserOption(o => o.setName('user').setDescription('Member').setRequired(true)))
-    .addSubcommand(s => s.setName('remove').setDescription('Delete a note by its number').addIntegerOption(o => o.setName('number').setDescription('Note number from /mod note list').setRequired(true).setMinValue(1))), { category: 'moderation', access: 'member', requiredPermissions: [PermissionFlagsBits.ModerateMembers], cooldown: 1500 }, async (ctx, i) => {
+    .addSubcommand(s => s.setName('remove').setDescription('Delete a note by its number').addIntegerOption(o => o.setName('number').setDescription('Note number from /mod notes list').setRequired(true).setMinValue(1))), { category: 'moderation', access: 'member', requiredPermissions: [PermissionFlagsBits.ModerateMembers], cooldown: 1500 }, async (ctx, i) => {
     const sub = i.options.getSubcommand(), guild = i.guildId;
     if (sub === 'add') {
         const user = i.options.getUser('user', true);
@@ -15,7 +15,7 @@ export default defineCommand(new SlashCommandBuilder().setName('note').setDescri
         ctx.store.run('INSERT OR IGNORE INTO guild_data(guild_id) VALUES(?)', guild);
         const id = Number(ctx.store.run('INSERT INTO member_notes(guild_id,user_id,author_id,text,at) VALUES(?,?,?,?,?)', guild, user.id, i.user.id, i.options.getString('text', true), Date.now()).lastInsertRowid);
         const number = ctx.store.get('SELECT number FROM member_notes WHERE guild_id=? AND id=?', guild, id)?.number;
-        return `Note **#${number}** added for <@${user.id}>. Only staff can read it with /mod note list.`;
+        return `Note **#${number}** added for <@${user.id}>. Only staff can read it with /mod notes list.`;
     }
     if (sub === 'list') {
         const user = i.options.getUser('user', true);

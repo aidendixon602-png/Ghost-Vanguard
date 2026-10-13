@@ -45,7 +45,7 @@ export function historyOnJoin(store: Store, logs: LogQueue, member: GuildMember)
     const notes = Number(store.get('SELECT COUNT(*) AS n FROM member_notes WHERE guild_id=? AND user_id=?', member.guild.id, member.id)?.n ?? 0);
     if (!total && !notes) return;
     const recentCases = cases.map(c => `• **#${c.number} ${c.action}** <t:${Math.floor(c.at / 1000)}:R> · ${clip(String(c.reason), 90)}`).join('\n');
-    logs.push(member.guild.id, embed('Returning member with history', `<@${member.id}> (${member.user.tag}) rejoined.\n**Cases:** ${total} · **Staff notes:** ${notes}${recentCases ? `\n${recentCases}` : ''}\n\nFull history: \`/mod history\` · \`/mod note list\``, Colors.Yellow));
+    logs.push(member.guild.id, embed('Returning member with history', `<@${member.id}> (${member.user.tag}) rejoined.\n**Cases:** ${total} · **Staff notes:** ${notes}${recentCases ? `\n${recentCases}` : ''}\n\nFull history: \`/mod history\` · \`/mod notes list\``, Colors.Yellow));
 }
 
 export interface WelcomeConfig { enabled: boolean; channelId: string | null; message: string; verifyButton: boolean }

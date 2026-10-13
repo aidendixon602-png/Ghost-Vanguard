@@ -1,4 +1,3 @@
-import { addToBlacklist, removeFromBlacklist } from '../../features/roblox-tools.js';
 import { ChannelType, Colors, PermissionFlagsBits, SlashCommandBuilder } from 'discord.js';
 import { clip, dangerous, RULES } from '../../core.js';
 import { AppError } from '../../errors.js';
@@ -20,11 +19,7 @@ export default defineCommand(new SlashCommandBuilder().setName('security').setDe
     .addUserOption(o => o.setName('user').setDescription('Required for add/remove')))
     .addSubcommand(s => s.setName('incidents').setDescription('View recent anti-nuke incidents').addIntegerOption(o => o.setName('id').setDescription('Specific incident ID').setMinValue(1)))
     .addSubcommand(s => s.setName('quarantine').setDescription('Contain a member and save their roles').addUserOption(o => o.setName('user').setDescription('Target').setRequired(true)))
-    .addSubcommand(s => s.setName('release').setDescription('Restore a quarantined member’s saved roles').addUserOption(o => o.setName('user').setDescription('Target').setRequired(true)).addBooleanOption(o => o.setName('restore_privileged').setDescription('Explicitly restore saved dangerous roles too')))
-    .addSubcommand(s => s.setName('roblox-block').setDescription('Block or unblock a Roblox account ID')
-    .addStringOption(o => o.setName('action').setDescription('Action').setRequired(true).addChoices({ name: 'Add', value: 'add' }, { name: 'Remove', value: 'remove' }))
-    .addStringOption(o => o.setName('roblox_id').setDescription('Roblox user ID').setRequired(true).setMinLength(1).setMaxLength(20))
-    .addStringOption(o => o.setName('reason').setDescription('Reason for blocking').setMaxLength(500))), { category: 'configuration', cooldown: 1500, access: 'security' }, async (ctx, i) => {
+    .addSubcommand(s => s.setName('release').setDescription('Restore a quarantined member’s saved roles').addUserOption(o => o.setName('user').setDescription('Target').setRequired(true)).addBooleanOption(o => o.setName('restore_privileged').setDescription('Explicitly restore saved dangerous roles too'))), { category: 'configuration', cooldown: 1500, access: 'security' }, async (ctx, i) => {
     const actor = ctx.actor;
     const s = ctx.store.settings(i.guildId);
     const sub = i.options.getSubcommand();
@@ -93,18 +88,6 @@ export default defineCommand(new SlashCommandBuilder().setName('security').setDe
         const result = sub === 'quarantine' ? await ctx.security.contain(i.guild, user.id) : await ctx.security.release(i.guild, user.id, i.options.getBoolean('restore_privileged') ?? false);
         ctx.logs.push(i.guildId, embed(sub === 'quarantine' ? 'Manual quarantine' : 'Quarantine release', `By <@${actor.id}> · member <@${user.id}>\n${result}`, Colors.Orange));
         return result;
-    }
-    if (sub === 'roblox-block') {
-        const id = i.options.getString('roblox_id', true);
-        if (!/^\d{1,20}$/.test(id) || id === '0')
-            throw new AppError('VALIDATION_ERROR', 'Enter a numeric Roblox user ID.');
-        const action = i.options.getString('action', true);
-        if (action === 'add')
-            addToBlacklist(ctx.store, i.guildId, id, i.options.getString('reason') || 'Blocked by security administrator', i.options.getString('reason') || 'Blacklisted');
-        else
-            removeFromBlacklist(ctx.store, i.guildId, id);
-        ctx.logs.push(i.guildId, embed('Recorded Roblox ban changed', `<@${actor.id}>: ${action} Roblox ID ${id}`));
-        return `Recorded Roblox ban ${action === 'add' ? 'added' : 'removed'} for ${id}. This blocks known linked accounts; it does not discover unknown alternate Roblox accounts.`;
     }
     throw new AppError('VALIDATION_ERROR', 'Unknown security action.');
 }, { subcommands: { admin: { access: 'owner' }, config: { botPermissions: [PermissionFlagsBits.ManageRoles] }, quarantine: { botPermissions: [PermissionFlagsBits.ManageRoles] }, release: { botPermissions: [PermissionFlagsBits.ManageRoles] } },

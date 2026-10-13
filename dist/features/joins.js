@@ -43,7 +43,7 @@ export function historyOnJoin(store, logs, member) {
     if (!total && !notes)
         return;
     const recentCases = cases.map(c => `• **#${c.number} ${c.action}** <t:${Math.floor(c.at / 1000)}:R> · ${clip(String(c.reason), 90)}`).join('\n');
-    logs.push(member.guild.id, embed('Returning member with history', `<@${member.id}> (${member.user.tag}) rejoined.\n**Cases:** ${total} · **Staff notes:** ${notes}${recentCases ? `\n${recentCases}` : ''}\n\nFull history: \`/mod history\` · \`/mod note list\``, Colors.Yellow));
+    logs.push(member.guild.id, embed('Returning member with history', `<@${member.id}> (${member.user.tag}) rejoined.\n**Cases:** ${total} · **Staff notes:** ${notes}${recentCases ? `\n${recentCases}` : ''}\n\nFull history: \`/mod history\` · \`/mod notes list\``, Colors.Yellow));
 }
 export const WELCOME_DEFAULTS = { enabled: false, channelId: null, message: 'Welcome to **{server}**, {user}! You are member #{count}.', verifyButton: true };
 export const welcomeConfig = (store, guild) => getFeature(store, guild, 'welcome', WELCOME_DEFAULTS);

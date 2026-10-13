@@ -302,11 +302,11 @@ export function renderRecord(r: BanRecord) {
 
 export interface BanButtonDeps {
     store: Store; logs: LogQueue;
-    /** Lifts a ban only if it is not a genreban/hardban (those belong to /ungenreban and /unhardban). */
+    /** Lifts a ban only if it is not a genreban/hardban (those belong to /network ungenreban and /network unhardban). */
     assertLocalUnban: (guild: Guild, userId: string) => Promise<void>;
     /**
      * Genrebans and hardbans: the active one for this user (shown as e.g. "HB-00005"), and a way
-     * for a developer to lift it everywhere (same as /unhardban or /ungenreban).
+     * for a developer to lift it everywhere (same as /network unhardban or /network ungenreban).
      */
     network?: {
         active(userId: string): { kind: 'genreban' | 'hardban'; record: string } | null;

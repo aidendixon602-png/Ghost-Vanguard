@@ -157,7 +157,7 @@ export class GuildLifecycle {
                 if (!plain.isSendable())
                     return false;
                 sent = await plain.send({ content: kind === 'pending'
-                        ? 'Midtown Vanguard is waiting for an approved developer to run /dev authserver within 120 seconds of joining; otherwise it leaves.'
+                        ? 'Midtown Vanguard is waiting for an approved developer to run /dev server authorize within 120 seconds of joining; otherwise it leaves.'
                         : 'Midtown Vanguard is online and anti-nuke protection is running. Give it Embed Links to see the setup panel, then run /setup logs setup.', allowedMentions: { parse: [] } });
             }
             else {
@@ -182,7 +182,7 @@ export class GuildLifecycle {
         const joined = me?.joinedTimestamp;
         const botId = this.client.user?.id ?? me?.id;
         if (!botId || !joined || !me?.permissions.has(PermissionFlagsBits.ViewAuditLog)) {
-            logEvent('developer_invite_unverified', { guildId: guild.id, reason: 'Missing bot membership or View Audit Log permission; /dev authserver is required.' });
+            logEvent('developer_invite_unverified', { guildId: guild.id, reason: 'Missing bot membership or View Audit Log permission; /dev server authorize is required.' });
             return;
         }
         // Bounded reads only when joining/pending after restart, never continuous polling.
@@ -205,7 +205,7 @@ export class GuildLifecycle {
                     return entry.executorId && developers.has(entry.executorId) ? entry.executorId : undefined;
             }
             catch (error) {
-                logEvent('developer_invite_unverified', { guildId: guild.id, reason: error instanceof Error ? error.message : 'Audit lookup failed; /dev authserver is required.' });
+                logEvent('developer_invite_unverified', { guildId: guild.id, reason: error instanceof Error ? error.message : 'Audit lookup failed; /dev server authorize is required.' });
                 return;
             }
             finally {
@@ -285,7 +285,7 @@ export class GuildLifecycle {
     async authorize(guild, actor) {
         developers.require(actor);
         const result = await this.queue.run(guild.id, () => this.authorizeCurrent(guild, actor));
-        // Manual /dev authserver: show the setup panel too (same 6-hour cooldown).
+        // Manual /dev server authorize: show the setup panel too (same 6-hour cooldown).
         if (this.store.isAuthorized(guild.id))
             void this.welcome(guild, 'ready', actor);
         return result;
@@ -363,7 +363,7 @@ export class GuildLifecycle {
             this.store.auditAuthorization(id, 'DEAUTHORIZED', actor, 'Server ban removed; new invite and authorization required.');
         });
         logEvent('server_unbanned', { guildId: id, actor });
-        return `Server ${id} is unbanned. A new invite and /dev authserver are required.`;
+        return `Server ${id} is unbanned. A new invite and /dev server authorize are required.`;
     }
     async leave(guild) {
         if (this.store.isAuthorized(guild.id) || !this.client.guilds.cache.has(guild.id))

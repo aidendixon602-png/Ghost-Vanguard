@@ -42,7 +42,7 @@ export function rankName(value: number): RankName | null {
 export const ADMINISTRATOR_RANK = RANKS.headadmin;
 export const ADMIN_RESTRICTED = new Set<string>([
     // Switching protection off, weakening it, or exempting people from it
-    'antinuke/disable', 'disable', 'antinuke-plus/extras', 'trust/add', 'trust/remove', 'trust/bots', 'tp', 'trustlist',
+    'antinuke/disable', 'disable', 'antinuke-plus/settings', 'trust/add', 'trust/remove', 'trust/bots', 'tp', 'trustlist',
     'security/release', 'emergency/start', 'emergency/stop', 'emergency/panel', 'emergency', 'botq',
     // Destructive restoration and deleting recovery points
     'backup/restore', 'snapshot/restore', 'config-history/restore', 'restore', 'layoutselect', 'incident',
@@ -95,7 +95,7 @@ export function explicitRank(store: Store, guildId: string | null, userId: strin
 /** Minimum rank per command, subcommand ("command/sub") or button prefix. Missing = ranks don't apply. */
 export const COMMAND_RANK: Record<string, number> = {
     // Helper
-    'moderation/warn': 1, 'antinuke-plus': 4, 'antinuke-plus/audit': 3, botq: 4, 'warnings/status': 1, warnings: 4, emergency: 3, webhooks: 3, webhook: 3, aimod: 1, roblox: 4, 'roblox/lookup': 1, 'roblox/sync': 1, 'roblox/blacklist': 2, 'roblox/unblacklist': 2, 'roblox/blacklisted': 1, 'roblox/binds': 1, 'case/search': 1, 'appeals/pending': 2, appeal: 2, 'staff/report': 3, automod: 3, welcome: 3, appeals: 4, 'moderation/timeout': 1, 'moderation/history': 1, 'note/add': 1, 'note/list': 1, 'case/view': 1, 'case/recent': 1,
+    'moderation/warn': 1, 'antinuke-plus': 4, 'antinuke-plus/scan': 3, botq: 4, 'warnings/status': 1, warnings: 4, emergency: 3, webhooks: 3, webhook: 3, aimod: 1, roblox: 4, 'roblox/lookup': 1, 'roblox/sync': 1, 'roblox/blacklist': 2, 'roblox/unblacklist': 2, 'roblox/blacklisted': 1, 'roblox/binds': 1, 'case/search': 1, 'appeals/pending': 2, appeal: 2, 'staff/report': 3, automod: 3, welcome: 3, appeals: 4, 'moderation/timeout': 1, 'moderation/history': 1, 'note/add': 1, 'note/list': 1, 'case/view': 1, 'case/recent': 1,
     // Moderator
     moderation: 2, bans: 2, tempban: 2, softban: 2, 'role/rules': 2, 'role/allow': 4, nick: 2, slowmode: 2, 'case/reason': 2, 'note/remove': 2, newacct: 2,
     // Admin

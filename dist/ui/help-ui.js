@@ -9,7 +9,7 @@ import { embed } from './ui.js';
 export const HELP_SECTIONS = [
     { key: 'antinuke', label: 'Anti-nuke', emoji: '🛡️', blurb: 'Stops raids and nukes; manage the whitelist', commands: ['antinuke', 'antinuke-plus', 'trust'] },
     { key: 'moderation', label: 'Moderation', emoji: '🔨', blurb: 'Ban, kick, timeout, cases, notes and appeals', commands: ['moderation', 'tempban', 'softban', 'massban', 'role', 'bans', 'case', 'warnings', 'note', 'appeals', 'nick'] },
-    { key: 'security', label: 'Security', emoji: '🚨', blurb: 'Automod, raid mode, lockdowns and scam links', commands: ['security', 'emergency', 'automod', 'raidmode', 'newaccounts', 'lockdown', 'unlock', 'slowmode', 'scam', 'antiping', 'mention', 'webhooks', 'health'] },
+    { key: 'security', label: 'Security', emoji: '🚨', blurb: 'Automod, raid mode, lockdowns and scam links', commands: ['security', 'emergency', 'automod', 'raidmode', 'newaccounts', 'lockdown', 'unlock', 'slowmode', 'scam', 'antiping', 'webhooks', 'health'] },
     { key: 'configuration', label: 'Server Setup', emoji: '⚙️', blurb: 'Staff ranks, welcome, logs and permissions', commands: ['staff', 'welcome', 'logs', 'guild-config', 'perm', 'config-history'] },
     { key: 'recovery', label: 'Backups', emoji: '💾', blurb: 'Save and restore the server layout', commands: ['snapshot', 'backup', 'copylayout'] },
     { key: 'verification', label: 'Roblox', emoji: '🎮', blurb: 'Verification, lookups, blacklist and group ranks', commands: ['verify', 'roblox'] },
@@ -83,7 +83,7 @@ export function helpPage(ctx, guild, user, requested = '', requestedPage = 0) {
     if (!requested || requested === 'home' || !groups.some(g => g.key === requested)) {
         const total = groups.reduce((n, g) => n + g.lines.length, 0);
         const body = groups.map(g => `${section(g.key)?.emoji ?? '•'} **${g.label}** · ${g.lines.length}\n-# ${section(g.key)?.blurb ?? ''}`).join('\n');
-        return { embeds: [embed('Midtown Vanguard · Commands', `Type \`/\` and pick **Midtown Vanguard** to see the main commands:\n\`/antinuke\` \`/mod\` \`/role\` \`/security\` \`/roblox\` \`/setup\` \`/recovery\` \`/info\` \`/verify\`\n\n${body}\n\n-# ${total} commands available to you · pick a category below`)], components: [menu], allowedMentions: { parse: [] } };
+        return { embeds: [embed('Midtown Vanguard · Commands', `Type \`/\` and pick **Midtown Vanguard** to see the main commands:\n\`/antinuke\` \`/mod\` \`/role\` \`/security\` \`/setup\` \`/recovery\` \`/info\` \`/roblox\` \`/verify\`\n\n${body}\n\n-# ${total} commands available to you · pick a category below`)], components: [menu], allowedMentions: { parse: [] } };
     }
     const group = groups.find(g => g.key === requested);
     const pages = Math.ceil(group.lines.length / PER_PAGE), page = Math.min(Math.max(0, requestedPage), pages - 1);

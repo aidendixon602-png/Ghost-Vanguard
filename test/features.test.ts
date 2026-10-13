@@ -307,6 +307,11 @@ test('grouped command tree: fits Discord limits, routes back to the original mod
     assert.ok(flat instanceof ChatInputCommandInteraction);
     assert.equal(flat.commandName, 'moderation'); assert.equal(flat.options.getSubcommand(), 'ban'); assert.equal(flat.options.getSubcommandGroup(false), null);
     assert.equal(flat.options.data[0].name, 'ban'); assert.equal(flat.options.getString('reason'), 'spam');
+    // A single command placed inside a shared group: /dev server authorize → authserver.
+    const nested = routeInteraction(real('dev', [{ type: 2, name: 'server', options: [{ type: 1, name: 'authorize', options: [{ type: 3, name: 'guild_id', value: '123456789012345678' }] }] }]));
+    assert.equal(nested.commandName, 'authserver'); assert.equal(nested.options.getSubcommand(false), null); assert.equal(nested.options.getString('guild_id'), '123456789012345678');
+    const network = routeInteraction(real('network', [{ type: 1, name: 'hardban', options: [] }]));
+    assert.equal(network.commandName, 'hardban');
     const group = routeInteraction(real('security', [{ type: 2, name: 'automod', options: [{ type: 1, name: 'links', options: [{ type: 3, name: 'mode', value: 'off' }] }] }]));
     assert.equal(group.commandName, 'automod'); assert.equal(group.options.getSubcommand(), 'links'); assert.equal(group.options.data[0].name, 'links'); assert.equal(group.options.getString('mode'), 'off');
     const single = routeInteraction(real('info', [{ type: 1, name: 'ping', options: [] }]));

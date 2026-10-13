@@ -334,7 +334,7 @@ test('the anti-nuke command offers only on/off, status and checks — no rule ed
     const registry = new Registry();
     await registry.load();
     const names = (registry.commands.get('1:antinuke')!.data.options as any[]).map(o => o.name).sort();
-    assert.deepEqual(names, ['check', 'disable', 'enable', 'rules', 'status', 'test']);
+    assert.deepEqual(names, ['check', 'disable', 'enable', 'status']);
 });
 
 test('layout copy remaps source objects and repeated copies reuse destination mappings', async () => {

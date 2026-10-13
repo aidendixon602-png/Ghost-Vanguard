@@ -66,7 +66,7 @@ export class Guard {
         if (policy.requiresAuthorization) {
             this.store.assertAuthorized(i.guildId);
             if (this.ready && !this.ready(i.guildId))
-                throw new AppError('AUTHORIZATION_ERROR', 'Server systems are initializing. A developer can run /dev authserver to retry initialization.');
+                throw new AppError('AUTHORIZATION_ERROR', 'Server systems are initializing. A developer can run /dev server authorize to retry initialization.');
         }
         // Interaction member contains current permission data; fetch only role data if not cached.
         const actor = refreshMember ? await i.guild.members.fetch({ user: i.user.id, force: true }) : i.member;

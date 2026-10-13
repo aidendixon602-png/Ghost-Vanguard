@@ -8,13 +8,11 @@ import { readiness } from '../../security/readiness.js';
 import { applyLockedPreset, setAntinukeChoice } from '../../security/locked-antinuke.js';
 import { statusPanel } from '../../ui/antinuke-panel.js';
 
-export default defineCommand(new SlashCommandBuilder().setName('antinuke').setDescription('Anti-nuke: turn it on or off, see its rules and check Vanguard\'s permissions')
+export default defineCommand(new SlashCommandBuilder().setName('antinuke').setDescription('Anti-nuke: status, on or off, and Vanguard\'s permissions')
+    .addSubcommand(s => s.setName('status').setDescription('Is anti-nuke on? Its 17 rules, their limits and the whitelist'))
     .addSubcommand(s => s.setName('enable').setDescription('Turn anti-nuke on (saves a backup of the server first)'))
     .addSubcommand(s => s.setName('disable').setDescription('Turn anti-nuke off (stays off after restarts)'))
-    .addSubcommand(s => s.setName('rules').setDescription('Show the 17 anti-nuke rules and the whitelist'))
-    .addSubcommand(s => s.setName('status').setDescription('Show whether anti-nuke is on, its rules and the whitelist'))
-    .addSubcommand(s => s.setName('check').setDescription('Check Vanguard\'s permissions and role position'))
-    .addSubcommand(s => s.setName('test').setDescription('List each rule\'s trigger limit (no actions taken)')), { category: 'antinuke', cooldown: 1500, access: 'security' }, async (ctx: CommandContext, i) => {
+    .addSubcommand(s => s.setName('check').setDescription('Check Vanguard\'s permissions and role position')), { category: 'antinuke', cooldown: 1500, access: 'security' }, async (ctx: CommandContext, i) => {
     const actor = ctx.actor!;
     const s = ctx.store.settings(i.guildId);
     const sub = i.options.getSubcommand();
@@ -23,10 +21,6 @@ export default defineCommand(new SlashCommandBuilder().setName('antinuke').setDe
         return;
     }
     if(sub==='check') {if(s.logChannelId)await i.guild.channels.fetch(s.logChannelId).catch(()=>null);return readiness(i.guild,s.logChannelId,ctx.store).text;}
-    if (sub === 'test') {
-        const results = RULES.map(r => `${r.key}: triggers at ${r.count} in ${r.seconds}s`);
-        return `**Dry run:** ${results.length} rules loaded. No Discord actions or synthetic incidents were executed.\n${results.join('\n')}`;
-    }
     if (sub === 'enable') {
         if (!s.logChannelId)
             throw new AppError('VALIDATION_ERROR', 'Set a security log channel with /security config before enabling enforcement.');

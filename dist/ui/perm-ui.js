@@ -41,7 +41,7 @@ export function registerPermControls(registry) {
         execute: async (ctx, i) => {
             const match = /^perm:(\d{17,20}):(-?\d{1,6})$/.exec(i.customId);
             if (!match || match[1] !== i.user.id)
-                throw new AppError('PERMISSION_ERROR', 'This permission list belongs to another staff member. Run /setup perm list yourself.');
+                throw new AppError('PERMISSION_ERROR', 'This permission list belongs to another staff member. Run /setup permissions list yourself.');
             await i.editReply(permPage(ctx, i.guildId, i.user.id, Number(match[2])));
         },
     });
@@ -50,7 +50,7 @@ export function registerPermControls(registry) {
         execute: async (ctx, i) => {
             const match = /^permdiscord:(\d{17,20}):(-?\d{1,6})$/.exec(i.customId);
             if (!match || match[1] !== i.user.id)
-                throw new AppError('PERMISSION_ERROR', 'This listing belongs to another staff member. Run /setup perm discord yourself.');
+                throw new AppError('PERMISSION_ERROR', 'This listing belongs to another staff member. Run /setup permissions discord yourself.');
             await i.editReply(discordPermPage(ctx, i.guildId, i.user.id, Number(match[2])));
         },
     });

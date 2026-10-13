@@ -55,7 +55,7 @@ export function welcomePanel(store, guild, inviter = null) {
 export function pendingPanel(guild, deadline) {
     const e = new EmbedBuilder().setColor(Colors.Blurple).setTitle('⏳ Waiting for a Midtown Vanguard developer')
         .setDescription([
-        `An approved developer needs to run \`/dev authserver\` here **<t:${Math.floor(deadline / 1000)}:R>**, or Midtown Vanguard leaves on its own.`,
+        `An approved developer needs to run \`/dev server authorize\` here **<t:${Math.floor(deadline / 1000)}:R>**, or Midtown Vanguard leaves on its own.`,
         '',
         'Until then protection, logs and moderation commands stay off.',
         '-# If a developer invited the bot, this happens automatically when Vanguard can read the audit log.',

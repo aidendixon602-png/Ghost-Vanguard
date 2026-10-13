@@ -27,7 +27,7 @@ export default defineCommand(new SlashCommandBuilder().setName('userinfo').setDe
         const link = ctx.store.get('SELECT roblox_id,username FROM links WHERE guild_id=? AND user_id=?', i.guildId, user.id);
         const bypass = ctx.security.trusted(i.guild, user.id);
         const tempban = ctx.store.get('SELECT until FROM tempbans WHERE guild_id=? AND user_id=?', i.guildId, user.id);
-        lines.push('', '**Staff view**', `**Cases:** ${caseCount}${cases.length ? ` · latest: ${cases.map(c => `#${c.number} ${c.action} <t:${Math.floor(c.at / 1000)}:R>`).join(', ')}` : ''}`, `**Notes:** ${notes}${notes ? ' · /mod note list' : ''}`, `**Anti-nuke bypass:** ${bypass ? 'yes' : 'no'}`, `**Roblox:** ${link ? `${link.username ?? 'linked'} (${link.roblox_id})` : 'not linked'}`);
+        lines.push('', '**Staff view**', `**Cases:** ${caseCount}${cases.length ? ` · latest: ${cases.map(c => `#${c.number} ${c.action} <t:${Math.floor(c.at / 1000)}:R>`).join(', ')}` : ''}`, `**Notes:** ${notes}${notes ? ' · /mod notes list' : ''}`, `**Anti-nuke bypass:** ${bypass ? 'yes' : 'no'}`, `**Roblox:** ${link ? `${link.username ?? 'linked'} (${link.roblox_id})` : 'not linked'}`);
         if (tempban)
             lines.push(`**Temp-banned until:** ${t(tempban.until, 'f')}`);
     }

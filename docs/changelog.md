@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.28.0: commands reorganized
+- **`/antinuke`:** `status · enable · disable · check · scan · settings · whitelist`. `rules` and `test` are gone (`status` shows the rules and limits); `audit` is now **`scan`**, `extras` is now **`settings`**.
+- **`/network`** (new, developers): `genreban · ungenreban · hardban · unhardban`, instead of four separate top-level commands.
+- **`/dev server`** (new group): `authorize · deauthorize · info · list · ban · unban`, replacing `/dev authserver`, `deauthserver`, `serverauth`, `servers`, `banserver`, `unbanserver`.
+- **`/setup permissions`** (was `/setup perm`), **`/mod notes`** (was `/mod note`).
+- **Removed duplicates:** `/security mention` (same as `/security antiping`) and `/security roblox-block` (same as `/roblox blacklist`).
+- Groups are ordered by how often staff use them. Every message, help page and doc points to the new names, and `docs/commands.md` is generated from the bot so it can't drift.
+- Saved settings, permissions and command on/off switches are unchanged: they use the same internal names.
+
 ## 2.27.4
 - **`/dev restart`** (developers only): restarts the bot from Discord after a confirmation. About 10 seconds offline; settings are kept. `launch.js` stops the bot cleanly and starts it again, so no Wispbyte panel is needed.
 

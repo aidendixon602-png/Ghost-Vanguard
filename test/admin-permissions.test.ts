@@ -53,7 +53,7 @@ const ADMIN_CANNOT = [
     // destructive restoration and deleting recovery points or records
     'backup/restore', 'snapshot/restore', 'config-history/restore', 'backup/delete', 'snapshot/delete', 'snapshot/cleanup', 'case/delete',
     // switching protection off or exempting people
-    'antinuke/disable', 'disable', 'antinuke-plus/extras', 'trust/add', 'trust/remove', 'trust/bots', 'security/release', 'emergency/start', 'emergency/stop',
+    'antinuke/disable', 'disable', 'antinuke-plus/settings', 'trust/add', 'trust/remove', 'trust/bots', 'security/release', 'emergency/start', 'emergency/stop',
     // granting permissions
     'security/admin', 'staff/role', 'guild-config/permission-role',
 ];
