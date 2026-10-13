@@ -14,7 +14,8 @@
  *    .env and data/ are never touched by an update.
  */
 import { spawn, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, copyFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, copyFileSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -88,9 +89,8 @@ function install(sha) {
     if (!git('fetch', '-q', 'origin', BRANCH).ok) return false;
     const lockChanged = before && quiet('git', ['diff', '--quiet', before, sha, '--', 'package-lock.json']).status !== 0;
     if (!git('reset', '-q', '--hard', sha).ok) return false;
-    if (lockChanged || !existsSync(join(root, 'node_modules', 'discord.js'))) {
-        say('Dependencies changed; installing...');
-        if (!run('npm', ['ci', '--omit=dev', '--no-audit', '--no-fund'])) { say('npm install failed; going back.'); git('reset', '-q', '--hard', before); run('npm', ['ci', '--omit=dev', '--no-audit', '--no-fund']); return false; }
+    if (lockChanged || !depsCurrent()) {
+        if (!installDeps()) { say('npm install failed; going back.'); git('reset', '-q', '--hard', before); installDeps(); return false; }
     }
     return true;
 }
@@ -101,9 +101,24 @@ if (updatesOn) {
     else if (ensureCheckout()) say(`Automatic updates are on: github.com/${REPO} (${BRANCH}), checked every ${CHECK_MS / 60000} minutes.`);
 }
 
-if (!existsSync(join(root, 'node_modules', 'discord.js'))) {
-    say('Installing dependencies (first start only) ...');
-    if (!run('npm', ['install', '--omit=dev', '--no-audit', '--no-fund'])) { say('npm install failed.'); process.exit(1); }
+// Dependencies: installed when missing, and again whenever package-lock.json changed (for
+// example after the host pulled a new version from GitHub), so new code never starts without them.
+const lockHash = () => { try { return createHash('sha1').update(readFileSync(join(root, 'package-lock.json'))).digest('hex'); } catch { return 'none'; } };
+const marker = join(root, 'node_modules', '.vanguard-lock');
+function depsCurrent() {
+    try { return existsSync(join(root, 'node_modules', 'discord.js')) && readFileSync(marker, 'utf8') === lockHash(); } catch { return false; }
+}
+function installDeps() {
+    const fresh = !existsSync(join(root, 'node_modules', 'discord.js'));
+    say(fresh ? 'Installing dependencies (first start) ...' : 'Dependencies changed; updating them ...');
+    const ok = run('npm', ['ci', '--omit=dev', '--no-audit', '--no-fund']) || run('npm', ['install', '--omit=dev', '--no-audit', '--no-fund']);
+    if (ok) try { writeFileSync(marker, lockHash()); } catch { }
+    return ok;
+}
+if (!depsCurrent()) {
+    // Older installs have no marker yet: if discord.js is there, trust it and just record the lock.
+    if (existsSync(join(root, 'node_modules', 'discord.js')) && !existsSync(marker)) { try { writeFileSync(marker, lockHash()); } catch { } }
+    else if (!installDeps()) { say('npm install failed.'); process.exit(1); }
 }
 
 const data = join(root, 'data'), importDb = join(data, 'import', 'vanguard.db'), main = join(data, 'vanguard.db');

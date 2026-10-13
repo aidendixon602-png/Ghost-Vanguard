@@ -433,3 +433,19 @@ export async function assertLocalUnban(store, guild, userId, existing) {
     if (type !== 'local')
         throw new AppError('PERMISSION_ERROR', `This server ban was placed by a Midtown Vanguard ${type}. Local unbans only lift local bans; a developer can lift it with \`/un${type}\`.`);
 }
+/**
+ * A developer lifts a genreban/hardban from the ban log: revoke it, then unban everywhere it
+ * placed a ban. Same effect as /unhardban or /ungenreban.
+ */
+export async function liftNetworkBan(deps, userId, by, reason) {
+    const ban = activeBan(deps.store, 'hardban', userId) ?? activeBan(deps.store, 'genreban', userId);
+    if (!ban)
+        return { lifted: 0, failed: 0, servers: 0 };
+    revokeBan(deps.store, ban, by, reason);
+    const results = await unbanEverywhere(deps, ban, reason, by.id);
+    return {
+        lifted: results.filter(r => r.outcome === 'success').length,
+        failed: results.filter(r => !['success', 'skipped', 'already'].includes(r.outcome)).length,
+        servers: results.length,
+    };
+}

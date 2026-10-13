@@ -25,6 +25,11 @@ function grantsEscalation(entry, guild) {
         const change = changesOf(entry).find(c => c.key === 'permissions');
         return !!change && escalationAdded(change.old, change.new) !== 0n;
     }
+    // A brand-new role that already has Administrator (or another escalation permission).
+    if (entry.action === AuditLogEvent.RoleCreate) {
+        const change = changesOf(entry).find(c => c.key === 'permissions');
+        return !!change && escalationAdded(0n, change.new) !== 0n;
+    }
     return escalatingRolesAdded(entry, guild).length > 0;
 }
 /**
@@ -256,6 +261,16 @@ export class Security {
     /** Undo the grant behind a dangerous_grant incident: strip the new permissions from the role, or the new roles from the member. */
     async revertGrant(entry, guild) {
         this.store.assertAuthorized(guild.id);
+        if (entry.action === AuditLogEvent.RoleCreate) {
+            const role = entry.targetId ? await guild.roles.fetch(entry.targetId).catch(() => null) : null;
+            if (!role)
+                return 'The new role is already gone.';
+            if (role.managed || !role.editable)
+                return 'The new role is managed or above Vanguard; kept it.';
+            this.store.assertAuthorized(guild.id);
+            await role.delete('Midtown Vanguard: new role created with dangerous permissions');
+            return `Deleted the new role ${role.name}, which was created with dangerous permissions.`;
+        }
         if (entry.action === AuditLogEvent.RoleUpdate) {
             const change = changesOf(entry).find(c => c.key === 'permissions');
             const role = entry.targetId ? await guild.roles.fetch(entry.targetId).catch(() => null) : null;

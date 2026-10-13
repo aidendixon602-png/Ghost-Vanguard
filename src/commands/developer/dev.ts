@@ -5,6 +5,15 @@ import { confirmDanger } from '../../ui/danger-ui.js';
 import { AppError } from '../../errors.js';
 import { broadcast, broadcastTargets, clearPresenceOverride, inspectGuild, setPresenceOverride, type PresenceMode } from '../../bot/dev-tools.js';
 import { presenceLines } from '../../security/protection-stats.js';
+import { spawnSync } from 'node:child_process';
+
+/** Which GitHub commit is running, and whether automatic updates are on (no secrets shown). */
+function codeVersion(): string {
+    const commit = spawnSync('git', ['rev-parse', '--short', 'HEAD'], { encoding: 'utf8' });
+    const sha = commit.status === 0 ? commit.stdout.trim() : '';
+    const updates = process.env.UPDATE_REPO && process.env.UPDATE_TOKEN ? `on (${process.env.UPDATE_REPO})` : 'off';
+    return `${sha ? ` · commit \`${sha}\`` : ''}\n**Automatic updates:** ${updates}`;
+}
 
 export default defineCommand(new SlashCommandBuilder().setName('dev').setDescription('Developer tools: diagnostics, server lookup, announcements and bot status')
     .addSubcommand(s => s.setName('diagnostics').setDescription('Inspect runtime health without secrets'))
@@ -64,5 +73,5 @@ export default defineCommand(new SlashCommandBuilder().setName('dev').setDescrip
         ctx.client.user?.setPresence({ activities: [{ name: 'Custom Status', type: ActivityType.Custom, state: ctx.stats ? presenceLines(ctx.stats.get())[0]! : 'Midtown Vanguard' }], status: 'online' });
         return 'Back to the normal rotating status.';
     }
-    return `**Database:** ${ctx.store.get('PRAGMA quick_check')?.quick_check}\n**Connected servers:** ${ctx.client.guilds.cache.size}\n**Loaded commands:** ${ctx.registry.commands.size}\n**Version:** ${VERSION}\n**RoVer configured:** ${!!config.roverKey}\n**Bloxlink configured:** ${!!config.bloxlinkKey}\n**AI configured:** ${config.aiEnabled && !!config.openaiKey}\n**Uptime:** ${Math.floor(process.uptime())} seconds`;
+    return `**Database:** ${ctx.store.get('PRAGMA quick_check')?.quick_check}\n**Connected servers:** ${ctx.client.guilds.cache.size}\n**Loaded commands:** ${ctx.registry.commands.size}\n**Version:** ${VERSION}${codeVersion()}\n**RoVer configured:** ${!!config.roverKey}\n**Bloxlink configured:** ${!!config.bloxlinkKey}\n**AI configured:** ${config.aiEnabled && !!config.openaiKey}\n**Uptime:** ${Math.floor(process.uptime())} seconds`;
 });

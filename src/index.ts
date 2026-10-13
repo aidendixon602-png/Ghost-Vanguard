@@ -41,7 +41,7 @@ import { reportWebhook } from './features/webhooks.js';
 import { logBulkDelete, logDeletedMessage, logEditedMessage } from './features/message-logs.js';
 import { withdrawSharedBan } from './features/roblox-tools.js';
 import { forgetHeldBot, lockServerSettings, quarantineNewBot } from './features/antinuke-plus.js';
-import { activeBan, assertLocalUnban, enforceOnJoin, enforceOnUnban, existingBan, networkDeps, sweepNetworkBans } from './security/network-ban.js';
+import { activeBan, assertLocalUnban, enforceOnJoin, enforceOnUnban, existingBan, liftNetworkBan, networkDeps, recordId, sweepNetworkBans } from './security/network-ban.js';
 import { handleBanLogInteraction, onBanAdd, onBanRemove, registerBanLogRenderer } from './audit/ban-log.js';
 import { reportBotError } from './audit/bot-errors.js';
 
@@ -233,7 +233,11 @@ client.on(Events.InteractionCreate, i => {
     // Ban log buttons live on log messages, outside the command menus (which are tidied up automatically).
     if (i.inCachedGuild() && (i.isButton() || i.isModalSubmit()) && i.customId.startsWith('banrec:')) {
         if (!startupReady || !lifecycle.isReady(i.guildId)) return task('ban log button', i.reply({ content: 'Vanguard is still starting up. Try again in a moment.', flags: MessageFlags.Ephemeral }));
-        return task('ban log button', handleBanLogInteraction(i, { store, logs, assertLocalUnban: async (guild, id) => assertLocalUnban(store, guild, id, await existingBan(guild, id)) }));
+        return task('ban log button', handleBanLogInteraction(i, { store, logs, assertLocalUnban: async (guild, id) => assertLocalUnban(store, guild, id, await existingBan(guild, id)),
+            network: {
+                active: id => { const ban = activeBan(store, 'hardban', id) ?? activeBan(store, 'genreban', id); return ban ? { kind: ban.kind, record: recordId(ban) } : null; },
+                lift: (id, by, reason) => liftNetworkBan(network, id, by, reason),
+            } }));
     }
     task('interaction', router.handle(i));
 });

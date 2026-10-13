@@ -254,6 +254,14 @@ export interface BanButtonDeps {
     store: Store; logs: LogQueue;
     /** Lifts a ban only if it is not a genreban/hardban (those belong to /ungenreban and /unhardban). */
     assertLocalUnban: (guild: Guild, userId: string) => Promise<void>;
+    /**
+     * Genrebans and hardbans: the active one for this user (shown as e.g. "HB-00005"), and a way
+     * for a developer to lift it everywhere (same as /unhardban or /ungenreban).
+     */
+    network?: {
+        active(userId: string): { kind: 'genreban' | 'hardban'; record: string } | null;
+        lift(userId: string, by: { id: string; tag?: string }, reason: string): Promise<{ lifted: number; failed: number; servers: number }>;
+    };
 }
 
 const NOT_DEVELOPER = 'Only Midtown Vanguard developers can use the ban log buttons.';
@@ -287,8 +295,12 @@ export async function handleBanLogInteraction(i: ButtonInteraction<'cached'> | M
             publish(store, logs, fixed, false);
             return reply(`${label} is ${live ? 'already banned' : 'no longer banned'} on Discord, so the record was corrected. Nothing else was changed.`);
         }
+        const net = deps.network?.active(record.user_id) ?? null;
         if (action === 'unban') {
             if (!live) return reply(`${label} is not banned.`);
+            if (net) return i.reply({ flags: MessageFlags.Ephemeral, embeds: [new EmbedBuilder().setColor(Colors.Orange).setTitle(`Lift ${net.kind} ${net.record}?`)
+                .setDescription(`${label}\n**Original reason:** ${clip(record.reason ?? 'none', 500)}\n\nThis is a **${net.kind}** across every Midtown server. Confirming revokes **${net.record}** and unbans them in every server where it placed the ban (the same as \`/un${net.kind}\`). Bans placed by a server's own staff are left alone.`)],
+                components: [confirmRow(id, 'unban')] });
             return i.reply({ flags: MessageFlags.Ephemeral, embeds: [new EmbedBuilder().setColor(Colors.Green).setTitle('Unban this user?')
                 .setDescription(`${label}\n**Original reason:** ${clip(record.reason ?? 'none', 500)}\n\nThey will be able to rejoin. The ban record is kept and updated.`)], components: [confirmRow(id, 'unban')] });
         }
@@ -307,6 +319,15 @@ export async function handleBanLogInteraction(i: ButtonInteraction<'cached'> | M
         }
         if (action === 'cunban' && i.isButton()) {
             if (!live) return i.update({ content: `${label} is not banned any more. Nothing was changed.`, embeds: [], components: [] });
+            if (net && deps.network) {
+                const reason = `Lifted from the ban log (${caseId(record)})`;
+                await i.update({ content: `⏳ Lifting ${net.kind} **${net.record}** in every server…`, embeds: [], components: [] });
+                // Recorded first, so the unban events that follow do not add a second entry.
+                const updated = setStatus(store, record, 'unbanned', i.user.id, 'via-bot', `${net.kind} ${net.record} lifted by a developer`);
+                publish(store, logs, updated, false);
+                const result = await deps.network.lift(record.user_id, { id: i.user.id, tag: i.user.tag }, reason);
+                return i.editReply({ content: `${result.failed ? '⚠️' : '✅'} **${net.record}** revoked. Unbanned in ${result.lifted} of ${result.servers} server(s)${result.failed ? `; ${result.failed} could not be reached (check Vanguard's Ban Members permission there)` : ''}. ${label} can rejoin.` });
+            }
             try { await deps.assertLocalUnban(i.guild, record.user_id); }
             catch (error) { return i.update({ content: error instanceof Error ? error.message : 'This ban cannot be lifted here.', embeds: [], components: [] }); }
             const reason = `Unbanned from the ban log (${caseId(record)})`;

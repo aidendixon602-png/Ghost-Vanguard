@@ -157,3 +157,28 @@ test('/disable is remembered across restarts and /enable switches it back on',as
   assert.equal(antinukeOptedOut(store,'g'),false);assert.equal(await applyDefaultAntinuke(store,{id:'g'} as any,logs),'unchanged');assert.equal(store.settings('g').enabled,true);
  } finally {store.close();}
 });
+
+test('a brand-new role created with Administrator counts as a Permission Grant straight away; an ordinary new role does not',async()=>{
+ const {store,security,guild,entry}=fixture('observe');
+ try {
+  guild.roles={cache:new Collection()};
+  await security.audit(entry('plain','r1',AuditLogEvent.RoleCreate,[{key:'permissions',new:'0'}]),guild);
+  assert.equal(store.all("SELECT * FROM incidents WHERE rule='dangerous_grant'").length,0);
+  await security.audit(entry('admin','r2',AuditLogEvent.RoleCreate,[{key:'permissions',new:String(PermissionFlagsBits.Administrator)}]),guild);
+  assert.equal(store.all("SELECT * FROM incidents WHERE rule='dangerous_grant'").length,1,'first offence, no waiting for five role creations');
+  store.grant('g','actor','trust','owner');
+  await security.audit(entry('trusted','r3',AuditLogEvent.RoleCreate,[{key:'permissions',new:String(PermissionFlagsBits.Administrator)}]),guild);
+  assert.equal(store.all("SELECT * FROM incidents WHERE rule='dangerous_grant'").length,1,'whitelisted people are not affected');
+ } finally {store.close();}
+});
+
+test('reverting that grant deletes the new role when Vanguard can, and keeps it when it cannot',async()=>{
+ const {store,security,guild}=fixture();
+ try {
+  let deleted=0;
+  guild.roles={fetch:async(id:string)=>id==='r2'?{name:'Hacker',managed:false,editable:true,delete:async()=>{deleted++;}}:{name:'Top',managed:false,editable:false,delete:async()=>{deleted++;}}};
+  assert.match(await security.revertGrant({action:AuditLogEvent.RoleCreate,targetId:'r2',changes:[]} as any,guild),/^Deleted the new role Hacker/);
+  assert.match(await security.revertGrant({action:AuditLogEvent.RoleCreate,targetId:'r9',changes:[]} as any,guild),/kept it/);
+  assert.equal(deleted,1);
+ } finally {store.close();}
+});

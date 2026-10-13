@@ -274,3 +274,28 @@ test('buttons keep working after a restart: everything they need is in the datab
         assert.match(c.replies[0].content, /Unbanned/);
     } finally { config.developers.delete(DEV); w.store.close(); }
 });
+
+test('a developer can lift a hardban straight from its record: it confirms, then revokes it everywhere', async () => {
+    const w = world();
+    config.developers.add(DEV);
+    try {
+        const record = (await w.discordBan(BOT, `[Vanguard hardban] HB-00005 ${DEV}: threats`))!;
+        const lifted: any[] = [];
+        const deps = { store: w.store, logs: w.logs, assertLocalUnban: async () => { throw new Error('only a developer can, with /unhardban'); },
+            network: { active: () => ({ kind: 'hardban' as const, record: 'HB-00005' }),
+                lift: async (userId: string, by: any, reason: string) => { lifted.push({ userId, by: by.id, reason }); w.bans.delete(userId); return { lifted: 3, failed: 0, servers: 3 }; } } };
+        const ask = click(w, `banrec:unban:${record.id}`, DEV);
+        await handleBanLogInteraction(ask.i, deps);
+        assert.equal(ask.replies[0].embeds[0].data.title, 'Lift hardban HB-00005?', 'the confirmation says it is network-wide');
+        assert.equal(lifted.length, 0, 'nothing happens before confirming');
+        const confirm = click(w, `banrec:cunban:${record.id}`, DEV);
+        confirm.i.editReply = async (p: any) => confirm.replies.push({ kind: 'edit', ...p });
+        await handleBanLogInteraction(confirm.i, deps);
+        assert.deepEqual(lifted.map(l => [l.userId, l.by]), [[USER, DEV]]);
+        assert.match(confirm.replies.at(-1).content, /HB-00005\*\* revoked\. Unbanned in 3 of 3/);
+        assert.equal(getRecord(w.store, G, record.id)!.status, 'unbanned');
+        const staff = click(w, `banrec:cunban:${record.id}`, STAFF);
+        await handleBanLogInteraction(staff.i, deps);
+        assert.match(staff.replies[0].content, /Only Midtown Vanguard developers/, 'still developers only');
+    } finally { config.developers.delete(DEV); w.store.close(); }
+});
