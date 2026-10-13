@@ -217,8 +217,44 @@ export function permissionDiff(oldValue: unknown, newValue: unknown, key: 'permi
     return parts.length > 25 ? `${parts.slice(0, 25).join(', ')} and ${parts.length - 25} more` : parts.join(', ');
 }
 
+/** Permissions worth calling out when a whole role is created or deleted (the everyday ones are just counted). */
+const NOTABLE = ['Administrator', 'ManageGuild', 'ManageRoles', 'ManageChannels', 'BanMembers', 'KickMembers', 'ModerateMembers', 'ManageWebhooks', 'ManageMessages', 'MentionEveryone', 'ManageNicknames', 'ViewAuditLog'] as const;
+export function notablePermissions(value: unknown): string | null {
+    const all = bits(value);
+    if (all === null) return null;
+    const flags = Object.entries(PermissionsBitField.Flags).filter(([, bit]) => all & bit);
+    const notable = flags.filter(([flag]) => (NOTABLE as readonly string[]).includes(flag)).map(([flag]) => `\`${permissionName(flag)}\``);
+    const rest = flags.length - notable.length;
+    if (!flags.length) return 'none';
+    return [notable.join(', '), rest && `${rest} everyday permission${rest === 1 ? '' : 's'}`].filter(Boolean).join(' + ');
+}
+
+/** One line per channel permission whose state changed: allowed, denied or reset. */
+export function overwriteDiff(entry: GuildAuditLogsEntry): string | null {
+    const changes = (entry.changes ?? []) as { key: string; old?: unknown; new?: unknown }[];
+    const allow = changes.find(c => c.key === 'allow'), deny = changes.find(c => c.key === 'deny');
+    if (!allow && !deny) return null;
+    const created = entry.action === AuditLogEvent.ChannelOverwriteCreate, removed = entry.action === AuditLogEvent.ChannelOverwriteDelete;
+    const pick = (c: typeof allow, side: 'old' | 'new') => bits(c ? c[side] : 0) ?? 0n;
+    // Discord only lists the side that changed; the unchanged side keeps its value (unknown to us), so treat it as unchanged.
+    const before = { a: pick(allow, created ? 'new' : 'old'), d: pick(deny, created ? 'new' : 'old') };
+    const after = { a: pick(allow, removed ? 'old' : 'new'), d: pick(deny, removed ? 'old' : 'new') };
+    if (created) { before.a = 0n; before.d = 0n; }
+    if (removed) { after.a = 0n; after.d = 0n; }
+    const parts: string[] = [];
+    for (const [flag, bit] of Object.entries(PermissionsBitField.Flags)) {
+        const was = before.a & bit ? 'allowed' : before.d & bit ? 'denied' : 'reset';
+        const now = after.a & bit ? 'allowed' : after.d & bit ? 'denied' : 'reset';
+        if (was !== now) parts.push(`\`${permissionName(flag)}\` ${now}`);
+    }
+    if (!parts.length) return null;
+    return parts.length > 25 ? `${parts.slice(0, 25).join(', ')} and ${parts.length - 25} more` : parts.join(', ');
+}
+
 function changeLines(entry: GuildAuditLogsEntry): string[] {
     const lines: string[] = [];
+    const overwrite = overwriteDiff(entry);
+    if (overwrite) lines.push(`🔐 **Permissions:** ${overwrite}`);
     for (const change of (entry.changes ?? []) as {
         key: string;
         old?: any;
@@ -231,10 +267,12 @@ function changeLines(entry: GuildAuditLogsEntry): string[] {
             lines.push(`**${change.key === '$add' ? 'Roles added' : 'Roles removed'}:** ${roles}`);
         } else if (change.key === 'communication_disabled_until')
             continue;
-        else if (change.key === 'permissions' || change.key === 'allow' || change.key === 'deny') {
-            const diff = permissionDiff(change.old, change.new, change.key);
+        else if (change.key === 'permissions') {
+            const diff = entry.action === AuditLogEvent.RoleCreate || entry.action === AuditLogEvent.RoleDelete
+                ? notablePermissions(change.new ?? change.old) : permissionDiff(change.old, change.new);
             if (diff) lines.unshift(`🔐 **Permissions:** ${diff}`);
-        }
+        } else if (change.key === 'allow' || change.key === 'deny')
+            continue;
         else if (!HIDDEN_KEYS.has(change.key))
             lines.push(`**${change.key.replaceAll('_', ' ')}:** ${shown(change.old)} → ${shown(change.new)}`);
         if (lines.length >= 6)
@@ -325,7 +363,7 @@ export function describeAudit(entry: GuildAuditLogsEntry, guild: Guild, options:
     const user = kind === 'user' && target && typeof target.displayAvatarURL === 'function' ? target : null;
     const channelId = kind === 'channel' ? entry.targetId : extra?.channel ? String(extra.channel.id ?? extra.channel) : null;
     return { category, action, actorId: actor, targetId: entry.targetId ?? null, target: targetText(entry, kind), details, at: entry.createdTimestamp,
-        actorLabel: category === 'moderation' ? 'Moderator' : kind === 'role' ? 'Updated By' : 'Changed by', color: ACTION_COLOR[action],
+        actorLabel: category === 'moderation' ? 'Moderator' : kind === 'role' ? (entry.action === AuditLogEvent.RoleCreate ? 'Created By' : entry.action === AuditLogEvent.RoleDelete ? 'Deleted By' : 'Updated By') : 'Changed by', color: ACTION_COLOR[action],
         targetLabel: kind === 'role' ? 'Role' : undefined,
         author: user ? { name: user.tag ?? user.username, iconURL: user.displayAvatarURL() } : null, channelId };
 }

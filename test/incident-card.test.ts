@@ -34,3 +34,26 @@ test('role permission changes list each permission granted or revoked', () => {
     assert.deepEqual(e.fields!.map(x => x.name), ['Role', 'Updated By']);
     assert.match(e.footer!.text, /^Role ID: 5/);
 });
+
+import { AuditLogEvent } from 'discord.js';
+import { describeAudit } from '../src/audit/event-log.js';
+const F = PermissionsBitField.Flags;
+const guild: any = { id: 'g', client: { user: { id: 'bot' }, users: { cache: new Map() } }, members: { cache: new Map() }, ownerId: 'o' };
+const audit = (action: number, changes: any[]) => describeAudit({ id: '1', action, executorId: 'owen', targetId: '555', createdTimestamp: Date.now(), changes, target: { name: 'x' } } as any, guild)!;
+
+test('a new role shows only its notable permissions and who created it', () => {
+    const ev = audit(AuditLogEvent.RoleCreate, [{ key: 'permissions', new: (F.Administrator | F.SendMessages | F.ViewChannel).toString() }]);
+    assert.equal(ev.details![0], '🔐 **Permissions:** `administrator` + 2 everyday permissions');
+    assert.equal(ev.actorLabel, 'Created By');
+    assert.equal(audit(AuditLogEvent.RoleDelete, []).actorLabel, 'Deleted By');
+});
+
+test('channel permission changes give one clear state per permission', () => {
+    const flip = audit(AuditLogEvent.ChannelOverwriteUpdate, [{ key: 'allow', old: '0', new: F.SendMessages.toString() }, { key: 'deny', old: F.SendMessages.toString(), new: '0' }]);
+    assert.deepEqual(flip.details!.filter(l => l.startsWith('🔐')), ['🔐 **Permissions:** `send messages` allowed']);
+    const create = audit(AuditLogEvent.ChannelOverwriteCreate, [{ key: 'allow', new: F.ViewChannel.toString() }, { key: 'deny', new: F.SendMessages.toString() }]);
+    assert.equal(create.details![0], '🔐 **Permissions:** `view channel` allowed, `send messages` denied');
+    const removed = audit(AuditLogEvent.ChannelOverwriteDelete, [{ key: 'allow', old: F.ViewChannel.toString() }, { key: 'deny', old: '0' }]);
+    assert.equal(removed.details![0], '🔐 **Permissions:** `view channel` reset');
+    assert.equal(audit(AuditLogEvent.RoleUpdate, [{ key: 'permissions', old: 'abc', new: '1' }]).details!.length, 0, 'bad data is skipped, not crashed on');
+});

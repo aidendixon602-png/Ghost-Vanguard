@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.29.1: log fixes from a full check
+- **New roles** list only the permissions that matter (administrator, ban, kick, manage server…) plus a count of everyday ones, instead of 20+ names.
+- **Channel permission changes** show one clear state per permission (allowed / denied / reset). Before, flipping a permission from denied to allowed printed two lines that contradicted each other.
+- Role logs say **Created By** / **Deleted By** / **Updated By** to match what happened.
+- Bad permission data from Discord is skipped instead of shown wrong.
+
 ## 2.29.0: clearer anti-nuke alerts and permission logs
 - **New anti-nuke alert:** "**@user was stripped for triggering anti-nuke.**" with **Action**, **Punishment**, **Limit**, **Changes reverted** and **Target** fields, and the full detail underneath. The footer shows the incident number and user ID.
   - If the punishment didn't work (for example the bot role is too low), it says so: "triggered anti-nuke but could **not** be banned".
