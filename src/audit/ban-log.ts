@@ -265,9 +265,26 @@ export interface BanButtonDeps {
 }
 
 const NOT_DEVELOPER = 'Only Midtown Vanguard developers can use the ban log buttons.';
-const confirmRow = (id: number, action: 'unban' | 'reban') => new ActionRowBuilder<ButtonBuilder>().addComponents(
-    new ButtonBuilder().setCustomId(`${REF}:c${action}:${id}`).setLabel(action === 'unban' ? 'Confirm unban' : 'Confirm reban').setStyle(action === 'unban' ? ButtonStyle.Success : ButtonStyle.Danger),
+const confirmRow = (id: number, action: 'unban' | 'reban', label?: string) => new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder().setCustomId(`${REF}:c${action}:${id}`).setLabel(label ?? (action === 'unban' ? 'Unban' : 'Reban')).setEmoji(action === 'unban' ? '🔓' : '🔨').setStyle(action === 'unban' ? ButtonStyle.Success : ButtonStyle.Danger),
     new ButtonBuilder().setCustomId(`${REF}:cancel:${id}`).setLabel('Cancel').setStyle(ButtonStyle.Secondary));
+
+const KIND_TITLE: Record<string, string> = { genreban: 'Genreban', hardban: 'Hardban', tempban: 'Temporary ban', softban: 'Softban', automatic: 'Automatic ban' };
+
+/** The private prompts and results for the ban log buttons: same look as the record itself. */
+function card(r: BanRecord, o: { title: string; color: number; ban?: string; fields?: { name: string; value: string; inline?: boolean }[]; footer?: string }) {
+    const e = new EmbedBuilder().setColor(o.color).setTitle(o.title)
+        .setAuthor({ name: r.username ?? r.user_id, iconURL: r.avatar_url ?? undefined })
+        .addFields(
+            { name: 'User', value: `<@${r.user_id}>\n\`${r.user_id}\``, inline: true },
+            { name: 'Case', value: caseId(r), inline: true },
+            { name: 'Ban', value: o.ban ?? KIND_TITLE[r.kind] ?? 'Ban', inline: true },
+            ...(o.fields ?? []),
+        );
+    if (o.footer) e.setFooter({ text: o.footer });
+    return e;
+}
+const reasonField = (r: BanRecord) => ({ name: 'Original reason', value: clip(r.reason || 'No reason provided', 1024) });
 
 /** Is this user banned right now? true / false, or null when Discord could not be asked. */
 async function bannedNow(guild: Guild, userId: string): Promise<boolean | null> {
@@ -298,11 +315,13 @@ export async function handleBanLogInteraction(i: ButtonInteraction<'cached'> | M
         const net = deps.network?.active(record.user_id) ?? null;
         if (action === 'unban') {
             if (!live) return reply(`${label} is not banned.`);
-            if (net) return i.reply({ flags: MessageFlags.Ephemeral, embeds: [new EmbedBuilder().setColor(Colors.Orange).setTitle(`Lift ${net.kind} ${net.record}?`)
-                .setDescription(`${label}\n**Original reason:** ${clip(record.reason ?? 'none', 500)}\n\nThis is a **${net.kind}** across every Midtown server. Confirming revokes **${net.record}** and unbans them in every server where it placed the ban (the same as \`/un${net.kind}\`). Bans placed by a server's own staff are left alone.`)],
-                components: [confirmRow(id, 'unban')] });
-            return i.reply({ flags: MessageFlags.Ephemeral, embeds: [new EmbedBuilder().setColor(Colors.Green).setTitle('Unban this user?')
-                .setDescription(`${label}\n**Original reason:** ${clip(record.reason ?? 'none', 500)}\n\nThey will be able to rejoin. The ban record is kept and updated.`)], components: [confirmRow(id, 'unban')] });
+            const name = record.username ?? record.user_id;
+            if (net) return i.reply({ flags: MessageFlags.Ephemeral, embeds: [card(record, { title: `🔓 Unban ${name}?`, color: Colors.Blurple, ban: `${KIND_TITLE[net.kind]} · ${net.record}`,
+                fields: [reasonField(record), { name: 'What happens', value: `• Unbanned in **every** Midtown server\n• ${net.record} is closed, so it won't be re-applied\n• Bans placed by a server's own staff stay` }],
+                footer: 'Only Midtown Vanguard developers can do this' })], components: [confirmRow(id, 'unban', 'Unban everywhere')] });
+            return i.reply({ flags: MessageFlags.Ephemeral, embeds: [card(record, { title: `🔓 Unban ${name}?`, color: Colors.Blurple,
+                fields: [reasonField(record), { name: 'What happens', value: '• They can rejoin this server\n• This ban record is updated, not deleted' }],
+                footer: 'Only Midtown Vanguard developers can do this' })], components: [confirmRow(id, 'unban')] });
         }
         if (action === 'reban') {
             if (live) return reply(`${label} is already banned.`);
@@ -314,19 +333,22 @@ export async function handleBanLogInteraction(i: ButtonInteraction<'cached'> | M
         if (action === 'rebanform' && i.isModalSubmit()) {
             const reason = i.fields.getTextInputValue('reason').trim();
             if (reason.length < 3) return reply('A reason is required.');
-            return i.reply({ flags: MessageFlags.Ephemeral, embeds: [new EmbedBuilder().setColor(Colors.Red).setTitle('Reban this user?')
-                .setDescription(`${label}`).addFields({ name: 'Reban reason', value: clip(reason, 1024) })], components: [confirmRow(id, 'reban')] });
+            return i.reply({ flags: MessageFlags.Ephemeral, embeds: [card(record, { title: `🔨 Reban ${record.username ?? record.user_id}?`, color: Colors.Red,
+                fields: [reasonField(record), { name: 'Reban reason', value: clip(reason, 1024) }, { name: 'What happens', value: '• They are banned from this server again\n• This ban record is updated with your reason' }],
+                footer: 'Only Midtown Vanguard developers can do this' })], components: [confirmRow(id, 'reban')] });
         }
         if (action === 'cunban' && i.isButton()) {
             if (!live) return i.update({ content: `${label} is not banned any more. Nothing was changed.`, embeds: [], components: [] });
             if (net && deps.network) {
                 const reason = `Lifted from the ban log (${caseId(record)})`;
-                await i.update({ content: `⏳ Lifting ${net.kind} **${net.record}** in every server…`, embeds: [], components: [] });
+                await i.update({ embeds: [card(record, { title: `⏳ Unbanning ${record.username ?? record.user_id} everywhere…`, color: Colors.Blurple, ban: `${KIND_TITLE[net.kind]} · ${net.record}` })], components: [] });
                 // Recorded first, so the unban events that follow do not add a second entry.
                 const updated = setStatus(store, record, 'unbanned', i.user.id, 'via-bot', `${net.kind} ${net.record} lifted by a developer`);
                 publish(store, logs, updated, false);
                 const result = await deps.network.lift(record.user_id, { id: i.user.id, tag: i.user.tag }, reason);
-                return i.editReply({ content: `${result.failed ? '⚠️' : '✅'} **${net.record}** revoked. Unbanned in ${result.lifted} of ${result.servers} server(s)${result.failed ? `; ${result.failed} could not be reached (check Vanguard's Ban Members permission there)` : ''}. ${label} can rejoin.` });
+                return i.editReply({ embeds: [card(record, { title: `${result.failed ? '⚠️' : '✅'} ${record.username ?? record.user_id} unbanned`, color: result.failed ? Colors.Orange : Colors.Green, ban: `${KIND_TITLE[net.kind]} · ${net.record} (closed)`,
+                    fields: [{ name: 'Servers', value: `Unbanned in **${result.lifted} of ${result.servers}**${result.failed ? `\n${result.failed} could not be reached: check Vanguard's Ban Members permission there` : ''}` }],
+                    footer: 'The ban record has been updated' })] });
             }
             try { await deps.assertLocalUnban(i.guild, record.user_id); }
             catch (error) { return i.update({ content: error instanceof Error ? error.message : 'This ban cannot be lifted here.', embeds: [], components: [] }); }
@@ -334,7 +356,7 @@ export async function handleBanLogInteraction(i: ButtonInteraction<'cached'> | M
             await i.guild.members.unban(record.user_id, clip(`${i.user.id}: ${reason}`, 500));
             const updated = setStatus(store, record, 'unbanned', i.user.id, 'via-bot', reason);
             publish(store, logs, updated, false);
-            return i.update({ content: `✅ Unbanned ${label}. The record now shows who unbanned them and when.`, embeds: [], components: [] });
+            return i.update({ embeds: [card(updated, { title: `✅ ${record.username ?? record.user_id} unbanned`, color: Colors.Green, footer: 'The ban record has been updated' })], components: [] });
         }
         if (action === 'creban' && i.isButton()) {
             const reason = i.message.embeds[0]?.fields.find(f => f.name === 'Reban reason')?.value;
@@ -347,10 +369,10 @@ export async function handleBanLogInteraction(i: ButtonInteraction<'cached'> | M
             catch (error) {
                 const reverted = setStatus(store, updated, 'unbanned', null, 'unverified', `Reban by <@${i.user.id}> failed: ${error instanceof Error ? error.message : 'unknown error'}`);
                 publish(store, logs, reverted, false);
-                return i.update({ content: `❌ The reban failed: ${error instanceof Error ? error.message : 'unknown error'}. Check Vanguard's role is above theirs and it has Ban Members.`, embeds: [], components: [] });
+                return i.update({ embeds: [card(record, { title: '❌ Reban failed', color: Colors.Red, fields: [{ name: 'Why', value: clip(`${error instanceof Error ? error.message : 'unknown error'}. Check Vanguard's role is above theirs and it has Ban Members.`, 1024) }] })], components: [] });
             }
             publish(store, logs, updated, false);
-            return i.update({ content: `✅ Rebanned ${label}. The record now shows the reban, your reason, and when.`, embeds: [], components: [] });
+            return i.update({ embeds: [card(updated, { title: `🔨 ${record.username ?? record.user_id} rebanned`, color: Colors.Red, fields: [{ name: 'Reban reason', value: clip(reason, 1024) }], footer: 'The ban record has been updated' })], components: [] });
         }
         return reply('That button is no longer valid.');
     });

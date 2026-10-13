@@ -199,11 +199,11 @@ test('Unban asks to confirm, re-checks the real ban, then updates the original r
         await w.logs.flush();
         const first = click(w, `banrec:unban:${record.id}`, DEV);
         await run(w, first);
-        assert.equal(first.replies[0].embeds[0].data.title, 'Unban this user?', 'a confirmation comes first');
+        assert.equal(first.replies[0].embeds[0].data.title, '🔓 Unban urloffy?', 'a confirmation comes first');
         assert.ok(w.bans.has(USER), 'not unbanned before confirming');
         const confirm = click(w, `banrec:cunban:${record.id}`, DEV);
         await run(w, confirm);
-        assert.match(confirm.replies[0].content, /Unbanned/);
+        assert.equal(confirm.replies[0].embeds[0].data.title, '✅ urloffy unbanned');
         assert.equal(w.bans.has(USER), false);
         const updated = getRecord(w.store, G, record.id)!;
         assert.deepEqual([updated.status, updated.status_by, updated.reason], ['unbanned', DEV, 'raid'], 'original details kept, status added');
@@ -230,11 +230,11 @@ test('Reban needs a reason, confirms, records the developer, and never starts a 
         const form = click(w, `banrec:rebanform:${record.id}`, DEV, { modal: true, reason: 'came back and raided again' });
         await run(w, form);
         const confirmEmbed = form.replies[0].embeds[0].data;
-        assert.equal(confirmEmbed.title, 'Reban this user?');
+        assert.equal(confirmEmbed.title, '🔨 Reban urloffy?');
         assert.equal(w.bans.has(USER), false, 'not banned before confirming');
         const confirm = click(w, `banrec:creban:${record.id}`, DEV, { embeds: [{ fields: confirmEmbed.fields }] });
         await run(w, confirm);
-        assert.match(confirm.replies[0].content, /Rebanned/);
+        assert.equal(confirm.replies[0].embeds[0].data.title, '🔨 urloffy rebanned');
         assert.ok(w.bans.has(USER));
         assert.match(w.bans.get(USER)!, new RegExp(`^${DEV}: Reban \\(BAN-0001\\): came back and raided again`));
         // Discord's ban event for the reban: the open record already covers it.
@@ -271,7 +271,7 @@ test('buttons keep working after a restart: everything they need is in the datab
         registerBanLogRenderer(w.store, logs);
         const c = click(w, `banrec:cunban:${record.id}`, DEV);
         await handleBanLogInteraction(c.i, { store: w.store, logs, assertLocalUnban: async () => undefined });
-        assert.match(c.replies[0].content, /Unbanned/);
+        assert.equal(c.replies[0].embeds[0].data.title, '✅ urloffy unbanned');
     } finally { config.developers.delete(DEV); w.store.close(); }
 });
 
@@ -286,13 +286,16 @@ test('a developer can lift a hardban straight from its record: it confirms, then
                 lift: async (userId: string, by: any, reason: string) => { lifted.push({ userId, by: by.id, reason }); w.bans.delete(userId); return { lifted: 3, failed: 0, servers: 3 }; } } };
         const ask = click(w, `banrec:unban:${record.id}`, DEV);
         await handleBanLogInteraction(ask.i, deps);
-        assert.equal(ask.replies[0].embeds[0].data.title, 'Lift hardban HB-00005?', 'the confirmation says it is network-wide');
+        assert.equal(ask.replies[0].embeds[0].data.title, '🔓 Unban urloffy?');
+        assert.match(JSON.stringify(ask.replies[0]), /every\*\* Midtown server/, 'the confirmation says it is network-wide');
+        assert.match(JSON.stringify(ask.replies[0]), /Unban everywhere/);
         assert.equal(lifted.length, 0, 'nothing happens before confirming');
         const confirm = click(w, `banrec:cunban:${record.id}`, DEV);
         confirm.i.editReply = async (p: any) => confirm.replies.push({ kind: 'edit', ...p });
         await handleBanLogInteraction(confirm.i, deps);
         assert.deepEqual(lifted.map(l => [l.userId, l.by]), [[USER, DEV]]);
-        assert.match(confirm.replies.at(-1).content, /HB-00005\*\* revoked\. Unbanned in 3 of 3/);
+        assert.equal(confirm.replies.at(-1).embeds[0].data.title, '✅ urloffy unbanned');
+        assert.match(JSON.stringify(confirm.replies.at(-1)), /Unbanned in \*\*3 of 3/);
         assert.equal(getRecord(w.store, G, record.id)!.status, 'unbanned');
         const staff = click(w, `banrec:cunban:${record.id}`, STAFF);
         await handleBanLogInteraction(staff.i, deps);

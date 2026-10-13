@@ -1,5 +1,8 @@
 # Changelog
 
+## 2.26.1
+- **Cleaner ban log prompts.** Unban and Reban confirmations now look like the ban record: avatar, user, case, ban type, original reason and a short "What happens" list, with **🔓 Unban** / **🔓 Unban everywhere** / **🔨 Reban** buttons. Results show as matching cards instead of plain text.
+
 ## 2.26.0
 - **Ban log buttons work for genrebans and hardbans.** A developer pressing **Unban** on a network-ban record is now asked to lift it everywhere (same as `/unhardban` / `/ungenreban`) instead of being told to use the command.
 - **Anti-nuke:** creating a new role that already has Administrator (or Manage Server, Ban, Kick, Manage Channels, Manage Webhooks) now counts as a Permission Grant straight away: the creator is stripped and the role deleted. Ordinary new roles still count toward the 5-in-2-minutes limit.
