@@ -56,7 +56,7 @@ export function explainBan(store, guild, userId, audit, fallbackReason, now = Da
         d.evidence = [record?.evidence, record?.evidence_file].filter(Boolean).join('\n') || null;
         d.moderatorId = record?.moderator_id ?? m?.[1] ?? null;
         d.moderatorRole = audit?.executorId === botId ? 'via-bot' : 'unverified';
-        d.approved = record ? `Midtown Vanguard developer <@${record.moderator_id}> · ${recordId(record)}` : null;
+        d.approved = record ? `<@${record.moderator_id}> (developer) · ${recordId(record)}` : null;
         d.duration = NETWORK_DURATION[kind];
         d.networkRecord = record ? recordId(record) : /\b([GH]B-\d+)\b/.exec(raw)?.[1] ?? null;
         return d;
@@ -213,7 +213,7 @@ export async function onBanRemove(store, logs, guild, user) {
 export function coverWithNetwork(store, logs, guildId, user, ban, at = Date.now()) {
     const id = recordId(ban);
     const open = openRecord(store, guildId, user.id);
-    const approved = `Midtown Vanguard developer <@${ban.moderator_id}> · ${id}`;
+    const approved = `<@${ban.moderator_id}> (developer) · ${id}`;
     const evidence = [ban.evidence, ban.evidence_file].filter(Boolean).join('\n') || null;
     if (open) {
         if (open.network_record === id)

@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.27.3
+- **Cleaner system notices.** "Back online", "Saved protection loaded", "Anti-nuke protection on" and snapshot messages use fields instead of a block of text, and snapshots say who made them ("Midtown Vanguard (automatic)") instead of a raw ID.
+- "Back online" counts the whole whitelist (users, roles and per-rule entries), not only full-bypass users.
+- **Data-loss protection:**
+  - starting with an empty database while already in servers now warns in each server and DMs the developers with how to restore
+  - if `data/vanguard.db` is missing but its automatic backups are there, `launch.js` puts the newest backup back before starting
+- A restart test now checks every kind of saved setting survives (whitelist, ranks, logging, automod, raid mode, cases, ban log, network bans and more).
+- Ban log "Approved by" is shorter: `@developer (developer) · HB-00002`.
+
 ## 2.27.2
 - **`/antinuke trust` is now `/antinuke whitelist`**, with clearer subcommands:
   - `add` (was `manage`) opens the panel: pick who, what anti-nuke lets them do, and for how long

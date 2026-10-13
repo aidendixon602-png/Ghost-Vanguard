@@ -1,3 +1,4 @@
+import { noticeEmbed } from '../ui/notice.js';
 import { Colors, type Guild } from 'discord.js';
 import { RULES } from '../core.js';
 import type { Settings, Store } from '../database/db.js';
@@ -46,6 +47,6 @@ export async function applyDefaultAntinuke(store: Store, guild: Guild, logs: Log
     let snapshot: number | null = null;
     if (!wasEnabled && baseline) snapshot = await baseline(guild).catch(() => null);
     logEvent('antinuke_default_applied', { guildId: guild.id, wasEnabled, snapshot });
-    logs.push(guild.id, embed('Anti-nuke protection active', `The standard ${RULES.length}-rule anti-nuke preset is enabled in enforce mode${snapshot ? ` · baseline #${snapshot}` : ''}. Rules are fixed; use /antinuke whitelist for exceptions and /antinuke disable to switch protection off.`, Colors.Green));
+    logs.push(guild.id, noticeEmbed('🛡️ Anti-nuke protection on', [`The standard anti-nuke preset is running. Nothing needs to be switched on.`, `**Rules:** ${RULES.length}`, '**Mode:** enforce', ...(snapshot ? [`**Baseline:** snapshot #${snapshot}`] : []), '**Exceptions:** `/antinuke whitelist add`', '**Turn off:** `/antinuke disable`'], Colors.Green));
     return 'enabled';
 }

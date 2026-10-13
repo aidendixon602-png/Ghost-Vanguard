@@ -126,7 +126,7 @@ test('every authorized server gets the fixed preset enabled in enforce mode auto
   const alerts:any[]=[];let baselines=0;const logs:any={push:(_g:any,e:any)=>alerts.push(e.toJSON())};
   assert.equal(await applyDefaultAntinuke(store,{id:'g'} as any,logs,async()=>++baselines),'enabled');
   const r=store.settings('g');assert.equal(r.enabled,true);assert.equal(r.mode,'enforce');assert.deepEqual(r.rules,{});assert.equal(store.kickBots('g'),false);
-  assert.equal(baselines,1);assert.match(alerts[0].description,/17-rule/);
+  assert.equal(baselines,1);assert.match(JSON.stringify(alerts[0]),/"name":"Rules","value":"17"/);
   assert.equal(await applyDefaultAntinuke(store,{id:'g'} as any,logs,async()=>++baselines),'unchanged');assert.equal(baselines,1);assert.equal(alerts.length,1);
   authorize(store,'other');store.run("UPDATE guild_authorization SET state='DEAUTHORIZED' WHERE guild_id='other'");
   assert.equal(await applyDefaultAntinuke(store,{id:'other'} as any,logs),'unchanged');assert.equal(store.settings('other').enabled,false);

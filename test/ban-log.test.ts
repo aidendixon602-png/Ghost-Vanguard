@@ -143,7 +143,7 @@ test('genrebans and hardbans show the developer approval and evidence', async ()
         const f = fieldsOf(renderRecord(latestRecord(w.store, G, USER)!));
         assert.equal(f.Type, 'Genreban');
         assert.equal(f.Evidence, 'ticket 42');
-        assert.match(f['Approved by'], new RegExp(`<@${DEV}> · GB-0000${ban.id}`));
+        assert.match(f['Approved by'], new RegExp(`<@${DEV}> \\(developer\\) · GB-0000${ban.id}`));
         assert.equal(f['Moderator (via bot)'], `<@${DEV}> (\`${DEV}\`)`);
     } finally { w.store.close(); }
 });

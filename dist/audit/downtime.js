@@ -1,3 +1,4 @@
+import { noticeEmbed } from '../ui/notice.js';
 import { logEvent } from '../errors.js';
 import { readiness } from '../security/readiness.js';
 import { Colors, PermissionFlagsBits } from 'discord.js';
@@ -29,15 +30,16 @@ export function formatDuration(ms) {
 /** The "back online" notice: proof that this server's settings were restored after a restart. */
 export function restartNotice(store, settings, offlineSince, now = Date.now()) {
     const customized = Object.keys(settings.rules ?? {}).length;
-    const trusted = Number(store.get("SELECT COUNT(*) AS n FROM grants WHERE guild_id=? AND kind='trust' AND (expires IS NULL OR expires>?)", settings.guildId, now)?.n ?? 0);
+    const trusted = Number(store.get("SELECT COUNT(DISTINCT user_id) AS n FROM grants WHERE guild_id=? AND (kind IN ('trust','trust_role') OR kind LIKE 'trust:%' OR kind LIKE 'trust_role:%') AND (expires IS NULL OR expires>?)", settings.guildId, now)?.n ?? 0);
     const logging = eventLogConfig(store, settings.guildId);
     return [
         offlineSince ? `Offline for about ${formatDuration(now - offlineSince)} (last seen <t:${Math.floor(offlineSince / 1000)}:t>).` : 'Started for the first time with this database.',
+        ...(offlineSince ? [] : ['⚠️ If this server was set up before, its settings were not found. Tell a Midtown Vanguard developer: they can be restored from a backup.']),
         `**Anti-nuke:** ${settings.enabled ? `on · ${settings.mode} mode` : 'off'}`,
         `**Rules:** ${RULES.length}${customized ? ` (${customized} with custom limits)` : ''}${settings.ruleDefaults ? ' · shared "All" limit set' : ''}`,
-        `**Trusted users:** ${trusted}`,
+        `**Whitelist:** ${trusted} user(s)/role(s)`,
         `**Event logging:** ${logging.enabled ? `on${logging.channelId ? ` in <#${logging.channelId}>` : ''}` : 'off · turn on with /setup logs enable'}`,
-        'All settings were restored from the database. Nothing needs to be set up again.',
+        ...(offlineSince ? ['All settings were restored from the database. Nothing needs to be set up again.'] : []),
     ];
 }
 /** Group audit entries from the offline period by who did what, flagging anything above a rule's limit. */
@@ -68,14 +70,14 @@ export async function catchUp(guild, store, logs, trusted, offlineSince, now = D
     // A quick restart with nothing changed stays quiet; a first start or a real outage is announced.
     const quick = !!offlineSince && now - offlineSince < QUIET_RESTART_MS;
     const notice = restartNotice(store, settings, offlineSince, now);
-    if (shouldPost(store, guild.id, 'restart', JSON.stringify(notice.slice(1)), { quietIfNew: quick, force: !quick }))
-        logs.push(guild.id, embed('🟢 Midtown Vanguard is back online', notice.join('\n'), Colors.Green));
+    if (shouldPost(store, guild.id, 'restart', JSON.stringify(notice.filter(l => l.startsWith('**'))), { quietIfNew: quick, force: !quick }))
+        logs.push(guild.id, noticeEmbed('🟢 Midtown Vanguard is back online', notice, offlineSince ? Colors.Green : Colors.Orange));
     if (settings.enabled) {
         const ready = readiness(guild, settings.logChannelId, store);
         logEvent('protection_startup', { guildId: guild.id, mode: settings.mode, missingPermissions: ready.missing, hierarchyWarnings: ready.above });
         const disabled = Object.values(settings.rules).filter(r => r.enabled === false).length;
         if (shouldPost(store, guild.id, 'protection', JSON.stringify([settings.mode, disabled, ready.missing, ready.above]), { quietIfNew: quick }))
-            logs.push(guild.id, embed('Saved protection loaded', `${Object.values(settings.rules).filter(r => r.enabled === false).length} rules disabled · mode: ${settings.mode}\n${ready.text}`, ready.missing.length || ready.above.length ? Colors.Orange : Colors.Green));
+            logs.push(guild.id, noticeEmbed('Saved protection loaded', [`**Mode:** ${settings.mode}`, `**Rules off:** ${disabled}`, ...ready.text.split('\n')], ready.missing.length || ready.above.length ? Colors.Orange : Colors.Green));
     }
     if (!offlineSince || guild.members.me?.permissions.has(PermissionFlagsBits.ViewAuditLog) === false)
         return;

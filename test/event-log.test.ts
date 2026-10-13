@@ -106,7 +106,7 @@ test('the restart notice reports the restored anti-nuke settings', () => {
     assert.match(lines, /Offline for about 7 minutes/);
     assert.match(lines, /\*\*Anti-nuke:\*\* on · enforce mode/);
     assert.match(lines, /17 \(1 with custom limits\)/);
-    assert.match(lines, /\*\*Trusted users:\*\* 1/);
+    assert.match(lines, /\*\*Whitelist:\*\* 1 user/);
     assert.match(lines, /Event logging:\*\* off/);
     assert.equal(formatDuration(30000), 'less than a minute');
     store.close();

@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 export function parseIds(value = '') {
     return new Set(value.split(',').map(v => v.trim()).filter(v => /^\d{17,20}$/.test(v)));
 }
-export const VERSION = '2.27.2';
+export const VERSION = '2.27.3';
 export const CONFIG_VERSION = 3;
 export const config = {
     token: process.env.DISCORD_TOKEN?.trim() ?? '',

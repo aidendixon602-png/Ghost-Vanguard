@@ -61,3 +61,19 @@ export async function dailyBackupDm(store: Store, client: Client, create: (kind:
     const sent = await dmLeaders(client, { embeds: [embed('📦 Daily database backup', `Attached: **${name}** (${(zipped.length / 1024).toFixed(0)} KB).\nKeep it private: it contains server settings, cases and verification links. To restore it, unzip it and follow \`npm run database:restore\`.`, Colors.Blurple)], files: [new AttachmentBuilder(zipped, { name })] });
     logEvent('daily_backup_dm', { size: zipped.length, sent });
 }
+
+/**
+ * Started with an empty database while already in servers: DM every developer and Supreme
+ * Leader once, with what to do. Restoring is never automatic here, because the new database
+ * may already hold changes people want to keep.
+ */
+export async function warnEmptyDatabase(client: Client, servers: number) {
+    const targets = new Set([config.ownerId, ...config.supremeExtra, ...config.developers].filter(Boolean));
+    const text = [
+        '⚠️ **Midtown Vanguard started with an empty database** while it is in **' + servers + '** server(s).',
+        'If this was not on purpose (a reinstall, a Clone, a wiped `data` folder), every server\'s settings are missing: whitelists, staff ranks, logs, cases and ban records.',
+        '',
+        '**To get them back:** use a **📦 Daily database backup** this bot DMed you before it happened (a `.db.gz` file: unzip it), the `data` archive you downloaded, or `data/database-backups` if it still exists. Stop the bot, put the file at `data/vanguard.db`, and start it again.',
+    ].join('\n');
+    for (const id of targets) await client.users.fetch(id).then(u => u.send({ content: text, allowedMentions: { parse: [] } })).catch(() => undefined);
+}

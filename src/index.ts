@@ -44,6 +44,8 @@ import { forgetHeldBot, lockServerSettings, quarantineNewBot } from './features/
 import { activeBan, assertLocalUnban, enforceOnJoin, enforceOnUnban, existingBan, liftNetworkBan, networkDeps, recordId, sweepNetworkBans } from './security/network-ban.js';
 import { handleBanLogInteraction, onBanAdd, onBanRemove, registerBanLogRenderer } from './audit/ban-log.js';
 import { reportBotError } from './audit/bot-errors.js';
+import { recoveryEmbed } from './ui/notice.js';
+import { warnEmptyDatabase } from './features/bot-health.js';
 
 const errors = validateConfig();
 
@@ -74,7 +76,7 @@ client.rest.on('rateLimited', recoveryApiWait);
 const logs = new LogQueue(store, client), security = new Security(store, logs), roblox = new Roblox(store, logs), snapshots = new Snapshots(store);
 const scam = new ScamProtection(store, logs);
 
-snapshots.onAudit = (guildId, title, detail) => logs.push(guildId, embed(title, detail));
+snapshots.onAudit = (guildId, title, detail) => logs.push(guildId, recoveryEmbed(title, detail, client.user?.id, Colors.Blurple));
 registerBanLogRenderer(store, logs);
 
 const registry = new Registry();
@@ -220,6 +222,10 @@ client.once(Events.ClientReady, async (c) => {
         task('back online notice', announceComeback(client, offlineSince));
         task('heartbeat', heartbeat());
         task('network ban sweep', sweepNetworkBans(network));
+        // A brand-new database while the bot is already in servers usually means data was lost
+        // (a reinstall, a wiped folder). Tell the developers straight away so they can restore it.
+        if (offlineSince === null && client.guilds.cache.size > 0)
+            task('empty database warning', warnEmptyDatabase(client, client.guilds.cache.size));
         await databaseBackups.create('startup');
     } catch (error) {
         logEvent('startup_failure', failure(error));
