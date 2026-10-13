@@ -156,7 +156,8 @@ let lastGood = head(), startedAt = 0;
 
 function startBot() {
     startedAt = Date.now();
-    child = spawn(process.execPath, ['dist/index.js'], { stdio: 'inherit', cwd: root, env: process.env });
+    child = spawn(process.execPath, ['dist/index.js'], { stdio: ['inherit', 'inherit', 'inherit', 'ipc'], cwd: root, env: process.env });
+    child.on('message', message => { void answerBot(child, message); });
     child.on('exit', (code, signal) => {
         child = null;
         if (stopping || updating) return;
@@ -192,18 +193,26 @@ function stopBot() {
 
 const rejected = new Set();
 let lastNote = '';
-async function checkForUpdate() {
-    if (updating || stopping) return;
+let lastCheck = { at: 0, result: 'not checked yet' };
+/** Returns what it found; `beforeInstall` runs (and is awaited) just before the bot is restarted. */
+async function checkForUpdate(beforeInstall) {
+    if (updating || stopping) return { state: 'busy' };
     try {
         const latest = await latestPassing();
-        if (!latest || latest.sha === head() || rejected.has(latest.sha)) return;
-        if (!latest.ready) {
+        const result = !latest ? { state: 'none' }
+            : latest.sha === head() ? { state: 'current', sha: latest.sha }
+            : rejected.has(latest.sha) ? { state: 'skipped', sha: latest.sha, why: 'it crashed or failed to install before' }
+            : !latest.ready ? { state: 'waiting', sha: latest.sha, why: latest.why }
+            : { state: 'installing', sha: latest.sha };
+        lastCheck = { at: Date.now(), result: result.state === 'waiting' ? `waiting for ${result.sha.slice(0, 7)}: ${result.why}` : result.state };
+        if (result.state === 'waiting') {
             // Say it once per commit and reason, not every check.
             const note = `${latest.sha}:${latest.why}`;
             if (note !== lastNote) say(`Update ${latest.sha.slice(0, 7)} found, not installing yet: ${latest.why}.`);
             lastNote = note;
-            return;
         }
+        if (result.state !== 'installing') return result;
+        if (beforeInstall) await beforeInstall(result);
         updating = true;
         say(`Updating to ${latest.sha.slice(0, 7)}...`);
         const previous = head();
@@ -214,11 +223,25 @@ async function checkForUpdate() {
         startBot();
         // Once the new version has run for 2 minutes, it becomes the version to fall back to.
         setTimeout(() => { if (child && Date.now() - startedAt >= HEALTHY_MS - 1000) lastGood = head(); }, HEALTHY_MS + 1000).unref();
+        return { state: 'installed', sha: latest.sha };
     } catch (error) {
         updating = false;
-        say(`Update check failed: ${hide(error instanceof Error ? error.message : error)}`);
+        const why = hide(error instanceof Error ? error.message : error);
+        lastCheck = { at: Date.now(), result: `check failed: ${why}` };
+        say(`Update check failed: ${why}`);
         if (!child && !stopping) startBot();
+        return { state: 'error', why };
     }
+}
+
+/** /dev update asks the launcher (over the bot's IPC channel) for status, or to check now. */
+async function answerBot(c, message) {
+    if (!message || message.type !== 'vg-update' || !c?.connected) return;
+    const reply = data => { try { if (c.connected) c.send({ type: 'vg-update-result', id: message.id, ...data }); } catch { } };
+    const status = { enabled: updatesOn && existsSync(join(root, '.git')), repo: REPO || null, branch: BRANCH, running: head(), fallback: lastGood, intervalMinutes: CHECK_MS / 60000, lastCheck, rejected: [...rejected] };
+    if (message.op !== 'now' || !status.enabled) return reply(status);
+    const result = await checkForUpdate(async found => { reply({ ...status, result: found }); await new Promise(r => setTimeout(r, 2500)); });
+    if (result.state !== 'installing' && result.state !== 'installed') reply({ ...status, result });
 }
 
 for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, async () => {
@@ -228,6 +251,6 @@ for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, async () => {
 });
 
 startBot();
-if (updatesOn && existsSync(join(root, '.git'))) setInterval(checkForUpdate, CHECK_MS).unref?.();
+if (updatesOn && existsSync(join(root, '.git'))) setInterval(() => { void checkForUpdate(); }, CHECK_MS).unref?.();
 // Keep the launcher alive while the bot runs.
 setInterval(() => { }, 1 << 30);

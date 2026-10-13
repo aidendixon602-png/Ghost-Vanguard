@@ -5,7 +5,7 @@ export const UMBRELLAS = [
         ] },
     { name: 'mod', description: 'Moderation: ban, kick, timeout, cases, notes, appeals', entries: [
             { child: 'moderation', mode: 'flat' }, { child: 'tempban', mode: 'single' }, { child: 'softban', mode: 'single' }, { child: 'massban', mode: 'single' },
-            { child: 'case', mode: 'group' }, { child: 'warnings', mode: 'group' }, { child: 'note', mode: 'group' }, { child: 'appeals', mode: 'group' }, { child: 'nick', mode: 'group' }
+            { child: 'case', mode: 'group' }, { child: 'bans', mode: 'group' }, { child: 'warnings', mode: 'group' }, { child: 'note', mode: 'group' }, { child: 'appeals', mode: 'group' }, { child: 'nick', mode: 'group' }
         ] },
     { name: 'security', description: 'Raids, lockdowns, automod, scam links and ping protection', entries: [
             { child: 'security', mode: 'flat' }, { child: 'emergency', mode: 'group' }, { child: 'webhooks', mode: 'single' }, { child: 'lockdown', mode: 'single' }, { child: 'unlock', mode: 'single' }, { child: 'slowmode', mode: 'single' }, { child: 'health', mode: 'single' },

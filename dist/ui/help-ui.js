@@ -8,7 +8,7 @@ import { embed } from './ui.js';
 /** Sections in the order staff need them, and the order of commands inside each section. */
 export const HELP_SECTIONS = [
     { key: 'antinuke', label: 'Anti-nuke', emoji: '🛡️', blurb: 'Stops raids and nukes; manage the whitelist', commands: ['antinuke', 'antinuke-plus', 'trust'] },
-    { key: 'moderation', label: 'Moderation', emoji: '🔨', blurb: 'Ban, kick, timeout, cases, notes and appeals', commands: ['moderation', 'tempban', 'softban', 'massban', 'role', 'case', 'warnings', 'note', 'appeals', 'nick'] },
+    { key: 'moderation', label: 'Moderation', emoji: '🔨', blurb: 'Ban, kick, timeout, cases, notes and appeals', commands: ['moderation', 'tempban', 'softban', 'massban', 'role', 'bans', 'case', 'warnings', 'note', 'appeals', 'nick'] },
     { key: 'security', label: 'Security', emoji: '🚨', blurb: 'Automod, raid mode, lockdowns and scam links', commands: ['security', 'emergency', 'automod', 'raidmode', 'newaccounts', 'lockdown', 'unlock', 'slowmode', 'scam', 'antiping', 'mention', 'webhooks', 'health'] },
     { key: 'configuration', label: 'Server Setup', emoji: '⚙️', blurb: 'Staff ranks, welcome, logs and permissions', commands: ['staff', 'welcome', 'logs', 'guild-config', 'perm', 'config-history'] },
     { key: 'recovery', label: 'Backups', emoji: '💾', blurb: 'Save and restore the server layout', commands: ['snapshot', 'backup', 'copylayout'] },

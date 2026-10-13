@@ -6,6 +6,7 @@ import { AppError } from '../../errors.js';
 import { broadcast, broadcastTargets, clearPresenceOverride, inspectGuild, setPresenceOverride } from '../../bot/dev-tools.js';
 import { presenceLines } from '../../security/protection-stats.js';
 import { spawnSync } from 'node:child_process';
+import { askLauncher, describeUpdate } from '../../bot/updater-link.js';
 /** Which GitHub commit is running, and whether automatic updates are on (no secrets shown). */
 function codeVersion() {
     const commit = spawnSync('git', ['rev-parse', '--short', 'HEAD'], { encoding: 'utf8' });
@@ -25,8 +26,14 @@ export default defineCommand(new SlashCommandBuilder().setName('dev').setDescrip
     .addStringOption(o => o.setName('text').setDescription('Status text, e.g. 🔧 Maintenance at 8pm UTC').setRequired(true).setMaxLength(128))
     .addIntegerOption(o => o.setName('minutes').setDescription('Return to the rotation after this many minutes (default: until reset)').setMinValue(1).setMaxValue(10080))
     .addStringOption(o => o.setName('presence').setDescription('Online indicator').addChoices({ name: 'Online', value: 'online' }, { name: 'Idle', value: 'idle' }, { name: 'Do not disturb', value: 'dnd' })))
-    .addSubcommand(s => s.setName('status-reset').setDescription('Return to the normal rotating status')), { responseKind: 'info', category: 'developer', developerOnly: true, requiresAuthorization: false }, async (ctx, i) => {
+    .addSubcommand(s => s.setName('status-reset').setDescription('Return to the normal rotating status'))
+    .addSubcommand(s => s.setName('update').setDescription('Automatic GitHub updates: see the status, or check and install now')
+    .addStringOption(o => o.setName('action').setDescription('What to do (default: status)').addChoices({ name: 'Show status', value: 'status' }, { name: 'Check and install now', value: 'now' }))), { responseKind: 'info', category: 'developer', developerOnly: true, requiresAuthorization: false }, async (ctx, i) => {
     const sub = i.options.getSubcommand();
+    if (sub === 'update') {
+        const op = (i.options.getString('action') ?? 'status');
+        return describeUpdate(await askLauncher(op), op);
+    }
     if (sub === 'inspect') {
         const id = i.options.getString('guild_id', true);
         if (!/^\d{17,20}$/.test(id))

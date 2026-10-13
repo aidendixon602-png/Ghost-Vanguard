@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.27.0
+- **`/mod bans`** searches the ban log without scrolling `#bans`:
+  - `lookup user` shows every ban record for someone here, plus any active genreban/hardban
+  - `case id` shows one record by case ID (`BAN-0005` or `5`) with a link to its message
+  - `recent` lists the latest 10
+  - `stats` covers the last 30 days: bans, unbans, still banned, by type, and who banned most
+- **`/dev update`** shows the auto-update status (running commit, fallback, last check, skipped versions), or **checks and installs now** instead of waiting for the next 5-minute check.
+
 ## 2.26.2
 - **Genrebans and hardbans work on users who are already banned.** Before, a server where the user was already banned by its own staff was skipped ("left as it is"). Now the existing ban stays, the genreban/hardban covers it (re-applied if anyone unbans them), a case is recorded, and the result counts as a success.
 - **The ban record is upgraded, not duplicated.** The same case (e.g. BAN-0004) now shows the hardban or genreban: type, record ID (also in the footer, e.g. `BAN-0004 • HB-00005`), approval and evidence, with an entry in its history. A ban from before the ban log gets a new record.

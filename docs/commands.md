@@ -248,3 +248,13 @@ Protected roles: any role with Administrator, Ban, Kick, Timeout, Manage Roles, 
 | Command | What it does |
 |---|---|
 | `/dev autoreact add / remove / list` | React (🐐 by default) to every message from chosen members, per server |
+
+## Ban log search (2.27)
+
+| Command | What it does | Who |
+|---|---|---|
+| `/mod bans lookup` | A user's ban records here, plus any active genreban/hardban | Moderator+, Ban Members |
+| `/mod bans case` | One record by case ID (BAN-0005 or 5) | Moderator+, Ban Members |
+| `/mod bans recent` | The latest 10 records | Moderator+, Ban Members |
+| `/mod bans stats` | Last 30 days: bans, unbans, types, top moderators | Moderator+, Ban Members |
+| `/dev update` | Auto-update status, or check and install now | Developers |
