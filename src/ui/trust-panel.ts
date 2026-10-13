@@ -6,7 +6,7 @@ import { embed } from './ui.js';
 import { canManageOwnTrust, RULE_LABELS, scopeName, TRUST_PRESETS, trustListPage } from './antinuke-panel.js';
 
 /**
- * The /antinuke trust manage panel: pick a user or role, tick what anti-nuke should let them do, pick how
+ * The /antinuke whitelist add panel: pick a user or role, tick what anti-nuke should let them do, pick how
  * long, press Save. Saving replaces everything that user or role had before, so what you see is
  * exactly what they get. The whole panel state lives in the component IDs, so nothing is lost
  * between clicks and old panels can never act for someone else.
@@ -132,7 +132,7 @@ export function clearTrust(ctx: CommandContext, guild: string, target: string, r
 export function registerTrustPanel(registry: Registry) {
     registry.component({ prefix: 'tp:', kinds: ['button', 'select'], metadata: { ...defaults, category: 'security', access: 'security', cooldown: 0 }, execute: async (ctx, i) => {
         const m = /^tp:(\d{17,20}):(\d{17,20}):([a-z]+):(-|[ur]\d{17,20}):(\d{1,4}):([0-9a-z]{1,8})$/.exec(i.customId);
-        if (!m || m[1] !== i.guildId || m[2] !== i.user.id) throw new AppError('PERMISSION_ERROR', 'This panel belongs to someone else. Run /antinuke trust manage yourself.');
+        if (!m || m[1] !== i.guildId || m[2] !== i.user.id) throw new AppError('PERMISSION_ERROR', 'This panel belongs to someone else. Run /antinuke whitelist add yourself.');
         const guild = i.guildId, user = i.user.id, action = m[3]!;
         const s: PanelState = { target: m[4] === '-' ? null : m[4]!.slice(1), role: m[4]!.startsWith('r'), hours: Number(m[5]), mask: parseInt(m[6]!, 36) };
         if (action === 'user' || action === 'role') {

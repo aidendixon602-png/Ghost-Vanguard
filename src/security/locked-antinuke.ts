@@ -7,7 +7,7 @@ import { embed } from '../ui/ui.js';
 
 /**
  * The anti-nuke preset is fixed: the 17 rules in RULES, their limits, punishments and reverts.
- * Servers can only switch protection on or off; the whitelist is managed with /antinuke trust.
+ * Servers can only switch protection on or off; the whitelist is managed with /antinuke whitelist.
  * A staff "off" choice is stored in antinuke_options.staff_disabled and survives restarts.
  */
 export function antinukeOptedOut(store: Store, guild: string): boolean {
@@ -46,6 +46,6 @@ export async function applyDefaultAntinuke(store: Store, guild: Guild, logs: Log
     let snapshot: number | null = null;
     if (!wasEnabled && baseline) snapshot = await baseline(guild).catch(() => null);
     logEvent('antinuke_default_applied', { guildId: guild.id, wasEnabled, snapshot });
-    logs.push(guild.id, embed('Anti-nuke protection active', `The standard ${RULES.length}-rule anti-nuke preset is enabled in enforce mode${snapshot ? ` · baseline #${snapshot}` : ''}. Rules are fixed; use /antinuke trust for exceptions and /antinuke disable to switch protection off.`, Colors.Green));
+    logs.push(guild.id, embed('Anti-nuke protection active', `The standard ${RULES.length}-rule anti-nuke preset is enabled in enforce mode${snapshot ? ` · baseline #${snapshot}` : ''}. Rules are fixed; use /antinuke whitelist for exceptions and /antinuke disable to switch protection off.`, Colors.Green));
     return 'enabled';
 }

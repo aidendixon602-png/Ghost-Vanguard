@@ -42,7 +42,7 @@ export function rankName(value: number): RankName | null {
 export const ADMINISTRATOR_RANK = RANKS.headadmin;
 export const ADMIN_RESTRICTED = new Set<string>([
     // Switching protection off, weakening it, or exempting people from it
-    'antinuke/disable', 'disable', 'antinuke-plus/extras', 'trust/manage', 'trust/verification-bot', 'tp', 'trustlist',
+    'antinuke/disable', 'disable', 'antinuke-plus/extras', 'trust/add', 'trust/remove', 'trust/bots', 'tp', 'trustlist',
     'security/release', 'emergency/start', 'emergency/stop', 'emergency/panel', 'emergency', 'botq',
     // Destructive restoration and deleting recovery points
     'backup/restore', 'snapshot/restore', 'config-history/restore', 'restore', 'layoutselect', 'incident',

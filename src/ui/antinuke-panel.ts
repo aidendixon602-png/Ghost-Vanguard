@@ -111,7 +111,7 @@ function whitelistPanel(ctx:CommandContext,guild:string,user:string,remove=false
         new ActionRowBuilder<UserSelectMenuBuilder>().addComponents(new UserSelectMenuBuilder().setCustomId(prefix+(remove?'removeuser':`adduser:${hours}`)).setPlaceholder(remove?'Remove a user':'Add or update a user').setMaxValues(1)),
         new ActionRowBuilder<RoleSelectMenuBuilder>().addComponents(new RoleSelectMenuBuilder().setCustomId(prefix+(remove?'removerole':`addrole:${hours}`)).setPlaceholder(remove?'Remove a role':'Add or update a role').setMaxValues(1)),
         new ActionRowBuilder<ButtonBuilder>().addComponents(new ButtonBuilder().setCustomId(prefix+(remove?'whitelist':'remove')).setLabel(remove?'Add bypass':'Remove bypass').setStyle(remove?ButtonStyle.Secondary:ButtonStyle.Danger),new ButtonBuilder().setCustomId(prefix+'refresh').setLabel('Back to Status').setStyle(ButtonStyle.Secondary)));
-    return {embeds:[embed('Manage Whitelist',`${lines}\n\n${instruction} Use /antinuke trust for verification-only exemptions.`)],components:rowsOut,allowedMentions:{parse:[] as never[]}};
+    return {embeds:[embed('Manage Whitelist',`${lines}\n\n${instruction} Use /antinuke whitelist for verification-only exemptions.`)],components:rowsOut,allowedMentions:{parse:[] as never[]}};
 }
 
 /**
@@ -135,7 +135,7 @@ export function trustListPage(ctx:CommandContext,guildId:string,user:string,requ
     const pages=Math.max(1,Math.ceil(all.length/10)),page=Math.min(Math.max(1,requested),pages);
     const lines=all.slice((page-1)*10,page*10).map(g=>{
         const scope=g.bot?'verification bot only':scopeName(g.kinds.filter(k=>k.includes(':')).map(k=>k.split(':')[1]!));
-        const gone=g.role&&guild&&!guild.roles.cache.has(g.id)?` *(role deleted · ID ${g.id} · remove with \`/antinuke trust manage\`)*`:'';
+        const gone=g.role&&guild&&!guild.roles.cache.has(g.id)?` *(role deleted · ID ${g.id} · remove with \`/antinuke whitelist add\`)*`:'';
         return `${g.role?'🛡️':'👤'} <@${g.role?'&':''}${g.id}>${gone} · **${scope}** · ${g.expires?`${g.expires>now?'expires':'EXPIRED'} <t:${Math.floor(g.expires/1000)}:R>`:'until removed'} · set by <@${g.by}>`;
     });
     const body=`${lines.join('\n')||'Nobody is whitelisted.'}\n\n**All rules** = anti-nuke ignores them completely. A **preset** or **<Rule> only** = only those rules are skipped.\n-# Page ${page}/${pages} · ${all.length} entr${all.length===1?'y':'ies'} · updated <t:${Math.floor(now/1000)}:T>`;
@@ -175,7 +175,7 @@ export function registerAntinukePanel(registry:Registry) {
     }});
     registry.component({prefix:'trustlist:',kinds:['button'],metadata:{...defaults,category:'security',access:'security',cooldown:0},execute:async(ctx,i)=>{
         const match=/^trustlist:(\d{17,20}):(\d{17,20}):(-?\d{1,6}):([01])(?::r)?$/.exec(i.customId);
-        if(!match||match[1]!==i.guildId||match[2]!==i.user.id)throw new AppError('PERMISSION_ERROR','This list belongs to another user. Run /antinuke trust list yourself.');
+        if(!match||match[1]!==i.guildId||match[2]!==i.user.id)throw new AppError('PERMISSION_ERROR','This list belongs to another user. Run /antinuke whitelist list yourself.');
         await i.editReply(trustListPage(ctx,i.guildId,i.user.id,Number(match[3]),match[4]==='1'));
     }});
 }

@@ -126,7 +126,7 @@ export async function lockServerSettings(store, logs, entry, guild, trusted, tru
         `<@${actor}> (not whitelisted) changed the server **${labels.join(', ')}**.`,
         restored.length ? `✅ Put back: ${restored.join(', ')}` : '',
         failed.length ? `⚠ Could not put back: ${failed.join(', ')}` : '',
-        '-# Allow someone to change server settings with `/antinuke trust manage` → "Server · Edit server settings".',
+        '-# Allow someone to change server settings with `/antinuke whitelist add` → "Server · Edit server settings".',
     ].filter(Boolean).join('\n'), ok && !failed.length ? Colors.Green : Colors.Orange));
     logEvent('settings_lock', { guildId: guild.id, actor, restored, failed });
 }

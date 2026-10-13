@@ -53,7 +53,7 @@ const ADMIN_CANNOT = [
     // destructive restoration and deleting recovery points or records
     'backup/restore', 'snapshot/restore', 'config-history/restore', 'backup/delete', 'snapshot/delete', 'snapshot/cleanup', 'case/delete',
     // switching protection off or exempting people
-    'antinuke/disable', 'disable', 'antinuke-plus/extras', 'trust/manage', 'trust/verification-bot', 'security/release', 'emergency/start', 'emergency/stop',
+    'antinuke/disable', 'disable', 'antinuke-plus/extras', 'trust/add', 'trust/remove', 'trust/bots', 'security/release', 'emergency/start', 'emergency/stop',
     // granting permissions
     'security/admin', 'staff/role', 'guild-config/permission-role',
 ];
@@ -75,7 +75,7 @@ test('Administrator alone never unlocks developer, cross-server, destructive or 
 test('the server owner can do the restricted server actions, but nothing developer-only', async () => {
     const { store, can } = await setup();
     const owner = member(OWNER, PermissionFlagsBits.Administrator);
-    for (const key of ['backup/restore', 'snapshot/restore', 'antinuke/disable', 'trust/manage', 'staff/role', 'guild-config/permission-role', 'case/delete'])
+    for (const key of ['backup/restore', 'snapshot/restore', 'antinuke/disable', 'trust/add', 'staff/role', 'guild-config/permission-role', 'case/delete'])
         assert.equal(can(owner, key), true, `owner should be able to use /${key}`);
     for (const key of ['dev/diagnostics', 'genreban', 'hardban', 'banserver', 'staff/global'])
         assert.equal(can(owner, key), false, `owner must NOT be able to use /${key}`);

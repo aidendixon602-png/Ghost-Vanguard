@@ -18,7 +18,7 @@ export function antinukeStatus(store: Store, guildId: string) {
         const key = `<@${String(g.kind).startsWith('trust_role') ? '&' : ''}${g.user_id}>`, title = RULES.find(r => r.key === String(g.kind).split(':')[1])?.title ?? '?';
         partial.set(key, [...(partial.get(key) ?? []), title]);
     }
-    const fullText = full.slice(0, 25).map(row => `<@${row.kind==='trust_role'?'&':''}${row.user_id}>`).join(' ') + (full.length > 25 ? `\n+${full.length - 25} more · /antinuke trust list` : '');
+    const fullText = full.slice(0, 25).map(row => `<@${row.kind==='trust_role'?'&':''}${row.user_id}>`).join(' ') + (full.length > 25 ? `\n+${full.length - 25} more · /antinuke whitelist list` : '');
     const partialText = [...partial].slice(0, 15).map(([who, rules]) => `${who} · ${rules.join(', ')} only`).join('\n');
     const whitelist = [fullText && `**All rules:** ${fullText}`, partialText && `**Some rules only:**\n${partialText}`].filter(Boolean).join('\n') || 'No explicit anti-nuke bypasses.';
     const state = !settings.enabled ? 'disabled' : settings.mode === 'observe' ? 'enabled in observe mode' : 'enabled';

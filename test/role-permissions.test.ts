@@ -265,7 +265,7 @@ test('developers can use every command without Administrator or any server role'
     const { store, can } = await guardSetup();
     config.developers.add(DEV);
     try {
-        for (const key of ['moderation/ban', 'moderation/purge', 'role/add', 'role/policy', 'role/allow', 'role/rules', 'backup/restore', 'antinuke/disable', 'trust/manage', 'staff/global', 'genreban', 'dev/diagnostics', 'logs/setup'])
+        for (const key of ['moderation/ban', 'moderation/purge', 'role/add', 'role/policy', 'role/allow', 'role/rules', 'backup/restore', 'antinuke/disable', 'trust/add', 'staff/global', 'genreban', 'dev/diagnostics', 'logs/setup'])
             assert.equal(can(plainMember(DEV), key), true, `developer should be able to use /${key}`);
     } finally { config.developers.delete(DEV); store.close(); }
 });
@@ -303,5 +303,26 @@ test('command visibility is not the security boundary: no command hides itself b
         const tree = treeJson(registry);
         assert.ok(tree.some(c => c.name === 'role'), '/role is a top-level command');
         for (const c of tree) assert.ok(c.default_member_permissions == null, `/${c.name} is visible to developers without Administrator`);
+    } finally { store.close(); }
+});
+
+test('/antinuke whitelist: add, remove, list and bots, under the clearer name', async () => {
+    const { store, registry } = await guardSetup();
+    try {
+        indexTree(registry);
+        const antinuke = treeJson(registry).find(c => c.name === 'antinuke')!;
+        const group = antinuke.options.find((o: any) => o.name === 'whitelist');
+        assert.ok(group, '/antinuke whitelist exists');
+        assert.deepEqual(group.options.map((o: any) => o.name), ['add', 'remove', 'list', 'bots']);
+        assert.ok(!antinuke.options.some((o: any) => o.name === 'trust'), 'the old name is gone');
+        const trust = (await import('../src/commands/security/trust.js')).default;
+        store.grant(G, TARGET, 'trust', OWNER); store.grant(G, TARGET, 'trust:mass_ban', OWNER);
+        const logs: any[] = [];
+        const i: any = { guildId: G, guild: { id: G, ownerId: OWNER }, user: { id: OWNER }, options: { getSubcommand: () => 'remove', getUser: () => ({ id: TARGET }), getRole: () => null } };
+        const reply = await store.withAuthorized(G, () => trust.execute({ store, actor: { id: OWNER }, logs: { push: (_g: string, e: any) => logs.push(e) } } as any, i));
+        assert.match(String(reply), /off the whitelist/);
+        assert.equal(store.all("SELECT * FROM grants WHERE user_id=?", TARGET).length, 0, 'every whitelist permission for them is removed');
+        const again = await store.withAuthorized(G, () => trust.execute({ store, actor: { id: OWNER }, logs: { push: () => {} } } as any, i));
+        assert.match(String(again), /not on the whitelist/);
     } finally { store.close(); }
 });

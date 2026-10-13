@@ -18,9 +18,10 @@ _Stops raids and nukes; manage the whitelist_
 | `/antinuke test` | List each rule's trigger limit (no actions taken) |
 | `/antinuke audit` | Safety score: powerful roles, roles above Vanguard, bots with Administrator |
 | `/antinuke extras` | Turn the extra layers on or off (all on by default) |
-| `/antinuke trust manage` | Open the whitelist panel: pick who, tick what they may do, pick how long, Save |
-| `/antinuke trust verification-bot` | Let a verification bot (Bloxlink, RoVer) give verified roles without tripping anti-nuke |
-| `/antinuke trust list` | Show everyone on the whitelist, what they skip and when it expires |
+| `/antinuke whitelist add` | Whitelist a user or role: pick what anti-nuke lets them do and for how long |
+| `/antinuke whitelist remove` | Take a user or role off the whitelist completely |
+| `/antinuke whitelist bots` | Let a verification bot (Bloxlink, RoVer) give verified roles without tripping anti-nuke |
+| `/antinuke whitelist list` | Show everyone on the whitelist, what they skip and when it expires |
 
 ## 🔨 Moderation
 
