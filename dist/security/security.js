@@ -5,6 +5,7 @@ import { developers } from '../bot/developers.js';
 import { autoRaid } from '../features/antinuke-plus.js';
 import { AppError } from '../errors.js';
 import { embed, memberOrNull } from '../ui/ui.js';
+import { incidentCard } from '../ui/incident-card.js';
 /** How far back an incident alert looks for channels and roles the actor deleted. */
 const DELETION_LOOKBACK_MS = 10 * 60 * 1000;
 const ruleByKey = (key) => RULES.find(r => r.key === key);
@@ -154,14 +155,11 @@ export class Security {
         }
         result += ` Reverts: ${progress.completed} completed, ${progress.failed} failed, ${progress.skipped} skipped.`;
         this.store.run('UPDATE incidents SET result=? WHERE guild_id=? AND id=?', result, guild.id, incident);
-        const lines = [`**Actor:** <@${actor}> (${actor})`, `**Rule:** ${rule.key}`, `**Trigger target:** ${entry.targetId ?? 'Unavailable'}`, `**Window:** ${count} actions / ${active.seconds}s`, `**Mode:** ${s.mode}`, `**Punishment:** ${active.punishment ?? 'strip'}`, `**Reverts:** ${progress.completed} completed · ${progress.failed} failed · ${progress.skipped} skipped`, `**Result:** ${result}`];
         const deleted = this.recentDeletions(guild.id, actor, now);
         const rows = [];
-        if (deleted.channels || deleted.roles) {
-            lines.push(`**Deleted by this actor in the last 10 minutes:** ${deleted.channels} channel(s), ${deleted.roles} role(s). Review restore opens a preview from the last snapshot taken before them.`);
+        if (deleted.channels || deleted.roles)
             rows.push(new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`incident:restore:${incident}`).setLabel('Review restore').setStyle(ButtonStyle.Secondary)));
-        }
-        this.logs.push(guild.id, embed(`Incident #${incident} · ${active.title}`, lines.join('\n'), Colors.Red), rows);
+        this.logs.push(guild.id, incidentCard({ incident, actor, rule: active, mode: s.mode, count, result, progress, deleted, targetId: entry.targetId ?? null }), rows);
     }
     async punish(guild, actor, action, ignoreRoles = []) {
         this.store.assertAuthorized(guild.id);

@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.29.0: clearer anti-nuke alerts and permission logs
+- **New anti-nuke alert:** "**@user was stripped for triggering anti-nuke.**" with **Action**, **Punishment**, **Limit**, **Changes reverted** and **Target** fields, and the full detail underneath. The footer shows the incident number and user ID.
+  - If the punishment didn't work (for example the bot role is too low), it says so: "triggered anti-nuke but could **not** be banned".
+  - In watch-only mode it says what *would* have happened.
+- **Role permission logs:** "Role Updated" now lists every permission, such as `administrator` granted or `ban members` revoked, instead of just "changed". It has **Role** and **Updated By** fields and a "Role ID" footer. Channel permission changes are listed the same way (allowed / denied / reset).
+
 ## 2.28.1: anti-nuke is less trigger-happy
 Staff were being stripped for normal work. The everyday rules now allow more before acting:
 

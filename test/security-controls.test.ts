@@ -90,7 +90,7 @@ test('incident report counts completed, failed and skipped reverts separately',a
  security.revert=async()=>outcomes.shift()!;
  for(let n=0;n<3;n++)await security.audit({id:'e'+n,executorId:'actor',targetId:'target'+n,createdTimestamp:Date.now(),action:AuditLogEvent.MemberBanAdd} as any,guild);
  assert.match(store.get('SELECT result FROM incidents WHERE guild_id=?','g')!.result,/1 completed, 1 failed, 1 skipped/);
- assert.match(logs[0].toJSON().description,/Trigger target/);
+ const card=logs[0].toJSON();assert.equal(card.description,'<@actor> was **banned** for triggering anti-nuke.');assert.equal(card.fields.find((f:any)=>f.name==='Changes reverted').value,'1 undone · 1 failed · 1 skipped');assert.equal(card.fields.find((f:any)=>f.name==='Target').value,'`target2`');
  }finally{store.close();}
 });
 

@@ -1,4 +1,4 @@
-import { AuditLogEvent, Colors, EmbedBuilder, type Guild, type GuildAuditLogsEntry, type GuildMember, type PartialGuildMember } from 'discord.js';
+import { AuditLogEvent, Colors, EmbedBuilder, PermissionsBitField, type Guild, type GuildAuditLogsEntry, type GuildMember, type PartialGuildMember } from 'discord.js';
 import { redact } from './redact.js';
 import { isExcluded, logChannels } from './log-setup.js';
 import type { Store } from '../database/db.js';
@@ -42,6 +42,8 @@ export interface LogEvent {
     actorUnverified?: boolean;
     /** Label for the actor field (default "By"). */
     actorLabel?: string;
+    /** Label for the target field (default "Target"). */
+    targetLabel?: string;
     color?: number;
     image?: string | null;
 }
@@ -84,7 +86,7 @@ export function renderEvent(event: LogEvent): EmbedBuilder {
     if (event.author) e.setAuthor({ name: event.author.name.slice(0, 256), iconURL: event.author.iconURL ?? undefined });
     const fields: { name: string; value: string; inline?: boolean }[] = [];
     const loose: string[] = [];
-    if (event.target) fields.push({ name: 'Target', value: event.target, inline: true });
+    if (event.target) fields.push({ name: event.targetLabel ?? 'Target', value: event.target, inline: true });
     if (event.actorId) fields.push({ name: event.actorLabel ?? 'By', value: `<@${event.actorId}> (\`${event.actorId}\`)`, inline: true });
     else if (event.actorUnverified) fields.push({ name: event.actorLabel ?? 'By', value: 'Unavailable (could not be verified)', inline: true });
     for (const line of event.details ?? []) {
@@ -95,7 +97,7 @@ export function renderEvent(event: LogEvent): EmbedBuilder {
     if (loose.length) e.setDescription(loose.join('\n').slice(0, 3900));
     if (fields.length) e.addFields(fields);
     if (event.image) e.setImage(event.image);
-    const ids = [event.targetId && `ID: ${event.targetId}`, event.actorId && `By: ${event.actorId}`].filter(Boolean).join(' · ');
+    const ids = [event.targetId && `${event.targetLabel ? `${event.targetLabel} ` : ''}ID: ${event.targetId}`, event.actorId && `By: ${event.actorId}`].filter(Boolean).join(' · ');
     e.setFooter({ text: ids || 'Midtown Vanguard' });
     return e;
 }
@@ -161,7 +163,7 @@ const AUDIT: Record<number, [LogCategory, string, Kind]> = {
     [AuditLogEvent.MemberRoleUpdate]: ['members', 'Roles Updated', 'user'],
     [AuditLogEvent.BotAdd]: ['server', 'Bot added', 'user'],
     [AuditLogEvent.RoleCreate]: ['roles', 'Role created', 'role'],
-    [AuditLogEvent.RoleUpdate]: ['roles', 'Role updated', 'role'],
+    [AuditLogEvent.RoleUpdate]: ['roles', 'Role Updated', 'role'],
     [AuditLogEvent.RoleDelete]: ['roles', 'Role deleted', 'role'],
     [AuditLogEvent.InviteCreate]: ['server', 'Invite created', 'other'],
     [AuditLogEvent.InviteDelete]: ['server', 'Invite deleted', 'other'],
@@ -193,6 +195,28 @@ const shown = (value: unknown): string => {
     return text.length > 60 ? `${text.slice(0, 57)}...` : text;
 };
 
+const PERMISSION_NAMES: Record<string, string> = { ManageGuild: 'manage server', CreateInstantInvite: 'create invite', ModerateMembers: 'timeout members', ViewAuditLog: 'view audit log', SendTTSMessages: 'send TTS messages', UseVAD: 'use voice activity' };
+const permissionName = (flag: string) => PERMISSION_NAMES[flag] ?? flag.replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase();
+
+function bits(value: unknown): bigint | null {
+    try { return value === undefined || value === null || value === '' ? 0n : BigInt(String(value)); } catch { return null; }
+}
+
+/** "`kick members` granted, `ban members` revoked" from two permission bitfields. */
+export function permissionDiff(oldValue: unknown, newValue: unknown, key: 'permissions' | 'allow' | 'deny' | string = 'permissions'): string | null {
+    const before = bits(oldValue), after = bits(newValue);
+    if (before === null || after === null) return null;
+    const on = key === 'deny' ? 'denied' : key === 'allow' ? 'allowed' : 'granted';
+    const off = key === 'permissions' ? 'revoked' : 'reset';
+    const parts: string[] = [];
+    for (const [flag, bit] of Object.entries(PermissionsBitField.Flags)) {
+        if ((after & bit) && !(before & bit)) parts.push(`\`${permissionName(flag)}\` ${on}`);
+        else if ((before & bit) && !(after & bit)) parts.push(`\`${permissionName(flag)}\` ${off}`);
+    }
+    if (!parts.length) return null;
+    return parts.length > 25 ? `${parts.slice(0, 25).join(', ')} and ${parts.length - 25} more` : parts.join(', ');
+}
+
 function changeLines(entry: GuildAuditLogsEntry): string[] {
     const lines: string[] = [];
     for (const change of (entry.changes ?? []) as {
@@ -207,8 +231,10 @@ function changeLines(entry: GuildAuditLogsEntry): string[] {
             lines.push(`**${change.key === '$add' ? 'Roles added' : 'Roles removed'}:** ${roles}`);
         } else if (change.key === 'communication_disabled_until')
             continue;
-        else if (change.key === 'permissions' || change.key === 'allow' || change.key === 'deny')
-            lines.push(`**${change.key === 'permissions' ? 'Permissions' : `Permission ${change.key}`}:** changed`);
+        else if (change.key === 'permissions' || change.key === 'allow' || change.key === 'deny') {
+            const diff = permissionDiff(change.old, change.new, change.key);
+            if (diff) lines.unshift(`🔐 **Permissions:** ${diff}`);
+        }
         else if (!HIDDEN_KEYS.has(change.key))
             lines.push(`**${change.key.replaceAll('_', ' ')}:** ${shown(change.old)} → ${shown(change.new)}`);
         if (lines.length >= 6)
@@ -240,7 +266,7 @@ function targetText(entry: GuildAuditLogsEntry, kind: Kind): string | null {
 const ROUTINE_KEYS = new Set(['name', 'topic']);
 const ACTION_COLOR: Record<string, number> = {
     'Member Banned': Colors.Red, 'Member Kicked': Colors.DarkOrange, 'Member Unbanned': Colors.Green,
-    'Timeout Added': Colors.Orange, 'Timeout Removed': Colors.Green, 'Nickname Changed': Colors.Blue, 'Roles Updated': Colors.Purple,
+    'Timeout Added': Colors.Orange, 'Timeout Removed': Colors.Green, 'Nickname Changed': Colors.Blue, 'Roles Updated': Colors.Purple, 'Role Updated': Colors.Orange,
 };
 
 export function duration(ms: number): string {
@@ -299,7 +325,8 @@ export function describeAudit(entry: GuildAuditLogsEntry, guild: Guild, options:
     const user = kind === 'user' && target && typeof target.displayAvatarURL === 'function' ? target : null;
     const channelId = kind === 'channel' ? entry.targetId : extra?.channel ? String(extra.channel.id ?? extra.channel) : null;
     return { category, action, actorId: actor, targetId: entry.targetId ?? null, target: targetText(entry, kind), details, at: entry.createdTimestamp,
-        actorLabel: category === 'moderation' ? 'Moderator' : 'Changed by', color: ACTION_COLOR[action],
+        actorLabel: category === 'moderation' ? 'Moderator' : kind === 'role' ? 'Updated By' : 'Changed by', color: ACTION_COLOR[action],
+        targetLabel: kind === 'role' ? 'Role' : undefined,
         author: user ? { name: user.tag ?? user.username, iconURL: user.displayAvatarURL() } : null, channelId };
 }
 
