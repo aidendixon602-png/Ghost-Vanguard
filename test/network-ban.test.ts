@@ -11,7 +11,7 @@ import { AppError } from '../src/errors.js';
 import { Registry } from '../src/bot/registry.js';
 import { Guard } from '../src/bot/guard.js';
 import {
-    activeBan, assertTargetable, banEverywhere, banIn, createBan, enforceOnJoin, enforceOnUnban, parseUserId, resolveTarget, revokeBan,
+    activeBan, activeException, addException, assertTargetable, banEverywhere, banIn, createBan, enforceOnJoin, enforceOnUnban, parseUserId, resolveTarget, revokeBan,
     serverResults, sweepNetworkBans, TAG, unbanEverywhere, type NetworkDeps,
 } from '../src/security/network-ban.js';
 import { issueCommand, revokeCommand } from '../src/security/network-commands.js';
@@ -600,8 +600,29 @@ test('/moderation unban lifts local bans only, and never a genreban or hardban',
 
     f = moderation('unban', { bans: { [TARGET]: 'mod: spam' } });
     newBan(f.store, 'genreban');
+    await assert.rejects(moderationCommand.execute(f.ctx, f.i), /only this server's \*\*owner or a Head Admin\*\*/i, 'a moderator cannot bypass an active genreban');
+    assert.deepEqual(f.calls.unbanned, []);
+    f.store.close();
+
+    // A Head Admin (here: a security admin) may let them back into this server only, after confirming.
+    f = moderation('unban', { bans: { [TARGET]: `${TAG.genreban} GB-00001 ${DEV}: raiding` } });
+    const gb = newBan(f.store, 'genreban');
+    f.store.grant('g', 'mod', 'admin', 'owner');
     await moderationCommand.execute(f.ctx, f.i);
-    assert.match(String(f.replies.at(-1).embeds[0].data.description), /active genreban.*only a developer/s, 'staff cannot bypass an active genreban');
+    assert.match(JSON.stringify(f.replies.at(-1)), /Let a genrebanned user back into this server/);
+    await f.press();
+    assert.deepEqual(f.calls.unbanned, [TARGET], 'unbanned here');
+    assert.ok(activeException(f.store, 'g', gb.id), 'the exception is recorded for this server');
+    assert.equal(activeException(f.store, 'other', gb.id), undefined, 'and only this server');
+    assert.ok(activeBan(f.store, 'genreban', TARGET), 'the genreban stays active everywhere else');
+    f.store.close();
+
+    // Hardbans never have exceptions, even for the owner's staff.
+    f = moderation('unban', { bans: { [TARGET]: `${TAG.hardban} HB-00001 ${DEV}: raiding` } });
+    newBan(f.store, 'genreban'); newBan(f.store, 'hardban');
+    f.store.grant('g', 'mod', 'admin', 'owner');
+    await moderationCommand.execute(f.ctx, f.i);
+    assert.match(String(f.replies.at(-1).embeds[0].data.description), /\/network unhardban/);
     assert.deepEqual(f.calls.unbanned, []);
     f.store.close();
 
@@ -628,4 +649,24 @@ test('a user with closed DMs is still banned, and the result says the DM was not
     assert.match(String(last.embeds[0].data.description), /DM to the user:\*\* not delivered/);
     assert.equal(a.calls.banned.length, 1);
     f.store.close();
+});
+
+test('a genreban exception keeps the bot from re-banning in that one server only; hardbans ignore it', async () => {
+    const store = new Store(':memory:');
+    try {
+        for (const g of ['g1', 'g2']) store.run("INSERT OR REPLACE INTO guild_authorization(guild_id,name,state,joined_at,authorized_at,authorized_by) VALUES(?,?,'AUTHORIZED',?,?,?)", g, g, Date.now(), Date.now(), DEV);
+        const gb = newBan(store, 'genreban');
+        const banned: string[] = [];
+        const guild = (id: string): any => ({ id, name: id, ownerId: 'owner', members: { me: { permissions: { has: () => true }, roles: { highest: { comparePositionTo: () => 1 } } }, fetch: async () => { throw { code: 10007 }; }, ban: async () => { banned.push(id); } },
+            bans: { fetch: async () => { throw { code: 10026 }; } } });
+        const deps: NetworkDeps = { client: {} as any, store, logs: { push: () => { } } as any, isReady: () => true };
+        addException(store, gb, { id: 'g1', name: 'g1' }, 'owner', 'reformed');
+        await enforceOnJoin(deps, guild('g1'), TARGET);
+        await enforceOnJoin(deps, guild('g2'), TARGET);
+        assert.deepEqual(banned, ['g2'], 'allowed back into g1 only');
+        assert.throws(() => addException(store, newBan(store, 'hardban'), { id: 'g1' }, 'owner', 'x'), /Hardbans have no exceptions/);
+        banned.length = 0;
+        await enforceOnJoin(deps, guild('g1'), TARGET);
+        assert.deepEqual(banned, ['g1'], 'once hardbanned, the exception no longer protects them');
+    } finally { store.close(); }
 });

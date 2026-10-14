@@ -418,7 +418,35 @@ export function unbanEverywhere(deps: NetworkDeps, ban: NetworkBan, reason: stri
 /** Problems already reported, so a server that keeps refusing does not flood the logs. */
 const reported = new Set<string>();
 
+// ---------------------------------------------------------------- per-server genreban exceptions
+
+export interface NetworkException { id: number; ban_id: number; guild_id: string; guild_name: string | null; user_id: string; by_id: string; reason: string; at: number; revoked_by: string | null; revoked_at: number | null }
+
+/** The exception that lets this genrebanned user into this one server, if any. Hardbans never have one. */
+export function activeException(store: Store, guildId: string, banId: number): NetworkException | undefined {
+    return store.get('SELECT * FROM network_exceptions WHERE ban_id=? AND guild_id=? AND revoked_at IS NULL ORDER BY id DESC LIMIT 1', banId, guildId) as NetworkException | undefined;
+}
+
+export function addException(store: Store, ban: NetworkBan, guild: { id: string; name?: string | null }, byId: string, reason: string, at = Date.now()): NetworkException {
+    if (ban.kind !== 'genreban') throw new AppError('PERMISSION_ERROR', 'Hardbans have no exceptions: only a developer can lift one, for every server.');
+    const existing = activeException(store, guild.id, ban.id);
+    if (existing) return existing;
+    const id = Number(store.run('INSERT INTO network_exceptions(ban_id,guild_id,guild_name,user_id,by_id,reason,at) VALUES(?,?,?,?,?,?,?)', ban.id, guild.id, guild.name ?? null, ban.user_id, byId, reason, at).lastInsertRowid);
+    return store.get('SELECT * FROM network_exceptions WHERE id=?', id) as NetworkException;
+}
+
+export function revokeException(store: Store, id: number, byId: string, at = Date.now()): NetworkException | undefined {
+    store.run('UPDATE network_exceptions SET revoked_by=?, revoked_at=? WHERE id=? AND revoked_at IS NULL', byId, at, id);
+    return store.get('SELECT * FROM network_exceptions WHERE id=?', id) as NetworkException | undefined;
+}
+
+export function listExceptions(store: Store, userId?: string): (NetworkException & { kind: string; status: string })[] {
+    return store.all(`SELECT e.*, b.kind, b.status FROM network_exceptions e JOIN network_bans b ON b.id=e.ban_id WHERE e.revoked_at IS NULL AND b.status='active'${userId ? ' AND e.user_id=?' : ''} ORDER BY e.at DESC LIMIT 50`, ...(userId ? [userId] : [])) as any;
+}
+
 async function enforce(deps: NetworkDeps, guild: Guild, ban: NetworkBan, why: Exclude<Why, 'issued'>): Promise<boolean> {
+    // This server's owner/Head Admin let them back in here only. The genreban still applies everywhere else.
+    if (ban.kind === 'genreban' && activeException(deps.store, guild.id, ban.id)) return false;
     const result = await banIn(deps, guild, ban, why);
     const key = `${guild.id}:${ban.id}`;
     if (result.outcome === 'success') {

@@ -116,7 +116,7 @@ export const COMMAND_RANK = {
     // Bot Developer
     dev: 7, database: 7, autoreact: 7, deauthserver: 7, banserver: 7, unbanserver: 7,
     // Bans across every authorized server: Bot Developers and Supreme Leaders only.
-    genreban: 7, ungenreban: 7, hardban: 7, unhardban: 7,
+    genreban: 7, ungenreban: 7, hardban: 7, unhardban: 7, netexception: 7,
     // Bot-wide staff ranks reach every server: Bot Developers and Supreme Leaders.
     'staff/global': 7,
 };

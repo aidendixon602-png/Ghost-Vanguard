@@ -1,3 +1,5 @@
+import { offerGenrebanException } from '../../security/network-exception.js';
+import { activeBan } from '../../security/network-ban.js';
 import { NO_REASON } from '../../core.js';
 import { PermissionFlagsBits, SlashCommandBuilder } from 'discord.js';
 import { moderate } from '../../security/moderation.js';
@@ -7,7 +9,7 @@ import { classify, finish, outcomeEmbed, showWorking } from '../../ui/progress.j
 
 export default defineCommand(new SlashCommandBuilder().setName('moderation').setDescription('Ban, kick, time out, warn, purge, and view a member\'s history')
     .addSubcommand(s => s.setName('ban').setDescription('Ban a user (asks to confirm)').addUserOption(o => o.setName('user').setDescription('Target').setRequired(true)).addStringOption(o => o.setName('reason').setDescription('Reason (optional)').setMaxLength(500)).addIntegerOption(o => o.setName('delete_messages').setDescription('Also delete their recent messages').addChoices({ name: 'Keep messages', value: 0 }, { name: 'Last hour', value: 3600 }, { name: 'Last 24 hours', value: 86400 }, { name: 'Last 7 days', value: 604800 })).addStringOption(o => o.setName('evidence').setDescription('Evidence: links or a short description (shown in the ban log)').setMaxLength(500)))
-    .addSubcommand(s => s.setName('unban').setDescription('Lift a local ban by user ID (genrebans/hardbans need a developer)').addStringOption(o => o.setName('user_id').setDescription('Discord user ID').setRequired(true).setMinLength(17).setMaxLength(20)).addStringOption(o => o.setName('reason').setDescription('Reason (optional)').setMaxLength(500)))
+    .addSubcommand(s => s.setName('unban').setDescription('Lift a ban by user ID (owners/Head Admins can exempt a genreban here; hardbans need a developer)').addStringOption(o => o.setName('user_id').setDescription('Discord user ID').setRequired(true).setMinLength(17).setMaxLength(20)).addStringOption(o => o.setName('reason').setDescription('Reason (optional)').setMaxLength(500)))
     .addSubcommand(s => s.setName('kick').setDescription('Kick a member').addUserOption(o => o.setName('user').setDescription('Target').setRequired(true)).addStringOption(o => o.setName('reason').setDescription('Reason (optional)').setMaxLength(500)))
     .addSubcommand(s => s.setName('timeout').setDescription('Time out a member for a number of minutes').addUserOption(o => o.setName('user').setDescription('Target').setRequired(true)).addIntegerOption(o => o.setName('minutes').setDescription('Duration').setMinValue(1).setMaxValue(40320).setRequired(true)).addStringOption(o => o.setName('reason').setDescription('Reason (optional)').setMaxLength(500)))
     .addSubcommand(s => s.setName('untimeout').setDescription('Remove a timeout').addUserOption(o => o.setName('user').setDescription('Target').setRequired(true)).addStringOption(o => o.setName('reason').setDescription('Reason (optional)').setMaxLength(500)))
@@ -70,6 +72,9 @@ export default defineCommand(new SlashCommandBuilder().setName('moderation').set
 
     if (sub === 'unban') {
         const id = i.options.getString('user_id', true);
+        // Genreban (no hardban): the owner or a Head Admin may let them back into this server only.
+        const genreban = /^\d{17,20}$/.test(id.trim()) && !activeBan(ctx.store, 'hardban', id.trim()) ? activeBan(ctx.store, 'genreban', id.trim()) : undefined;
+        if (genreban) return offerGenrebanException(ctx, i, genreban, i.options.getString('reason') ?? NO_REASON);
         await showWorking(i, 'Unbanning', `User ID \`${id}\`\nChecking the ban type and permissions, then unbanning…`);
         try {
             await finish(i, outcomeEmbed('Unban succeeded', { outcome: 'success', reason: await run(ctx) }));

@@ -5,11 +5,11 @@
 **Anti-nuke protection, moderation, logging and server recovery for the Midtown Discord network.**
 
 [![CI](https://github.com/aidendixon602-png/midtown-vanguard/actions/workflows/ci.yml/badge.svg)](https://github.com/aidendixon602-png/midtown-vanguard/actions/workflows/ci.yml)
-![Version](https://img.shields.io/badge/version-2.35.1-5865F2)
+![Version](https://img.shields.io/badge/version-2.36.0-5865F2)
 ![Node](https://img.shields.io/badge/node-24%2B-339933?logo=node.js&logoColor=white)
 ![discord.js](https://img.shields.io/badge/discord.js-14-5865F2?logo=discord&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
-![Tests](https://img.shields.io/badge/tests-480%20passing-2EA043)
+![Tests](https://img.shields.io/badge/tests-481%20passing-2EA043)
 
 [Features](#-features) · [Commands](#-commands) · [Deploying](#-deploying) · [Automatic updates](#-automatic-updates) · [Development](#-development) · [Docs](#-documentation)
 
@@ -27,7 +27,7 @@
 | 📜 **Server logs** | `#midtown-vanguard-logging`: deleted/edited messages, roles, channels, nicknames, timeouts, bans, kicks and bot actions. Nothing is guessed: anything Discord doesn't confirm is marked *Unavailable*. |
 | 🔨 **Moderation** | Bans, tempbans, softbans, massbans, timeouts, warnings with automatic escalation, cases, notes and appeals. |
 | 🎭 **Safe role management** | `/role` with hierarchy checks; `/role who-can-give` decides who may hand out each role; rejoining members get their roles back in one click. |
-| 🌐 **Network bans** | Developer-only genrebans and hardbans across every Midtown server, enforced on join. |
+| 🌐 **Network bans** | Developer-only genrebans and hardbans across every Midtown server, enforced on join. A server's owner or Head Admin can let a genrebanned person back into their own server only; hardbans have no exceptions. |
 | 💾 **Recovery** | Snapshots and backups of the server layout with previewed, rate-limit-aware restores. |
 | 🚨 **Raid tools** | Raid mode, lockdowns, emergency mode, new-account holds, scam-link and anti-ping protection. |
 | 🎮 **Roblox** | RoVer/Bloxlink verification, group rank binds and a shared blacklist. |
@@ -46,7 +46,7 @@ Type `/` and pick **Midtown Vanguard**. Commands are grouped so the menu stays s
 | `/recovery` | `snapshot`, `backup`, `copylayout` |
 | `/info` | `user`, `role`, `server`, `bot`, `ping` |
 | `/roblox` | `lookup`, `sync`, `blacklist`, `bind`, `group` |
-| `/network` | `genreban`, `ungenreban`, `hardban`, `unhardban` (developers) |
+| `/network` | `genreban`, `ungenreban`, `hardban`, `unhardban`, `exceptions` (developers) |
 | `/dev` | `diagnostics`, `update`, `restart`, `server`, `database` (developers) |
 | `/help` | Every command you can use, with who it's for |
 
@@ -110,7 +110,7 @@ UPDATE_TOKEN=github_pat_...   # fine-grained, read-only Contents + Actions, this
 ```bash
 npm ci
 npm run build     # compile src/ → dist/ (dist/ is committed; CI checks it matches)
-npm test          # 480 tests
+npm test          # 481 tests
 npm run dev       # run from source
 ```
 

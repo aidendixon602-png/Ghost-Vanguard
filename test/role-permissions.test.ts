@@ -345,7 +345,7 @@ test('the reorganized command list: the expected top-level commands and groups',
         assert.deepEqual(tree.map(c => c.name), ['antinuke', 'mod', 'security', 'setup', 'recovery', 'info', 'network', 'dev', 'help', 'verify', 'roblox', 'ask', 'role']);
         const subs = (name: string) => tree.find(c => c.name === name)!.options.map((o: any) => o.name);
         assert.deepEqual(subs('antinuke'), ['status', 'enable', 'disable', 'check', 'scan', 'settings', 'whitelist']);
-        assert.deepEqual(subs('network'), ['genreban', 'ungenreban', 'hardban', 'unhardban']);
+        assert.deepEqual(subs('network'), ['genreban', 'ungenreban', 'hardban', 'unhardban', 'exceptions']);
         assert.ok(!subs('security').includes('mention') && !subs('security').includes('roblox-block'), 'duplicates removed');
         assert.ok(subs('setup').includes('permissions') && subs('mod').includes('notes'));
         const server = tree.find(c => c.name === 'dev')!.options.find((o: any) => o.name === 'server');

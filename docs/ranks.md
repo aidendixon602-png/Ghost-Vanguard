@@ -30,6 +30,8 @@ Everything, in every server, without needing Discord permissions. Ignored by ant
 - `/dev server deauthorize`: Developer: remove this server's authorization and leave
 - `/dev server unban`: Developer: remove a server ban
 - `/dev update`: Automatic GitHub updates: see the status, or check and install now
+- `/network exceptions list`: Active genreban exceptions, newest first
+- `/network exceptions revoke`: Cancel an exception: the genreban applies in that server again
 - `/network genreban`: Developer: ban a user from every authorized server until /network ungenreban
 - `/network hardban`: Developer: permanently ban a user from every authorized server until /network unhardban
 - `/network ungenreban`: Developer: revoke a genreban and lift it in every authorized server
@@ -189,7 +191,7 @@ Server rank, or Discord's matching permission (Ban/Kick/Timeout Members, Manage 
 - `/mod purge`: Delete up to 100 recent messages in this channel (asks to confirm)
 - `/mod softban`: Ban then immediately unban: kicks a member and deletes their recent messages
 - `/mod tempban`: Ban a user for a set time; Vanguard lifts the ban automatically
-- `/mod unban`: Lift a local ban by user ID (genrebans/hardbans need a developer)
+- `/mod unban`: Lift a ban by user ID (owners/Head Admins can exempt a genreban here; hardbans need a developer)
 - `/mod untimeout`: Remove a timeout
 - `/roblox blacklist`: Block a Roblox account from verifying here (and flag it on join)
 - `/roblox unblacklist`: Remove a Roblox account from this server's blacklist

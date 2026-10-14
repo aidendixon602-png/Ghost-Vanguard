@@ -24,7 +24,7 @@ export const UMBRELLAS = [
             { child: 'bot-info', mode: 'single', as: 'bot' }, { child: 'ping', mode: 'single' }
         ] },
     { name: 'network', description: 'Developers: genrebans and hardbans across every Midtown server', entries: [
-            { child: 'genreban', mode: 'single' }, { child: 'ungenreban', mode: 'single' }, { child: 'hardban', mode: 'single' }, { child: 'unhardban', mode: 'single' }
+            { child: 'genreban', mode: 'single' }, { child: 'ungenreban', mode: 'single' }, { child: 'hardban', mode: 'single' }, { child: 'unhardban', mode: 'single' }, { child: 'netexception', mode: 'group', as: 'exceptions' }
         ] },
     { name: 'dev', description: 'Bot developers: diagnostics, updates, servers and the database', entries: [
             { child: 'dev', mode: 'flat' },

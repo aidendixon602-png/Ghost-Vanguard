@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.36.0: genreban exceptions for one server
+- **`/mod unban` on a genrebanned user** now lets a server's **owner or Head Admin** (a Vanguard rank, not just Discord's Administrator permission) let them back into **their server only**:
+  - it asks for confirmation first
+  - they are unbanned there and the bot stops re-banning them in that server
+  - the genreban stays in force in every other Midtown server
+  - a case is recorded and the server's log gets a note
+  - every developer gets a DM with the reason and how to cancel it
+- **Moderators and Admins** still cannot. They are told to ask the owner or a Head Admin.
+- **Hardbans never have exceptions.** Hardbanning someone who has an exception makes the hardban apply everywhere, including that server.
+- **New `/network exceptions list` and `revoke`** (developers): see every exception and cancel any of them. If the person is in that server, they are banned again straight away.
+
 ## 2.35.1: complete, always-current command and rank lists
 - **New [docs/ranks.md](ranks.md):** every rank (Supreme Leader, Developer, Overseer, Bot Manager, Server Owner, Head Admin, Admin, Moderator, Helper, Everyone) with every command it unlocks.
 - **[docs/commands.md](commands.md) is regenerated** with everything new: `/setup panel`, `/role restore`, `/role who-can-give`, `/antinuke whitelist check`, `/dev database restore-settings` and more.

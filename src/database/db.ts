@@ -46,7 +46,7 @@ export const GUILD_SCOPED_TABLES = ['scam_config', 'scam_domains', 'scam_images'
 
 /** Tables carrying a guild column that are intentionally not scope-guarded. */
 // roblox_network is shared on purpose: servers that opt in share their Roblox blacklist with each other.
-export const UNSCOPED_GUILD_TABLES = ['guild_data', 'guild_authorization', 'server_bans', 'authorization_events', 'recovery_events', 'leases', 'roblox_network', 'network_partners', 'network_ban_results'] as const;
+export const UNSCOPED_GUILD_TABLES = ['guild_data', 'guild_authorization', 'server_bans', 'authorization_events', 'recovery_events', 'leases', 'roblox_network', 'network_partners', 'network_ban_results', 'network_exceptions'] as const;
 
 const SCOPED_TABLE_PATTERN = new RegExp(`\\b(${[...GUILD_SCOPED_TABLES, 'recovery_events'].join('|')})\\b`, 'i');
 
@@ -131,6 +131,11 @@ export class Store {
         id INTEGER PRIMARY KEY AUTOINCREMENT, ban_id INTEGER NOT NULL REFERENCES network_bans(id),
         guild_id TEXT NOT NULL, guild_name TEXT, action TEXT NOT NULL, outcome TEXT NOT NULL, detail TEXT, at INTEGER NOT NULL);
       CREATE INDEX IF NOT EXISTS network_ban_results_ban ON network_ban_results(ban_id, id);
+      -- A server's owner/Head Admin letting one genrebanned person back into that server only. Never for hardbans.
+      CREATE TABLE IF NOT EXISTS network_exceptions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, ban_id INTEGER NOT NULL REFERENCES network_bans(id), guild_id TEXT NOT NULL, guild_name TEXT,
+        user_id TEXT NOT NULL, by_id TEXT NOT NULL, reason TEXT NOT NULL, at INTEGER NOT NULL, revoked_by TEXT, revoked_at INTEGER);
+      CREATE INDEX IF NOT EXISTS network_exceptions_ban ON network_exceptions(ban_id, guild_id);
       CREATE TABLE IF NOT EXISTS authorization_events (id INTEGER PRIMARY KEY AUTOINCREMENT, guild_id TEXT NOT NULL, state TEXT NOT NULL, actor TEXT, at INTEGER NOT NULL, detail TEXT);
       CREATE TABLE IF NOT EXISTS runtime_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
       `);

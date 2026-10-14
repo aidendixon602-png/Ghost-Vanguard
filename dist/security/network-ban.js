@@ -315,7 +315,30 @@ export function unbanEverywhere(deps, ban, reason, actorId, onProgress) {
 // ---------------------------------------------------------------- enforcement
 /** Problems already reported, so a server that keeps refusing does not flood the logs. */
 const reported = new Set();
+/** The exception that lets this genrebanned user into this one server, if any. Hardbans never have one. */
+export function activeException(store, guildId, banId) {
+    return store.get('SELECT * FROM network_exceptions WHERE ban_id=? AND guild_id=? AND revoked_at IS NULL ORDER BY id DESC LIMIT 1', banId, guildId);
+}
+export function addException(store, ban, guild, byId, reason, at = Date.now()) {
+    if (ban.kind !== 'genreban')
+        throw new AppError('PERMISSION_ERROR', 'Hardbans have no exceptions: only a developer can lift one, for every server.');
+    const existing = activeException(store, guild.id, ban.id);
+    if (existing)
+        return existing;
+    const id = Number(store.run('INSERT INTO network_exceptions(ban_id,guild_id,guild_name,user_id,by_id,reason,at) VALUES(?,?,?,?,?,?,?)', ban.id, guild.id, guild.name ?? null, ban.user_id, byId, reason, at).lastInsertRowid);
+    return store.get('SELECT * FROM network_exceptions WHERE id=?', id);
+}
+export function revokeException(store, id, byId, at = Date.now()) {
+    store.run('UPDATE network_exceptions SET revoked_by=?, revoked_at=? WHERE id=? AND revoked_at IS NULL', byId, at, id);
+    return store.get('SELECT * FROM network_exceptions WHERE id=?', id);
+}
+export function listExceptions(store, userId) {
+    return store.all(`SELECT e.*, b.kind, b.status FROM network_exceptions e JOIN network_bans b ON b.id=e.ban_id WHERE e.revoked_at IS NULL AND b.status='active'${userId ? ' AND e.user_id=?' : ''} ORDER BY e.at DESC LIMIT 50`, ...(userId ? [userId] : []));
+}
 async function enforce(deps, guild, ban, why) {
+    // This server's owner/Head Admin let them back in here only. The genreban still applies everywhere else.
+    if (ban.kind === 'genreban' && activeException(deps.store, guild.id, ban.id))
+        return false;
     const result = await banIn(deps, guild, ban, why);
     const key = `${guild.id}:${ban.id}`;
     if (result.outcome === 'success') {
