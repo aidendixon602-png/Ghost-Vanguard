@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.32.0: give rejoining members their roles back in one click
+- When someone leaves, Vanguard remembers their roles for 90 days (not bot or integration roles).
+- When they rejoin, a **Member Rejoined** card in the log lists the roles they had, with a green **↩️ Restore roles** button.
+- **`/role restore user:`** does the same from a command.
+- Every role goes through the same checks as `/role add`, so the person pressing it only gives back what they could give by hand:
+  - **ordinary roles:** anyone with Manage Roles, Administrator or a Vanguard moderator rank
+  - **staff and admin roles** (Ban, Kick, Administrator…): the owner, a developer, or someone with an approved `/role policy` rule
+  - **always skipped:** roles above the bot, integration roles and deleted roles, with the reason listed
+- If some roles needed more access, the button stays so the owner can finish the job. Once everything is back, it turns into "Roles restored".
+- Anti-nuke knows these are approved changes, so restoring roles never counts toward Role Invite.
+
 ## 2.31.0: warnings before strips, trusted bots, whitelist check, settings restore
 - **Warn before strip.** Everyday rules (Role Invite, Role Create, Role Update, Channel Create, Channel Update, Server Update, Timeout) now give a **warning** the first time:
   - the change is undone, a yellow **Anti-nuke Warning** is posted, and the person is DMed telling them to slow down or ask for a whitelist

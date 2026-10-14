@@ -5,11 +5,11 @@
 **Anti-nuke protection, moderation, logging and server recovery for the Midtown Discord network.**
 
 [![CI](https://github.com/aidendixon602-png/midtown-vanguard/actions/workflows/ci.yml/badge.svg)](https://github.com/aidendixon602-png/midtown-vanguard/actions/workflows/ci.yml)
-![Version](https://img.shields.io/badge/version-2.31.0-5865F2)
+![Version](https://img.shields.io/badge/version-2.32.0-5865F2)
 ![Node](https://img.shields.io/badge/node-24%2B-339933?logo=node.js&logoColor=white)
 ![discord.js](https://img.shields.io/badge/discord.js-14-5865F2?logo=discord&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
-![Tests](https://img.shields.io/badge/tests-464%20passing-2EA043)
+![Tests](https://img.shields.io/badge/tests-468%20passing-2EA043)
 
 [Features](#-features) · [Commands](#-commands) · [Deploying](#-deploying) · [Automatic updates](#-automatic-updates) · [Development](#-development) · [Docs](#-documentation)
 
@@ -39,7 +39,7 @@ Type `/` and pick **Midtown Vanguard**. Commands are grouped so the menu stays s
 |---|---|
 | `/antinuke` | `status`, `enable`, `disable`, `check`, `scan`, `settings`, `whitelist` (`add`, `remove`, `list`, `check`, `bots`) |
 | `/mod` | `ban`, `unban`, `kick`, `timeout`, `warn`, `purge`, `tempban`, `softban`, `massban`, `bans`, `case`, `notes`, `warnings`, `appeals` |
-| `/role` | `add`, `remove`, `allow`, `policy`, `rules` |
+| `/role` | `add`, `remove`, `restore`, `allow`, `policy`, `rules` |
 | `/security` | `lockdown`, `emergency`, `raidmode`, `automod`, `scam`, `antiping`, `health` |
 | `/setup` | `logs`, `staff`, `welcome`, `config`, `permissions`, `history` |
 | `/recovery` | `snapshot`, `backup`, `copylayout` |
@@ -102,7 +102,7 @@ UPDATE_TOKEN=github_pat_...   # fine-grained, read-only Contents + Actions, this
 ```bash
 npm ci
 npm run build     # compile src/ → dist/ (dist/ is committed; CI checks it matches)
-npm test          # 464 tests
+npm test          # 468 tests
 npm run dev       # run from source
 ```
 

@@ -2,6 +2,7 @@ import { ActionRowBuilder, ButtonBuilder, Colors, PermissionFlagsBits } from 'di
 import { developers } from '../bot/developers.js';
 import { confirmDanger } from './danger-ui.js';
 import { embed } from './ui.js';
+import { restoredLog, restoreRoles, restoreSummary } from '../features/rejoin-roles.js';
 import { AppError } from '../errors.js';
 import { COMPONENTS } from '../recovery/recovery.js';
 import { addConfirmation, showLayoutReview } from './layout-ui.js';
@@ -53,6 +54,20 @@ export function registerIncidentControls(registry) {
                 throw new AppError('VALIDATION_ERROR', 'No usable snapshot was taken before these deletions, so there is nothing to restore from. Keep a recent baseline with /recovery snapshot create or scheduled backups.');
             const key = addConfirmation(ctx, { guild: i.guildId, user: i.user.id, snapshot, prune: false, fingerprint: '', components: plan.components });
             await showLayoutReview(ctx, i, key, ctx.confirmations.get(key));
+        } });
+    registry.component({ prefix: 'rejoin:restore:', kinds: ['button'], metadata: { ...defaults, category: 'moderation', access: 'member', botPermissions: [PermissionFlagsBits.ManageRoles] },
+        execute: async (ctx, i) => {
+            const userId = /^rejoin:restore:(\d{17,20})$/.exec(i.customId)?.[1];
+            if (!userId)
+                throw new AppError('VALIDATION_ERROR', 'Invalid restore button.');
+            // Same checks as /role add for every role: the button gives back only what the presser may give.
+            const result = await restoreRoles(ctx.store, i.guild, i.user.id, userId);
+            if (result.given.length)
+                ctx.logs.push(i.guildId, restoredLog(i.guildId, i.user.id, userId, result));
+            const done = !result.skipped.some(s => s.reason !== 'the role was deleted');
+            if (done && i.message?.components?.length)
+                await i.message.edit({ components: [new ActionRowBuilder().addComponents(ButtonBuilder.from(i.message.components[0].components[0]).setDisabled(true).setLabel('Roles restored'))] }).catch(() => null);
+            return restoreSummary(userId, result);
         } });
     registry.component({ prefix: 'incident:undo:', kinds: ['button'], metadata: { ...defaults, category: 'security', access: 'security', botPermissions: [PermissionFlagsBits.ManageRoles] },
         execute: async (ctx, i) => {

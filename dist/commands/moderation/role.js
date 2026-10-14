@@ -6,6 +6,7 @@ import { staffReason } from '../../security/raidmode.js';
 import { developers } from '../../bot/developers.js';
 import { decideRoleChange, privilegedReason } from '../../security/role-policy.js';
 import { approveRoleChange } from '../../security/role-authorizations.js';
+import { restoredLog, restoreRoles, restoreSummary } from '../../features/rejoin-roles.js';
 /**
  * /role add | remove — give or take one role, with every check done in here (not by Discord's
  * command visibility): see security/role-policy.ts for who may change what.
@@ -16,6 +17,8 @@ export default defineCommand(new SlashCommandBuilder().setName('role').setDescri
     .addUserOption(o => o.setName('user').setDescription('Member').setRequired(true)).addRoleOption(o => o.setName('role').setDescription('Role').setRequired(true)))
     .addSubcommand(s => s.setName('remove').setDescription('Take a role from a member')
     .addUserOption(o => o.setName('user').setDescription('Member').setRequired(true)).addRoleOption(o => o.setName('role').setDescription('Role').setRequired(true)))
+    .addSubcommand(s => s.setName('restore').setDescription('Give a member back the roles they had before they left the server')
+    .addUserOption(o => o.setName('user').setDescription('Member who rejoined').setRequired(true)))
     .addSubcommand(s => s.setName('allow').setDescription('Let configured moderators give and take a role (owner or Head Admin)')
     .addRoleOption(o => o.setName('role').setDescription('Role').setRequired(true))
     .addBooleanOption(o => o.setName('allowed').setDescription('True: moderators may manage it · False: remove it from the list').setRequired(true)))
@@ -33,6 +36,13 @@ export default defineCommand(new SlashCommandBuilder().setName('role').setDescri
         const grants = rows.filter(r => r.kind === 'grant').map(r => `<@&${r.role_id}> ← ${r.grantor_type === 'role' ? `<@&${r.grantor_id}>` : `<@${r.grantor_id}>`} · approved by <@${r.by_id}>`);
         return [`**Moderators may manage:** ${allow.join(', ') || 'no roles yet (`/role allow`)'}`, `**Approved grants of protected roles:**\n${grants.join('\n') || 'none (`/role policy`)'}`,
             '-# The owner and developers can manage any eligible role. Administrator / Manage Roles can manage ordinary roles below their own.'].join('\n');
+    }
+    if (sub === 'restore') {
+        const user = i.options.getUser('user', true);
+        const result = await restoreRoles(ctx.store, i.guild, i.user.id, user.id);
+        if (result.given.length)
+            ctx.logs.push(guildId, restoredLog(guildId, i.user.id, user.id, result));
+        return restoreSummary(user.id, result);
     }
     if (sub === 'allow') {
         const role = i.options.getRole('role', true), allowed = i.options.getBoolean('allowed', true);

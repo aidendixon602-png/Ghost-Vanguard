@@ -1,3 +1,4 @@
+import { onRejoin, saveLeftRoles } from './features/rejoin-roles.js';
 import { selfRestart } from './bot/updater-link.js';
 import { autoReact } from './features/autoreact.js';
 import { reconcileStartupMembers } from './security/startup-members.js';
@@ -284,6 +285,7 @@ client.on(Events.MessageUpdate, (old, m) => {
 client.on(Events.GuildMemberRemove, member => {
     stats.invalidate();
     protectedTask('event log', member.guild.id, async () => recordMemberEvent(store, logs, member, false));
+    protectedTask('save roles on leave', member.guild.id, async () => saveLeftRoles(store, member));
     if (member.user.bot) protectedTask('bot quarantine cleanup', member.guild.id, async () => forgetHeldBot(store, member.guild.id, member.id));
 });
 
@@ -304,6 +306,7 @@ client.on(Events.GuildMemberAdd, member => {
     });
     protectedTask('rejoin quarantine', member.guild.id, () => security.reconcile(member));
     protectedTask('history on join', member.guild.id, async () => historyOnJoin(store, logs, member));
+    protectedTask('rejoin roles', member.guild.id, async () => onRejoin(store, logs, member));
     protectedTask('alt check', member.guild.id, () => checkAltAccount(store, logs, roblox, member, id => security.trusted(member.guild, id)));
     protectedTask('welcome', member.guild.id, () => sendWelcome(store, member));
     if (member.user.bot) protectedTask('bot quarantine', member.guild.id, () => quarantineNewBot(store, logs, member));
