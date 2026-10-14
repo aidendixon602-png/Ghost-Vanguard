@@ -5,7 +5,7 @@ export function parseIds(value = ''): Set<string> {
     return new Set(value.split(',').map(v => v.trim()).filter(v => /^\d{17,20}$/.test(v)));
 }
 
-export const VERSION = '2.36.1';
+export const VERSION = '2.37.0';
 export const CONFIG_VERSION = 3;
 
 export const config = {
@@ -22,7 +22,7 @@ export const config = {
     logLevel: process.env.LOG_LEVEL || 'info',
     ownerId: process.env.BOT_OWNER_ID || '1277709272041394187',
     /** Extra Supreme Leaders besides BOT_OWNER_ID (comma-separated IDs). */
-    supremeExtra: parseIds(process.env.SUPREME_LEADER_IDS || '843909457616044092'),
+    supremeExtra: parseIds(process.env.SUPREME_LEADER_IDS || ''),
     /** Optional uptime check URL (e.g. https://hc-ping.com/<uuid>); pinged every minute. */
     heartbeatUrl: /^https:\/\//.test(process.env.HEARTBEAT_URL?.trim() ?? '') ? process.env.HEARTBEAT_URL!.trim() : '',
     /** The only people the bot DMs about itself (backup files, alerts). Default: BOT_OWNER_ID only. */

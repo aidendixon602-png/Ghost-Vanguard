@@ -1,6 +1,6 @@
 {
   "name": "midtown-vanguard",
-  "version": "2.36.1",
+  "version": "2.37.0",
   "private": true,
   "description": "Security and moderation platform for the Midtown Discord network: anti-nuke, moderation, audit logging and server recovery",
   "type": "module",

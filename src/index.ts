@@ -1,3 +1,4 @@
+import { accessSummary } from './bot/access-summary.js';
 import { dmTrusted } from './bot/trusted-dm.js';
 import { onRejoin, saveLeftRoles } from './features/rejoin-roles.js';
 import { selfRestart } from './bot/updater-link.js';
@@ -209,8 +210,11 @@ client.once(Events.ClientReady, async (c) => {
                 integrations: { RoVer: !!config.roverKey, Bloxlink: !!config.bloxlinkKey, AI: !!config.aiEnabled }, health: healthUrl }))
                 console.log(line);
         printStartupInvite(client.guilds.cache.size);
-        if (config.logFormat !== 'json')
+        if (config.logFormat !== 'json') {
+            console.log('');
+            for (const line of accessSummary(store)) console.log(line);
             console.log(closingRule());
+        }
         endStartupSummary();
         markSeen(store);
         for (const guild of client.guilds.cache.values())

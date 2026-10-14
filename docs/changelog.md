@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.37.0: no built-in access, and a startup access check
+- **Removed the built-in Supreme Leader** (`843909457616044092`). It used to have full control in every server, and received the daily database backup, unless `SUPREME_LEADER_IDS` was set.
+- **Supreme Leaders now come only from:**
+  - `BOT_OWNER_ID`
+  - `SUPREME_LEADER_IDS`
+  - ranks given with `/setup staff global`
+- **Every start prints an Access block** under the banner: owner, Supreme Leaders, developers, bot-wide ranks and who gets bot DMs. If an unexpected ID shows up, remove it.
+
 ## 2.36.1: bot DMs go only to people you trust
 - **New `TRUSTED_DM_IDS`:** the only people the bot ever DMs about itself. That covers:
   - the **daily database backup file** (`.db.gz`)

@@ -7,8 +7,8 @@
 Anti-nuke protection · Moderation and audit logging · Staff permissions · Server recovery
 
 [![CI](https://github.com/aidendixon602-png/midtown-vanguard/actions/workflows/ci.yml/badge.svg)](https://github.com/aidendixon602-png/midtown-vanguard/actions/workflows/ci.yml)
-![Version](https://img.shields.io/badge/version-2.36.1-5865F2)
-![Tests](https://img.shields.io/badge/tests-482%20passing-2EA043)
+![Version](https://img.shields.io/badge/version-2.37.0-5865F2)
+![Tests](https://img.shields.io/badge/tests-483%20passing-2EA043)
 ![Node](https://img.shields.io/badge/node-24-339933?logo=node.js&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
 ![discord.js](https://img.shields.io/badge/discord.js-14-5865F2?logo=discord&logoColor=white)
@@ -111,7 +111,8 @@ Copy [`.env.example`](.env.example) to `.env` and set at least:
 | `DISCORD_CLIENT_ID` | Yes | Application ID |
 | `DEVELOPER_IDS` | Yes | Comma-separated user IDs with developer access |
 | `DATABASE_PATH` | No | SQLite database location (default `./data/vanguard.db`) |
-| `SUPREME_LEADER_IDS` | No | Additional Supreme Leaders |
+| `BOT_OWNER_ID` | Recommended | The bot owner: Supreme Leader, and the default for `TRUSTED_DM_IDS` |
+| `SUPREME_LEADER_IDS` | No | Additional Supreme Leaders. Nobody is built in; every start prints who has bot-wide access |
 | `TRUSTED_DM_IDS` | No | The only people the bot DMs about itself, including the daily database backup (default: `BOT_OWNER_ID`) |
 | `UPDATE_REPO`, `UPDATE_TOKEN` | No | Enable automatic updates (see below) |
 | `ROVER_API_KEY`, `BLOXLINK_API_KEY` | No | Roblox verification providers |
