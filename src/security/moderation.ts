@@ -8,6 +8,7 @@ import { RANKS, rankOf } from '../bot/ranks.js';
 import { sendBanNotice } from '../features/appeals.js';
 import { escalateWarnings } from '../features/warn-points.js';
 import { assertLocalUnban, banTypeFromReason, existingBan } from './network-ban.js';
+import { caseId, recordExistingBan } from '../audit/ban-log.js';
 
 
 export async function moderate(i: ChatInputCommandInteraction<'cached'>, store: Store, logs: LogQueue, actor: GuildMember) {
@@ -34,6 +35,7 @@ export async function moderate(i: ChatInputCommandInteraction<'cached'>, store: 
     let targetId: string;
     let username: string | null = null;
     let note = '';
+    let alreadyBanned = false;
     if (sub === 'unban') {
         targetId = i.options.getString('user_id', true).trim();
         if (!/^\d{17,20}$/.test(targetId))
@@ -56,16 +58,21 @@ export async function moderate(i: ChatInputCommandInteraction<'cached'>, store: 
             checkTarget(actor, target, me);
         store.assertAuthorized(i.guildId);
         if (sub === 'ban') {
-            // No duplicate bans or cases: an existing ban is reported, not repeated.
+            // Already banned (by hand, another bot, or before the ban log): Discord's ban is left alone and
+            // this reason/evidence goes on their record instead of the command being refused.
             const existing = await existingBan(i.guild, targetId);
-            if (existing)
-                throw new AppError('VALIDATION_ERROR', `That user is already banned here${banTypeFromReason(existing.reason) !== 'local' ? ` (by a Midtown Vanguard ${banTypeFromReason(existing.reason)})` : ''}. No new ban or case was recorded.`);
-            const deleteMessageSeconds = i.options.getInteger('delete_messages') ?? 0;
-            // Tell them why (with an Appeal button when appeals are on) while they still share a server with the bot.
-            if (!await sendBanNotice(store, i.guild, user, reason)) note = 'The ban DM could not be delivered (their DMs may be closed).';
-            await i.guild.members.ban(targetId, { reason: auditReason, deleteMessageSeconds });
-            if (deleteMessageSeconds)
-                note = `${note ? note + ' ' : ''}Their messages from the last ${deleteMessageSeconds === 3600 ? 'hour' : deleteMessageSeconds === 86400 ? '24 hours' : '7 days'} were deleted.`;
+            // A genreban or hardban belongs to the developers; its reason and record stay theirs.
+            if (existing && banTypeFromReason(existing.reason) !== 'local')
+                throw new AppError('VALIDATION_ERROR', `That user is already banned here by a Midtown Vanguard ${banTypeFromReason(existing.reason)}, which only a developer can change. Nothing was recorded.`);
+            if (existing) alreadyBanned = true;
+            const deleteMessageSeconds = alreadyBanned ? 0 : i.options.getInteger('delete_messages') ?? 0;
+            if (!alreadyBanned) {
+                // Tell them why (with an Appeal button when appeals are on) while they still share a server with the bot.
+                if (!await sendBanNotice(store, i.guild, user, reason)) note = 'The ban DM could not be delivered (their DMs may be closed).';
+                await i.guild.members.ban(targetId, { reason: auditReason, deleteMessageSeconds });
+                if (deleteMessageSeconds)
+                    note = `${note ? note + ' ' : ''}Their messages from the last ${deleteMessageSeconds === 3600 ? 'hour' : deleteMessageSeconds === 86400 ? '24 hours' : '7 days'} were deleted.`;
+            }
         } else {
             if (!target)
                 throw new AppError('VALIDATION_ERROR', 'That user is not a member of this server.');
@@ -88,6 +95,11 @@ export async function moderate(i: ChatInputCommandInteraction<'cached'>, store: 
         }
     }
     const id = store.recordCase(i.guildId, targetId, actor.id, sub, reason, { username, evidence: sub === 'ban' ? i.options.getString('evidence') : null });
+    if (alreadyBanned) {
+        const user = i.options.getUser('user', true);
+        const { record, isNew } = recordExistingBan(store, logs, i.guildId, { id: targetId, tag: user.tag, username: user.username, avatar: user.displayAvatarURL?.() ?? null }, actor.id, reason, i.options.getString('evidence'));
+        note = [`They were **already banned** on Discord, so the ban itself did not change. Your reason${i.options.getString('evidence') ? ' and evidence were' : ' was'} ${isNew ? 'used to start' : 'added to'} their ban record **${caseId(record)}** in #bans.`, note].filter(Boolean).join('\n');
+    }
     // Warning points: enough warnings trigger an automatic timeout, kick or ban.
     // Only members can be escalated (a ban on someone already gone needs a Moderator's own decision).
     if (sub === 'warn' && await memberOrNull(i.guild, targetId))

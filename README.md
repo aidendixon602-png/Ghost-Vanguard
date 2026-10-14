@@ -5,7 +5,7 @@
 **Anti-nuke protection, moderation, logging and server recovery for the Midtown Discord network.**
 
 [![CI](https://github.com/aidendixon602-png/midtown-vanguard/actions/workflows/ci.yml/badge.svg)](https://github.com/aidendixon602-png/midtown-vanguard/actions/workflows/ci.yml)
-![Version](https://img.shields.io/badge/version-2.33.1-5865F2)
+![Version](https://img.shields.io/badge/version-2.33.2-5865F2)
 ![Node](https://img.shields.io/badge/node-24%2B-339933?logo=node.js&logoColor=white)
 ![discord.js](https://img.shields.io/badge/discord.js-14-5865F2?logo=discord&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)

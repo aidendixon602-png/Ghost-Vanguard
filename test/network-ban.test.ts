@@ -562,12 +562,24 @@ test('/moderation ban explains missing permissions, role hierarchy and duplicate
     assert.equal(f.calls.banned.length, 0);
     f.store.close();
 
+    // Already banned (by hand or another bot): Discord's ban is left alone, the reason goes on their record.
     f = moderation('ban', { bans: { [TARGET]: 'mod: earlier' } });
     await moderationCommand.execute(f.ctx, f.i);
     await f.press();
-    assert.match(title(f.clickReplies.at(-1)), /already done/);
+    assert.equal(f.calls.banned.length, 0, 'no second ban sent to Discord');
+    assert.match(JSON.stringify(f.clickReplies.at(-1)), /already banned/);
+    assert.match(JSON.stringify(f.clickReplies.at(-1)), /BAN-0001/);
+    assert.equal(f.store.readGuild('g', () => f.store.get('SELECT COUNT(*) AS n FROM cases WHERE guild_id=?', 'g'))!.n, 1, 'one case with this reason');
+    const record = f.store.readGuild('g', () => f.store.get('SELECT * FROM ban_records WHERE guild_id=?', 'g'))!;
+    assert.equal(record.status, 'banned'); assert.ok(record.reason, 'the reason is on the ban record');
+    f.store.close();
+
+    // A genreban or hardban is the developers' to change.
+    f = moderation('ban', { bans: { [TARGET]: '[Vanguard hardban] HB-00001 1277709272041394187: raid' } });
+    await moderationCommand.execute(f.ctx, f.i);
+    await f.press();
+    assert.match(JSON.stringify(f.clickReplies.at(-1)), /only a developer can change/);
     assert.equal(f.calls.banned.length, 0);
-    assert.equal(f.store.readGuild('g', () => f.store.get('SELECT COUNT(*) AS n FROM cases WHERE guild_id=?', 'g'))!.n, 0, 'no duplicate case');
     f.store.close();
 });
 

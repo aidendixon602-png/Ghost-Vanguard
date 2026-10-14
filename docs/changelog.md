@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.33.2: banning someone who is already banned
+- `/mod ban` used to refuse with "No change: already done" when the person was already banned (by hand in Discord, by another bot like Midtown Utilities, or before the ban log existed). That left no way to record why.
+- Now Discord's ban is left as it is (no second ban, no DM), but your **reason and evidence are recorded**:
+  - a case is saved
+  - their ban record in `#bans` is updated, or a new **BAN-xxxx** record is started if they had none
+  - if nobody was known to be behind the original ban, you are listed as the moderator
+- The reply says so: "They were already banned on Discord, so the ban itself did not change. Your reason was added to BAN-0007."
+- Genrebans and hardbans are still left alone. Only a developer can change those.
+
 ## 2.33.1: cleaner console
 - **Updates** are 3 short lines: `↻ Update found: <commit> · <what changed>`, `📦 Dependencies updated · 35 added · 10s`, `✔ Installed`. npm's spinner garbage (`\|/-\|/-`) is gone.
 - **Dependencies are no longer reinstalled** when only the version number changed, so most updates start about 10 seconds faster.

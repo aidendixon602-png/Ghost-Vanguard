@@ -141,6 +141,32 @@ export function setStatus(store: Store, record: BanRecord, status: BanStatus, by
     return getRecord(store, record.guild_id, record.id)!;
 }
 
+/**
+ * /mod ban on someone who is already banned (by hand, by another bot, or before the ban log existed):
+ * Discord's ban stays as it is, and this staff member's reason and evidence go on the record, so the
+ * ban is explained in #bans. Updates the open record, or starts one if there is none.
+ */
+export function recordExistingBan(store: Store, logs: LogQueue, guildId: string, user: { id: string; tag?: string | null; username?: string | null; avatar?: string | null },
+    staffId: string, reason: string, evidence: string | null, at = Date.now()): { record: BanRecord; isNew: boolean } {
+    const open = openRecord(store, guildId, user.id);
+    if (!open) {
+        const record = createRecord(store, guildId, user, { kind: 'ban', reason, evidence, moderatorId: staffId, moderatorRole: 'via-bot', approved: null, duration: 'Permanent', expiresAt: null }, at);
+        const history = pushHistory(record, { action: 'recorded (was already banned)', by: staffId, role: 'via-bot', at, reason: null });
+        store.run('UPDATE ban_records SET history=? WHERE guild_id=? AND id=?', history, guildId, record.id);
+        const fresh = getRecord(store, guildId, record.id)!;
+        publish(store, logs, fresh, true);
+        return { record: fresh, isNew: true };
+    }
+    const history = pushHistory(open, { action: 'reason added', by: staffId, role: 'via-bot', at, reason: redact(reason) });
+    // Someone unknown (or a bot without a reason) banned them: the staff member now stands behind it.
+    const takeOver = !open.moderator_id || open.moderator_role === 'unverified' || !open.reason;
+    store.run(`UPDATE ban_records SET reason=?, evidence=?, history=?${takeOver ? ", moderator_id=?, moderator_role='via-bot'" : ''} WHERE guild_id=? AND id=?`,
+        redact(reason) ?? null, redact([open.evidence, evidence].filter(Boolean).join('\n')) || null, history, ...(takeOver ? [staffId] : []), guildId, open.id);
+    const updated = getRecord(store, guildId, open.id)!;
+    publish(store, logs, updated, false);
+    return { record: updated, isNew: false };
+}
+
 /** Post a new record to #bans, or refresh the message it already has. */
 export function publish(store: Store, logs: LogQueue, record: BanRecord, isNew: boolean) {
     if (!isNew) return logs.refreshRef(record.guild_id, REF, record.id);
