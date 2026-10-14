@@ -15,14 +15,14 @@ export const HELP_SECTIONS = [
     { key: 'recovery', label: 'Backups', emoji: '💾', blurb: 'Save and restore the server layout', commands: ['snapshot', 'backup', 'copylayout'] },
     { key: 'verification', label: 'Roblox', emoji: '🎮', blurb: 'Verification, lookups, blacklist and group ranks', commands: ['verify', 'roblox'] },
     { key: 'utility', label: 'Information', emoji: 'ℹ️', blurb: 'Look up users, roles, the server and the bot', commands: ['help', 'userinfo', 'roleinfo', 'server-info', 'bot-info', 'ping', 'ask'] },
-    { key: 'developer', label: 'Developer', emoji: '🧰', blurb: 'Bot developers only', commands: ['dev', 'database', 'autoreact', 'authserver', 'serverauth', 'authorizedservers', 'deauthserver', 'banserver', 'unbanserver', 'genreban', 'ungenreban', 'hardban', 'unhardban', 'netexception'] },
+    { key: 'developer', label: 'Developer', emoji: '🧰', blurb: 'Bot-wide staff: developers, plus Supreme Leader for the risky tools', commands: ['dev', 'database', 'autoreact', 'authserver', 'serverauth', 'authorizedservers', 'deauthserver', 'banserver', 'unbanserver', 'genreban', 'ungenreban', 'hardban', 'unhardban', 'netexception'] },
 ];
 /** Who can use a command, shown next to it in /help. */
 export function accessLabel(policy, key) {
     // Developer tools that a bot-wide rank also unlocks (Bot Manager, Overseer) say so.
     if (policy.developerOnly) {
         const need = requiredRank(key);
-        return need !== undefined && need < RANKS.developer ? `${RANK_LABEL[rankName(need)]}+` : 'Developer';
+        return need !== undefined && need > RANKS.developer ? 'Supreme Leader' : need !== undefined && need < RANKS.developer ? `${RANK_LABEL[rankName(need)]}+` : 'Developer';
     }
     if (policy.access === 'owner')
         return 'Owner';

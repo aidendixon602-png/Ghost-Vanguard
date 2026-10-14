@@ -6,6 +6,7 @@ import type { Store } from '../database/db.js';
 import type { LogQueue } from '../logging.js';
 import { clip, KeyedQueue } from '../core.js';
 import { developers } from '../bot/developers.js';
+import { canLiftNetworkBan, RANKS, rankOf } from '../bot/ranks.js';
 import { activeBan, recordId, TAG, type NetworkBan, type NetworkKind } from '../security/network-ban.js';
 
 type NetworkCover = Pick<NetworkBan, 'id' | 'kind' | 'reason' | 'moderator_id' | 'evidence' | 'evidence_file'>;
@@ -342,7 +343,10 @@ export interface BanButtonDeps {
     };
 }
 
-const NOT_DEVELOPER = 'Only Midtown Vanguard developers can use the ban log buttons.';
+const NOT_ALLOWED = 'Only Admins, the server owner and Midtown Vanguard developers can use the ban log buttons.';
+const networkLifter = (kind: NetworkKind) => kind === 'hardban' ? 'Supreme Leader' : 'developer';
+const notNetwork = (kind: NetworkKind) => `This is a Midtown-wide **${kind}**: only a ${networkLifter(kind)} can lift it. Server Admins and owners can lift ordinary bans only.`;
+const LOCAL_FOOTER = 'Admins, the server owner and developers can do this';
 const confirmRow = (id: number, action: 'unban' | 'reban', label?: string) => new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder().setCustomId(`${REF}:c${action}:${id}`).setLabel(label ?? (action === 'unban' ? 'Unban' : 'Reban')).setEmoji(action === 'unban' ? '🔓' : '🔨').setStyle(action === 'unban' ? ButtonStyle.Success : ButtonStyle.Danger),
     new ButtonBuilder().setCustomId(`${REF}:cancel:${id}`).setLabel('Cancel').setStyle(ButtonStyle.Secondary));
@@ -370,11 +374,15 @@ async function bannedNow(guild: Guild, userId: string): Promise<boolean | null> 
     catch (error: any) { return error?.code === 10026 ? false : null; }
 }
 
-/** Handles every ban-log button and form. The developer is checked on every single interaction. */
+/**
+ * Handles every ban-log button and form. Checked on every single interaction:
+ * ordinary bans: Admin rank (or Discord Administrator), the owner or a developer;
+ * genrebans: developers; hardbans: Supreme Leaders.
+ */
 export async function handleBanLogInteraction(i: ButtonInteraction<'cached'> | ModalSubmitInteraction<'cached'>, deps: BanButtonDeps) {
     const [, action, raw] = i.customId.split(':');
     const reply = (content: string) => i.replied || i.deferred ? i.followUp({ content, flags: MessageFlags.Ephemeral }) : i.reply({ content, flags: MessageFlags.Ephemeral });
-    if (!developers.has(i.user.id)) return reply(NOT_DEVELOPER);
+    if (!developers.has(i.user.id) && rankOf(deps.store, i.guildId, i.user.id, i.member, 'moderation/unban') < RANKS.admin) return reply(NOT_ALLOWED);
     if (action === 'cancel') return i.isButton() ? i.update({ content: 'Cancelled. Nothing was changed.', embeds: [], components: [] }) : undefined;
     const id = Number(raw);
     const { store, logs } = deps;
@@ -391,15 +399,17 @@ export async function handleBanLogInteraction(i: ButtonInteraction<'cached'> | M
             return reply(`${label} is ${live ? 'already banned' : 'no longer banned'} on Discord, so the record was corrected. Nothing else was changed.`);
         }
         const net = deps.network?.active(record.user_id) ?? null;
+        if (net && (action === 'unban' || action === 'cunban') && !canLiftNetworkBan(store, i.user.id, net.kind))
+            return i.isButton() && action === 'cunban' ? i.update({ content: notNetwork(net.kind), embeds: [], components: [] }) : reply(notNetwork(net.kind));
         if (action === 'unban') {
             if (!live) return reply(`${label} is not banned.`);
             const name = record.username ?? record.user_id;
             if (net) return i.reply({ flags: MessageFlags.Ephemeral, embeds: [card(record, { title: `🔓 Unban ${name}?`, color: Colors.Blurple, ban: `${KIND_TITLE[net.kind]} · ${net.record}`,
                 fields: [reasonField(record), { name: 'What happens', value: `• Unbanned in **every** Midtown server\n• ${net.record} is closed, so it won't be re-applied\n• Bans placed by a server's own staff stay` }],
-                footer: 'Only Midtown Vanguard developers can do this' })], components: [confirmRow(id, 'unban', 'Unban everywhere')] });
+                footer: `Only a ${networkLifter(net.kind)} can do this` })], components: [confirmRow(id, 'unban', 'Unban everywhere')] });
             return i.reply({ flags: MessageFlags.Ephemeral, embeds: [card(record, { title: `🔓 Unban ${name}?`, color: Colors.Blurple,
                 fields: [reasonField(record), { name: 'What happens', value: '• They can rejoin this server\n• This ban record is updated, not deleted' }],
-                footer: 'Only Midtown Vanguard developers can do this' })], components: [confirmRow(id, 'unban')] });
+                footer: LOCAL_FOOTER })], components: [confirmRow(id, 'unban')] });
         }
         if (action === 'reban') {
             if (live) return reply(`${label} is already banned.`);
@@ -413,7 +423,7 @@ export async function handleBanLogInteraction(i: ButtonInteraction<'cached'> | M
             if (reason.length < 3) return reply('A reason is required.');
             return i.reply({ flags: MessageFlags.Ephemeral, embeds: [card(record, { title: `🔨 Reban ${record.username ?? record.user_id}?`, color: Colors.Red,
                 fields: [reasonField(record), { name: 'Reban reason', value: clip(reason, 1024) }, { name: 'What happens', value: '• They are banned from this server again\n• This ban record is updated with your reason' }],
-                footer: 'Only Midtown Vanguard developers can do this' })], components: [confirmRow(id, 'reban')] });
+                footer: LOCAL_FOOTER })], components: [confirmRow(id, 'reban')] });
         }
         if (action === 'cunban' && i.isButton()) {
             if (!live) return i.update({ content: `${label} is not banned any more. Nothing was changed.`, embeds: [], components: [] });
@@ -423,7 +433,7 @@ export async function handleBanLogInteraction(i: ButtonInteraction<'cached'> | M
                 // Is this server's ban the network ban itself, or the server's own ban that it covers?
                 const own = !TAG[net.kind] || !(await i.guild.bans.fetch({ user: record.user_id, force: true }).catch(() => null))?.reason?.startsWith(TAG[net.kind]);
                 // Recorded first, so the unban events that follow do not add a second entry.
-                if (!own) publish(store, logs, setStatus(store, record, 'unbanned', i.user.id, 'via-bot', `${net.kind} ${net.record} lifted by a developer`), false);
+                if (!own) publish(store, logs, setStatus(store, record, 'unbanned', i.user.id, 'via-bot', `${net.kind} ${net.record} lifted by a ${networkLifter(net.kind)}`), false);
                 const result = await deps.network.lift(record.user_id, { id: i.user.id, tag: i.user.tag }, reason);
                 if (own) return i.editReply({ embeds: [card(getRecord(store, i.guildId, record.id) ?? record, { title: `✅ ${net.record} lifted everywhere`, color: Colors.Green, ban: `${KIND_TITLE[net.kind]} · ${net.record} (closed)`,
                     fields: [{ name: 'Servers', value: `Unbanned in **${result.lifted} of ${result.servers}**` }, { name: 'This server', value: "Still banned: this server's own ban was there first and stays. Press **Unban** again to lift it too." }],

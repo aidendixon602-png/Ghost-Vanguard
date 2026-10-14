@@ -2,7 +2,7 @@ import { SlashCommandBuilder } from 'discord.js';
 import { defineCommand } from '../../bot/registry.js';
 import { confirmDanger } from '../../ui/danger-ui.js';
 import { classify, finish, outcomeEmbed } from '../../ui/progress.js';
-export default defineCommand(new SlashCommandBuilder().setName('banserver').setDescription('Developer: ban a server from Vanguard')
+export default defineCommand(new SlashCommandBuilder().setName('banserver').setDescription('Supreme Leader: ban a server from Vanguard')
     .addStringOption(o => o.setName('guild_id').setDescription('Server ID; omit for this server').setMinLength(17).setMaxLength(20))
     .addStringOption(o => o.setName('reason').setDescription('Ban reason').setMaxLength(500)), { category: 'developer', developerOnly: true, requiresAuthorization: false }, async (ctx, i) => {
     const id = i.options.getString('guild_id') ?? i.guildId;

@@ -178,17 +178,64 @@ function click(w: ReturnType<typeof world>, customId: string, userId: string, ex
 }
 const run = (w: ReturnType<typeof world>, c: { i: any }) => handleBanLogInteraction(c.i, { store: w.store, logs: w.logs, assertLocalUnban: async () => undefined });
 
-test('only developers can press Unban or Reban, checked on every click including the confirmation', async () => {
+test('staff without the Admin rank cannot press Unban or Reban, checked on every click including the confirmation', async () => {
     const w = world();
     try {
         const record = (await w.discordBan(MANUAL, 'raid'))!;
         for (const id of [`banrec:unban:${record.id}`, `banrec:cunban:${record.id}`, `banrec:reban:${record.id}`, `banrec:creban:${record.id}`]) {
             const c = click(w, id, STAFF);
             await run(w, c);
-            assert.match(c.replies[0].content, /Only Midtown Vanguard developers/);
+            assert.match(c.replies[0].content, /Only Admins, the server owner and Midtown Vanguard developers/);
         }
         assert.ok(w.bans.has(USER), 'nothing changed');
     } finally { w.store.close(); }
+});
+
+test('a server Admin can lift an ordinary ban from its record, but not a genreban or hardban', async () => {
+    const w = world();
+    try {
+        const record = (await w.discordBan(MANUAL, 'raid'))!;
+        w.store.grant(G, STAFF, 'admin', 'owner'); // security admin = Head Admin, above Admin
+        const ask = click(w, `banrec:unban:${record.id}`, STAFF);
+        await run(w, ask);
+        assert.equal(ask.replies[0].embeds[0].data.title, '🔓 Unban urloffy?');
+        const ok = click(w, `banrec:cunban:${record.id}`, STAFF);
+        await run(w, ok);
+        assert.equal(ok.replies[0].embeds[0].data.title, '✅ urloffy unbanned');
+        assert.ok(!w.bans.has(USER));
+
+        const again = (await w.discordBan(MANUAL, 'raid again'))!;
+        for (const kind of ['genreban', 'hardban'] as const) {
+            const deps = { store: w.store, logs: w.logs, assertLocalUnban: async () => undefined,
+                network: { active: () => ({ kind, record: 'X-1' }), lift: async () => { throw new Error('must not lift'); } } };
+            for (const id of [`banrec:unban:${again.id}`, `banrec:cunban:${again.id}`]) {
+                const c = click(w, id, STAFF);
+                await handleBanLogInteraction(c.i, deps as any);
+                assert.match(c.replies[0].content, new RegExp(`Midtown-wide \\*\\*${kind}\\*\\*: only a ${kind === 'hardban' ? 'Supreme Leader' : 'developer'}`));
+            }
+            assert.ok(w.bans.has(USER), `${kind}: nothing changed`);
+        }
+    } finally { w.store.close(); }
+});
+
+test('a developer (not Supreme Leader) can lift a genreban from its record, but not a hardban', async () => {
+    const w = world();
+    const JUNIOR = '823456789012345678';
+    config.developers.add(JUNIOR);
+    try {
+        const record = (await w.discordBan(BOT, `[Vanguard hardban] HB-00005 ${DEV}: threats`))!;
+        const lifted: string[] = [];
+        const deps = (kind: 'genreban' | 'hardban') => ({ store: w.store, logs: w.logs, assertLocalUnban: async () => undefined,
+            network: { active: () => ({ kind, record: 'X-00005' }), lift: async (u: string) => { lifted.push(kind); w.bans.delete(u); return { lifted: 1, failed: 0, servers: 1 }; } } });
+        const c = click(w, `banrec:cunban:${record.id}`, JUNIOR);
+        await handleBanLogInteraction(c.i, deps('hardban') as any);
+        assert.match(c.replies[0].content, /only a Supreme Leader can lift it/);
+        assert.ok(w.bans.has(USER));
+        const g = click(w, `banrec:cunban:${record.id}`, JUNIOR);
+        g.i.editReply = async (p: any) => g.replies.push(p);
+        await handleBanLogInteraction(g.i, deps('genreban') as any);
+        assert.deepEqual(lifted, ['genreban'], 'a genreban is lifted by a developer');
+    } finally { config.developers.delete(JUNIOR); w.store.close(); }
 });
 
 test('Unban asks to confirm, re-checks the real ban, then updates the original record with who and when', async () => {
@@ -275,9 +322,9 @@ test('buttons keep working after a restart: everything they need is in the datab
     } finally { config.developers.delete(DEV); w.store.close(); }
 });
 
-test('a developer can lift a hardban straight from its record: it confirms, then revokes it everywhere', async () => {
+test('a Supreme Leader can lift a hardban straight from its record: it confirms, then revokes it everywhere', async () => {
     const w = world();
-    config.developers.add(DEV);
+    config.developers.add(DEV); config.supremeExtra.add(DEV);
     try {
         const record = (await w.discordBan(BOT, `[Vanguard hardban] HB-00005 ${DEV}: threats`))!;
         const lifted: any[] = [];
@@ -299,8 +346,8 @@ test('a developer can lift a hardban straight from its record: it confirms, then
         assert.equal(getRecord(w.store, G, record.id)!.status, 'unbanned');
         const staff = click(w, `banrec:cunban:${record.id}`, STAFF);
         await handleBanLogInteraction(staff.i, deps);
-        assert.match(staff.replies[0].content, /Only Midtown Vanguard developers/, 'still developers only');
-    } finally { config.developers.delete(DEV); w.store.close(); }
+        assert.match(staff.replies[0].content, /Only Admins, the server owner and Midtown Vanguard developers/, 'ordinary staff still cannot');
+    } finally { config.developers.delete(DEV); config.supremeExtra.delete(DEV); w.store.close(); }
 });
 
 test('a normal ban that gets a hardban on top: the same record is upgraded, and goes back if the hardban is lifted', async () => {

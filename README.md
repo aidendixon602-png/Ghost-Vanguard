@@ -7,8 +7,8 @@
 Anti-nuke protection · Moderation and audit logging · Staff permissions · Server recovery
 
 [![CI](https://github.com/aidendixon602-png/midtown-vanguard/actions/workflows/ci.yml/badge.svg)](https://github.com/aidendixon602-png/midtown-vanguard/actions/workflows/ci.yml)
-![Version](https://img.shields.io/badge/version-2.37.0-5865F2)
-![Tests](https://img.shields.io/badge/tests-483%20passing-2EA043)
+![Version](https://img.shields.io/badge/version-2.38.0-5865F2)
+![Tests](https://img.shields.io/badge/tests-486%20passing-2EA043)
 ![Node](https://img.shields.io/badge/node-24-339933?logo=node.js&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
 ![discord.js](https://img.shields.io/badge/discord.js-14-5865F2?logo=discord&logoColor=white)
@@ -45,7 +45,7 @@ Midtown Vanguard protects a network of Discord servers from account takeovers, r
 |---|---|
 | **Moderation suite** | Ban, tempban, softban, massban, kick, timeout, warnings with automatic escalation, cases, notes and appeals. Reasons are optional. |
 | **Ban records** | One record per ban (`BAN-0001`) in `#bans` with reason, evidence, moderator, duration and expiry, including bans made by hand or by other bots. |
-| **Network bans** | Developer-issued genrebans and hardbans across every server, enforced on join. A server owner or Head Admin can grant a single-server exception for a genreban; hardbans have none. |
+| **Network bans** | Developer-issued genrebans and hardbans across every server, enforced on join. Server staff cannot lift them: genrebans are lifted by a Developer (or excepted for one server by an Overseer+), hardbans only by a Supreme Leader. |
 | **Role management** | `/role` with full hierarchy checks, per-role giving rules, and one-click role restore for members who leave and rejoin. |
 
 ### Operations
@@ -58,19 +58,29 @@ Midtown Vanguard protects a network of Discord servers from account takeovers, r
 
 ## Access model
 
-Every command has a minimum rank. Each rank includes everything below it.
+Every command has a minimum rank, and each rank includes everything below it. Bot-wide ranks work in every server; server ranks work only where they were given.
 
-| Rank | Scope | Responsibilities |
+| Rank | Scope | Can do |
 |---|---|---|
-| Supreme Leader | All servers | Full control |
-| Developer | All servers | Updates, restarts, database, network bans; exempt from anti-nuke |
-| Overseer | All servers | Bot Manager, plus inspecting and authorizing servers |
-| Bot Manager | All servers | Head Admin everywhere, plus diagnostics, status and broadcasts |
-| Server Owner | Own server | Security admins, staff role policy, undoing strips |
-| Head Admin | One server | Anti-nuke, whitelist, control panel, backups, staff ranks |
-| Admin | One server | Raid tools, automod, scam protection, logging, welcome |
-| Moderator | One server | Bans, kicks, tempbans, purges, ban records |
-| Helper | One server | Warnings, short timeouts, cases and notes |
+| **Supreme Leader** | All servers | Everything, including the tools that can break the bot: restarts, installing updates, restoring database settings, removing or banning servers, giving bot-wide ranks, lifting hardbans |
+| **Developer** | All servers | Day-to-day maintenance: diagnostics, update status, database health and backups, issuing genrebans and hardbans, lifting genrebans |
+| **Overseer** | All servers | Bot Manager, plus inspecting and authorizing servers and one-server genreban exceptions |
+| **Bot Manager** | All servers | Head Admin in every server, plus bot status, diagnostics and announcements |
+| **Server Owner** | Own server | Head Admin, plus security admins, undoing setting changes and undoing strips |
+| **Head Admin** | One server | Anti-nuke, whitelist, control panel, backups, staff ranks |
+| **Admin** | One server | Lifting ordinary bans, accepting appeals, raid tools, automod, scam protection, logging |
+| **Moderator** | One server | Bans, kicks, tempbans, purges, ban records, denying appeals |
+| **Helper** | One server | Warnings, short timeouts, cases and notes |
+
+**Developer access is deliberately limited.** Anything that can take the bot offline, change its data or affect every server at once needs a Supreme Leader, so developer access is safe to give to someone who is still learning.
+
+**Who can lift a ban**
+
+| Ban | Lifted by |
+|---|---|
+| Ordinary server ban | Admin rank, Discord Administrator or the server owner (`/mod unban`, ban log buttons, accepting an appeal) |
+| Genreban | A Developer, everywhere (`/network ungenreban`); an Overseer or higher can let the person back into one server (`/mod unban`) |
+| Hardban | A Supreme Leader only (`/network unhardban`) |
 
 Anti-nuke watches every rank except Developers, Supreme Leaders, server owners and whitelisted entries. The complete list of commands for each rank is in **[docs/ranks.md](docs/ranks.md)**.
 
@@ -89,7 +99,7 @@ Commands are grouped under a small number of top-level entries:
 | `/info` | Users, roles, server, bot, latency |
 | `/roblox` | Verification, lookups, blacklist, group binds |
 | `/network` | Genrebans, hardbans and their exceptions (developers) |
-| `/dev` | Diagnostics, updates, restarts, servers, database (developers and bot-wide ranks) |
+| `/dev` | Diagnostics, updates, restarts, servers, database (bot-wide ranks; the risky tools need a Supreme Leader) |
 
 `/help` in Discord lists only the commands available to you. The full reference is in **[docs/commands.md](docs/commands.md)**.
 
@@ -147,7 +157,7 @@ push to main → CI (typecheck, build, tests, secret scan) → launcher installs
 - Only commits that passed CI are installed.
 - A version that stops within two minutes of installing is rolled back automatically and skipped.
 - `.env` and `data/` are never modified.
-- Developers can check or trigger an update with `/dev update`, and restart with `/dev restart`.
+- Developers can check the update status with `/dev update`. Installing immediately (`action: now`) and `/dev restart` need a Supreme Leader.
 
 ### Backups
 

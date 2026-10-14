@@ -600,14 +600,22 @@ test('/moderation unban lifts local bans only, and never a genreban or hardban',
 
     f = moderation('unban', { bans: { [TARGET]: 'mod: spam' } });
     newBan(f.store, 'genreban');
-    await assert.rejects(moderationCommand.execute(f.ctx, f.i), /only this server's \*\*owner or a Head Admin\*\*/i, 'a moderator cannot bypass an active genreban');
+    await assert.rejects(moderationCommand.execute(f.ctx, f.i), /Server owners and admins cannot lift it: an \*\*Overseer or higher\*\*/, 'a moderator cannot bypass an active genreban');
     assert.deepEqual(f.calls.unbanned, []);
     f.store.close();
 
-    // A Head Admin (here: a security admin) may let them back into this server only, after confirming.
+    // A Head Admin (here: a security admin) cannot either: a network ban is a network decision.
+    f = moderation('unban', { bans: { [TARGET]: `${TAG.genreban} GB-00001 ${DEV}: raiding` } });
+    newBan(f.store, 'genreban');
+    f.store.grant('g', 'mod', 'admin', 'owner');
+    await assert.rejects(moderationCommand.execute(f.ctx, f.i), /Overseer or higher/, 'a Head Admin cannot grant an exception');
+    assert.deepEqual(f.calls.unbanned, []);
+    f.store.close();
+
+    // An Overseer (bot-wide rank) may let them back into this server only, after confirming.
     f = moderation('unban', { bans: { [TARGET]: `${TAG.genreban} GB-00001 ${DEV}: raiding` } });
     const gb = newBan(f.store, 'genreban');
-    f.store.grant('g', 'mod', 'admin', 'owner');
+    f.store.run("INSERT INTO bot_staff(user_id,level,by_id,at) VALUES('mod','overseer','owner',0)");
     await moderationCommand.execute(f.ctx, f.i);
     assert.match(JSON.stringify(f.replies.at(-1)), /Let a genrebanned user back into this server/);
     await f.press();

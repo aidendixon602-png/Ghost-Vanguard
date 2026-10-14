@@ -275,9 +275,28 @@ test('developers can use every command without Administrator or any server role'
     const { store, can } = await guardSetup();
     config.developers.add(DEV);
     try {
-        for (const key of ['moderation/ban', 'moderation/purge', 'role/add', 'role/who-can-give', 'backup/restore', 'antinuke/disable', 'trust/add', 'staff/global', 'genreban', 'dev/diagnostics', 'logs/setup'])
+        for (const key of ['moderation/ban', 'moderation/unban', 'moderation/purge', 'role/add', 'role/who-can-give', 'backup/restore', 'antinuke/disable', 'trust/add', 'genreban', 'ungenreban', 'hardban', 'dev/diagnostics', 'dev/update', 'database/backup', 'logs/setup'])
             assert.equal(can(plainMember(DEV), key), true, `developer should be able to use /${key}`);
     } finally { config.developers.delete(DEV); store.close(); }
+});
+
+test('the risky tools need a Supreme Leader: developers, Overseers and server owners cannot use them', async () => {
+    const { store, can } = await guardSetup();
+    const SUPREME = '888888888888888881';
+    config.developers.add(DEV);
+    store.run("INSERT INTO bot_staff(user_id,level,by_id,at) VALUES(?,?,?,0)", MEMBER, 'overseer', OWNER);
+    const risky = ['dev/restart', 'database/restore-settings', 'deauthserver', 'banserver', 'unbanserver', 'staff/global', 'unhardban'];
+    try {
+        for (const key of risky) {
+            assert.equal(can(plainMember(DEV), key), false, `developer must not use /${key}`);
+            assert.equal(can(plainMember(MEMBER), key), false, `Overseer must not use /${key}`);
+            assert.equal(can(plainMember(OWNER, PermissionFlagsBits.Administrator), key), false, `server owner must not use /${key}`);
+        }
+        config.supremeExtra.add(SUPREME);
+        for (const key of risky) assert.equal(can(plainMember(SUPREME), key), true, `Supreme Leader can use /${key}`);
+        store.run("INSERT INTO bot_staff(user_id,level,by_id,at) VALUES(?,?,?,0)", ADMIN, 'supreme', OWNER);
+        assert.equal(can(plainMember(ADMIN), 'dev/restart'), true, 'a Supreme Leader given with /setup staff global counts too');
+    } finally { config.developers.delete(DEV); config.supremeExtra.delete(SUPREME); store.close(); }
 });
 
 test('the owner cannot use developer-only commands; Administrator cannot use owner-only role rules', async () => {
@@ -295,7 +314,7 @@ test('the owner cannot use developer-only commands; Administrator cannot use own
 test('moderation commands need the matching Discord permission or a configured Vanguard rank', async () => {
     const { store, can } = await guardSetup();
     try {
-        const cases: [string, bigint][] = [['moderation/ban', PermissionFlagsBits.BanMembers], ['moderation/unban', PermissionFlagsBits.BanMembers],
+        const cases: [string, bigint][] = [['moderation/ban', PermissionFlagsBits.BanMembers], ['moderation/unban', PermissionFlagsBits.Administrator],
             ['moderation/kick', PermissionFlagsBits.KickMembers], ['moderation/timeout', PermissionFlagsBits.ModerateMembers], ['moderation/untimeout', PermissionFlagsBits.ModerateMembers],
             ['moderation/purge', PermissionFlagsBits.ManageMessages]];
         for (const [key, perm] of cases) {
@@ -303,6 +322,8 @@ test('moderation commands need the matching Discord permission or a configured V
             assert.equal(can(plainMember(MEMBER, perm), key), true, `${key} with its permission`);
         }
         assert.equal(can(plainMember(MEMBER, PermissionFlagsBits.KickMembers), 'moderation/ban'), false, 'Kick Members does not unlock ban');
+        assert.equal(can(plainMember(MEMBER, PermissionFlagsBits.BanMembers), 'moderation/unban'), false, 'Ban Members alone does not unlock unban: Admins and owners lift bans');
+        assert.equal(can(plainMember(OWNER), 'moderation/unban'), true, 'the server owner can unban');
     } finally { store.close(); }
 });
 

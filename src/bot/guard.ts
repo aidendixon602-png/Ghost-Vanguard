@@ -6,7 +6,7 @@ import type { Store } from '../database/db.js';
 import { developers } from './developers.js';
 import { AppError } from '../errors.js';
 import type { Policy } from './registry.js';
-import { rankOf, requiredRank } from './ranks.js';
+import { explicitRank, needsSupreme, rankOf, requiredRank, SUPREME_MESSAGE } from './ranks.js';
 
 const permissionNames = (permissions: bigint[]) => permissions.map(p => new PermissionsBitField(p).toArray().join(' ')).map(p => p.replace(/([a-z])([A-Z])/g, '$1 $2'));
 
@@ -24,7 +24,11 @@ export class Guard {
             return false;
         if (policy.requiresAuthorization && this.ready && !this.ready(guildId!))
             return false;
-        // Developers (DEVELOPER_IDS only) may use every command here without Administrator, Manage Roles
+        // Supreme-only commands: a Vanguard rank of Supreme Leader is the only way in (no developer bypass,
+        // no Discord permission, no server role).
+        if (needsSupreme(rankKey ?? command))
+            return explicitRank(this.store, guildId, user, actor) >= requiredRank(rankKey ?? command)! && this.enabledHere(policy, guildId, command);
+        // Developers (DEVELOPER_IDS only) may use every other command here without Administrator, Manage Roles
         // or a server role. Discord's limits on the bot itself and confirmation prompts still apply.
         if (developers.has(user))
             return this.enabledHere(policy, guildId, command);
@@ -70,6 +74,8 @@ export class Guard {
         }
         // Interaction member contains current permission data; fetch only role data if not cached.
         const actor = refreshMember ? await i.guild.members.fetch({ user: i.user.id, force: true }) : i.member;
+        if (needsSupreme(key) && explicitRank(this.store, i.guildId, i.user.id, actor) < requiredRank(key)!)
+            throw new AppError('PERMISSION_ERROR', SUPREME_MESSAGE);
         if (policy.developerOnly && (requiredRank(key) ?? Infinity) > rankOf(this.store, i.guildId, i.user.id, actor, key))
             developers.require(i.user.id);
         if (!this.allowed(policy, i.guildId, i.user.id, actor, undefined, key))
@@ -78,7 +84,7 @@ export class Guard {
         const missing = policy.botPermissions.filter(p => !me.permissions.has(p));
         if (missing.length)
             throw new AppError('PERMISSION_ERROR', `Midtown Vanguard is missing:\n${permissionNames(missing).map(p => `• ${p}`).join('\n')}`);
-        const rankOk = developers.has(i.user.id) || (requiredRank(key) ?? Infinity) <= rankOf(this.store, i.guildId, i.user.id, actor, key);
+        const rankOk = developers.has(i.user.id) && !needsSupreme(key) || (requiredRank(key) ?? Infinity) <= rankOf(this.store, i.guildId, i.user.id, actor, key);
         for (const [member, permissions, label] of [[me, policy.channelPermissions ?? [], 'Midtown Vanguard'], [actor, rankOk ? [] : policy.userChannelPermissions ?? [], 'You']] as const) {
             if (!permissions.length)
                 continue;

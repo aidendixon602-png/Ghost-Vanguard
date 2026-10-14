@@ -120,7 +120,7 @@ export function issueCommand(kind: NetworkKind) {
 
 export function revokeCommand(kind: NetworkKind) {
     const name = KIND_NAME[kind];
-    const builder = new SlashCommandBuilder().setName(`un${kind}`).setDescription(`Developer: revoke a ${kind} and lift it in every authorized server`)
+    const builder = new SlashCommandBuilder().setName(`un${kind}`).setDescription(`${kind === 'hardban' ? 'Supreme Leader' : 'Developer'}: revoke a ${kind} and lift it in every authorized server`)
         .addStringOption(o => o.setName('user').setDescription('User ID, @mention, or the username recorded with the ban').setRequired(true).setMaxLength(40))
         .addStringOption(o => o.setName('reason').setDescription('Reason for lifting it (optional)').setMaxLength(400));
     if (kind === 'hardban')

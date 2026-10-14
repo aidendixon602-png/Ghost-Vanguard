@@ -7,6 +7,7 @@ import { broadcast, broadcastTargets, clearPresenceOverride, inspectGuild, setPr
 import { presenceLines } from '../../security/protection-stats.js';
 import { spawnSync } from 'node:child_process';
 import { askLauncher, askRestart, describeUpdate, fallbackRestart } from '../../bot/updater-link.js';
+import { explicitRank, RANKS, SUPREME_MESSAGE } from '../../bot/ranks.js';
 /** Which GitHub commit is running, and whether automatic updates are on (no secrets shown). */
 function codeVersion() {
     const commit = spawnSync('git', ['rev-parse', '--short', 'HEAD'], { encoding: 'utf8' });
@@ -27,8 +28,8 @@ export default defineCommand(new SlashCommandBuilder().setName('dev').setDescrip
     .addIntegerOption(o => o.setName('minutes').setDescription('Return to the rotation after this many minutes (default: until reset)').setMinValue(1).setMaxValue(10080))
     .addStringOption(o => o.setName('presence').setDescription('Online indicator').addChoices({ name: 'Online', value: 'online' }, { name: 'Idle', value: 'idle' }, { name: 'Do not disturb', value: 'dnd' })))
     .addSubcommand(s => s.setName('status-reset').setDescription('Return to the normal rotating status'))
-    .addSubcommand(s => s.setName('restart').setDescription('Restart the bot (about 10 seconds offline); settings are kept'))
-    .addSubcommand(s => s.setName('update').setDescription('Automatic GitHub updates: see the status, or check and install now')
+    .addSubcommand(s => s.setName('restart').setDescription('Supreme Leader: restart the bot (about 10 seconds offline); settings are kept'))
+    .addSubcommand(s => s.setName('update').setDescription('Automatic GitHub updates: see the status (developers), or install now (Supreme Leader)')
     .addStringOption(o => o.setName('action').setDescription('What to do (default: status)').addChoices({ name: 'Show status', value: 'status' }, { name: 'Check and install now', value: 'now' }))), { responseKind: 'info', category: 'developer', developerOnly: true, requiresAuthorization: false }, async (ctx, i) => {
     const sub = i.options.getSubcommand();
     if (sub === 'restart') {
@@ -61,6 +62,9 @@ export default defineCommand(new SlashCommandBuilder().setName('dev').setDescrip
     }
     if (sub === 'update') {
         const op = (i.options.getString('action') ?? 'status');
+        // Anyone with /dev may look; installing a new version is for Supreme Leaders.
+        if (op === 'now' && explicitRank(ctx.store, i.guildId, i.user.id, ctx.actor ?? null) < RANKS.supreme)
+            throw new AppError('PERMISSION_ERROR', `${SUPREME_MESSAGE}\nYou can still see the update status with \`/dev update\`.`);
         return describeUpdate(await askLauncher(op), op);
     }
     if (sub === 'inspect') {

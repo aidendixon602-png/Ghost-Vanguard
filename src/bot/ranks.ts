@@ -96,7 +96,8 @@ export function explicitRank(store: Store, guildId: string | null, userId: strin
 export const COMMAND_RANK: Record<string, number> = {
     // Helper
     'moderation/warn': 1, 'antinuke-plus': 4, 'antinuke-plus/scan': 3, botq: 4, 'warnings/status': 1, warnings: 4, emergency: 3, webhooks: 3, webhook: 3, aimod: 1, roblox: 4, 'roblox/lookup': 1, 'roblox/sync': 1, 'roblox/blacklist': 2, 'roblox/unblacklist': 2, 'roblox/blacklisted': 1, 'roblox/binds': 1, 'case/search': 1, 'appeals/pending': 2, appeal: 2, 'staff/report': 3, automod: 3, welcome: 3, appeals: 4, 'moderation/timeout': 1, 'moderation/history': 1, 'note/add': 1, 'note/list': 1, 'case/view': 1, 'case/recent': 1,
-    // Moderator
+    // Moderator. Lifting a ban is Admin: Moderators can ban, but only Admins and owners undo bans.
+    'moderation/unban': 3,
     moderation: 2, bans: 2, tempban: 2, softban: 2, 'role/who-can-give': 4, nick: 2, slowmode: 2, 'case/reason': 2, 'note/remove': 2, newacct: 2,
     // Admin
     raidmode: 3, vgwelcome: 3, vgcommands: 0, lockdown: 3, unlock: 3, massban: 3, newaccounts: 3, scam: 3, logs: 3, antiping: 3, mention: 3, health: 3,
@@ -109,14 +110,24 @@ export const COMMAND_RANK: Record<string, number> = {
     // Bot Manager
     authorizedservers: 5, serverauth: 5, 'dev/diagnostics': 5, 'dev/status': 5, 'dev/status-reset': 5, 'dev/broadcast': 5, 'staff/list': 1, 'staff/check': 1,
     // Overseer
-    'dev/inspect': 6, authserver: 6, 'dev/update': 7, 'dev/restart': 7,
-    // Bot Developer
-    dev: 7, database: 7, autoreact: 7, deauthserver: 7, banserver: 7, unbanserver: 7,
-    // Bans across every authorized server: Bot Developers and Supreme Leaders only.
-    genreban: 7, ungenreban: 7, hardban: 7, unhardban: 7, netexception: 7,
-    // Bot-wide staff ranks reach every server: Bot Developers and Supreme Leaders.
-    'staff/global': 7,
+    'dev/inspect': 6, authserver: 6,
+    // Bot Developer: everyday developer tools. Installing updates (`/dev update action:now`) is checked in the command.
+    dev: 7, 'dev/update': 7, database: 7, autoreact: 7,
+    // Network bans: Developers issue them and lift genrebans. Hardbans are lifted only by a Supreme Leader.
+    genreban: 7, ungenreban: 7, hardban: 7, netexception: 7,
+    // Supreme Leader only: anything that can take the bot down, rewrite its data or reach every server at once.
+    // Developers do NOT bypass these (see needsSupreme).
+    'dev/restart': 8, 'database/restore-settings': 8, deauthserver: 8, banserver: 8, unbanserver: 8, 'staff/global': 8, unhardban: 8,
 };
+
+/** Commands above Developer: a developer's usual bypass does not reach them. */
+export const needsSupreme = (key: string | undefined) => (requiredRank(key) ?? 0) > RANKS.developer;
+export const SUPREME_MESSAGE = 'Only a **Supreme Leader** can do this. It affects the bot in every server (restarts, updates, the database, removing servers, bot-wide ranks or lifting hardbans), so ordinary developer access does not include it.';
+
+/** Who may lift a network ban everywhere: genreban = Developer or higher, hardban = Supreme Leader only. */
+export function canLiftNetworkBan(store: Store, userId: string, kind: 'genreban' | 'hardban'): boolean {
+    return explicitRank(store, null, userId) >= (kind === 'hardban' ? RANKS.supreme : RANKS.developer);
+}
 
 /** "moderation/timeout" → its own entry, else "moderation". */
 export function requiredRank(key: string | undefined): number | undefined {

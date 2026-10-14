@@ -102,7 +102,7 @@ export async function handleAppealDm(i: Interaction, store: Store, client: Clien
     return true;
 }
 
-/** Accept / Deny on the staff appeal message. Moderator rank or Ban Members. */
+/** Accept / Deny on the staff appeal message. Deny: Moderator rank or Ban Members. Accept (unbans): Admin rank or Administrator. */
 export function registerAppealControls(registry: Registry) {
     registry.component({ prefix: 'appeal:', kinds: ['button'], metadata: { ...defaults, category: 'moderation', access: 'member', cooldown: 0 }, execute: async (ctx, i) => {
         const m = /^appeal:(accept|deny):(\d{17,20}):(\d{1,10})$/.exec(i.customId);
@@ -114,6 +114,9 @@ export function registerAppealControls(registry: Registry) {
         if (!row) throw new AppError('VALIDATION_ERROR', 'That appeal no longer exists.');
         if (row.status !== 'pending') throw new AppError('VALIDATION_ERROR', `Appeal #${id} was already ${row.status}.`);
         const accept = m[1] === 'accept';
+        // Accepting lifts the ban, and lifting bans is for Admins and owners (same as /mod unban).
+        if (accept && rankOf(ctx.store, i.guildId, actor.id, actor) < RANKS.admin && !actor.permissions.has(PermissionFlagsBits.Administrator))
+            throw new AppError('PERMISSION_ERROR', 'Accepting an appeal unbans them, so it needs the Admin rank or Administrator. Moderators can still deny appeals.');
         if (accept) {
             // An appeal decides this server's own ban only; it can never lift a genreban or hardban.
             await assertLocalUnban(ctx.store, i.guild, row.user_id);

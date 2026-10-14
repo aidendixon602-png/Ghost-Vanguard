@@ -9,7 +9,7 @@ export default defineCommand(new SlashCommandBuilder().setName('database').setDe
     .addSubcommand(s => s.setName('status').setDescription('Show database health, storage, backup and migration status'))
     .addSubcommand(s => s.setName('backup').setDescription('Create a verified database backup now'))
     .addSubcommand(s => s.setName('backups').setDescription('List recent database backups'))
-    .addSubcommand(s => s.setName('restore-settings').setDescription('Put back lost settings from an old backup file; anything newer is kept')
+    .addSubcommand(s => s.setName('restore-settings').setDescription('Supreme Leader: put back lost settings from an old backup file; anything newer is kept')
         .addAttachmentOption(o => o.setName('file').setDescription('vanguard.db or a vanguard-YYYY-MM-DD.db.gz backup').setRequired(true)))
     .addSubcommand(s => s.setName('verify').setDescription('Recheck backup checksum and database integrity').addStringOption(o => o.setName('backup').setDescription('Backup UUID').setRequired(true).setMaxLength(36))), { category: 'developer', developerOnly: true, requiresAuthorization: false }, async (ctx, i) => {
     if (!ctx.databaseBackups)

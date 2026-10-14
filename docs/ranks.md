@@ -4,50 +4,51 @@ Generated from the bot itself (`npm run docs`). Every rank can also use everythi
 
 - **Bot-wide ranks** (Supreme Leader, Developer, Overseer, Bot Manager) work in every server.
 - **Server ranks** (Owner, Head Admin, Admin, Moderator, Helper) work only in the server they were given in.
+- **Developer is not "everything".** Restarts, installing updates, restoring data, removing servers, bot-wide ranks and lifting hardbans are Supreme Leader only, so a developer who is still learning cannot break the bot.
+- **Unbans:** ordinary bans are lifted by Admins and server owners; genrebans by Developers (or a one-server exception from an Overseer+); hardbans only by a Supreme Leader.
 - **Anti-nuke** ignores only Developers, Supreme Leaders, the server owner and whitelisted people. Every other rank is still watched.
 - Check anyone with `/setup staff check user:@them`; see all ranks with `/setup staff list`.
 
 ## 👑 Supreme Leader
 
-Full control of the bot in every server. Given with `/setup staff global`.
+The bot owner and anyone they choose. Everything, plus the tools that can take the bot down or reach every server at once: restarts, installing updates, restoring database settings, removing or banning servers, bot-wide ranks and lifting hardbans. Set by `BOT_OWNER_ID` / `SUPREME_LEADER_IDS` in `.env`, or given with `/setup staff global`.
 
-_Everything below._
+- `/dev database restore-settings`: Supreme Leader: put back lost settings from an old backup file; anything newer is kept
+- `/dev restart`: Supreme Leader: restart the bot (about 10 seconds offline); settings are kept
+- `/dev server ban`: Supreme Leader: ban a server from Vanguard
+- `/dev server deauthorize`: Supreme Leader: remove this server's authorization and leave
+- `/dev server unban`: Supreme Leader: remove a server ban
+- `/network unhardban`: Supreme Leader: revoke a hardban and lift it in every authorized server
+- `/setup staff global`: Supreme Leader: make someone Supreme Leader, Overseer or Bot Manager in every server
 
 ## 🧰 Developer
 
-Everything, in every server, without needing Discord permissions. Ignored by anti-nuke. Added only by listing the user ID in `DEVELOPER_IDS` in `.env`.
+Day-to-day bot maintenance in every server without needing Discord permissions: diagnostics, update status, database health and backups, genrebans and hardbans, lifting genrebans. Cannot restart, install updates, restore data, remove servers, give bot-wide ranks or lift hardbans. Ignored by anti-nuke. Added only through `DEVELOPER_IDS` in `.env`.
 
 - `/dev autoreact add`: React to every message from a member (🐐 by default)
 - `/dev autoreact list`: Members the bot auto-reacts to in this server
 - `/dev autoreact remove`: Stop auto-reacting to a member
 - `/dev database backup`: Create a verified database backup now
 - `/dev database backups`: List recent database backups
-- `/dev database restore-settings`: Put back lost settings from an old backup file; anything newer is kept
 - `/dev database status`: Show database health, storage, backup and migration status
 - `/dev database verify`: Recheck backup checksum and database integrity
-- `/dev restart`: Restart the bot (about 10 seconds offline); settings are kept
-- `/dev server ban`: Developer: ban a server from Vanguard
-- `/dev server deauthorize`: Developer: remove this server's authorization and leave
-- `/dev server unban`: Developer: remove a server ban
-- `/dev update`: Automatic GitHub updates: see the status, or check and install now
+- `/dev update`: Automatic GitHub updates: see the status (developers), or install now (Supreme Leader) _(anyone with /dev sees the status; installing now needs a Supreme Leader)_
 - `/network exceptions list`: Active genreban exceptions, newest first
-- `/network exceptions revoke`: Cancel an exception: the genreban applies in that server again
+- `/network exceptions revoke`: Cancel an exception: the genreban applies in that server again _(exceptions are granted by Overseers and higher through `/mod unban`)_
 - `/network genreban`: Developer: ban a user from every authorized server until /network ungenreban
 - `/network hardban`: Developer: permanently ban a user from every authorized server until /network unhardban
 - `/network ungenreban`: Developer: revoke a genreban and lift it in every authorized server
-- `/network unhardban`: Developer: revoke a hardban and lift it in every authorized server
-- `/setup staff global`: Supreme Leader: make someone Supreme Leader, Overseer or Bot Manager in every server
 
 ## 🔭 Overseer
 
-Bot-wide rank, every server. Given with `/setup staff global`.
+Bot-wide, every server: Bot Manager plus inspecting and authorizing servers, and letting a genrebanned person back into one server. Given with `/setup staff global`.
 
 - `/dev inspect`: Read-only overview of any server Vanguard knows
 - `/dev server authorize`: Developer: authorize this server so Vanguard protects it
 
 ## 🛠️ Bot Manager
 
-Bot-wide rank, every server: Head Admin everywhere plus bot status tools. Given with `/setup staff global`.
+Bot-wide, every server: Head Admin everywhere plus bot status, diagnostics and announcements. Given with `/setup staff global`.
 
 - `/dev broadcast`: Post an announcement to every authorized server's log channel
 - `/dev diagnostics`: Inspect runtime health without secrets
@@ -58,14 +59,14 @@ Bot-wide rank, every server: Head Admin everywhere plus bot status tools. Given 
 
 ## 🏠 Server Owner
 
-The owner of a server, in that server. Ignored by anti-nuke.
+The owner of a server, in that server: everything a Head Admin can do, plus security admins and undoing setting changes. Cannot lift genrebans or hardbans. Ignored by anti-nuke.
 
 - `/security admin`: Server owner: add, remove or list security admins
 - `/setup history restore`: Server owner: undo a setting change by its number
 
 ## 🛡️ Head Admin
 
-Server rank. Given by linking a role with `/setup staff role`, or `/security admin` (owner). Discord's Administrator permission counts as Head Admin, except for actions that weaken protection.
+Server rank: anti-nuke, whitelist, control panel, backups and staff ranks. Given by linking a role with `/setup staff role`, or `/security admin` (owner). Discord's Administrator permission counts as Head Admin, except for actions that weaken protection.
 
 - `/antinuke check`: Check Vanguard's permissions and role position
 - `/antinuke disable`: Turn anti-nuke off (stays off after restarts)
@@ -115,10 +116,11 @@ Server rank. Given by linking a role with `/setup staff role`, or `/security adm
 
 ## 🔧 Admin
 
-Server rank. Given with `/setup staff role`.
+Server rank: lifting ordinary bans and accepting appeals, raid tools, automod, scam protection and logging. Given with `/setup staff role`; Discord's Administrator permission also works for unbans.
 
 - `/antinuke scan`: Safety scan: powerful roles, roles above Vanguard, bots with Administrator
 - `/mod massban`: Raid cleanup: ban up to 200 user IDs at once (whitelisted staff only) _(must also be on the anti-nuke whitelist)_
+- `/mod unban`: Admins and owners: lift a ban by user ID (genrebans and hardbans need bot-wide staff) _(ordinary bans only; a genreban needs an Overseer+ for a one-server exception, or a Developer to lift it everywhere; a hardban needs a Supreme Leader)_
 - `/security antiping bypass`: Allow or disallow a role to mention protected staff
 - `/security antiping disable`: Disable staff mention blocking
 - `/security antiping enable`: Enable blocking mentions of configured staff
@@ -175,7 +177,7 @@ Server rank. Given with `/setup staff role`.
 
 ## 🔨 Moderator
 
-Server rank, or Discord's matching permission (Ban/Kick/Timeout Members, Manage Messages).
+Server rank, or Discord's matching permission (Ban/Kick/Timeout Members, Manage Messages): bans, kicks, purges, denying appeals. Cannot lift bans.
 
 - `/mod appeals pending`: Appeals waiting for a decision
 - `/mod ban`: Ban a user (asks to confirm)
@@ -191,7 +193,6 @@ Server rank, or Discord's matching permission (Ban/Kick/Timeout Members, Manage 
 - `/mod purge`: Delete up to 100 recent messages in this channel (asks to confirm)
 - `/mod softban`: Ban then immediately unban: kicks a member and deletes their recent messages
 - `/mod tempban`: Ban a user for a set time; Vanguard lifts the ban automatically
-- `/mod unban`: Lift a ban by user ID (owners/Head Admins can exempt a genreban here; hardbans need a developer)
 - `/mod untimeout`: Remove a timeout
 - `/roblox blacklist`: Block a Roblox account from verifying here (and flag it on join)
 - `/roblox unblacklist`: Remove a Roblox account from this server's blacklist
@@ -199,7 +200,7 @@ Server rank, or Discord's matching permission (Ban/Kick/Timeout Members, Manage 
 
 ## 🤝 Helper
 
-Server rank. Given with `/setup staff role`.
+Server rank: warnings, short timeouts, cases and notes. Given with `/setup staff role`.
 
 - `/mod case recent`: The latest cases in this server
 - `/mod case search`: Find cases by member, staff member, action, words in the reason or date
