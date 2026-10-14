@@ -48,7 +48,7 @@ export const ADMIN_RESTRICTED = new Set<string>([
     'backup/restore', 'snapshot/restore', 'config-history/restore', 'restore', 'layoutselect', 'incident',
     'backup/delete', 'snapshot/delete', 'snapshot/cleanup', 'snapshotdelete', 'case/delete',
     // Granting permissions or ranks
-    'security/admin', 'staff/role', 'guild-config/permission-role', 'perm', 'role/who-can-give',
+    'security/admin', 'staff/role', 'guild-config/permission-role', 'perm', 'role/who-can-give', 'panel', 'vgpanel',
     // Beyond this server
     'copylayout', 'staff/global', 'roblox/network', 'roblox/partner',
 ]);
@@ -101,7 +101,7 @@ export const COMMAND_RANK: Record<string, number> = {
     // Admin
     raidmode: 3, vgwelcome: 3, vgcommands: 0, lockdown: 3, unlock: 3, massban: 3, newaccounts: 3, scam: 3, logs: 3, antiping: 3, mention: 3, health: 3,
     // Head Admin
-    antinuke: 4, enable: 4, disable: 4, trust: 4, snapshot: 4, backup: 4, copylayout: 4, security: 4, 'guild-config': 4,
+    antinuke: 4, panel: 4, vgpanel: 4, enable: 4, disable: 4, trust: 4, snapshot: 4, backup: 4, copylayout: 4, security: 4, 'guild-config': 4,
     'config-history': 4, perm: 4, 'case/delete': 4, staff: 4, anpanel: 4, trustlist: 4, tp: 4, snapshotdelete: 4, snapshotcancel: 4, snapshotpage: 4,
     restore: 4, layoutselect: 4, layoutcancel: 4, incident: 4, permui: 4,
     // Bot Manager

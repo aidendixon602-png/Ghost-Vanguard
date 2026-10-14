@@ -14,7 +14,7 @@ export const UMBRELLAS = [
         ] },
     { name: 'setup', description: 'Server setup: logs, staff ranks, welcome, config, permissions', entries: [
             { child: 'logs', mode: 'group' }, { child: 'staff', mode: 'group' }, { child: 'welcome', mode: 'group' }, { child: 'guild-config', mode: 'group', as: 'config' },
-            { child: 'perm', mode: 'group', as: 'permissions' }, { child: 'config-history', mode: 'group', as: 'history' }
+            { child: 'perm', mode: 'group', as: 'permissions' }, { child: 'config-history', mode: 'group', as: 'history' }, { child: 'panel', mode: 'single' }
         ] },
     { name: 'recovery', description: 'Server backups and snapshots: save, restore, copy layout', entries: [
             { child: 'snapshot', mode: 'group' }, { child: 'backup', mode: 'group' }, { child: 'copylayout', mode: 'single' }

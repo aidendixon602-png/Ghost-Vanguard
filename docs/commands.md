@@ -118,6 +118,7 @@ Server setup: logs, staff ranks, welcome, config, permissions
 
 | Command | What it does | Who |
 |---|---|---|
+| `/setup panel` | Create or update the private control panel channel (buttons for staff) | Owner or Head Admin |
 | `/setup logs setup` | Create or reuse #bans and #midtown-vanguard-logging, check access and send a test | Admin+ |
 | `/setup logs check` | Check both log channels and the bot permissions, then send a test embed | Admin+ |
 | `/setup logs exclude` | Stop (or start again) logging events from a channel | Admin+ |

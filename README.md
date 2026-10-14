@@ -5,11 +5,11 @@
 **Anti-nuke protection, moderation, logging and server recovery for the Midtown Discord network.**
 
 [![CI](https://github.com/aidendixon602-png/midtown-vanguard/actions/workflows/ci.yml/badge.svg)](https://github.com/aidendixon602-png/midtown-vanguard/actions/workflows/ci.yml)
-![Version](https://img.shields.io/badge/version-2.34.0-5865F2)
+![Version](https://img.shields.io/badge/version-2.35.0-5865F2)
 ![Node](https://img.shields.io/badge/node-24%2B-339933?logo=node.js&logoColor=white)
 ![discord.js](https://img.shields.io/badge/discord.js-14-5865F2?logo=discord&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
-![Tests](https://img.shields.io/badge/tests-472%20passing-2EA043)
+![Tests](https://img.shields.io/badge/tests-478%20passing-2EA043)
 
 [Features](#-features) · [Commands](#-commands) · [Deploying](#-deploying) · [Automatic updates](#-automatic-updates) · [Development](#-development) · [Docs](#-documentation)
 
@@ -22,6 +22,7 @@
 | | |
 |---|---|
 | 🛡️ **Anti-nuke** | 17 fixed rules that start automatically: mass bans/kicks, channel and role deletes, dangerous permission grants, webhooks, bot adds, server edits. Everyday rules warn first and staff get a heads-up before any limit; offenders lose their powers (stripped), and the damage is reverted. False alarms can be undone in one click. |
+| 🎛️ **Control panel** | A private `#vanguard-control` channel with buttons to restore or strip roles, undo the bot's strips and bans, and read recent actions. Authorized staff only, confirmed and logged. |
 | 📋 **Ban logs** | One record per ban in `#bans` (BAN-0001) with reason, evidence, moderator, duration and expiry, even for bans made by hand or by other bots. Developer **Unban / Reban** buttons update the same record. |
 | 📜 **Server logs** | `#midtown-vanguard-logging`: deleted/edited messages, roles, channels, nicknames, timeouts, bans, kicks and bot actions. Nothing is guessed: anything Discord doesn't confirm is marked *Unavailable*. |
 | 🔨 **Moderation** | Bans, tempbans, softbans, massbans, timeouts, warnings with automatic escalation, cases, notes and appeals. |
@@ -41,7 +42,7 @@ Type `/` and pick **Midtown Vanguard**. Commands are grouped so the menu stays s
 | `/mod` | `ban`, `unban`, `kick`, `timeout`, `warn`, `purge`, `tempban`, `softban`, `massban`, `bans`, `case`, `notes`, `warnings`, `appeals` |
 | `/role` | `add`, `remove`, `restore`, `who-can-give` |
 | `/security` | `lockdown`, `emergency`, `raidmode`, `automod`, `scam`, `antiping`, `health` |
-| `/setup` | `logs`, `staff`, `welcome`, `config`, `permissions`, `history` |
+| `/setup` | `panel`, `logs`, `staff`, `welcome`, `config`, `permissions`, `history` |
 | `/recovery` | `snapshot`, `backup`, `copylayout` |
 | `/info` | `user`, `role`, `server`, `bot`, `ping` |
 | `/roblox` | `lookup`, `sync`, `blacklist`, `bind`, `group` |
@@ -102,7 +103,7 @@ UPDATE_TOKEN=github_pat_...   # fine-grained, read-only Contents + Actions, this
 ```bash
 npm ci
 npm run build     # compile src/ → dist/ (dist/ is committed; CI checks it matches)
-npm test          # 472 tests
+npm test          # 478 tests
 npm run dev       # run from source
 ```
 

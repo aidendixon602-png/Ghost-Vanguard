@@ -1,5 +1,29 @@
 # Changelog
 
+## 2.35.0: control panel
+**`/setup panel`** creates a private **#vanguard-control** channel with a button panel, so staff can act without typing commands.
+
+| Button | What it does |
+|---|---|
+| 🟢 **Restore Roles** | Pick a member and give back roles the bot removed (an anti-nuke strip or a panel strip), or the roles they had before leaving |
+| 🔴 **Strip Roles** | Pick a member and remove their staff/admin roles. They are saved first, so Restore Roles can undo it |
+| ↩️ **Revert Action** | Pick a recent anti-nuke strip or a ban the bot made (last 7 days) and undo it |
+| 📋 **View Logs** | Recent panel actions, anti-nuke alerts and moderation cases: who, whom, what and when |
+| 🔄 **Refresh Panel** | Updates the panel message in place |
+
+**Security**
+- **Who can see it:** the channel is hidden from everyone except the server owner, security admins, admin permission roles and Head Admin/Admin staff roles.
+- **Who can use it:** the buttons use the same "security" access level as `/antinuke`. Discord's Administrator permission alone is not enough, and developer-only tools are unchanged.
+- **Confirmation:** strip, restore and revert always ask first, then check everything again at the moment you confirm.
+- **Role hierarchy:** never acts on roles at or above the bot, on members above the person pressing it, on yourself, on the owner or on developers.
+- **Staff and admin roles:** only the owner or a developer gives these back, or someone allowed by `/role who-can-give`. Genrebans and hardbans can never be reverted here.
+- **Logged:** every action is saved and posted to the security log with the staff member's ID, the target, the action and the time.
+
+**Behaviour**
+- Running `/setup panel` again updates the same channel's access and edits the same panel message. It never creates duplicates, and it posts a new panel only if the old message was deleted.
+- The buttons have fixed IDs, so they keep working after restarts and updates.
+- The panel refreshes itself after every action.
+
 ## 2.34.0: gentler anti-nuke, still watching
 **Nobody is banned or kicked by anti-nuke any more.** Every rule now **strips** (removes their staff roles), which stops an attack just as well, and a false alarm can be undone in one click with **Undo strip**.
 
