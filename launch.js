@@ -21,7 +21,8 @@ import { fileURLToPath } from 'node:url';
 
 const root = dirname(fileURLToPath(import.meta.url));
 process.chdir(root);
-const say = text => console.log(`[launch] ${text}`);
+/** Launcher messages: one short line each, marked with a symbol so they stand out from the bot's own log. */
+const say = (text, mark = '›') => console.log(`${mark} ${text}`);
 const run = (cmd, args, opts = {}) => spawnSync(cmd, args, { stdio: 'inherit', cwd: root, shell: process.platform === 'win32', ...opts }).status === 0;
 const quiet = (cmd, args) => spawnSync(cmd, args, { cwd: root, encoding: 'utf8' });
 
@@ -87,9 +88,8 @@ function ensureCheckout() {
 function install(sha) {
     const before = head();
     if (!git('fetch', '-q', 'origin', BRANCH).ok) return false;
-    const lockChanged = before && quiet('git', ['diff', '--quiet', before, sha, '--', 'package-lock.json']).status !== 0;
     if (!git('reset', '-q', '--hard', sha).ok) return false;
-    if (lockChanged || !depsCurrent()) {
+    if (!depsCurrent()) {
         if (!installDeps()) { say('npm install failed; going back.'); git('reset', '-q', '--hard', before); installDeps(); return false; }
     }
     return true;
@@ -103,16 +103,35 @@ if (updatesOn) {
 
 // Dependencies: installed when missing, and again whenever package-lock.json changed (for
 // example after the host pulled a new version from GitHub), so new code never starts without them.
-const lockHash = () => { try { return createHash('sha1').update(readFileSync(join(root, 'package-lock.json'))).digest('hex'); } catch { return 'none'; } };
+// The bot's own version number is in package-lock.json too; bumping it alone must not reinstall everything.
+const lockHash = () => {
+    try {
+        const lock = JSON.parse(readFileSync(join(root, 'package-lock.json'), 'utf8'));
+        delete lock.version; if (lock.packages?.['']) delete lock.packages[''].version;
+        return createHash('sha1').update(JSON.stringify(lock)).digest('hex');
+    } catch { return 'none'; }
+};
 const marker = join(root, 'node_modules', '.vanguard-lock');
 function depsCurrent() {
     try { return existsSync(join(root, 'node_modules', 'discord.js')) && readFileSync(marker, 'utf8') === lockHash(); } catch { return false; }
 }
 function installDeps() {
     const fresh = !existsSync(join(root, 'node_modules', 'discord.js'));
-    say(fresh ? 'Installing dependencies (first start) ...' : 'Dependencies changed; updating them ...');
-    const ok = run('npm', ['ci', '--omit=dev', '--no-audit', '--no-fund']) || run('npm', ['install', '--omit=dev', '--no-audit', '--no-fund']);
-    if (ok) try { writeFileSync(marker, lockHash()); } catch { }
+    const started = Date.now();
+    // npm's spinner and progress bars turn into garbage in a host panel, so run it quietly and print one summary line.
+    const npm = args => spawnSync('npm', [...args, '--omit=dev', '--no-audit', '--no-fund', '--no-progress', '--loglevel=error'], { cwd: root, encoding: 'utf8', shell: process.platform === 'win32' });
+    let result = npm(['ci']);
+    if (result.status !== 0) result = npm(['install']);
+    const ok = result.status === 0;
+    const output = `${result.stdout ?? ''}\n${result.stderr ?? ''}`;
+    const counts = ['added', 'changed', 'removed'].map(word => { const m = new RegExp(`${word} (\\d+) package`).exec(output); return m ? `${m[1]} ${word}` : null; }).filter(Boolean);
+    if (ok) {
+        say(`${fresh ? 'Dependencies installed' : 'Dependencies updated'} · ${counts.join(', ') || 'up to date'} · ${Math.round((Date.now() - started) / 1000)}s`, '  📦');
+        try { writeFileSync(marker, lockHash()); } catch { }
+    } else {
+        say('Installing dependencies failed. npm said:', '✖');
+        for (const line of output.trim().split('\n').slice(-12)) console.log(`    ${line}`);
+    }
     return ok;
 }
 if (!depsCurrent()) {
@@ -178,7 +197,7 @@ function startBot() {
         // A brand-new version that dies within 2 minutes is rolled back.
         if (updatesOn && lastGood && head() !== lastGood && now - startedAt < HEALTHY_MS) {
             const bad = head();
-            say(`The new version ${bad?.slice(0, 7)} stopped within 2 minutes (code ${code ?? signal}). Going back to ${lastGood.slice(0, 7)} and skipping it.`);
+            say(`The new version ${bad?.slice(0, 7)} stopped within 2 minutes (code ${code ?? signal}). Going back to ${lastGood.slice(0, 7)} and skipping it.`, '✖');
             if (bad) rejected.add(bad);
             install(lastGood);
             return startBot();
@@ -186,10 +205,10 @@ function startBot() {
         crashes.push(now);
         while (crashes.length && now - crashes[0] > 600000) crashes.shift();
         if (code === 0 || crashes.length > 5) {
-            say(code === 0 ? 'The bot stopped.' : 'The bot keeps stopping; giving up so the panel shows the error.');
+            say(code === 0 ? 'The bot stopped.' : 'The bot keeps stopping; giving up so the panel shows the error.', code === 0 ? '›' : '✖');
             process.exit(code ?? 1);
         }
-        say(`The bot stopped unexpectedly (code ${code ?? signal}); restarting in 5 seconds...`);
+        say(`The bot stopped unexpectedly (code ${code ?? signal}); restarting in 5 seconds...`, '⚠');
         setTimeout(startBot, 5000);
     });
 }
@@ -221,21 +240,23 @@ async function checkForUpdate(beforeInstall) {
         if (result.state === 'waiting') {
             // Say it once per commit and reason, not every check.
             const note = `${latest.sha}:${latest.why}`;
-            if (note !== lastNote) say(`Update ${latest.sha.slice(0, 7)} found, not installing yet: ${latest.why}.`);
+            if (note !== lastNote) say(`Update ${latest.sha.slice(0, 7)} found, not installing yet: ${latest.why}.`, '⏳');
             lastNote = note;
         }
         if (result.state !== 'installing') return result;
         if (beforeInstall) await beforeInstall(result);
         updating = true;
-        say(`Updating to ${latest.sha.slice(0, 7)}...`);
+        const subject = quiet('git', ['log', '-1', '--format=%s', latest.sha]).stdout?.trim();
+        console.log('');
+        say(`Update found: ${latest.sha.slice(0, 7)}${subject ? ` · ${subject.length > 70 ? `${subject.slice(0, 67)}...` : subject}` : ''}`, '↻');
         const previous = head();
         await stopBot();
         if (install(latest.sha)) {
-            lastGood = previous; say(`Installed ${latest.sha.slice(0, 7)}. Starting the new version.`);
+            lastGood = previous; say(`Installed ${latest.sha.slice(0, 7)} · starting the new version`, '✔');
             // The bot code is new now, but this launcher keeps running the code it started with.
-            if (launcherHash() !== LAUNCHER_HASH) say('launch.js itself changed in this update. Press Restart in the Wispbyte panel when convenient to load it (the bot keeps working until then).');
+            if (launcherHash() !== LAUNCHER_HASH) say('launch.js itself changed in this update. Press Restart in the Wispbyte panel when convenient to load it (the bot keeps working until then).', '⚠');
         }
-        else { rejected.add(latest.sha); say('The update could not be installed; staying on the current version.'); }
+        else { rejected.add(latest.sha); say('The update could not be installed; staying on the current version.', '✖'); }
         updating = false;
         startBot();
         // Once the new version has run for 2 minutes, it becomes the version to fall back to.
@@ -245,7 +266,7 @@ async function checkForUpdate(beforeInstall) {
         updating = false;
         const why = hide(error instanceof Error ? error.message : error);
         lastCheck = { at: Date.now(), result: `check failed: ${why}` };
-        say(`Update check failed: ${why}`);
+        say(`Update check failed: ${why} (trying again in ${CHECK_MS / 60000} minutes)`, '⚠');
         if (!child && !stopping) startBot();
         return { state: 'error', why };
     }
@@ -257,7 +278,8 @@ async function answerBot(c, message) {
     if (message?.type === 'vg-restart' && c?.connected) {
         try { c.send({ type: 'vg-restart-result', id: message.id, ok: !updating && !stopping }); } catch { }
         if (updating || stopping) return;
-        say(`Restart requested from Discord by ${String(message.by ?? 'a developer').replace(/[^\d]/g, '') || 'a developer'}.`);
+        console.log('');
+        say(`Restart requested from Discord by ${String(message.by ?? 'a developer').replace(/[^\d]/g, '') || 'a developer'}`, '↻');
         updating = true;
         await new Promise(r => setTimeout(r, 2000));
         await stopBot();

@@ -19,9 +19,7 @@ export function inviteUrl(clientId = config.clientId, guildId) {
 export function printStartupInvite(serverCount, clientId = config.clientId) {
     if (serverCount === 0)
         console.log(`  ${style.yellow('!')} Connected to 0 servers. Invite the bot with the link below before using server commands.`);
-    console.log(`  ${style.bold('Invite link')}`);
     // A public installation URL only. Keep this separate from redacted diagnostic logs.
-    console.log(`  ${inviteUrl(clientId)}`);
-    console.log(style.dim('  Invite with an account listed in DEVELOPER_IDS to authorize automatically,'));
-    console.log(style.dim('  otherwise run /dev server authorize within 120 seconds of inviting.'));
+    console.log(`  ${style.cyan('+')} ${'Invite'.padEnd(13)} ${style.dim('use an account in DEVELOPER_IDS and the server is authorized automatically')}`);
+    console.log(`    ${inviteUrl(clientId)}`);
 }

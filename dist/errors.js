@@ -38,6 +38,28 @@ export function endStartupSummary() {
     summarizingStartup = false;
 }
 const LEVEL_STYLE = { ERROR: style.red, WARN: style.yellow, INFO: style.cyan, DEBUG: style.dim };
+/** One symbol per level, so a scan of the console shows problems at a glance. */
+const LEVEL_MARK = { ERROR: '✖ ERROR', WARN: '⚠ WARN ', INFO: '• INFO ', DEBUG: '· DEBUG' };
+const sentence = (event) => { const text = event.replaceAll('_', ' '); return text[0].toUpperCase() + text.slice(1); };
+/**
+ * Events with their own short, readable layout. Roles above the bot are grouped under one heading
+ * with the fix written once, instead of a wall of key=value warnings.
+ */
+let attentionHeader = false;
+const SPECIAL_LINES = {
+    protection_warning: e => {
+        const lines = [];
+        if (!attentionHeader) {
+            attentionHeader = true;
+            lines.push('', `  ${style.yellow('⚠ Roles above the bot')}  ${style.dim('anti-nuke cannot act on people with these · drag Midtown Vanguard above them in Server Settings → Roles')}`);
+        }
+        const above = Array.isArray(e.rolesAboveBot) && e.rolesAboveBot.length ? e.rolesAboveBot.join(', ') : '';
+        const missing = Array.isArray(e.missingPermissions) && e.missingPermissions.length ? style.yellow(`bot is missing ${e.missingPermissions.join(', ')}`) : '';
+        lines.push(`    ${style.yellow('•')} ${style.bold(String(e.server ?? '?'))} ${style.dim('—')} ${[above, missing].filter(Boolean).join(' · ')}`);
+        return lines;
+    },
+    database_backup_verified: e => [`  ${style.green('✔')} Database backup saved ${style.dim(`· ${e.kind ?? 'backup'} · ${typeof e.size === 'number' ? readableSize(e.size) : '?'}`)}`],
+};
 export function logEvent(event, fields = {}) {
     const sanitized = sanitize({ timestamp: new Date().toISOString(), event, ...fields });
     const level = /fail|error|exception/.test(event) ? 'ERROR' : /unavailable|unverified|retry|pending|warning/.test(event) ? 'WARN' : event === 'command_activity' ? 'DEBUG' : 'INFO';
@@ -50,12 +72,19 @@ export function logEvent(event, fields = {}) {
     }
     if (summarizingStartup && level === 'INFO' && STARTUP_SUMMARY_EVENTS.has(event))
         return;
-    const time = new Date().toLocaleTimeString('en-US', { hour12: false });
+    const special = SPECIAL_LINES[event]?.(sanitized);
+    if (special) {
+        for (const line of special)
+            console.log(line);
+        return;
+    }
+    // Under launch.js the host panel already stamps every line, so a second (differently zoned) clock only confuses.
+    const time = typeof process.send === 'function' ? '' : `${style.dim(new Date().toLocaleTimeString('en-US', { hour12: false }))}  `;
     const { timestamp, details, error, ...values } = sanitized;
     const shown = (key, value) => key === 'size' && typeof value === 'number' ? readableSize(value)
         : typeof value === 'object' ? JSON.stringify(value) : String(value);
     const body = Object.entries(values).filter(([k]) => k !== 'event').map(([k, v]) => `${style.dim(`${k}=`)}${shown(k, v)}`).join(style.dim(' · '));
-    console.log(`${style.dim(time)}  ${(LEVEL_STYLE[level] ?? String)(level.padEnd(5))}  ${style.bold(event.replaceAll('_', ' '))}${body ? style.dim(' · ') + body : ''}`);
+    console.log(`${time}${(LEVEL_STYLE[level] ?? String)(LEVEL_MARK[level] ?? level)}  ${style.bold(sentence(event))}${body ? style.dim(' · ') + body : ''}`);
     const fullDetails = config.logLevel === 'debug' || event === 'command_load_failure';
     if ((details || error) && !(fullDetails && details))
         console.log(`       ${String(details ?? error).split('\n')[0]}`);

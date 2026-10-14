@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.33.1: cleaner console
+- **Updates** are 3 short lines: `↻ Update found: <commit> · <what changed>`, `📦 Dependencies updated · 35 added · 10s`, `✔ Installed`. npm's spinner garbage (`\|/-\|/-`) is gone.
+- **Dependencies are no longer reinstalled** when only the version number changed, so most updates start about 10 seconds faster.
+- **Roles above the bot** are grouped under one heading with the fix written once: `• Midtown Tower Cafe — Cafe Owner, admin`.
+- **Backups** are one line (`✔ Database backup saved · startup · 1.1 MB`) without the long ID.
+- **No second clock:** Wispbyte already stamps each line, so the bot's own (differently zoned) time is hidden when running under `launch.js`.
+- **The invite link** is one labelled row.
+- Each level has its own mark: `✖ ERROR`, `⚠ WARN`, `• INFO`.
+- The launcher's crash and rollback messages are marked ⚠ / ✖.
+- The launcher changes show after one Restart from the Wispbyte panel. The bot's own lines change straight away.
+
 ## 2.33.0: `/role who-can-give` replaces allow, policy and rules
 `/role allow`, `/role policy` and `/role rules` were confusing, so they are now one command:
 - **`/role who-can-give`** with nothing filled in shows the list: each role, and who can give it.
