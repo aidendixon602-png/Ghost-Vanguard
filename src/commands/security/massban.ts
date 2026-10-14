@@ -8,7 +8,8 @@ import { developers } from '../../bot/developers.js';
 import { config } from '../../config.js';
 import { BOT_BELOW_TARGET, classify, finish } from '../../ui/progress.js';
 import { liveProgress, summaryEmbed, type NetworkView } from '../../ui/network-ui.js';
-import type { ServerResult } from '../../security/network-ban.js';
+import { banTypeFromReason, type ServerResult } from '../../security/network-ban.js';
+import { caseId, recordExistingBan } from '../../audit/ban-log.js';
 
 export function parseIds(text: string): string[] {
     const ids = [...new Set(text.split(/[\s,;]+/).map(s => s.replace(/[<@!>]/g, '')).filter(Boolean))];
@@ -44,13 +45,22 @@ export default defineCommand(new SlashCommandBuilder().setName('massban').setDes
             const view: NetworkView = { working: `Mass-banning ${ids.length} account(s)`, verb: 'Banned', action: 'Mass ban', unit: 'account',
                 header: `**Moderator:** <@${c.actor!.id}>\n**Reason:** ${reason}${skipped ? `\n${skipped} protected ID(s) were removed from the list.` : ''}` };
             const progress = liveProgress(b, view);
-            const already = await b.guild.bans.fetch({ limit: 1000, cache: false }).then((l: any) => new Set<string>(l.keys()), () => new Set<string>());
+            // Existing bans with their reasons, so a genreban/hardban is never touched and a local one gets this reason on record.
+            const already = await b.guild.bans.fetch({ limit: 1000, cache: false }).then((l: any) => new Map<string, string | null>([...l.entries()].map(([id, ban]: [string, any]) => [id, ban?.reason ?? null])), () => new Map<string, string | null>());
             const results: ServerResult[] = [];
             await progress(0, ids.length, results);
             for (const id of ids) {
                 const row = (outcome: ServerResult['outcome'], why: string, reference?: string): ServerResult => ({ guildId: id, name: `\`${id}\``, outcome, reason: why, reference });
                 const member = b.guild.members.cache.get(id);
-                if (already.has(id)) results.push(row('already', 'Already banned; no new case recorded.'));
+                if (already.has(id)) {
+                    const type = banTypeFromReason(already.get(id) ?? null);
+                    if (type !== 'local') results.push(row('already', `Already banned by a ${type}; left as it is.`));
+                    else {
+                        c.store.recordCase(b.guildId, id, c.actor!.id, 'massban', reason, { username: member?.user?.tag ?? null });
+                        const { record } = recordExistingBan(c.store, c.logs, b.guildId, { id, tag: member?.user?.tag ?? null }, c.actor!.id, reason, null);
+                        results.push(row('already', `Already banned; reason added to ${caseId(record)}.`));
+                    }
+                }
                 else if (member && !member.bannable) results.push(row('hierarchy', BOT_BELOW_TARGET));
                 else try {
                     await b.guild.members.ban(id, { reason: staffReason(c.actor!.id, `massban: ${reason}`), deleteMessageSeconds: seconds });

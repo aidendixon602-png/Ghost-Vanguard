@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.33.3: every ban command handles someone who is already banned
+- **`/mod tempban`** on someone already banned keeps their ban and gives it an **end date**: they are unbanned automatically when the time is up. A case is recorded, and their ban record shows "Temporary ban" with the end time.
+- **`/mod massban`** records the reason (a case, plus the ban record in `#bans`) for every account that was already banned, instead of skipping it silently.
+- **`/mod softban`** still won't run on someone already banned, because a softban ends by unbanning and would set them free. The message now says so and points to `/mod ban` for adding a reason.
+- **Genrebans and hardbans** are never changed by any of these. Only a developer can change them.
+- `/network genreban` and `hardban` already covered people banned by hand (since 2.27), and the #bans Reban button already checks Discord first.
+
 ## 2.33.2: banning someone who is already banned
 - `/mod ban` used to refuse with "No change: already done" when the person was already banned (by hand in Discord, by another bot like Midtown Utilities, or before the ban log existed). That left no way to record why.
 - Now Discord's ban is left as it is (no second ban, no DM), but your **reason and evidence are recorded**:

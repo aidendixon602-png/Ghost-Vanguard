@@ -7,6 +7,7 @@ import { confirmDanger } from '../../ui/danger-ui.js';
 import { staffReason } from '../../security/raidmode.js';
 import { banTypeFromReason, existingBan } from '../../security/network-ban.js';
 import { classify, finish, outcomeEmbed } from '../../ui/progress.js';
+import { caseId, recordExistingBan } from '../../audit/ban-log.js';
 const DURATIONS = [['1 hour', 1], ['6 hours', 6], ['12 hours', 12], ['1 day', 24], ['3 days', 72], ['7 days', 168], ['14 days', 336], ['30 days', 720]];
 export default defineCommand(new SlashCommandBuilder().setName('tempban').setDescription('Ban a user for a set time; Vanguard lifts the ban automatically')
     .addUserOption(o => o.setName('user').setDescription('User').setRequired(true))
@@ -29,16 +30,25 @@ export default defineCommand(new SlashCommandBuilder().setName('tempban').setDes
         run: async (c, b) => {
             try {
                 const existing = await existingBan(b.guild, user.id);
-                if (existing)
-                    throw new AppError('VALIDATION_ERROR', `That user is already banned here${banTypeFromReason(existing.reason) !== 'local' ? ` (by a Midtown Vanguard ${banTypeFromReason(existing.reason)})` : ''}. No tempban or case was recorded.`);
-                await sendBanNotice(c.store, b.guild, user, reason, `This ban ends automatically <t:${Math.floor((Date.now() + hours * 3600000) / 1000)}:R>.`);
-                await b.guild.members.ban(user.id, { reason: staffReason(c.actor.id, `tempban ${label}: ${reason}`), deleteMessageSeconds: seconds });
-                const number = c.store.recordCase(b.guildId, user.id, c.actor.id, `tempban (${label})`, reason, { username: user.tag, evidence });
+                // A genreban or hardban is the developers' to change: never put a timer on it.
+                if (existing && banTypeFromReason(existing.reason) !== 'local')
+                    throw new AppError('VALIDATION_ERROR', `That user is already banned here by a Midtown Vanguard ${banTypeFromReason(existing.reason)}, which only a developer can change. Nothing was recorded.`);
                 const until = Date.now() + hours * 3600000;
+                // Already banned (by hand or another bot): keep the ban and give it an end date instead of refusing.
+                if (!existing) {
+                    await sendBanNotice(c.store, b.guild, user, reason, `This ban ends automatically <t:${Math.floor(until / 1000)}:R>.`);
+                    await b.guild.members.ban(user.id, { reason: staffReason(c.actor.id, `tempban ${label}: ${reason}`), deleteMessageSeconds: seconds });
+                }
+                const number = c.store.recordCase(b.guildId, user.id, c.actor.id, `tempban (${label})`, reason, { username: user.tag, evidence });
                 c.store.run('INSERT OR IGNORE INTO guild_data(guild_id) VALUES(?)', b.guildId);
                 c.store.run('INSERT INTO tempbans VALUES(?,?,?,?,?,?) ON CONFLICT(guild_id,user_id) DO UPDATE SET until=excluded.until,moderator_id=excluded.moderator_id,reason=excluded.reason,case_number=excluded.case_number', b.guildId, user.id, until, c.actor.id, reason, number);
-                c.logs.push(b.guildId, embed(`Case #${number} · tempban (${label})`, `**User:** <@${user.id}> (${user.id})\n**Moderator:** <@${c.actor.id}>\n**Unbanned:** <t:${Math.floor(until / 1000)}:R>\n**Reason:** ${reason}`, Colors.Orange));
-                return finish(b, outcomeEmbed(`Tempban succeeded: ${user.username}`, { outcome: 'success', reason: `Case #${number}: **${user.tag}** (\`${user.id}\`) banned until <t:${Math.floor(until / 1000)}:f>.\n**Moderator:** <@${c.actor.id}> · **Reason:** ${reason}` }));
+                c.logs.push(b.guildId, embed(`Case #${number} · tempban (${label})`, `**User:** <@${user.id}> (${user.id})\n**Moderator:** <@${c.actor.id}>\n**Unbanned:** <t:${Math.floor(until / 1000)}:R>\n**Reason:** ${reason}${existing ? '\n-# They were already banned; this put an end date on that ban.' : ''}`, Colors.Orange));
+                let extra = '';
+                if (existing) {
+                    const { record } = recordExistingBan(c.store, c.logs, b.guildId, { id: user.id, tag: user.tag, username: user.username, avatar: user.displayAvatarURL?.() ?? null }, c.actor.id, reason, evidence, Date.now(), { kind: 'tempban', duration: label, expiresAt: until });
+                    extra = `\nThey were **already banned**, so instead of a new ban their existing ban now **ends automatically** <t:${Math.floor(until / 1000)}:R>. Ban record **${caseId(record)}** was updated.`;
+                }
+                return finish(b, outcomeEmbed(`Tempban succeeded: ${user.username}`, { outcome: 'success', reason: `Case #${number}: **${user.tag}** (\`${user.id}\`) banned until <t:${Math.floor(until / 1000)}:f>.\n**Moderator:** <@${c.actor.id}> · **Reason:** ${reason}${extra}` }));
             }
             catch (error) {
                 return finish(b, outcomeEmbed('', classify(error, 'tempban')));

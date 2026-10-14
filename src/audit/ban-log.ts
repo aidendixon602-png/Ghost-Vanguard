@@ -147,10 +147,10 @@ export function setStatus(store: Store, record: BanRecord, status: BanStatus, by
  * ban is explained in #bans. Updates the open record, or starts one if there is none.
  */
 export function recordExistingBan(store: Store, logs: LogQueue, guildId: string, user: { id: string; tag?: string | null; username?: string | null; avatar?: string | null },
-    staffId: string, reason: string, evidence: string | null, at = Date.now()): { record: BanRecord; isNew: boolean } {
+    staffId: string, reason: string, evidence: string | null, at = Date.now(), change: { kind?: string; duration?: string; expiresAt?: number | null } = {}): { record: BanRecord; isNew: boolean } {
     const open = openRecord(store, guildId, user.id);
     if (!open) {
-        const record = createRecord(store, guildId, user, { kind: 'ban', reason, evidence, moderatorId: staffId, moderatorRole: 'via-bot', approved: null, duration: 'Permanent', expiresAt: null }, at);
+        const record = createRecord(store, guildId, user, { kind: change.kind ?? 'ban', reason, evidence, moderatorId: staffId, moderatorRole: 'via-bot', approved: null, duration: change.duration ?? 'Permanent', expiresAt: change.expiresAt ?? null }, at);
         const history = pushHistory(record, { action: 'recorded (was already banned)', by: staffId, role: 'via-bot', at, reason: null });
         store.run('UPDATE ban_records SET history=? WHERE guild_id=? AND id=?', history, guildId, record.id);
         const fresh = getRecord(store, guildId, record.id)!;
@@ -162,6 +162,8 @@ export function recordExistingBan(store: Store, logs: LogQueue, guildId: string,
     const takeOver = !open.moderator_id || open.moderator_role === 'unverified' || !open.reason;
     store.run(`UPDATE ban_records SET reason=?, evidence=?, history=?${takeOver ? ", moderator_id=?, moderator_role='via-bot'" : ''} WHERE guild_id=? AND id=?`,
         redact(reason) ?? null, redact([open.evidence, evidence].filter(Boolean).join('\n')) || null, history, ...(takeOver ? [staffId] : []), guildId, open.id);
+    // e.g. a tempban on someone already banned: the record now shows when the ban ends.
+    if (change.kind) store.run('UPDATE ban_records SET kind=?, duration=?, expires_at=? WHERE guild_id=? AND id=?', change.kind, change.duration ?? null, change.expiresAt ?? null, guildId, open.id);
     const updated = getRecord(store, guildId, open.id)!;
     publish(store, logs, updated, false);
     return { record: updated, isNew: false };

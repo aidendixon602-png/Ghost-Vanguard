@@ -41,7 +41,7 @@ function world(o: { bans?: Record<string, string>; unbanFails?: boolean; banErro
         bans: {
             fetch: async (q: any) => {
                 if (q?.user) { if (!bans.has(q.user)) throw { code: 10026 }; return { reason: bans.get(q.user) }; }
-                return new Map([...bans.keys()].map(k => [k, {}]));
+                return new Map([...bans.keys()].map(k => [k, { reason: bans.get(k) }]));
             },
             remove: async (id: string) => { calls.unbanned.push(id); bans.delete(id); },
         },
@@ -92,7 +92,7 @@ test('/mod tempban shows loading, then success; a user already banned is reporte
 test('/mod softban never runs on someone already banned, so it cannot lift their ban', async () => {
     const w = world({ bans: { [TARGET]: `${TAG.genreban} GB-00001 ${DEV}: raiding` } });
     await w.run(softbanCommand, { reason: 'spam' });
-    assert.match(String(w.clickReplies.at(-1).embeds[0].data.description), /already banned here, so a softban would lift their ban/);
+    assert.match(String(w.clickReplies.at(-1).embeds[0].data.description), /already banned. A softban ends by unbanning/);
     assert.deepEqual(w.calls.unbanned, [], 'the existing ban was not lifted');
     w.store.close();
 });
@@ -119,7 +119,28 @@ test('/mod massban shows progress and a partial result with each failed account'
     assert.match(title(last), /^⚠ Mass ban partially succeeded: 2 of 3 accounts/);
     assert.match(String(last.embeds[0].data.description), /400000000000000013`\*\* · Missing permissions/);
     assert.deepEqual(w.calls.banned, [ok], 'the already-banned account was not banned again');
+    assert.equal(w.store.readGuild(G, () => w.store.get('SELECT reason FROM ban_records WHERE guild_id=? AND user_id=?', G, already))!.reason, 'raid', 'their ban record now has the reason');
+    assert.equal(w.store.readGuild(G, () => w.store.get('SELECT COUNT(*) AS n FROM cases WHERE guild_id=? AND user_id=?', G, already))!.n, 1, 'the reason is recorded for the already-banned account');
     w.store.close();
+});
+
+test('/mod tempban on someone already banned puts an end date on their ban instead of refusing', async () => {
+    const w = world({ bans: { [TARGET]: 'Banned by hand' } });
+    await w.run(tempbanCommand, { duration: 24, reason: 'cooling off' });
+    const text = JSON.stringify(w.clickReplies.at(-1));
+    assert.match(text, /already banned/); assert.match(text, /ends automatically/);
+    assert.deepEqual(w.calls.banned, [], 'no second ban');
+    const row = w.store.readGuild(G, () => w.store.get('SELECT until FROM tempbans WHERE guild_id=? AND user_id=?', G, TARGET))!;
+    assert.ok(Number(row.until) > Date.now() + 23 * 3600000, 'the unban is scheduled');
+    const record = w.store.readGuild(G, () => w.store.get('SELECT kind,expires_at FROM ban_records WHERE guild_id=? AND user_id=?', G, TARGET))!;
+    assert.equal(record.kind, 'tempban'); assert.ok(record.expires_at);
+    w.store.close();
+
+    const n = world({ bans: { [TARGET]: `${TAG.hardban} HB-00001 ${DEV}: raiding` } });
+    await n.run(tempbanCommand, { duration: 24, reason: 'cooling off' });
+    assert.match(JSON.stringify(n.clickReplies.at(-1)), /only a developer can change/);
+    assert.equal(n.store.readGuild(G, () => n.store.get('SELECT COUNT(*) AS n FROM tempbans WHERE guild_id=?', G))!.n, 0, 'a hardban never gets a timer');
+    n.store.close();
 });
 
 test('appeals cannot reach a genreban or hardban', async () => {

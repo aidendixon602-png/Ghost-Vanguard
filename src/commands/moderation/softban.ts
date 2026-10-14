@@ -25,7 +25,7 @@ export default defineCommand(new SlashCommandBuilder().setName('softban').setDes
             // A softban ends by unbanning, so it must never run on someone who is already banned:
             // that would lift their real ban (including a genreban or hardban).
             if (await existingBan(b.guild, user.id))
-                throw new AppError('VALIDATION_ERROR', 'That user is already banned here, so a softban would lift their ban. Nothing was changed.');
+                throw new AppError('VALIDATION_ERROR', 'That user is already banned. A softban ends by unbanning, so it would set them free: nothing was changed. To add your reason to their ban, use `/mod ban` instead.');
             await b.guild.members.ban(user.id, { reason: staffReason(c.actor!.id, `softban: ${reason}`), deleteMessageSeconds: seconds });
             // Never report a softban as done while they are still banned.
             const lifted = await b.guild.members.unban(user.id, staffReason(c.actor!.id, 'softban: lifting the ban')).then(() => true, () => false);

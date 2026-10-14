@@ -8,6 +8,8 @@ import { developers } from '../../bot/developers.js';
 import { config } from '../../config.js';
 import { BOT_BELOW_TARGET, classify, finish } from '../../ui/progress.js';
 import { liveProgress, summaryEmbed } from '../../ui/network-ui.js';
+import { banTypeFromReason } from '../../security/network-ban.js';
+import { caseId, recordExistingBan } from '../../audit/ban-log.js';
 export function parseIds(text) {
     const ids = [...new Set(text.split(/[\s,;]+/).map(s => s.replace(/[<@!>]/g, '')).filter(Boolean))];
     const bad = ids.filter(id => !/^\d{17,20}$/.test(id));
@@ -44,14 +46,23 @@ export default defineCommand(new SlashCommandBuilder().setName('massban').setDes
             const view = { working: `Mass-banning ${ids.length} account(s)`, verb: 'Banned', action: 'Mass ban', unit: 'account',
                 header: `**Moderator:** <@${c.actor.id}>\n**Reason:** ${reason}${skipped ? `\n${skipped} protected ID(s) were removed from the list.` : ''}` };
             const progress = liveProgress(b, view);
-            const already = await b.guild.bans.fetch({ limit: 1000, cache: false }).then((l) => new Set(l.keys()), () => new Set());
+            // Existing bans with their reasons, so a genreban/hardban is never touched and a local one gets this reason on record.
+            const already = await b.guild.bans.fetch({ limit: 1000, cache: false }).then((l) => new Map([...l.entries()].map(([id, ban]) => [id, ban?.reason ?? null])), () => new Map());
             const results = [];
             await progress(0, ids.length, results);
             for (const id of ids) {
                 const row = (outcome, why, reference) => ({ guildId: id, name: `\`${id}\``, outcome, reason: why, reference });
                 const member = b.guild.members.cache.get(id);
-                if (already.has(id))
-                    results.push(row('already', 'Already banned; no new case recorded.'));
+                if (already.has(id)) {
+                    const type = banTypeFromReason(already.get(id) ?? null);
+                    if (type !== 'local')
+                        results.push(row('already', `Already banned by a ${type}; left as it is.`));
+                    else {
+                        c.store.recordCase(b.guildId, id, c.actor.id, 'massban', reason, { username: member?.user?.tag ?? null });
+                        const { record } = recordExistingBan(c.store, c.logs, b.guildId, { id, tag: member?.user?.tag ?? null }, c.actor.id, reason, null);
+                        results.push(row('already', `Already banned; reason added to ${caseId(record)}.`));
+                    }
+                }
                 else if (member && !member.bannable)
                     results.push(row('hierarchy', BOT_BELOW_TARGET));
                 else

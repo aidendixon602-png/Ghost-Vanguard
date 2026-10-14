@@ -125,10 +125,10 @@ export function setStatus(store, record, status, by, role, reason, at = Date.now
  * Discord's ban stays as it is, and this staff member's reason and evidence go on the record, so the
  * ban is explained in #bans. Updates the open record, or starts one if there is none.
  */
-export function recordExistingBan(store, logs, guildId, user, staffId, reason, evidence, at = Date.now()) {
+export function recordExistingBan(store, logs, guildId, user, staffId, reason, evidence, at = Date.now(), change = {}) {
     const open = openRecord(store, guildId, user.id);
     if (!open) {
-        const record = createRecord(store, guildId, user, { kind: 'ban', reason, evidence, moderatorId: staffId, moderatorRole: 'via-bot', approved: null, duration: 'Permanent', expiresAt: null }, at);
+        const record = createRecord(store, guildId, user, { kind: change.kind ?? 'ban', reason, evidence, moderatorId: staffId, moderatorRole: 'via-bot', approved: null, duration: change.duration ?? 'Permanent', expiresAt: change.expiresAt ?? null }, at);
         const history = pushHistory(record, { action: 'recorded (was already banned)', by: staffId, role: 'via-bot', at, reason: null });
         store.run('UPDATE ban_records SET history=? WHERE guild_id=? AND id=?', history, guildId, record.id);
         const fresh = getRecord(store, guildId, record.id);
@@ -139,6 +139,9 @@ export function recordExistingBan(store, logs, guildId, user, staffId, reason, e
     // Someone unknown (or a bot without a reason) banned them: the staff member now stands behind it.
     const takeOver = !open.moderator_id || open.moderator_role === 'unverified' || !open.reason;
     store.run(`UPDATE ban_records SET reason=?, evidence=?, history=?${takeOver ? ", moderator_id=?, moderator_role='via-bot'" : ''} WHERE guild_id=? AND id=?`, redact(reason) ?? null, redact([open.evidence, evidence].filter(Boolean).join('\n')) || null, history, ...(takeOver ? [staffId] : []), guildId, open.id);
+    // e.g. a tempban on someone already banned: the record now shows when the ban ends.
+    if (change.kind)
+        store.run('UPDATE ban_records SET kind=?, duration=?, expires_at=? WHERE guild_id=? AND id=?', change.kind, change.duration ?? null, change.expiresAt ?? null, guildId, open.id);
     const updated = getRecord(store, guildId, open.id);
     publish(store, logs, updated, false);
     return { record: updated, isNew: false };
