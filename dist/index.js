@@ -1,3 +1,4 @@
+import { dmTrusted } from './bot/trusted-dm.js';
 import { onRejoin, saveLeftRoles } from './features/rejoin-roles.js';
 import { selfRestart } from './bot/updater-link.js';
 import { autoReact } from './features/autoreact.js';
@@ -139,16 +140,9 @@ function presence(soon = false) {
     lastPresence = Date.now();
 }
 databaseBackups.onFailure = async (message) => {
-    // Explicitly requested developer alerts; no credentials or raw database records are sent.
-    const targets = new Set([config.ownerId, ...config.developers]);
-    for (const id of targets)
-        try {
-            const user = await client.users.fetch(id);
-            await user.send({ content: `Midtown Vanguard: ${message}`, allowedMentions: { parse: [] } });
-        }
-        catch {
-            logEvent('developer_alert_unavailable', { developer: id });
-        }
+    // Only the trusted DM list (TRUSTED_DM_IDS, default the bot owner) is told; no credentials or database records are sent.
+    if (!await dmTrusted(client, { content: `Midtown Vanguard: ${message}`, allowedMentions: { parse: [] } }))
+        logEvent('trusted_alert_unavailable', {});
 };
 async function scheduledLayouts() {
     for (const guild of client.guilds.cache.values()) {

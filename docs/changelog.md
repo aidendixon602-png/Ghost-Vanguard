@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.36.1: bot DMs go only to people you trust
+- **New `TRUSTED_DM_IDS`:** the only people the bot ever DMs about itself. That covers:
+  - the **daily database backup file** (`.db.gz`)
+  - "back online" notices and backup-failure alerts
+  - empty-database warnings and genreban-exception notices
+- It defaults to **`BOT_OWNER_ID` only**.
+- **Supreme Leaders and developers no longer get these DMs because of their rank.** Add them to `TRUSTED_DM_IDS` if you want them to.
+
 ## 2.36.0 (documentation)
 - **Rewrote the README** in a cleaner style:
   - an overview and design principles

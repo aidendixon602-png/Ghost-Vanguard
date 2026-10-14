@@ -7,8 +7,8 @@
 Anti-nuke protection · Moderation and audit logging · Staff permissions · Server recovery
 
 [![CI](https://github.com/aidendixon602-png/midtown-vanguard/actions/workflows/ci.yml/badge.svg)](https://github.com/aidendixon602-png/midtown-vanguard/actions/workflows/ci.yml)
-![Version](https://img.shields.io/badge/version-2.36.0-5865F2)
-![Tests](https://img.shields.io/badge/tests-481%20passing-2EA043)
+![Version](https://img.shields.io/badge/version-2.36.1-5865F2)
+![Tests](https://img.shields.io/badge/tests-482%20passing-2EA043)
 ![Node](https://img.shields.io/badge/node-24-339933?logo=node.js&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
 ![discord.js](https://img.shields.io/badge/discord.js-14-5865F2?logo=discord&logoColor=white)
@@ -62,7 +62,7 @@ Every command has a minimum rank. Each rank includes everything below it.
 
 | Rank | Scope | Responsibilities |
 |---|---|---|
-| Supreme Leader | All servers | Full control; receives the daily database backup |
+| Supreme Leader | All servers | Full control |
 | Developer | All servers | Updates, restarts, database, network bans; exempt from anti-nuke |
 | Overseer | All servers | Bot Manager, plus inspecting and authorizing servers |
 | Bot Manager | All servers | Head Admin everywhere, plus diagnostics, status and broadcasts |
@@ -112,6 +112,7 @@ Copy [`.env.example`](.env.example) to `.env` and set at least:
 | `DEVELOPER_IDS` | Yes | Comma-separated user IDs with developer access |
 | `DATABASE_PATH` | No | SQLite database location (default `./data/vanguard.db`) |
 | `SUPREME_LEADER_IDS` | No | Additional Supreme Leaders |
+| `TRUSTED_DM_IDS` | No | The only people the bot DMs about itself, including the daily database backup (default: `BOT_OWNER_ID`) |
 | `UPDATE_REPO`, `UPDATE_TOKEN` | No | Enable automatic updates (see below) |
 | `ROVER_API_KEY`, `BLOXLINK_API_KEY` | No | Roblox verification providers |
 | `AI_ENABLED`, `OPENAI_API_KEY` | No | AI moderation and `/ask` |
@@ -149,7 +150,7 @@ push to main → CI (typecheck, build, tests, secret scan) → launcher installs
 
 ### Backups
 
-- **Database:** verified backups every hour, kept on a rolling schedule in `data/database-backups`, plus a daily compressed copy sent by DM to Supreme Leaders. Lost settings can be merged back from any backup with `/dev database restore-settings`.
+- **Database:** verified backups every hour, kept on a rolling schedule in `data/database-backups`, plus a daily compressed copy sent by DM only to `TRUSTED_DM_IDS` (default: the bot owner). Lost settings can be merged back from any backup with `/dev database restore-settings`.
 - **Server layout:** snapshots and scheduled backups with `/recovery`.
 
 ### Running more than one copy

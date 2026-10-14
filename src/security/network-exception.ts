@@ -1,7 +1,7 @@
 import { Colors, type Client, type Guild } from 'discord.js';
 import type { CommandContext } from '../bot/registry.js';
 import { AppError } from '../errors.js';
-import { config } from '../config.js';
+import { dmTrusted } from '../bot/trusted-dm.js';
 import { developers } from '../bot/developers.js';
 import { explicitRank, RANKS } from '../bot/ranks.js';
 import { confirmDanger } from '../ui/danger-ui.js';
@@ -23,9 +23,7 @@ export function canGrantException(store: CommandContext['store'], guild: Pick<Gu
 }
 
 export async function tellDevelopers(client: Client | undefined, text: string) {
-    if (!client?.users) return;
-    const targets = new Set([config.ownerId, ...config.supremeExtra, ...config.developers].filter(Boolean) as string[]);
-    for (const id of targets) await client.users.fetch(id).then(u => u.send({ content: text.slice(0, 1900), allowedMentions: { parse: [] } })).catch(() => undefined);
+    await dmTrusted(client, { content: text.slice(0, 1900), allowedMentions: { parse: [] } });
 }
 
 /** /mod unban on someone with an active genreban (and no hardban): offer a this-server-only exception. */

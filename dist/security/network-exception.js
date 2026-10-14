@@ -1,6 +1,6 @@
 import { Colors } from 'discord.js';
 import { AppError } from '../errors.js';
-import { config } from '../config.js';
+import { dmTrusted } from '../bot/trusted-dm.js';
 import { developers } from '../bot/developers.js';
 import { explicitRank, RANKS } from '../bot/ranks.js';
 import { confirmDanger } from '../ui/danger-ui.js';
@@ -21,11 +21,7 @@ export function canGrantException(store, guild, actor) {
     return explicitRank(store, guild.id, actor.id, actor) >= RANKS.headadmin;
 }
 export async function tellDevelopers(client, text) {
-    if (!client?.users)
-        return;
-    const targets = new Set([config.ownerId, ...config.supremeExtra, ...config.developers].filter(Boolean));
-    for (const id of targets)
-        await client.users.fetch(id).then(u => u.send({ content: text.slice(0, 1900), allowedMentions: { parse: [] } })).catch(() => undefined);
+    await dmTrusted(client, { content: text.slice(0, 1900), allowedMentions: { parse: [] } });
 }
 /** /mod unban on someone with an active genreban (and no hardban): offer a this-server-only exception. */
 export async function offerGenrebanException(ctx, i, ban, reason) {

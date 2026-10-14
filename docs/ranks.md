@@ -9,7 +9,7 @@ Generated from the bot itself (`npm run docs`). Every rank can also use everythi
 
 ## 👑 Supreme Leader
 
-Full control of the bot in every server. Receives the daily database backup by DM. Given with `/setup staff global`.
+Full control of the bot in every server. Given with `/setup staff global`.
 
 _Everything below._
 

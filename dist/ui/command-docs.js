@@ -2,7 +2,7 @@ import { displayPath, RETIRED, treeJson } from '../bot/command-tree.js';
 import { requiredRank } from '../bot/ranks.js';
 import { accessLabel } from './help-ui.js';
 const LEVELS = [
-    [8, '👑 Supreme Leader', 'Full control of the bot in every server. Receives the daily database backup by DM. Given with `/setup staff global`.'],
+    [8, '👑 Supreme Leader', 'Full control of the bot in every server. Given with `/setup staff global`.'],
     [7, '🧰 Developer', 'Everything, in every server, without needing Discord permissions. Ignored by anti-nuke. Added only by listing the user ID in `DEVELOPER_IDS` in `.env`.'],
     [6, '🔭 Overseer', 'Bot-wide rank, every server. Given with `/setup staff global`.'],
     [5, '🛠️ Bot Manager', 'Bot-wide rank, every server: Head Admin everywhere plus bot status tools. Given with `/setup staff global`.'],

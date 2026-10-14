@@ -5,24 +5,17 @@ import { promisify } from 'node:util';
 import { config, VERSION } from '../config.js';
 import { embed } from '../ui/ui.js';
 import { logEvent } from '../errors.js';
-import { supremeLeaders } from '../bot/ranks.js';
+import { dmTrusted } from '../bot/trusted-dm.js';
 import { formatDuration } from '../audit/downtime.js';
 /**
  * Bot health:
- *  - "Back online" DM to the Supreme Leaders when the bot starts after being down for 3+ minutes.
+ *  - "Back online" DM to the trusted DM list (TRUSTED_DM_IDS, default the bot owner) when the bot starts after being down for 3+ minutes.
  *  - Heartbeat: when HEARTBEAT_URL is set (for example a free healthchecks.io check), the bot pings
  *    it every minute. If the pings stop, that service alerts you, even while the bot is offline.
- *  - Daily database backup sent by DM to the Supreme Leaders (DAILY_BACKUP_DM=false turns it off).
+ *  - Daily database backup sent by DM to the trusted DM list only (DAILY_BACKUP_DM=false turns it off).
  */
-async function dmLeaders(client, payload) {
-    let sent = 0;
-    for (const id of supremeLeaders()) {
-        const user = await client.users.fetch(id).catch(() => null);
-        if (user && await user.send(payload).then(() => true, () => false))
-            sent++;
-    }
-    return sent;
-}
+// Only TRUSTED_DM_IDS (default: the bot owner) ever receive these, never every Supreme Leader or developer.
+const dmLeaders = dmTrusted;
 export async function announceComeback(client, offlineSince, now = Date.now()) {
     if (!offlineSince || now - offlineSince < 3 * 60000)
         return;
@@ -67,13 +60,11 @@ export async function dailyBackupDm(store, client, create, now = Date.now()) {
  * may already hold changes people want to keep.
  */
 export async function warnEmptyDatabase(client, servers) {
-    const targets = new Set([config.ownerId, ...config.supremeExtra, ...config.developers].filter(Boolean));
     const text = [
         '⚠️ **Midtown Vanguard started with an empty database** while it is in **' + servers + '** server(s).',
         'If this was not on purpose (a reinstall, a Clone, a wiped `data` folder), every server\'s settings are missing: whitelists, staff ranks, logs, cases and ban records.',
         '',
         '**To get them back:** use a **📦 Daily database backup** this bot DMed you before it happened (a `.db.gz` file: unzip it), the `data` archive you downloaded, or `data/database-backups` if it still exists. Stop the bot, put the file at `data/vanguard.db`, and start it again.',
     ].join('\n');
-    for (const id of targets)
-        await client.users.fetch(id).then(u => u.send({ content: text, allowedMentions: { parse: [] } })).catch(() => undefined);
+    await dmTrusted(client, { content: text, allowedMentions: { parse: [] } });
 }

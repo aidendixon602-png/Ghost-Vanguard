@@ -5,7 +5,7 @@ export function parseIds(value = ''): Set<string> {
     return new Set(value.split(',').map(v => v.trim()).filter(v => /^\d{17,20}$/.test(v)));
 }
 
-export const VERSION = '2.36.0';
+export const VERSION = '2.36.1';
 export const CONFIG_VERSION = 3;
 
 export const config = {
@@ -25,7 +25,9 @@ export const config = {
     supremeExtra: parseIds(process.env.SUPREME_LEADER_IDS || '843909457616044092'),
     /** Optional uptime check URL (e.g. https://hc-ping.com/<uuid>); pinged every minute. */
     heartbeatUrl: /^https:\/\//.test(process.env.HEARTBEAT_URL?.trim() ?? '') ? process.env.HEARTBEAT_URL!.trim() : '',
-    /** DM a gzipped database backup to the Supreme Leaders once a day. */
+    /** The only people the bot DMs about itself (backup files, alerts). Default: BOT_OWNER_ID only. */
+    trustedDmIds: parseIds(process.env.TRUSTED_DM_IDS || process.env.BOT_OWNER_ID || '1277709272041394187'),
+    /** DM a gzipped database backup to the trusted DM list once a day. */
     dailyBackupDm: process.env.DAILY_BACKUP_DM !== 'false',
     ownerUsername: process.env.BOT_OWNER_USERNAME || 'web_w2z',
     snapshotActionDelayMs: Number(process.env.SNAPSHOT_ACTION_DELAY_MS || 0),
