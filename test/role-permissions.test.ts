@@ -186,15 +186,24 @@ test('/role refuses a moderator a privileged role and makes no change', async ()
     } finally { store.close(); }
 });
 
-test('/role policy is the server owner only (Administrator and Head Admin cannot)', async () => {
-    const { store, p } = setup();
-    const i = (user: string) => ({ guildId: G, guild: { id: G, ownerId: OWNER }, user: { id: user },
-        options: { getSubcommand: () => 'policy', getRole: (n: string) => n === 'role' ? R.banRole : null, getBoolean: () => true, getUser: () => ({ id: MANAGER }) } }) as any;
+test('/role who-can-give: staff roles are owner only and also let moderator-rank givers use them; ordinary roles open to moderators', async () => {
+    const { store } = setup();
+    const i = (user: string, opts: { role?: any; who?: any; remove?: boolean }) => ({ guildId: G, guild: { id: G, ownerId: OWNER }, user: { id: user },
+        options: { getSubcommand: () => 'who-can-give', getRole: () => opts.role ?? null, get: (n: string) => n === 'who' ? opts.who ?? null : null, getBoolean: () => opts.remove ?? null } }) as any;
+    const run = (user: string, opts: any) => store.withAuthorized(G, () => roleCommand.execute({ store } as any, i(user, opts)));
     try {
         store.grant(G, ADMIN, 'admin', OWNER); // a Head Admin-equivalent grant
-        await assert.rejects(store.withAuthorized(G, () => roleCommand.execute({ store } as any, i(ADMIN))), /Only the server owner/);
-        assert.match(String(await store.withAuthorized(G, () => roleCommand.execute({ store } as any, i(OWNER)))), /Approved/);
+        await assert.rejects(run(ADMIN, { role: R.banRole, who: { role: R.managerRole } }), /only the server owner can choose who gives it/);
+        await assert.rejects(run(OWNER, { role: R.banRole }), /Pick \*\*who\*\* may give it/);
+        assert.match(String(await run(OWNER, { role: R.banRole, who: { role: R.managerRole } })), /Anyone with <@&900000000000000003> can now give and take <@&900000000000000007>/);
         assert.equal(store.all("SELECT * FROM role_rules WHERE kind='grant'").length, 1, 'saved per server, so it survives restarts');
+        assert.equal(store.all("SELECT * FROM role_rules WHERE kind='allow' AND role_id=?", R.banRole.id).length, 1, 'moderator-rank givers can use it too');
+        assert.match(String(await run(ADMIN, { role: R.cosmetic })), /Moderators can now give and take <@&900000000000000006>/);
+        const list = String(await run(OWNER, {}));
+        assert.match(list, /<@&900000000000000007> → <@&900000000000000003>/);
+        assert.match(list, /<@&900000000000000006> → any moderator/);
+        assert.match(String(await run(OWNER, { role: R.banRole, who: { role: R.managerRole }, remove: true })), /can \*\*no longer\*\* give/);
+        assert.equal(store.all('SELECT * FROM role_rules WHERE role_id=?', R.banRole.id).length, 0, 'last giver removed: moderator access to the staff role goes too');
     } finally { store.close(); }
 });
 
@@ -266,7 +275,7 @@ test('developers can use every command without Administrator or any server role'
     const { store, can } = await guardSetup();
     config.developers.add(DEV);
     try {
-        for (const key of ['moderation/ban', 'moderation/purge', 'role/add', 'role/policy', 'role/allow', 'role/rules', 'backup/restore', 'antinuke/disable', 'trust/add', 'staff/global', 'genreban', 'dev/diagnostics', 'logs/setup'])
+        for (const key of ['moderation/ban', 'moderation/purge', 'role/add', 'role/who-can-give', 'backup/restore', 'antinuke/disable', 'trust/add', 'staff/global', 'genreban', 'dev/diagnostics', 'logs/setup'])
             assert.equal(can(plainMember(DEV), key), true, `developer should be able to use /${key}`);
     } finally { config.developers.delete(DEV); store.close(); }
 });
@@ -276,9 +285,9 @@ test('the owner cannot use developer-only commands; Administrator cannot use own
     try {
         for (const key of ['genreban', 'hardban', 'dev/diagnostics', 'staff/global', 'banserver', 'autoreact/add'])
             assert.equal(can(plainMember(OWNER, PermissionFlagsBits.Administrator), key), false, `owner must not use /${key}`);
-        assert.equal(can(plainMember(OWNER), 'role/policy'), true);
+        assert.equal(can(plainMember(OWNER), 'role/who-can-give'), true);
         const admin = plainMember(ADMIN, PermissionFlagsBits.Administrator);
-        for (const key of ['role/policy', 'role/allow']) assert.equal(can(admin, key), false, `Administrator must not use /${key}`);
+        for (const key of ['role/who-can-give']) assert.equal(can(admin, key), false, `Administrator must not use /${key}`);
         assert.equal(can(admin, 'role/add'), true, 'but can use /role add (the handler then checks role by role)');
     } finally { store.close(); }
 });

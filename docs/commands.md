@@ -263,6 +263,4 @@ Give or take a role from a member, with role rules and hierarchy enforced
 | `/role add` | Give a member a role | Everyone |
 | `/role remove` | Take a role from a member | Everyone |
 | `/role restore` | Give a member back the roles they had before they left the server | Everyone (checked role by role) |
-| `/role allow` | Let configured moderators give and take a role (owner or Head Admin) | Owner or Head Admin |
-| `/role policy` | Owner only: approve who may grant a protected (admin/moderation) role | Owner |
-| `/role rules` | Show the role allow list and approved grant rules | Moderator+ or Manage Roles |
+| `/role who-can-give` | Choose who can give a role, or see the list (leave everything empty) | Owner or Head Admin (staff roles: owner) |

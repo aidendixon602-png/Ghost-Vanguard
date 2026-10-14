@@ -7,10 +7,10 @@ import { explicitRank, hasAdministrator, RANKS } from '../bot/ranks.js';
  *  - Developers (DEVELOPER_IDS): any eligible role, any member, in any server.
  *  - The server owner: any eligible role in their own server, including privileged roles.
  *  - Administrator or Manage Roles: roles below their own highest role, on members below them.
- *  - Configured Vanguard moderators (staff role, moderator rank): only roles on the /role allow list.
+ *  - Configured Vanguard moderators (staff role, moderator rank): only roles allowed with /role who-can-give.
  *
  * Privileged roles (admin or moderation powers, Vanguard staff roles, the quarantine role) need a
- * saved owner-approved rule (/role policy) for anyone other than the owner or a developer, for
+ * saved owner-approved rule (/role who-can-give ... who:) for anyone other than the owner or a developer, for
  * both adding and removing. Nobody but the owner or a developer can give themselves a role.
  * Vanguard can never manage @everyone, bot/integration roles, or roles at or above its own.
  */
@@ -60,7 +60,7 @@ export function decideRoleChange({ store, guild, actor, target, role, me, op }) 
     if (!manager && !moderator)
         return { ok: false, kind: 'permission', reason: 'You need Manage Roles, Administrator, or a Vanguard moderator rank to use /role.' };
     if (!manager && !isAllowlisted(store, guild.id, role.id))
-        return { ok: false, kind: 'permission', reason: `Moderators can only manage roles on this server's allow list, and <@&${role.id}> is not on it. A Head Admin or the owner can add it with \`/role allow\`.` };
+        return { ok: false, kind: 'permission', reason: `Moderators can only manage roles on this server's allow list, and <@&${role.id}> is not on it. A Head Admin or the owner can allow it with \`/role who-can-give\`.` };
     if (actor.roles.highest.comparePositionTo(role) <= 0)
         return { ok: false, kind: 'hierarchy', reason: `<@&${role.id}> is equal to or above your highest role.` };
     if (target.id === guild.ownerId)
@@ -71,6 +71,6 @@ export function decideRoleChange({ store, guild, actor, target, role, me, op }) 
         return { ok: false, kind: 'hierarchy', reason: `<@${target.id}>'s highest role is equal to or above yours.` };
     const privileged = privilegedReason(store, guild.id, role);
     if (privileged && !hasGrantRule(store, guild.id, role.id, actor))
-        return { ok: false, kind: 'permission', reason: `<@&${role.id}> is a protected role (${privileged}). Only the server owner can ${op === 'add' ? 'give' : 'remove'} it, unless they approve a rule for you with \`/role policy\`.` };
+        return { ok: false, kind: 'permission', reason: `<@&${role.id}> is a protected role (${privileged}). Only the server owner can ${op === 'add' ? 'give' : 'remove'} it, unless they let you with \`/role who-can-give\`.` };
     return { ok: true, as: manager ? 'manager' : 'moderator', noop };
 }

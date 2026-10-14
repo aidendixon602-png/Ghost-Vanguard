@@ -5,7 +5,7 @@
 **Anti-nuke protection, moderation, logging and server recovery for the Midtown Discord network.**
 
 [![CI](https://github.com/aidendixon602-png/midtown-vanguard/actions/workflows/ci.yml/badge.svg)](https://github.com/aidendixon602-png/midtown-vanguard/actions/workflows/ci.yml)
-![Version](https://img.shields.io/badge/version-2.32.0-5865F2)
+![Version](https://img.shields.io/badge/version-2.33.0-5865F2)
 ![Node](https://img.shields.io/badge/node-24%2B-339933?logo=node.js&logoColor=white)
 ![discord.js](https://img.shields.io/badge/discord.js-14-5865F2?logo=discord&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
@@ -25,7 +25,7 @@
 | 📋 **Ban logs** | One record per ban in `#bans` (BAN-0001) with reason, evidence, moderator, duration and expiry, even for bans made by hand or by other bots. Developer **Unban / Reban** buttons update the same record. |
 | 📜 **Server logs** | `#midtown-vanguard-logging`: deleted/edited messages, roles, channels, nicknames, timeouts, bans, kicks and bot actions. Nothing is guessed: anything Discord doesn't confirm is marked *Unavailable*. |
 | 🔨 **Moderation** | Bans, tempbans, softbans, massbans, timeouts, warnings with automatic escalation, cases, notes and appeals. |
-| 🎭 **Safe role management** | `/role` with hierarchy checks, a moderator allow-list and owner-approved rules for protected roles, coordinated with anti-nuke. |
+| 🎭 **Safe role management** | `/role` with hierarchy checks; `/role who-can-give` decides who may hand out each role; rejoining members get their roles back in one click. |
 | 🌐 **Network bans** | Developer-only genrebans and hardbans across every Midtown server, enforced on join. |
 | 💾 **Recovery** | Snapshots and backups of the server layout with previewed, rate-limit-aware restores. |
 | 🚨 **Raid tools** | Raid mode, lockdowns, emergency mode, new-account holds, scam-link and anti-ping protection. |
@@ -39,7 +39,7 @@ Type `/` and pick **Midtown Vanguard**. Commands are grouped so the menu stays s
 |---|---|
 | `/antinuke` | `status`, `enable`, `disable`, `check`, `scan`, `settings`, `whitelist` (`add`, `remove`, `list`, `check`, `bots`) |
 | `/mod` | `ban`, `unban`, `kick`, `timeout`, `warn`, `purge`, `tempban`, `softban`, `massban`, `bans`, `case`, `notes`, `warnings`, `appeals` |
-| `/role` | `add`, `remove`, `restore`, `allow`, `policy`, `rules` |
+| `/role` | `add`, `remove`, `restore`, `who-can-give` |
 | `/security` | `lockdown`, `emergency`, `raidmode`, `automod`, `scam`, `antiping`, `health` |
 | `/setup` | `logs`, `staff`, `welcome`, `config`, `permissions`, `history` |
 | `/recovery` | `snapshot`, `backup`, `copylayout` |
@@ -125,7 +125,7 @@ src/
   index.ts         entry point: client, health endpoint, startup
   bot/             command registry, routing, permissions, guild lifecycle
   commands/        one file per slash command, by category
-  security/        anti-nuke engine, moderation, network bans, /role policy
+  security/        anti-nuke engine, moderation, network bans, /role rules
   audit/           ban log, server event log, log setup, redaction
   database/        SQLite store, migrations, scheduled backups
   recovery/        snapshots and the restore engine

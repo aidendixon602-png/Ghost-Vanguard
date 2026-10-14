@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.33.0: `/role who-can-give` replaces allow, policy and rules
+`/role allow`, `/role policy` and `/role rules` were confusing, so they are now one command:
+- **`/role who-can-give`** with nothing filled in shows the list: each role, and who can give it.
+- **`/role who-can-give role:@Helper`** lets every moderator give an ordinary role (owner or Head Admin).
+- **`/role who-can-give role:@Moderator who:@Head Mods`** lets that role or one person give a staff role (one with ban, kick, admin and so on). Only the server owner can do this. One step is enough: givers with a moderator rank no longer also need the allow list.
+- Add **`remove:True`** to take it away.
+- Setups saved with the old commands keep working exactly as before.
+- Error messages from `/role add` now point to `/role who-can-give`.
+
 ## 2.32.0: give rejoining members their roles back in one click
 - When someone leaves, Vanguard remembers their roles for 90 days (not bot or integration roles).
 - When they rejoin, a **Member Rejoined** card in the log lists the roles they had, with a green **↩️ Restore roles** button.
