@@ -1,3 +1,4 @@
+import { RANKS } from '../bot/ranks.js';
 import { displayPath, RETIRED } from '../bot/command-tree.js';
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, PermissionsBitField, StringSelectMenuBuilder } from 'discord.js';
 import { isAdminRestricted, RANK_LABEL, rankName, requiredRank } from '../bot/ranks.js';
@@ -20,7 +21,8 @@ export const HELP_SECTIONS: { key: string; label: string; emoji: string; blurb: 
 ];
 /** Who can use a command, shown next to it in /help. */
 export function accessLabel(policy:Policy,key:string):string {
-    if(policy.developerOnly)return 'Developer';
+    // Developer tools that a bot-wide rank also unlocks (Bot Manager, Overseer) say so.
+    if(policy.developerOnly){const need=requiredRank(key);return need!==undefined&&need<RANKS.developer?`${RANK_LABEL[rankName(need)!]}+`:'Developer';}
     if(policy.access==='owner')return 'Owner';
     const need=requiredRank(key);
     const perms=policy.requiredPermissions.length?new PermissionsBitField(policy.requiredPermissions).toArray().map(p=>p.replace(/([a-z])([A-Z])/g,'$1 $2')).join(', '):'';

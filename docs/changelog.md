@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.35.1: complete, always-current command and rank lists
+- **New [docs/ranks.md](ranks.md):** every rank (Supreme Leader, Developer, Overseer, Bot Manager, Server Owner, Head Admin, Admin, Moderator, Helper, Everyone) with every command it unlocks.
+- **[docs/commands.md](commands.md) is regenerated** with everything new: `/setup panel`, `/role restore`, `/role who-can-give`, `/antinuke whitelist check`, `/dev database restore-settings` and more.
+- **Both docs come from the code** (`npm run docs`), and a test fails if they fall out of date, so they always match the bot.
+- **`/help` and the docs now say who can really use developer tools.** Bot Manager and Overseer tools show "Bot Manager+" / "Overseer+" instead of "Developer".
+- **Security fix:** `/security admin` (which hands out Head Admin access) and `/setup history restore` were labelled "Server owner" but also worked for a Head Admin rank. They are now owner-only, while Bot Managers and above still pass.
+- The README's "Who can use what" covers every rank, including bot-wide ones.
+
 ## 2.35.0: control panel
 **`/setup panel`** creates a private **#vanguard-control** channel with a button panel, so staff can act without typing commands.
 

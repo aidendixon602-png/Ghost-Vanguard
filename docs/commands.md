@@ -1,6 +1,6 @@
 # Commands
 
-Generated from the bot itself. Type `/` in Discord and pick **Midtown Vanguard**; `/help` shows only what you can use.
+Generated from the bot itself (`npm run docs`). Type `/` in Discord and pick **Midtown Vanguard**; `/help` shows only what you can use. For the same list grouped by rank, see [ranks.md](ranks.md).
 
 ## /antinuke
 
@@ -8,12 +8,12 @@ Anti-nuke protection: status, on/off, safety scan and the whitelist
 
 | Command | What it does | Who |
 |---|---|---|
+| `/antinuke scan` | Safety scan: powerful roles, roles above Vanguard, bots with Administrator | Admin+ |
+| `/antinuke settings` | Turn the extra protection layers on or off (all on by default) | Owner or Head Admin |
 | `/antinuke status` | Is anti-nuke on? Its 17 rules, their limits and the whitelist | Head Admin+ |
 | `/antinuke enable` | Turn anti-nuke on (saves a backup of the server first) | Head Admin+ |
 | `/antinuke disable` | Turn anti-nuke off (stays off after restarts) | Owner or Head Admin |
 | `/antinuke check` | Check Vanguard's permissions and role position | Head Admin+ |
-| `/antinuke scan` | Safety scan: powerful roles, roles above Vanguard, bots with Administrator | Admin+ |
-| `/antinuke settings` | Turn the extra protection layers on or off (all on by default) | Owner or Head Admin |
 | `/antinuke whitelist add` | Whitelist a user or role: pick what anti-nuke lets them do and for how long | Owner or Head Admin |
 | `/antinuke whitelist remove` | Take a user or role off the whitelist completely | Owner or Head Admin |
 | `/antinuke whitelist list` | Show everyone on the whitelist, what they skip and when it expires | Head Admin+ |
@@ -26,17 +26,8 @@ Moderation: ban, kick, timeout, bans, cases, notes, appeals
 
 | Command | What it does | Who |
 |---|---|---|
-| `/mod ban` | Ban a user (asks to confirm) | Moderator+ or Ban Members |
-| `/mod unban` | Lift a local ban by user ID (genrebans/hardbans need a developer) | Moderator+ or Ban Members |
-| `/mod kick` | Kick a member | Moderator+ or Kick Members |
-| `/mod timeout` | Time out a member for a number of minutes | Helper+ or Moderate Members |
-| `/mod untimeout` | Remove a timeout | Moderator+ or Moderate Members |
-| `/mod warn` | Warn a member (sent by DM and recorded as a case) | Helper+ or Moderate Members |
-| `/mod history` | Show a member's last 10 cases | Helper+ or Moderate Members |
-| `/mod purge` | Delete up to 100 recent messages in this channel (asks to confirm) | Moderator+ or Manage Messages |
-| `/mod tempban` | Ban a user for a set time; Vanguard lifts the ban automatically | Moderator+ or Ban Members |
-| `/mod softban` | Ban then immediately unban: kicks a member and deletes their recent messages | Moderator+ or Ban Members |
-| `/mod massban` | Raid cleanup: ban up to 200 user IDs at once (whitelisted staff only) | Admin+ |
+| `/mod appeals setup` | Turn appeals on or off and pick the staff channel they go to | Head Admin+ |
+| `/mod appeals pending` | Appeals waiting for a decision | Moderator+ |
 | `/mod bans lookup` | A user's ban records in this server | Moderator+ or Ban Members |
 | `/mod bans case` | Show one ban record by case ID | Moderator+ or Ban Members |
 | `/mod bans recent` | The latest ban records in this server | Moderator+ or Ban Members |
@@ -46,16 +37,25 @@ Moderation: ban, kick, timeout, bans, cases, notes, appeals
 | `/mod case delete` | Security admins: permanently delete a case record | Owner or Head Admin |
 | `/mod case search` | Find cases by member, staff member, action, words in the reason or date | Helper+ or Moderate Members |
 | `/mod case recent` | The latest cases in this server | Helper+ or Moderate Members |
+| `/mod ban` | Ban a user (asks to confirm) | Moderator+ or Ban Members |
+| `/mod unban` | Lift a local ban by user ID (genrebans/hardbans need a developer) | Moderator+ or Ban Members |
+| `/mod kick` | Kick a member | Moderator+ or Kick Members |
+| `/mod timeout` | Time out a member for a number of minutes | Helper+ or Moderate Members (Helpers up to 60 minutes; Moderators longer) |
+| `/mod untimeout` | Remove a timeout | Moderator+ or Moderate Members |
+| `/mod warn` | Warn a member (sent by DM and recorded as a case) | Helper+ or Moderate Members |
+| `/mod history` | Show a member's last 10 cases | Helper+ or Moderate Members |
+| `/mod purge` | Delete up to 100 recent messages in this channel (asks to confirm) | Moderator+ or Manage Messages |
+| `/mod nick set` | Give a member a nickname | Moderator+ or Manage Nicknames |
+| `/mod nick reset` | Remove a member's nickname | Moderator+ or Manage Nicknames |
 | `/mod notes add` | Write a note about a member | Helper+ or Moderate Members |
 | `/mod notes list` | Read the notes on a member | Helper+ or Moderate Members |
 | `/mod notes remove` | Delete a note by its number | Moderator+ or Moderate Members |
+| `/mod softban` | Ban then immediately unban: kicks a member and deletes their recent messages | Moderator+ or Ban Members |
+| `/mod tempban` | Ban a user for a set time; Vanguard lifts the ban automatically | Moderator+ or Ban Members |
 | `/mod warnings status` | Show the warning levels, or how many warnings someone has | Helper+ |
 | `/mod warnings setup` | Change the warning levels (0 turns a level off) | Head Admin+ |
 | `/mod warnings pardon` | Wipe someone's active warnings (cases stay in their history) | Head Admin+ |
-| `/mod appeals setup` | Turn appeals on or off and pick the staff channel they go to | Head Admin+ |
-| `/mod appeals pending` | Appeals waiting for a decision | Moderator+ |
-| `/mod nick set` | Give a member a nickname | Moderator+ or Manage Nicknames |
-| `/mod nick reset` | Remove a member's nickname | Moderator+ or Manage Nicknames |
+| `/mod massban` | Raid cleanup: ban up to 200 user IDs at once (whitelisted staff only) | Admin+ (must also be on the anti-nuke whitelist) |
 
 ## /security
 
@@ -69,21 +69,12 @@ Raids, lockdowns, automod, scam links and ping protection
 | `/security incidents` | View recent anti-nuke incidents | Head Admin+ |
 | `/security quarantine` | Contain a member and save their roles | Head Admin+ |
 | `/security release` | Restore a quarantined member’s saved roles | Owner or Head Admin |
-| `/security lockdown` | Lock every channel and post a notice; /security unlock restores everything exactly | Admin+ |
-| `/security unlock` | End the lockdown and restore every channel exactly as it was | Admin+ |
-| `/security slowmode` | Set how often members can send messages in a channel | Moderator+ or Manage Channels |
-| `/security webhooks` | List every webhook in the server and delete ones you do not trust | Admin+ |
-| `/security health` | Check protection, permissions, integrations and backups at a glance | Admin+ |
-| `/security emergency start` | Lock every channel, pause invites, turn on raid mode and ping Admins | Owner or Admin |
-| `/security emergency stop` | All clear: undo everything emergency mode did | Owner or Admin |
-| `/security emergency panel` | Post Emergency / All clear buttons in this channel (put it in a staff channel) | Owner or Admin |
-| `/security emergency status` | Is emergency mode on? | Admin+ |
-| `/security raidmode on` | Start raid mode | Admin+ |
-| `/security raidmode off` | End raid mode | Admin+ |
-| `/security raidmode status` | Show whether raid mode is on and how many joins it handled | Admin+ |
-| `/security newaccounts status` | Show the new-account rule for this server | Admin+ |
-| `/security newaccounts on` | Turn the new-account rule on or change it | Admin+ |
-| `/security newaccounts off` | Stop handling new accounts | Admin+ |
+| `/security antiping status` | Show staff mention protection and configured targets | Admin+ |
+| `/security antiping enable` | Enable blocking mentions of configured staff | Admin+ |
+| `/security antiping disable` | Disable staff mention blocking | Admin+ |
+| `/security antiping protect` | Add a protected staff role mention or individual user | Admin+ |
+| `/security antiping remove` | Remove a protected role or user | Admin+ |
+| `/security antiping bypass` | Allow or disallow a role to mention protected staff | Admin+ |
 | `/security automod status` | Show what automod is doing in this server | Admin+ |
 | `/security automod spam` | Mass pings, repeated messages and message bursts | Admin+ |
 | `/security automod invites` | Delete invite links to other Discord servers | Admin+ |
@@ -94,6 +85,18 @@ Raids, lockdowns, automod, scam links and ping protection
 | `/security automod ai-ignore` | Channels or kinds of content AI moderation should skip | Admin+ |
 | `/security automod alts` | Alert staff when a new member's Roblox account belongs to a banned or existing member | Admin+ |
 | `/security automod quiet-hours` | Lock the server every day between two times, then unlock it | Admin+ |
+| `/security emergency start` | Lock every channel, pause invites, turn on raid mode and ping Admins | Owner or Admin |
+| `/security emergency stop` | All clear: undo everything emergency mode did | Owner or Admin |
+| `/security emergency panel` | Post Emergency / All clear buttons in this channel (put it in a staff channel) | Owner or Admin |
+| `/security emergency status` | Is emergency mode on? | Admin+ |
+| `/security health` | Check protection, permissions, integrations and backups at a glance | Admin+ |
+| `/security lockdown` | Lock every channel and post a notice; /security unlock restores everything exactly | Admin+ |
+| `/security newaccounts status` | Show the new-account rule for this server | Admin+ |
+| `/security newaccounts on` | Turn the new-account rule on or change it | Admin+ |
+| `/security newaccounts off` | Stop handling new accounts | Admin+ |
+| `/security raidmode on` | Start raid mode | Admin+ |
+| `/security raidmode off` | End raid mode | Admin+ |
+| `/security raidmode status` | Show whether raid mode is on and how many joins it handled | Admin+ |
 | `/security scam status` | Show automatic protection, scan limits and readiness | Admin+ |
 | `/security scam test` | Check text or an image without deletion, bans or AI requests | Admin+ |
 | `/security scam enable` | Enable deletion and bans for confirmed scam matches | Admin+ |
@@ -105,12 +108,9 @@ Raids, lockdowns, automod, scam links and ping protection
 | `/security scam list` | List blocked domains, image references and excluded channels | Admin+ |
 | `/security scam exclude` | Exclude or include a channel and its threads | Admin+ |
 | `/security scam vision` | Opt in to sending images to OpenAI for text scanning; alerts only | Admin+ |
-| `/security antiping status` | Show staff mention protection and configured targets | Admin+ |
-| `/security antiping enable` | Enable blocking mentions of configured staff | Admin+ |
-| `/security antiping disable` | Disable staff mention blocking | Admin+ |
-| `/security antiping protect` | Add a protected staff role mention or individual user | Admin+ |
-| `/security antiping remove` | Remove a protected role or user | Admin+ |
-| `/security antiping bypass` | Allow or disallow a role to mention protected staff | Admin+ |
+| `/security slowmode` | Set how often members can send messages in a channel | Moderator+ or Manage Channels |
+| `/security unlock` | End the lockdown and restore every channel exactly as it was | Admin+ |
+| `/security webhooks` | List every webhook in the server and delete ones you do not trust | Admin+ |
 
 ## /setup
 
@@ -118,7 +118,13 @@ Server setup: logs, staff ranks, welcome, config, permissions
 
 | Command | What it does | Who |
 |---|---|---|
-| `/setup panel` | Create or update the private control panel channel (buttons for staff) | Owner or Head Admin |
+| `/setup history list` | Show recent setting changes and who made them | Head Admin+ |
+| `/setup history restore` | Server owner: undo a setting change by its number | Owner |
+| `/setup config provider` | Enable or disable a configured verification provider | Owner |
+| `/setup config permission-role` | Give a Discord role a Vanguard staff rank (Head Admin, Admin, Moderator, Helper) | Owner |
+| `/setup config command` | Turn one Vanguard command on/off or change its cooldown | Owner |
+| `/setup config feature` | Turn moderation, verification, AI or backups on/off | Owner |
+| `/setup config backups` | Configure scheduled server layout backups | Owner |
 | `/setup logs setup` | Create or reuse #bans and #midtown-vanguard-logging, check access and send a test | Admin+ |
 | `/setup logs check` | Check both log channels and the bot permissions, then send a test embed | Admin+ |
 | `/setup logs exclude` | Stop (or start again) logging events from a channel | Admin+ |
@@ -128,6 +134,9 @@ Server setup: logs, staff ranks, welcome, config, permissions
 | `/setup logs disable` | Turn off event logging (stored history is kept) | Admin+ |
 | `/setup logs category` | Choose which kinds of events are logged | Admin+ |
 | `/setup logs view` | Browse logged events from the last 30 days | Admin+ |
+| `/setup panel` | Create or update the private control panel channel (buttons for staff) | Owner or Head Admin |
+| `/setup permissions list` | Browse the roles that hold Vanguard command access | Head Admin+ |
+| `/setup permissions discord` | Roles holding Administrator or Manage Roles, which can reorder the hierarchy | Head Admin+ |
 | `/setup staff role` | Link a Discord role to a server rank (Head Admin, Admin, Moderator, Helper) | Owner |
 | `/setup staff global` | Supreme Leader: make someone Supreme Leader, Overseer or Bot Manager in every server | Developer |
 | `/setup staff report` | Staff activity: actions per staff member | Owner |
@@ -135,15 +144,6 @@ Server setup: logs, staff ranks, welcome, config, permissions
 | `/setup staff check` | Show someone's Vanguard rank here | Helper+ |
 | `/setup welcome setup` | Turn welcome messages on or off | Admin+ |
 | `/setup welcome test` | Send the welcome message for yourself to check how it looks | Admin+ |
-| `/setup config provider` | Enable or disable a configured verification provider | Owner |
-| `/setup config permission-role` | Give a Discord role a Vanguard staff rank (Head Admin, Admin, Moderator, Helper) | Owner |
-| `/setup config command` | Turn one Vanguard command on/off or change its cooldown | Owner |
-| `/setup config feature` | Turn moderation, verification, AI or backups on/off | Owner |
-| `/setup config backups` | Configure scheduled server layout backups | Owner |
-| `/setup permissions list` | Browse the roles that hold Vanguard command access | Head Admin+ |
-| `/setup permissions discord` | Roles holding Administrator or Manage Roles, which can reorder the hierarchy | Head Admin+ |
-| `/setup history list` | Show recent setting changes and who made them | Head Admin+ |
-| `/setup history restore` | Server owner: undo a setting change by its number | Owner |
 
 ## /recovery
 
@@ -151,16 +151,16 @@ Server backups and snapshots: save, restore, copy layout
 
 | Command | What it does | Who |
 |---|---|---|
-| `/recovery snapshot create` | Save roles, category/channel layout and permission overwrites | Head Admin+ |
-| `/recovery snapshot list` | List this server's snapshots and backups, newest first | Head Admin+ |
-| `/recovery snapshot restore` | Preview restoring a snapshot or backup, then confirm | Owner or Head Admin |
-| `/recovery snapshot delete` | Delete snapshots/backups: one (3), several (3,5,7), a range (2-6) or all | Owner or Head Admin |
-| `/recovery snapshot cleanup` | Delete old snapshots/backups in bulk by age and type (previews first) | Owner or Head Admin |
 | `/recovery backup create` | Save a manual server backup | Head Admin+ |
 | `/recovery backup list` | List this server's backups, newest first | Head Admin+ |
 | `/recovery backup restore` | Preview restoring a backup, then confirm | Owner or Head Admin |
 | `/recovery backup delete` | Delete backups: one (3), several (3,5,7), a range (2-6) or all | Owner or Head Admin |
 | `/recovery copylayout` | Copy this server's roles and channels to another server Vanguard protects | Owner or Head Admin |
+| `/recovery snapshot create` | Save roles, category/channel layout and permission overwrites | Head Admin+ |
+| `/recovery snapshot list` | List this server's snapshots and backups, newest first | Head Admin+ |
+| `/recovery snapshot restore` | Preview restoring a snapshot or backup, then confirm | Owner or Head Admin |
+| `/recovery snapshot delete` | Delete snapshots/backups: one (3), several (3,5,7), a range (2-6) or all | Owner or Head Admin |
+| `/recovery snapshot cleanup` | Delete old snapshots/backups in bulk by age and type (previews first) | Owner or Head Admin |
 
 ## /info
 
@@ -168,11 +168,11 @@ Look things up: users, roles, the server and the bot
 
 | Command | What it does | Who |
 |---|---|---|
-| `/info user` | Member details; staff also see cases, notes, bypasses and Roblox link | Everyone |
-| `/info role` | Role details: members, position, key permissions and anti-nuke bypass | Everyone |
-| `/info server` | Browse complete server details and Vanguard protection status | Everyone |
 | `/info bot` | About Vanguard: developer, uptime and protection statistics | Everyone |
 | `/info ping` | Check that Vanguard is responding: latency, uptime and version | Everyone |
+| `/info role` | Role details: members, position, key permissions and anti-nuke bypass | Everyone |
+| `/info server` | Browse complete server details and Vanguard protection status | Everyone |
+| `/info user` | Member details; staff also see cases, notes, bypasses and Roblox link | Everyone |
 
 ## /network
 
@@ -181,8 +181,8 @@ Developers: genrebans and hardbans across every Midtown server
 | Command | What it does | Who |
 |---|---|---|
 | `/network genreban` | Developer: ban a user from every authorized server until /network ungenreban | Developer |
-| `/network ungenreban` | Developer: revoke a genreban and lift it in every authorized server | Developer |
 | `/network hardban` | Developer: permanently ban a user from every authorized server until /network unhardban | Developer |
+| `/network ungenreban` | Developer: revoke a genreban and lift it in every authorized server | Developer |
 | `/network unhardban` | Developer: revoke a hardban and lift it in every authorized server | Developer |
 
 ## /dev
@@ -191,27 +191,27 @@ Bot developers: diagnostics, updates, servers and the database
 
 | Command | What it does | Who |
 |---|---|---|
-| `/dev diagnostics` | Inspect runtime health without secrets | Developer |
-| `/dev inspect` | Read-only overview of any server Vanguard knows | Developer |
-| `/dev broadcast` | Post an announcement to every authorized server's log channel | Developer |
-| `/dev status` | Show a custom bot status instead of the rotation | Developer |
-| `/dev status-reset` | Return to the normal rotating status | Developer |
-| `/dev restart` | Restart the bot (about 10 seconds offline); settings are kept | Developer |
-| `/dev update` | Automatic GitHub updates: see the status, or check and install now | Developer |
-| `/dev server authorize` | Developer: authorize this server so Vanguard protects it | Developer |
-| `/dev server deauthorize` | Developer: remove this server's authorization and leave | Developer |
-| `/dev server info` | Developer: show this server's authorization details | Developer |
-| `/dev server list` | Developer: list every server Vanguard is authorized in | Developer |
+| `/dev server list` | Developer: list every server Vanguard is authorized in | Bot Manager+ |
+| `/dev server authorize` | Developer: authorize this server so Vanguard protects it | Overseer+ |
+| `/dev autoreact add` | React to every message from a member (🐐 by default) | Developer |
+| `/dev autoreact remove` | Stop auto-reacting to a member | Developer |
+| `/dev autoreact list` | Members the bot auto-reacts to in this server | Developer |
 | `/dev server ban` | Developer: ban a server from Vanguard | Developer |
-| `/dev server unban` | Developer: remove a server ban | Developer |
 | `/dev database status` | Show database health, storage, backup and migration status | Developer |
 | `/dev database backup` | Create a verified database backup now | Developer |
 | `/dev database backups` | List recent database backups | Developer |
 | `/dev database restore-settings` | Put back lost settings from an old backup file; anything newer is kept | Developer |
 | `/dev database verify` | Recheck backup checksum and database integrity | Developer |
-| `/dev autoreact add` | React to every message from a member (🐐 by default) | Developer |
-| `/dev autoreact remove` | Stop auto-reacting to a member | Developer |
-| `/dev autoreact list` | Members the bot auto-reacts to in this server | Developer |
+| `/dev server deauthorize` | Developer: remove this server's authorization and leave | Developer |
+| `/dev diagnostics` | Inspect runtime health without secrets | Bot Manager+ |
+| `/dev inspect` | Read-only overview of any server Vanguard knows | Overseer+ |
+| `/dev broadcast` | Post an announcement to every authorized server's log channel | Bot Manager+ |
+| `/dev status` | Show a custom bot status instead of the rotation | Bot Manager+ |
+| `/dev status-reset` | Return to the normal rotating status | Bot Manager+ |
+| `/dev restart` | Restart the bot (about 10 seconds offline); settings are kept | Developer |
+| `/dev update` | Automatic GitHub updates: see the status, or check and install now | Developer |
+| `/dev server info` | Developer: show this server's authorization details | Bot Manager+ |
+| `/dev server unban` | Developer: remove a server ban | Developer |
 
 ## /help
 
@@ -261,7 +261,7 @@ Give or take a role from a member, with role rules and hierarchy enforced
 
 | Command | What it does | Who |
 |---|---|---|
-| `/role add` | Give a member a role | Everyone |
-| `/role remove` | Take a role from a member | Everyone |
-| `/role restore` | Give a member back the roles they had before they left the server | Everyone (checked role by role) |
-| `/role who-can-give` | Choose who can give a role, or see the list (leave everything empty) | Owner or Head Admin (staff roles: owner) |
+| `/role add` | Give a member a role | Everyone (checked role by role: Manage Roles or a Moderator rank, and staff roles need `/role who-can-give`) |
+| `/role remove` | Take a role from a member | Everyone (checked role by role, like `/role add`) |
+| `/role restore` | Give a member back the roles they had before they left the server | Everyone (gives back only roles the person could give with `/role add`) |
+| `/role who-can-give` | Choose who can give a role, or see the list (leave everything empty) | Owner or Head Admin (staff roles: owner only) |

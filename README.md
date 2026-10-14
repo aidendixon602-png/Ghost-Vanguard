@@ -5,11 +5,11 @@
 **Anti-nuke protection, moderation, logging and server recovery for the Midtown Discord network.**
 
 [![CI](https://github.com/aidendixon602-png/midtown-vanguard/actions/workflows/ci.yml/badge.svg)](https://github.com/aidendixon602-png/midtown-vanguard/actions/workflows/ci.yml)
-![Version](https://img.shields.io/badge/version-2.35.0-5865F2)
+![Version](https://img.shields.io/badge/version-2.35.1-5865F2)
 ![Node](https://img.shields.io/badge/node-24%2B-339933?logo=node.js&logoColor=white)
 ![discord.js](https://img.shields.io/badge/discord.js-14-5865F2?logo=discord&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
-![Tests](https://img.shields.io/badge/tests-478%20passing-2EA043)
+![Tests](https://img.shields.io/badge/tests-480%20passing-2EA043)
 
 [Features](#-features) · [Commands](#-commands) · [Deploying](#-deploying) · [Automatic updates](#-automatic-updates) · [Development](#-development) · [Docs](#-documentation)
 
@@ -54,13 +54,20 @@ Full list with access levels: **[docs/commands.md](docs/commands.md)**.
 
 ### Who can use what
 
-| Level | Can do |
-|---|---|
-| 🧰 **Developers** (`DEVELOPER_IDS`) | Everything, in every authorized server, without Discord permissions |
-| 👑 **Server owner** | All server settings, protection, logging, roles and recovery in their own server |
-| 🛠️ **Administrators** | Everyday management and moderation, but nothing that weakens protection |
-| 🔨 **Moderators** | Actions matching their Discord permissions (Ban, Kick, Timeout, Manage Messages) or their Vanguard rank |
-| 👤 **Members** | Public utility commands |
+| Rank | Where | Can do |
+|---|---|---|
+| 👑 **Supreme Leader** | every server | Everything; receives the daily database backup |
+| 🧰 **Developer** (`DEVELOPER_IDS`) | every server | Everything, including updates, restarts, the database and network bans; ignored by anti-nuke |
+| 🔭 **Overseer** | every server | Bot Manager + inspect any server, authorize new servers |
+| 🛠️ **Bot Manager** | every server | Head Admin everywhere + diagnostics, bot status, broadcasts, server list |
+| 🏠 **Server Owner** | their server | Everything there, incl. security admins, staff roles and undoing strips |
+| 🛡️ **Head Admin** | one server | Anti-nuke, whitelist, control panel, backups, staff ranks |
+| 🔧 **Admin** | one server | Raid tools, automod, scam protection, logs, welcome |
+| 🔨 **Moderator** | one server | Bans, kicks, tempbans, purge, ban records |
+| 🤝 **Helper** | one server | Warnings, short timeouts, cases and notes |
+| 👤 **Everyone** | | Help, info, verify |
+
+Every command with its rank: **[docs/ranks.md](docs/ranks.md)** (generated from the code with `npm run docs`, and checked by the tests so it never goes stale).
 
 ## 🚀 Deploying
 
@@ -103,7 +110,7 @@ UPDATE_TOKEN=github_pat_...   # fine-grained, read-only Contents + Actions, this
 ```bash
 npm ci
 npm run build     # compile src/ → dist/ (dist/ is committed; CI checks it matches)
-npm test          # 478 tests
+npm test          # 480 tests
 npm run dev       # run from source
 ```
 
@@ -114,6 +121,7 @@ npm run dev       # run from source
 | `npm run check` | Type-check |
 | `npm test` | Run the test suites |
 | `npm run doctor` | Check configuration and command loading |
+| `npm run docs` | Regenerate docs/commands.md and docs/ranks.md from the code |
 | `npm run database:restore` | Restore a verified database backup (bot stopped) |
 
 **Never run two copies with the same token.** A database lease refuses a second copy on the same database, but two hosts would both answer.
@@ -146,6 +154,7 @@ dist/              compiled output (committed)
 | Page | Contents |
 |---|---|
 | [commands.md](docs/commands.md) | Every command and who can use it |
+| [ranks.md](docs/ranks.md) | Every rank and the commands it unlocks |
 | [changelog.md](docs/changelog.md) | Version history |
 | [security-controls.md](docs/security-controls.md) | Anti-nuke behaviour and controls |
 | [server-lifecycle.md](docs/server-lifecycle.md) | Invites, authorization and deadlines |

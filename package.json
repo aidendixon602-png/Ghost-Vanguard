@@ -1,6 +1,6 @@
 {
   "name": "midtown-vanguard",
-  "version": "2.35.0",
+  "version": "2.35.1",
   "private": true,
   "description": "Multi-server Midtown Vanguard with durable authorization, global command synchronization and centralized security",
   "type": "module",
@@ -16,7 +16,8 @@
     "doctor": "node --import tsx src/doctor.ts",
     "database:restore": "node scripts/restore-database.mjs",
     "database:drop-csb": "node scripts/drop-csb-tables.mjs",
-    "scam:setup": "node scripts/scam-setup.mjs"
+    "scam:setup": "node scripts/scam-setup.mjs",
+    "docs": "node --import tsx scripts/commands-doc.ts"
   },
   "dependencies": {
     "discord.js": "14.27.0",
