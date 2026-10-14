@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.29.3: `/dev restart` works on older launchers
+- `/dev restart` said "needs the bot to be started with `node launch.js`" even when it was. Automatic updates replace the bot's code, but the `launch.js` already running on the host stays the version it started with, and launchers from before 2.27.4 don't understand the restart request.
+- Now, if the launcher doesn't answer, the bot shuts down cleanly with a "please start me again" exit code, which every version of `launch.js` handles. It only does this after the bot has been up for 2.5 minutes, so the launcher can't mistake it for a crashing update and roll back.
+- When an update changes `launch.js` itself, the console now says so and suggests one Restart from the Wispbyte panel to load it.
+
 ## 2.29.2: whitelisted staff can promote moderators
 The **Permission Grant** rule stripped people the first time they gave out any role with Ban, Kick, Manage Channels, Manage Webhooks or Manage Server, even staff on the whitelist. Now:
 - **Whitelisted role managers** (the *Role manager* or *Administrator* preset, or "Give roles to people") can give, create and edit moderator-level roles. **Administrator** and **Manage Server** are still checked for anyone without a full bypass.

@@ -1,3 +1,4 @@
+import { selfRestart } from './bot/updater-link.js';
 import { autoReact } from './features/autoreact.js';
 import { reconcileStartupMembers } from './security/startup-members.js';
 import { ScamProtection } from './security/scam.js';
@@ -433,6 +434,7 @@ async function shutdown(code = 0) {
     process.exit(code);
 }
 
+selfRestart.run = code => task('shutdown', shutdown(code));
 process.on('SIGINT', () => task('shutdown', shutdown()));
 process.on('SIGTERM', () => task('shutdown', shutdown()));
 

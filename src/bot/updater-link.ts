@@ -59,3 +59,22 @@ export function askRestart(by: string, timeoutMs = 5000, proc: NodeJS.Process = 
         proc.send!({ type: 'vg-restart', id, by });
     });
 }
+
+/** Set by index.ts: shut down cleanly with a non-zero code so any launch.js (even an old one) starts the bot again. */
+export const selfRestart: { run: ((code: number) => void) | null } = { run: null };
+
+/** Exit code the launcher treats as "stopped, start again" (anything but 0, which stops the server). */
+export const RESTART_EXIT_CODE = 75;
+
+/**
+ * Fallback for a launch.js started before /dev restart existed: it does not answer the restart request,
+ * but it restarts the bot whenever it stops with a non-zero code. Only after 2.5 minutes of uptime, so the
+ * launcher never mistakes it for a freshly installed version crashing (which would roll the update back).
+ */
+export function fallbackRestart(proc: NodeJS.Process = process, uptimeSeconds = proc.uptime()): 'scheduled' | 'too-soon' | 'no-launcher' {
+    if (typeof proc.send !== 'function' || !proc.connected || !selfRestart.run) return 'no-launcher';
+    if (uptimeSeconds < 150) return 'too-soon';
+    const run = selfRestart.run;
+    setTimeout(() => run(RESTART_EXIT_CODE), 1500).unref?.();
+    return 'scheduled';
+}

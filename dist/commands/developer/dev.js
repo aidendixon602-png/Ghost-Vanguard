@@ -6,7 +6,7 @@ import { AppError } from '../../errors.js';
 import { broadcast, broadcastTargets, clearPresenceOverride, inspectGuild, setPresenceOverride } from '../../bot/dev-tools.js';
 import { presenceLines } from '../../security/protection-stats.js';
 import { spawnSync } from 'node:child_process';
-import { askLauncher, askRestart, describeUpdate } from '../../bot/updater-link.js';
+import { askLauncher, askRestart, describeUpdate, fallbackRestart } from '../../bot/updater-link.js';
 /** Which GitHub commit is running, and whether automatic updates are on (no secrets shown). */
 function codeVersion() {
     const commit = spawnSync('git', ['rev-parse', '--short', 'HEAD'], { encoding: 'utf8' });
@@ -44,8 +44,14 @@ export default defineCommand(new SlashCommandBuilder().setName('dev').setDescrip
             reversal: 'Nothing to undo: it starts again by itself.',
             run: async (_c, b) => {
                 const ok = await askRestart(b.user.id);
-                if (ok === null)
+                if (ok === null) {
+                    const fallback = fallbackRestart();
+                    if (fallback === 'scheduled')
+                        return '🔄 **Restarting.** Midtown Vanguard will be back in about 10 seconds; run `/info ping` to check.\n-# The launcher on the host is an older version, so this used the backup method. Press Restart in the Wispbyte panel once to load the newest launcher.';
+                    if (fallback === 'too-soon')
+                        throw new AppError('VALIDATION_ERROR', 'The bot started less than 3 minutes ago. Wait a minute and try again (restarting this early could make the launcher undo the latest update).');
                     throw new AppError('VALIDATION_ERROR', 'Restarting from Discord needs the bot to be started with `node launch.js`. Use Restart in the Wispbyte panel instead.');
+                }
                 if (!ok)
                     throw new AppError('VALIDATION_ERROR', 'An update or restart is already in progress. Try again in a minute.');
                 return '🔄 **Restarting.** Midtown Vanguard will be back in about 10 seconds; run `/info ping` to check.';

@@ -162,6 +162,8 @@ if (existsSync(importDb)) {
 
 // ------------------------------------------------------------ run the bot, restart it, update it
 let child = null, stopping = false, updating = false;
+const launcherHash = () => { try { return createHash('sha256').update(readFileSync(join(root, 'launch.js'))).digest('hex'); } catch { return ''; } };
+const LAUNCHER_HASH = launcherHash();
 const crashes = [];
 let lastGood = head(), startedAt = 0;
 
@@ -228,7 +230,11 @@ async function checkForUpdate(beforeInstall) {
         say(`Updating to ${latest.sha.slice(0, 7)}...`);
         const previous = head();
         await stopBot();
-        if (install(latest.sha)) { lastGood = previous; say(`Installed ${latest.sha.slice(0, 7)}. Starting the new version.`); }
+        if (install(latest.sha)) {
+            lastGood = previous; say(`Installed ${latest.sha.slice(0, 7)}. Starting the new version.`);
+            // The bot code is new now, but this launcher keeps running the code it started with.
+            if (launcherHash() !== LAUNCHER_HASH) say('launch.js itself changed in this update. Press Restart in the Wispbyte panel when convenient to load it (the bot keeps working until then).');
+        }
         else { rejected.add(latest.sha); say('The update could not be installed; staying on the current version.'); }
         updating = false;
         startBot();
