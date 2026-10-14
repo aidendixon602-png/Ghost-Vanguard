@@ -6,16 +6,16 @@ channels/roles and test members. Test actions can ban or kick the executor and s
 roles; use a helper account below Vanguard rather than the server owner, a developer or
 an exempt account. Do not automate a normal user account.
 
-1. Invite Vanguard and authorize the test server with `/authserver` as a developer.
+1. Invite Vanguard and authorize the test server with `/dev server authorize` as a developer.
 2. Place Vanguard above regular staff/test roles, grant the permissions reported by
    `/antinuke check`, and set a security log channel with `/security config`.
-3. Run `/backup`, `/antinuke check`, then `/enable`. Confirm green status and the defaults.
+3. Run `/recovery backup`, `/antinuke check`, then `/antinuke enable`. Confirm green status and the defaults.
 4. Run `/antinuke mode value:observe`. Have the untrusted helper create two disposable
    channels within 120 seconds. Confirm an incident with no punishment or deletion.
 5. Delete the test channels yourself and wait 120 seconds for that rule's window to clear.
    Switch to enforce mode. Have the helper create two new disposable channels. Confirm
    the helper is kicked and both channels are removed. Record failures/hierarchy issues.
-6. Reinvite the helper. Grant them a one-hour user bypass using `/trust add`, wait for
+6. Reinvite the helper. Grant them a one-hour user bypass using `/antinuke whitelist add`, wait for
    the prior window to clear, then repeat channel creation. Confirm no incident. Revoke
    the exemption and clean up the channels. Repeat using a regular test role bypass.
 7. Toggle Channel Create off, repeat channel creation and confirm no incident. Turn it
@@ -25,7 +25,7 @@ an exempt account. Do not automate a normal user account.
    operate them. Test whitelist add/remove; check expiration and that no mention is sent.
 9. Restart Vanguard. Confirm saved mode, toggles, presets and exemptions remain, and
    the startup log reports readiness. Temporarily remove a required permission and run
-   `/antinuke check`; confirm `/enable` rejects it before creating a snapshot.
+   `/antinuke check`; confirm `/antinuke enable` rejects it before creating a snapshot.
 
 Additional rule checks, each using disposable targets and a fresh incident window:
 
@@ -51,4 +51,4 @@ manual review rather than a successful revert.
 
 Record each incident ID, actual punishment, completed/failed/skipped counts and any
 permission or hierarchy failures. Restore the test server from its baseline only after
-reviewing the restore preview. Finish with `/disable` and its confirmation.
+reviewing the restore preview. Finish with `/antinuke disable` and its confirmation.

@@ -1,5 +1,21 @@
 # Changelog
 
+## 2.36.0 (documentation)
+- **Rewrote the README** in a cleaner style:
+  - an overview and design principles
+  - capabilities grouped by protection, moderation and operations
+  - an access model table
+  - a configuration reference
+  - getting started, operations (updates, backups) and development
+- **SECURITY.md** now has a reporting policy, a table for responding to a leaked secret, and deployment-integrity guidance.
+- **Updated every doc that still used command names from before the reorganization:**
+  - `/trust` → `/antinuke whitelist`
+  - `/snapshot` → `/recovery snapshot`
+  - `/scam` → `/security scam`
+  - `/authserver` → `/dev server authorize`
+  - and others
+- **`docs/security-controls.md` is rewritten** for the current anti-nuke (heads-up, warn first, strip, Undo strip). It used to describe removed preset and toggle commands.
+
 ## 2.36.0: genreban exceptions for one server
 - **`/mod unban` on a genrebanned user** now lets a server's **owner or Head Admin** (a Vanguard rank, not just Discord's Administrator permission) let them back into **their server only**:
   - it asks for confirmation first

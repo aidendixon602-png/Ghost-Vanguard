@@ -11,10 +11,10 @@ Stop the bot and run Update-Vanguard-Scam-Protection.ps1 from the existing bot f
 3. On Wispbyte install dependencies in the hosted bot folder with `npm ci`; do not upload Windows node_modules to Linux. Upload updated src, dist, assets, scripts, package.json and package-lock.json. Preserve hosted credentials, .env and data.
 4. Authorized servers start scanner setup automatically, including after restart and later authorization. An existing configured security log is reused. If none exists (or the configured channel was deleted), the bot creates private `#vanguard-security` when it has Manage Channels. Ordinary members are denied View Channel; server owner/Administrator members and the bot can read it. Other security staff can be granted access by an administrator.
 5. Required Manage Messages/Ban Members permissions and an accessible log are checked automatically. Missing requirements pause scanning and report a startup/log warning. Readiness is retried every minute and on later messages. Put the bot role above members it should ban; per-member hierarchy restrictions are still logged.
-6. Saved `/scam disable` stays disabled. `/scam enable` resumes scanning and attempts automatic log setup. `/scam status` shows the configured state and requirements.
-7. Preserve or set reporting/evidence-channel exclusions with `/scam exclude channel:#reports excluded:true`. Exclusion includes that channel's threads. Channels are **not guessed from their names**; sharing a known scam image in a scanned channel can match enforcement even when posted as evidence. For a server not yet configured, temporarily disable the scanner while setting exclusions.
+6. Saved `/security scam disable` stays disabled. `/security scam enable` resumes scanning and attempts automatic log setup. `/security scam status` shows the configured state and requirements.
+7. Preserve or set reporting/evidence-channel exclusions with `/security scam exclude channel:#reports excluded:true`. Exclusion includes that channel's threads. Channels are **not guessed from their names**; sharing a known scam image in a scanned channel can match enforcement even when posted as evidence. For a server not yet configured, temporarily disable the scanner while setting exclusions.
 
-No `npm run scam:setup` or `/scam enable` is needed for an unconfigured authorized server. `MESSAGE_CONTENT_ENABLED=false` remains available as an application-wide Message Content override; change it to true when intentionally using the scanner. The Developer Portal toggle cannot be set by the bot itself.
+No `npm run scam:setup` or `/security scam enable` is needed for an unconfigured authorized server. `MESSAGE_CONTENT_ENABLED=false` remains available as an application-wide Message Content override; change it to true when intentionally using the scanner. The Developer Portal toggle cannot be set by the bot itself.
 
 ## Matching and outcomes
 
@@ -27,7 +27,7 @@ No `npm run scam:setup` or `/scam enable` is needed for an unconfigured authoriz
 | Suspicious image text from optional AI transcription | Staff review alert only |
 | Download/decoding failure or attachment limit exceeded | Incomplete-scan alert; no punishment from failure alone |
 
-Three fingerprint references are bundled from the supplied screenshot: full Discord screenshot, left promotion panel and right withdrawal panel. The panel crops are reference approximations; original scam attachments can differ and may only generate a similarity alert. Cropped, heavily edited, rotated or reformatted variants are not guaranteed to match. To enforce on an actual original scam attachment, register that file with `/scam image-add`.
+Three fingerprint references are bundled from the supplied screenshot: full Discord screenshot, left promotion panel and right withdrawal panel. The panel crops are reference approximations; original scam attachments can differ and may only generate a similarity alert. Cropped, heavily edited, rotated or reformatted variants are not guaranteed to match. To enforce on an actual original scam attachment, register that file with `/security scam image-add`.
 
 No blocked domains are invented or supplied by default. Add only confirmed domains you intend to block. The regex matches URL host boundaries; it does not follow links, expand shorteners, visit blocked sites, or inspect video/GIF/SVG content. Image matching is not a universal scam classifier.
 
@@ -37,19 +37,19 @@ Owner, bot owner and configured developers can have confirmed posts deleted, but
 
 All commands require internal Vanguard security access. Changes also require Discord Manage Guild. Server authorization, command-disabled settings and the existing cooldown/interaction routing apply.
 
-- `/scam status`: readiness and limits.
-- `/scam enable`, `/scam disable`: per-server persistent override; default is automatic enabled.
-- `/scam domain-add domain:scam.example`: block this host and subdomains (maximum 20/server).
-- `/scam domain-remove domain:scam.example`: remove block.
-- `/scam image-add image:<file> name:<label>`: add a confirmed original scam image (maximum 20 custom references/server).
-- `/scam image-remove id:<reference>`: remove a custom reference. Built-ins cannot be removed individually.
-- `/scam list page:1`: paginated references/domains/exclusions.
-- `/scam exclude channel:#reports excluded:true`: exclude channel and threads (maximum 20/server); false includes it again.
-- `/scam vision enabled:true`: explicitly opt in to image text transcription using existing OpenAI settings. False stops this optional stage.
+- `/security scam status`: readiness and limits.
+- `/security scam enable`, `/security scam disable`: per-server persistent override; default is automatic enabled.
+- `/security scam domain-add domain:scam.example`: block this host and subdomains (maximum 20/server).
+- `/security scam domain-remove domain:scam.example`: remove block.
+- `/security scam image-add image:<file> name:<label>`: add a confirmed original scam image (maximum 20 custom references/server).
+- `/security scam image-remove id:<reference>`: remove a custom reference. Built-ins cannot be removed individually.
+- `/security scam list page:1`: paginated references/domains/exclusions.
+- `/security scam exclude channel:#reports excluded:true`: exclude channel and threads (maximum 20/server); false includes it again.
+- `/security scam vision enabled:true`: explicitly opt in to image text transcription using existing OpenAI settings. False stops this optional stage.
 
 ## Optional image text scanning
 
-Set `AI_ENABLED=true`, `OPENAI_API_KEY` and an image-capable `OPENAI_MODEL`, restart, then opt in with `/scam vision enabled:true` in the chosen server. **Images are sent to OpenAI and API charges can apply.** Existing AI_ENABLED alone does not opt any server into image scanning. The scanner asks for transcription only; suspicious transcribed text produces staff review, never an automatic ban. It uses store:false, not a promise of zero provider retention.
+Set `AI_ENABLED=true`, `OPENAI_API_KEY` and an image-capable `OPENAI_MODEL`, restart, then opt in with `/security scam vision enabled:true` in the chosen server. **Images are sent to OpenAI and API charges can apply.** Existing AI_ENABLED alone does not opt any server into image scanning. The scanner asks for transcription only; suspicious transcribed text produces staff review, never an automatic ban. It uses store:false, not a promise of zero provider retention.
 
 The optional stage scans at most one image per server every 30 seconds and at most two AI requests concurrently. It is best effort; API failures generate incomplete-scan alerts, and skipped budget slots do not inspect image text. Use exact originals and confirmed domains for deterministic enforcement.
 

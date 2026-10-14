@@ -24,12 +24,12 @@ Every authorized server runs the same 17-rule anti-nuke preset in **enforce** mo
 
 ## What staff can change
 
-- **On/off only:** `/enable` (or `/antinuke enable`) and `/disable` (or `/antinuke disable`, with confirmation). A disable is remembered across restarts.
-- **Whitelist:** `/trust` and the status panel's *Manage Whitelist* button.
+- **On/off only:** `/antinuke enable` (or `/antinuke enable`) and `/antinuke disable` (or `/antinuke disable`, with confirmation). A disable is remembered across restarts.
+- **Whitelist:** `/antinuke whitelist` and the status panel's *Manage Whitelist* button.
 - Nothing else. `/antinuke rule`, `toggle`, `preset`, `mode`, `bots` and `/antinuke-rule` were removed. Limits saved by older versions are ignored and cleared on the next startup.
 
 ## Automatic enable
 
-At startup and whenever a server is authorized, Vanguard enables the preset in enforce mode unless staff used `/disable`. The first automatic enable captures a baseline snapshot and posts "Anti-nuke protection active" in the security log.
+At startup and whenever a server is authorized, Vanguard enables the preset in enforce mode unless staff used `/antinuke disable`. The first automatic enable captures a baseline snapshot and posts "Anti-nuke protection active" in the security log.
 
 The server owner, configured developers and Vanguard itself are never punished. Role hierarchy still applies: Vanguard cannot act on members above its top role, so keep its role at the top (`/antinuke check`).

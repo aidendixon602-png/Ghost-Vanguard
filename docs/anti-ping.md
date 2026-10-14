@@ -9,7 +9,7 @@ Vanguard watches message-create and message-update events. When someone mentions
 /antiping enable
 ```
 
-`/mention` is an alias for `/antiping` with the same options:
+`/mention` is an alias for `/security antiping` with the same options:
 
 | Subcommand | Purpose |
 |---|---|

@@ -1,46 +1,45 @@
-# Security controls — Vanguard 2.9.2
+# Anti-nuke controls
 
-Run `/antinuke status` for Refresh, View Incidents, Manage Whitelist and Edit Rules.
-Controls recheck security access, server authorization and the user/server that opened
-the panel. Whitelist mentions do not notify anyone. The whitelist panel grants 24-hour
-bypasses; use `/trust` for different durations, permanent bypasses and verification-only
-bot exemptions. Another administrator must change your own bypass or a role you hold.
+Anti-nuke runs a fixed preset of 17 rules in every authorized server. It starts automatically and survives restarts. The limits are listed in [antinuke-locked.md](antinuke-locked.md), and `/antinuke status` shows the live values.
 
-| Command | Behavior |
+## How a rule fires
+
+1. Every audit-log action is counted against the person responsible. Actions made through Vanguard on behalf of a staff member, such as `/mod ban`, count against that staff member.
+2. **One step before a limit**, a blue *heads-up* is posted to the security log. Nothing is done to the person.
+3. **At the limit:**
+   - *Everyday rules* (role and channel edits, role grants, server edits, timeouts, webhooks) **warn first**. The change is undone, a yellow *Anti-nuke Warning* is posted and the person is DMed. Hitting any of these rules again within an hour gets the punishment.
+   - *All other rules*, and any bot, are punished straight away.
+4. **The punishment is always a strip.** Staff and admin roles are removed and saved, and the damage is reverted where possible (bans lifted, created channels/roles/webhooks deleted, granted permissions removed).
+5. The alert in the security log has an **Undo strip** button (owner or developer) and, after deletions, **Review restore**.
+
+## Who is not counted
+
+| Who | Covered for |
 |---|---|
-| `/antinuke check` | Report permissions, log-channel overwrites and hierarchy |
-| `/enable` | Check readiness, capture a baseline and enable the default preset |
-| `/disable` | Stop protection after confirmation; keep saved data |
-| `/antinuke toggle name enabled` | Turn an individual rule on or off |
-| `/antinuke preset action:save name` | Save current limits and toggles, up to 20 presets per server |
-| `/antinuke preset action:load name` | Load limits and toggles; retain mode, whitelist and enabled state |
-| `/antinuke preset action:list` | List this server's presets |
-| `/antinuke preset action:delete name` | Delete a named preset |
-| `/antinuke preset action:reset` | Restore default limits and turn all rules on; retain mode and whitelist |
-| `/trust manage [user\|role]` | Panel: pick who, tick what they may do (Everything, a ★ preset or single actions), pick how long, Save. Save replaces what they had; Remove all clears it. |
-| `/trust remove user/role` | Revoke the selected exemption |
-| `/trust list` | Show active exemptions and expiration times |
+| Server owner, developers, Supreme Leaders, Vanguard itself | Everything |
+| Full-bypass whitelist entries (user or role) | Everything |
+| Rule-specific whitelist entries | Only the chosen rules (presets: Basic moderation, Role manager, Channel manager, Administrator) |
+| Known verification bots (Bloxlink, RoVer, Carl-bot, Dyno, MEE6) and `/antinuke whitelist bots` | Ordinary member-role updates only |
+| Changes approved through `/role` | That single change |
 
-`/enable` intentionally reloads the default preset. Load a custom preset afterwards.
-Enable rejects missing permissions, inaccessible log channels and regular roles at or
-above Vanguard. Managed integration roles are excluded from the hierarchy check.
-Startup retains saved settings and reports readiness problems instead of silently
-resetting protection. A missing security log permission is also reported in the console.
+Granting **Administrator** or **Manage Server** is always checked unless the person has a full bypass. Role managers on the whitelist may hand out moderator-level roles. A role someone gives themselves never exempts that same action.
 
-Incident reports include executor, triggering target, rule, count/window, mode,
-punishment and completed/failed/skipped revert counts. Each reviewed event updates the
-stored incident. Larger incidents publish progress updates after the first reviewed event
-and every ten events, followed by the final report. An interrupted revert is not resumed
-automatically; review the recorded progress and recovery controls after a crash.
+## Commands
 
-Role bypasses cover all anti-nuke rules. Verification-only exemptions cover ordinary
-member-role updates and never dangerous permission grants. Both expire automatically. Newly assigned bypass roles do not exempt the assignment that grants them.
-Rule toggles and presets persist in the existing per-server database. Disabling a rule
-stops counting its new events. Evidence from earlier events is retained.
+| Command | What it does |
+|---|---|
+| `/antinuke status` | Rules, limits, whitelist and state, with Refresh, Incidents and Whitelist buttons |
+| `/antinuke enable` / `disable` | Turn protection on (takes a baseline snapshot) or off (asks to confirm; stays off after restarts) |
+| `/antinuke check` | Vanguard's permissions, log-channel access and role position |
+| `/antinuke scan` | Powerful roles, roles above Vanguard, bots with Administrator |
+| `/antinuke settings` | Extra protection layers (all on by default) |
+| `/antinuke whitelist add` | Panel: pick who, what they may do and for how long |
+| `/antinuke whitelist remove` · `list` · `check` · `bots` | Remove, list, explain one person's coverage, verification-bot exemptions |
+| `/security quarantine` · `release` | Strip and save someone's roles by hand, or give them back |
+| `/setup panel` | Private control channel with Restore / Strip / Revert / Logs buttons |
 
-Permission reverts remove only newly added dangerous permission bits and preserve
-pre-existing permissions and unrelated later changes. Managed and uneditable roles,
-trusted users and hierarchy restrictions remain protected. Webhook creation can be
-undone; edits/deletions still require manual review. See [default preset](antinuke-preset.md).
+## Evidence and reverts
 
-For live validation, follow [the test-server walkthrough](notes/security-live-test.md).
+Evidence is written before any Discord change is made. Incidents record the executor, target, rule, count and window, mode, punishment and completed/failed/skipped reverts. Large incidents post progress every ten events. Permission reverts remove only the newly added dangerous permission bits and keep everything else. Webhook creation is undone; edits and deletions need manual review.
+
+For a live test plan, see [notes/security-live-test.md](notes/security-live-test.md).

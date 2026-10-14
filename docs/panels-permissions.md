@@ -30,7 +30,7 @@ Permission checks retain this structure:
 
 Administrator permission alone does not grant Vanguard's internal security access and
 does not create an anti-nuke bypass. Use the existing security/admin-role configuration
-for command access and `/trust` separately for anti-nuke exemptions.
+for command access and `/antinuke whitelist` separately for anti-nuke exemptions.
 
 Confirmation buttons no longer require developer status when the original action is
 available to moderators or security administrators. Developer-only actions remain

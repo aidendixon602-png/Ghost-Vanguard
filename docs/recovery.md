@@ -6,18 +6,18 @@ Snapshots record a server's roles, categories, channels, role order, supported c
 
 | Command | What it does |
 |---|---|
-| `/snapshot create` | Save a baseline of the current layout. |
-| `/snapshot view page:<n>` | Browse every saved snapshot and backup, including older and legacy entries, with Previous/Next buttons. |
-| `/snapshot restore` | Pick **All** or individual components, review the per-object preview, then press Confirm. |
-| `/snapshot delete id:<ID>` | Review and confirm deletion of a saved recovery point. Blocked during an active recovery. |
-| `/backup create` / `/backup restore` | Manual layout backup, restored through the same flow. |
-| `/copylayout destination_id:<server ID>` | Use the current server as the source and copy it to another. Both servers must be authorized, and you need Vanguard security access in both. |
+| `/recovery snapshot create` | Save a baseline of the current layout. |
+| `/recovery snapshot view page:<n>` | Browse every saved snapshot and backup, including older and legacy entries, with Previous/Next buttons. |
+| `/recovery snapshot restore` | Pick **All** or individual components, review the per-object preview, then press Confirm. |
+| `/recovery snapshot delete id:<ID>` | Review and confirm deletion of a saved recovery point. Blocked during an active recovery. |
+| `/recovery backup create` / `/recovery backup restore` | Manual layout backup, restored through the same flow. |
+| `/recovery copylayout destination_id:<server ID>` | Use the current server as the source and copy it to another. Both servers must be authorized, and you need Vanguard security access in both. |
 
 **All** is the first option and expands to Roles, Categories, Channels, Permissions and Settings. Confirmations are bound to the user and server, expire after two minutes, and check that the snapshot has not changed since the preview.
 
 ## Cleaning up old recovery points
 
-`/snapshot delete id` removes one recovery point after a confirmation. To remove many at once, use `/snapshot cleanup`:
+`/recovery snapshot delete id` removes one recovery point after a confirmation. To remove many at once, use `/recovery snapshot cleanup`:
 
 | Option | Meaning |
 |---|---|
@@ -30,7 +30,7 @@ Run it without `confirm` first to see how many points would go and their date ra
 
 ## Who can see snapshots
 
-Snapshots and backups belong to the server they were taken in. `/snapshot view`, `restore`, `delete` and `cleanup` only ever see the current server's recovery points, and the database refuses cross-server reads. The one deliberate exception is `/copylayout`: it stores a copy of the source server's layout in the destination server, and only someone with Vanguard security access in both servers can run it.
+Snapshots and backups belong to the server they were taken in. `/recovery snapshot view`, `restore`, `delete` and `cleanup` only ever see the current server's recovery points, and the database refuses cross-server reads. The one deliberate exception is `/recovery copylayout`: it stores a copy of the source server's layout in the destination server, and only someone with Vanguard security access in both servers can run it.
 
 ## How a restore works
 
@@ -79,7 +79,7 @@ A long restore can outlive Discord's 15-minute interaction token. Progress deliv
 
 ## Restoring after an incident
 
-When an incident's actor deleted channels or roles in the 10 minutes before it, the incident alert in your log channel shows a **Review restore** button. It opens the same preview as `/snapshot restore`, using the newest snapshot taken before the first deletion (layout-copy templates are skipped), with the matching components selected. It restores the whole snapshot for those components, so changes made since that snapshot are reverted too. Check the preview, adjust the components if needed, then confirm. Only people with Vanguard security access can use it, and the reply is visible only to them.
+When an incident's actor deleted channels or roles in the 10 minutes before it, the incident alert in your log channel shows a **Review restore** button. It opens the same preview as `/recovery snapshot restore`, using the newest snapshot taken before the first deletion (layout-copy templates are skipped), with the matching components selected. It restores the whole snapshot for those components, so changes made since that snapshot are reverted too. Check the preview, adjust the components if needed, then confirm. Only people with Vanguard security access can use it, and the reply is visible only to them.
 
 ## Audit history
 

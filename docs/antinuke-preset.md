@@ -1,8 +1,8 @@
 # Default anti-nuke preset
 
-`/enable` and `/antinuke enable` capture a fresh baseline, clear older shared or
+`/antinuke enable` and `/antinuke enable` capture a fresh baseline, clear older shared or
 individual thresholds, load this preset, and enable enforcement. Configure a security
-log channel with `/security config` first. `/disable` and `/antinuke disable` use a
+log channel with `/security config` first. `/antinuke disable` and `/antinuke disable` use a
 confirmation and stop detection/enforcement. Settings, incidents and backups are retained.
 
 | Rule | Count | Window | Action | Revert |
@@ -38,12 +38,12 @@ original ID, URL and token cannot be recreated; update/deletion events are repor
 manual review. Role/channel deletion rules do not auto-restore deleted objects; use the
 existing snapshot review and recovery controls.
 
-The saved configuration survives restart. `/enable` deliberately reloads this preset;
+The saved configuration survives restart. `/antinuke enable` deliberately reloads this preset;
 customize thresholds afterwards with `/antinuke rule` or `/antinuke-rule`. A 120-second
 window is available in the rule menu. Observe mode remains selectable with `/antinuke mode`.
 
 For Wispbyte, upload the patched source, compiled modules and package files, then restart.
-Keep the host's database and credentials. The new `/enable` and `/disable` commands are
+Keep the host's database and credentials. The new `/antinuke enable` and `/antinuke disable` commands are
 synchronized on startup; Discord command refresh may take a little time.
 
 `/antinuke status` and `/antinuke rules` show the Antinuke Status embed: current state, configured limits/actions, revert flags and active explicit anti-nuke bypasses. Enabled enforcement is green, observe mode orange and disabled protection red. Whitelist mentions do not send notifications. Verification exemptions are scoped to member-role updates and do not appear as unrestricted bypasses.
