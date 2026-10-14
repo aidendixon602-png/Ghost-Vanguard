@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.29.2: whitelisted staff can promote moderators
+The **Permission Grant** rule stripped people the first time they gave out any role with Ban, Kick, Manage Channels, Manage Webhooks or Manage Server, even staff on the whitelist. Now:
+- **Whitelisted role managers** (the *Role manager* or *Administrator* preset, or "Give roles to people") can give, create and edit moderator-level roles. **Administrator** and **Manage Server** are still checked for anyone without a full bypass.
+- **Only real new permissions count.** Giving someone a role whose powers they already had from another role is no longer a "dangerous grant".
+- People who aren't whitelisted are checked exactly as before.
+- If Discord is slow to answer while anti-nuke looks someone up, the check carries on instead of being skipped.
+
 ## 2.29.1: log fixes from a full check
 - **New roles** list only the permissions that matter (administrator, ban, kick, manage server…) plus a count of everyday ones, instead of 20+ names.
 - **Channel permission changes** show one clear state per permission (allowed / denied / reset). Before, flipping a permission from denied to allowed printed two lines that contradicted each other.

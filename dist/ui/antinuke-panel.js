@@ -19,9 +19,9 @@ export function statusPanel(ctx, guild, user) {
  */
 export const TRUST_PRESETS = {
     moderation: { title: 'Basic moderation', description: 'bans, kicks and timeouts', rules: ['mass_ban', 'mass_kick', 'timeout'] },
-    roles: { title: 'Role manager', description: 'give roles, create, edit and delete roles', rules: ['role_grant', 'role_create', 'role_update', 'role_delete'] },
+    roles: { title: 'Role manager', description: 'give roles (including moderator roles), create, edit and delete roles', rules: ['role_grant', 'role_create', 'role_update', 'role_delete'] },
     channels: { title: 'Channel manager', description: 'create, edit and delete channels and webhooks', rules: ['channel_create', 'channel_update', 'channel_delete', 'webhook_change'] },
-    administrator: { title: 'Administrator', description: 'everything except adding bots, dangerous permissions and prunes',
+    administrator: { title: 'Administrator', description: 'everything incl. promoting mods; not Administrator grants, bots or prunes',
         rules: ['mass_ban', 'mass_kick', 'timeout', 'role_grant', 'role_create', 'role_update', 'role_delete', 'channel_create', 'channel_update', 'channel_delete', 'webhook_change', 'guild_update', 'automod_tamper'] },
 };
 /** Single rules, grouped by area and ordered from everyday to dangerous. Join flood is not a person's action, so it is not listed. */

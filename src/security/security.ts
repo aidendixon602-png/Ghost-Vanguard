@@ -1,5 +1,5 @@
 import { consumeApprovedRoleChange } from './role-authorizations.js';
-import { ActionRowBuilder, AuditLogEvent, ButtonBuilder, ButtonStyle, Colors, Guild, GuildAuditLogsEntry, GuildMember } from 'discord.js';
+import { ActionRowBuilder, AuditLogEvent, PermissionFlagsBits, ButtonBuilder, ButtonStyle, Colors, Guild, GuildAuditLogsEntry, GuildMember } from 'discord.js';
 import { dangerous, escalationAdded, KeyedQueue, overrideRule, ruleFor, RULES, type Rule } from '../core.js';
 import type { Store } from '../database/db.js';
 import { developers } from '../bot/developers.js';
@@ -21,30 +21,48 @@ const ruleByKey = (key: string) => RULES.find(r => r.key === key)!;
 const changesOf = (entry: GuildAuditLogsEntry) => (entry.changes ?? []) as Change[];
 
 /** Roles added to a member by this entry that carry escalation permissions. */
-function escalatingRolesAdded(entry: GuildAuditLogsEntry, guild: Guild): string[] {
+/** Administrator and Manage Server: still checked for whitelisted role managers (Manage Server can add bots). */
+const ALWAYS_STRICT = PermissionFlagsBits.Administrator | PermissionFlagsBits.ManageGuild;
+
+/** Escalation permissions a member role grant really adds: what the new roles give that the member's other roles did not. */
+function memberEscalation(entry: GuildAuditLogsEntry, guild: Guild): { roles: string[]; bits: bigint } {
     if (entry.action !== AuditLogEvent.MemberRoleUpdate)
-        return [];
-    const added = changesOf(entry).find(c => c.key === '$add')?.new as {
-        id: string;
-    }[] | undefined;
-    return (added ?? []).map(r => r.id).filter(id => {
+        return { roles: [], bits: 0n };
+    const added = ((changesOf(entry).find(c => c.key === '$add')?.new ?? []) as { id: string }[]).map(r => r.id);
+    const member = entry.targetId ? guild.members?.cache?.get(entry.targetId) : undefined;
+    let before = 0n;
+    for (const [id, role] of member?.roles?.cache ?? [])
+        if (!added.includes(String(id))) before |= toBigInt((role as any)?.permissions?.bitfield ?? guild.roles?.cache?.get(String(id))?.permissions?.bitfield);
+    let bits = 0n;
+    const roles: string[] = [];
+    for (const id of added) {
         const role = guild.roles?.cache?.get(id);
-        return !!role && !role.managed && escalationAdded(0n, role.permissions.bitfield) !== 0n;
-    });
+        if (!role || role.managed) continue;
+        const gain = escalationAdded(before, role.permissions.bitfield);
+        if (gain !== 0n) { roles.push(id); bits |= gain; }
+    }
+    return { roles, bits };
 }
 
-/** A role gained escalation permissions, or a member was given a role that has them. */
-function grantsEscalation(entry: GuildAuditLogsEntry, guild: Guild): boolean {
+function escalatingRolesAdded(entry: GuildAuditLogsEntry, guild: Guild): string[] {
+    return memberEscalation(entry, guild).roles;
+}
+
+function toBigInt(value: unknown): bigint {
+    try { return value === undefined || value === null ? 0n : BigInt(value as any); } catch { return 0n; }
+}
+
+/** Escalation permissions this entry hands out: a role gaining them, a new role created with them, or a member given a role with them. */
+function escalationBits(entry: GuildAuditLogsEntry, guild: Guild): bigint {
     if (entry.action === AuditLogEvent.RoleUpdate) {
         const change = changesOf(entry).find(c => c.key === 'permissions');
-        return !!change && escalationAdded(change.old, change.new) !== 0n;
+        return change ? escalationAdded(change.old, change.new) : 0n;
     }
-    // A brand-new role that already has Administrator (or another escalation permission).
     if (entry.action === AuditLogEvent.RoleCreate) {
         const change = changesOf(entry).find(c => c.key === 'permissions');
-        return !!change && escalationAdded(0n, change.new) !== 0n;
+        return change ? escalationAdded(0n, change.new) : 0n;
     }
-    return escalatingRolesAdded(entry, guild).length > 0;
+    return memberEscalation(entry, guild).bits;
 }
 
 /**
@@ -89,11 +107,12 @@ export class Security {
             // A change approved through /role (this exact member, role and operation, made by Vanguard) is not an attack.
             if (consumeApprovedRoleChange(entry, guild)) return;
             const actor = responsibleActor(entry, guild);
-            if (actor && this.store.get("SELECT 1 FROM grants WHERE guild_id=? AND (kind='trust_role' OR kind LIKE 'trust_role:%') AND (expires IS NULL OR expires>?)", guild.id, Date.now())) await memberOrNull(guild, actor);
+            if (actor && this.store.get("SELECT 1 FROM grants WHERE guild_id=? AND (kind='trust_role' OR kind LIKE 'trust_role:%') AND (expires IS NULL OR expires>?)", guild.id, Date.now())) await memberOrNull(guild, actor).catch(() => null);
             const newlyAssigned = entry.action === AuditLogEvent.MemberRoleUpdate && entry.targetId === actor ? (changesOf(entry).find(c=>c.key==='$add')?.new ?? []).map((r:{id:string})=>r.id) : [];
             if (!s.authorized || !actor || this.trusted(guild, actor, newlyAssigned))
                 return;
-            for (const { rule, eventId } of this.rulesFor(entry, guild, actor))
+            if (entry.action === AuditLogEvent.MemberRoleUpdate && entry.targetId && entry.targetId !== actor) await memberOrNull(guild, entry.targetId).catch(() => null);
+            for (const { rule, eventId } of this.rulesFor(entry, guild, actor, newlyAssigned))
                 // A role the actor just gave themselves cannot exempt that same action.
                 if (!this.trustedFor(guild, actor, rule.key, newlyAssigned))
                     await this.evaluate(entry, guild, actor, rule, eventId);
@@ -101,7 +120,7 @@ export class Security {
     }
 
     /** Every rule this audit entry counts toward, each with its own observation id. */
-    private rulesFor(entry: GuildAuditLogsEntry, guild: Guild, actor: string): {
+    private rulesFor(entry: GuildAuditLogsEntry, guild: Guild, actor: string, newlyAssigned: string[] = []): {
         rule: Rule;
         eventId: string;
     }[] {
@@ -115,7 +134,13 @@ export class Security {
         const addsRole = entry.action !== AuditLogEvent.MemberRoleUpdate || changesOf(entry).some(c => c.key === '$add' && c.new?.length);
         if (primary && !verificationBot && addsRole)
             found.push({ rule: primary, eventId: entry.id });
-        if (grantsEscalation(entry, guild))
+        let escalation = escalationBits(entry, guild);
+        // Staff whitelisted to manage roles can hand out moderator-level roles (ban, kick, channels, webhooks);
+        // Administrator and Manage Server are still checked for everyone without a full bypass.
+        const roleRule = entry.action === AuditLogEvent.MemberRoleUpdate ? 'role_grant' : entry.action === AuditLogEvent.RoleCreate ? 'role_create' : 'role_update';
+        if (escalation && this.trustedFor(guild, actor, roleRule, newlyAssigned))
+            escalation &= ALWAYS_STRICT;
+        if (escalation)
             found.push({ rule: ruleByKey('dangerous_grant'), eventId: `${entry.id}:dangerous_grant` });
         if (disablesAutoMod(entry))
             found.push({ rule: ruleByKey('automod_tamper'), eventId: `${entry.id}:automod_tamper` });

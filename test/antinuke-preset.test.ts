@@ -193,3 +193,39 @@ test('Role Invite allows normal role giving: five grants pass, the sixth in a mi
   assert.equal(punished,1);assert.equal(store.all("SELECT * FROM incidents WHERE rule='role_grant'").length,1);
  }finally{store.close();}
 });
+
+function staffGuild() {
+ const f=fixture();const {guild}=f;
+ const role=(id:string,bits:bigint)=>({id,managed:false,editable:true,permissions:{bitfield:bits}});
+ guild.roles={cache:new Collection<string,any>([['mod',role('mod',PermissionFlagsBits.BanMembers|PermissionFlagsBits.KickMembers)],['admin',role('admin',PermissionFlagsBits.Administrator)],['oldmod',role('oldmod',PermissionFlagsBits.BanMembers|PermissionFlagsBits.KickMembers)],['plain',role('plain',0n)]])};
+ const members=new Collection<string,any>();
+ const member=(id:string,roles:string[])=>{const m={id,roles:{cache:new Collection(roles.map(r=>[r,guild.roles.cache.get(r)]))}};members.set(id,m);return m;};
+ guild.members={cache:members,fetch:async({user}:any)=>members.get(user)??null};
+ f.security.punish=async()=>'Stripped actor.';f.security.revert=async()=>'Removed 1 newly granted role(s).';
+ const give=(id:string,target:string,role:string)=>f.security.audit(f.entry(id,target,AuditLogEvent.MemberRoleUpdate,[{key:'$add',new:[{id:role}]}]),guild);
+ const incidents=()=>f.store.all("SELECT * FROM incidents WHERE rule='dangerous_grant'").length;
+ return {...f,member,give,incidents};
+}
+
+test('whitelisted role managers can promote moderators, but Administrator is still checked',async()=>{
+ const {store,member,give,incidents}=staffGuild();
+ try {
+  member('actor',['plain']);member('newmod',['plain','mod']);member('newadmin',['plain','admin']);
+  for(const r of ['role_grant','role_create','role_update','role_delete'])store.grant('g','actor',`trust:${r}`,'owner');
+  await give('p1','newmod','mod');
+  assert.equal(incidents(),0,'giving a Ban/Kick role is normal work for a whitelisted role manager');
+  await give('p2','newadmin','admin');
+  assert.equal(incidents(),1,'Administrator still needs a full bypass');
+ }finally{store.close();}
+});
+
+test('Permission Grant only counts permissions the member did not already have',async()=>{
+ const {store,member,give,incidents}=staffGuild();
+ try {
+  member('actor',['plain']);member('existing',['oldmod','mod']);member('fresh',['plain','mod']);
+  await give('e1','existing','mod');
+  assert.equal(incidents(),0,'they already had Ban/Kick from another role');
+  await give('e2','fresh','mod');
+  assert.equal(incidents(),1,'someone without the role is still a new grant, and not being whitelisted still strips');
+ }finally{store.close();}
+});

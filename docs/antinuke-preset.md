@@ -12,7 +12,7 @@ confirmation and stop detection/enforcement. Settings, incidents and backups are
 | Channel Create | 4 | 120 seconds | kick | Yes |
 | Channel Delete | 2 | 120 seconds | ban | No |
 | Kick | 3 | 120 seconds | ban | No |
-| Permission Grant | 1 | 60 seconds | strip | Yes, including member role grants |
+| Permission Grant | 1 | 60 seconds | strip | Yes, including member role grants (whitelisted role managers may grant moderator perms; Administrator and Manage Server always checked) |
 | Role Create | 5 | 120 seconds | strip | Yes |
 | Role Delete | 5 | 120 seconds | strip | No |
 | Role Invite | 6 | 60 seconds | strip | Yes |
