@@ -191,9 +191,13 @@ export class Security {
         result += ` Reverts: ${progress.completed} completed, ${progress.failed} failed, ${progress.skipped} skipped.`;
         this.store.run('UPDATE incidents SET result=? WHERE guild_id=? AND id=?', result, guild.id, incident);
         const deleted = this.recentDeletions(guild.id, actor, now);
-        const rows = [];
+        const buttons = [];
+        // A strip that removed roles can be undone in one click if it was a false alarm (owner and developers only).
+        if (s.mode === 'enforce' && (active.punishment ?? 'strip') === 'strip' && /^Removed [1-9]\d* dangerous role/.test(result))
+            buttons.push(new ButtonBuilder().setCustomId(`incident:undo:${incident}`).setLabel('Undo strip').setEmoji('↩️').setStyle(ButtonStyle.Success));
         if (deleted.channels || deleted.roles)
-            rows.push(new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`incident:restore:${incident}`).setLabel('Review restore').setStyle(ButtonStyle.Secondary)));
+            buttons.push(new ButtonBuilder().setCustomId(`incident:restore:${incident}`).setLabel('Review restore').setStyle(ButtonStyle.Secondary));
+        const rows = buttons.length ? [new ActionRowBuilder().addComponents(...buttons)] : [];
         this.logs.push(guild.id, incidentCard({ incident, actor, rule: active, mode: s.mode, count, result, progress, deleted, targetId: entry.targetId ?? null }), rows);
     }
     async punish(guild, actor, action, ignoreRoles = []) {

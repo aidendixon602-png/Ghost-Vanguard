@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.30.0: Undo strip button
+- When anti-nuke strips someone, the alert now has a green **↩️ Undo strip** button for false alarms.
+- **Only the server owner or a developer** can use it. It asks for confirmation first, then gives back every role that was removed (staff and admin roles included) and ends their quarantine, so anti-nuke stops re-removing staff roles from them.
+- It works once per incident: the button turns into "Strip undone", and a **Strip undone** note is posted to the log saying who undid it.
+- Anti-nuke still watches them afterwards. If what they did is normal for them, add them with `/antinuke whitelist add`.
+
 ## 2.29.3: `/dev restart` works on older launchers
 - `/dev restart` said "needs the bot to be started with `node launch.js`" even when it was. Automatic updates replace the bot's code, but the `launch.js` already running on the host stays the version it started with, and launchers from before 2.27.4 don't understand the restart request.
 - Now, if the launcher doesn't answer, the bot shuts down cleanly with a "please start me again" exit code, which every version of `launch.js` handles. It only does this after the bot has been up for 2.5 minutes, so the launcher can't mistake it for a crashing update and roll back.
