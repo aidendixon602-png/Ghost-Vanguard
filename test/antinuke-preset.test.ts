@@ -17,7 +17,7 @@ test('status embed shows the fixed limits (saved custom limits are ignored) and 
   store.run('UPDATE grants SET expires=? WHERE guild_id=? AND user_id=?',Date.now()-1,'g','333');
   const status=antinukeStatus(store,'g').toJSON();
   assert.equal(status.title,'Antinuke Status');assert.equal(status.color,0x57F287);
-  assert.match(status.description!,/`Ban` – \*\*3 in 60s → ban\*\* `\[revert\]`/);assert.match(status.description!,/preset is fixed/);
+  assert.match(status.description!,/`Ban` – \*\*5 in 60s → strip\*\* `\[revert\]`/);assert.match(status.description!,/preset is fixed/);
   assert.match(status.description!,/<@111>/);assert.doesNotMatch(status.description!,/<@222>|<@333>/);
   assert.match(status.description!,/manage_webhooks/);assert.ok(status.description!.length<=3900);
   s.enabled=false;store.save(s);assert.equal(antinukeStatus(store,'g').toJSON().color,0xED4245);
@@ -45,7 +45,7 @@ function fixture(mode:'observe'|'enforce'='enforce') {
 }
 
 test('the twelve requested preset limits, actions and revert flags are exact',()=>{
- const expected:any={mass_ban:[3,60,'ban',true],bot_add:[1,60,'ban',true],channel_create:[4,120,'kick',true],channel_delete:[2,120,'ban',false],mass_kick:[3,120,'ban',false],dangerous_grant:[1,60,'strip',true],role_create:[5,120,'strip',true],role_delete:[5,120,'strip',false],role_grant:[6,60,'strip',true],guild_update:[3,120,'strip',false],timeout:[8,120,'strip',true],webhook_change:[1,60,'kick',true]};
+ const expected:any={mass_ban:[5,60,'strip',true],bot_add:[1,60,'strip',true],channel_create:[6,120,'strip',true],channel_delete:[3,120,'strip',false],mass_kick:[5,120,'strip',false],dangerous_grant:[1,60,'strip',true],role_create:[8,120,'strip',true],role_delete:[5,120,'strip',false],role_grant:[8,60,'strip',true],guild_update:[5,120,'strip',false],timeout:[10,120,'strip',true],webhook_change:[3,60,'strip',true]};
  for(const [key,values] of Object.entries(expected)) {const r=RULES.find(r=>r.key===key)!;assert.deepEqual([r.count,r.seconds,r.punishment,r.revert],values);}
 });
 
@@ -67,22 +67,22 @@ test('/enable reloads the preset, clears shared limits, captures a baseline and 
  } finally {store.close();}
 });
 
-test('three bans in sixty seconds ban the executor and revert every observed ban in that window',async()=>{
+test('five bans in sixty seconds strip the executor and revert every observed ban in that window',async()=>{
  const {store,security,guild,entry}=fixture();
  try {
   const undone:string[]=[];let banned=0;
-  guild.members={fetch:async()=>({id:'actor',bannable:true,ban:async()=>{banned++;}})};
+  security.punish=async()=>{banned++;return 'Removed 1 dangerous role(s).';};
   guild.bans={remove:async(id:string)=>{undone.push(id);}};
   await security.audit(entry('old','older',AuditLogEvent.MemberBanAdd,[],Date.now()-61000),guild);
-  for(let n=1;n<=3;n++)await security.audit(entry(String(n),'target'+n),guild);
-  assert.equal(banned,1);assert.deepEqual(undone.sort(),['target1','target2','target3']);
+  for(let n=1;n<=5;n++)await security.audit(entry(String(n),'target'+n),guild);
+  assert.equal(banned,1);assert.deepEqual(undone.sort(),['target1','target2','target3','target4','target5']);
   assert.equal(store.all('SELECT * FROM incidents').length,1);
  } finally {store.close();}
 });
 
 test('observe mode never bans an executor or undoes their bans',async()=>{
  const {store,security,guild,entry}=fixture('observe');
- try {security.punish=async()=>{throw new Error('Must not punish');};security.revert=async()=>{throw new Error('Must not revert');};for(let n=1;n<=3;n++)await security.audit(entry(String(n),'t'+n),guild);assert.match(store.get('SELECT result FROM incidents')!.result,/Observed only/);}finally{store.close();}
+ try {security.punish=async()=>{throw new Error('Must not punish');};security.revert=async()=>{throw new Error('Must not revert');};for(let n=1;n<=5;n++)await security.audit(entry(String(n),'t'+n),guild);assert.match(store.get('SELECT result FROM incidents')!.result,/Observed only/);}finally{store.close();}
 });
 
 test('kick punishment respects hierarchy and trusted accounts',async()=>{
@@ -102,14 +102,14 @@ test('Role Invite detects additions but ignores removals and verification-bot up
  }finally{store.close();}
 });
 
-test('Timeout fires on the eighth imposed timeout and preserves a subsequently changed timeout',async()=>{
+test('Timeout fires on the tenth imposed timeout and preserves a subsequently changed timeout',async()=>{
  const {store,security,guild,entry}=fixture();
  try {
   const until=new Date(Date.now()+600000).toISOString();let restored=0;
   guild.members={fetch:async({user}:any)=>({id:user,moderatable:true,communicationDisabledUntilTimestamp:user==='t5'?Date.now()+500000:Date.parse(until),disableCommunicationUntil:async()=>{restored++;}})};
   security.punish=async()=> 'Stripped actor.';
-  for(let n=1;n<=8;n++)await security.audit(entry(String(n),'t'+n,AuditLogEvent.MemberUpdate,[{key:'communication_disabled_until',old:null,new:until}]),guild);
-  assert.equal(restored,7);assert.equal(store.all("SELECT * FROM incidents WHERE rule='timeout'").length,1);
+  for(let n=1;n<=10;n++)await security.audit(entry(String(n),'t'+n,AuditLogEvent.MemberUpdate,[{key:'communication_disabled_until',old:null,new:until}]),guild);
+  assert.equal(restored,9);assert.equal(store.all("SELECT * FROM incidents WHERE rule='timeout'").length,1);
  }finally{store.close();}
 });
 
@@ -183,15 +183,15 @@ test('reverting that grant deletes the new role when Vanguard can, and keeps it 
  } finally {store.close();}
 });
 
-test('Role Invite allows normal role giving: five grants pass, the sixth warns, the seventh strips',async()=>{
+test('Role Invite allows normal role giving: seven grants pass, the eighth warns, the ninth strips',async()=>{
  const {store,security,guild,entry}=fixture();
  try {
   guild.roles={cache:new Collection()};let punished=0;security.punish=async()=>{punished++;return 'Stripped actor.';};security.revert=async()=>'Removed 1 assigned role(s).';
-  for(let n=1;n<=5;n++)await security.audit(entry('g'+n,'m'+n,AuditLogEvent.MemberRoleUpdate,[{key:'$add',new:[{id:'r'}]}]),guild);
+  for(let n=1;n<=7;n++)await security.audit(entry('g'+n,'m'+n,AuditLogEvent.MemberRoleUpdate,[{key:'$add',new:[{id:'r'}]}]),guild);
   assert.equal(punished,0);assert.equal(store.all("SELECT * FROM incidents WHERE rule='role_grant'").length,0);
-  await security.audit(entry('g6','m6',AuditLogEvent.MemberRoleUpdate,[{key:'$add',new:[{id:'r'}]}]),guild);
+  await security.audit(entry('g8','m8',AuditLogEvent.MemberRoleUpdate,[{key:'$add',new:[{id:'r'}]}]),guild);
   assert.equal(punished,0,'first time over the limit is a warning');assert.equal(store.get("SELECT mode FROM incidents WHERE rule='role_grant'")!.mode,'warn');
-  await security.audit(entry('g7','m7',AuditLogEvent.MemberRoleUpdate,[{key:'$add',new:[{id:'r'}]}]),guild);
+  await security.audit(entry('g9','m9',AuditLogEvent.MemberRoleUpdate,[{key:'$add',new:[{id:'r'}]}]),guild);
   assert.equal(punished,1,'carrying on after the warning strips');
  }finally{store.close();}
 });
@@ -242,17 +242,17 @@ test('warnings: undone and logged, dangerous rules and bots get no warning, and 
  const e=(id:string,actor:string,action:number,changes:any[]=[])=>({id,targetId:'t'+id,action,changes,executorId:actor,createdTimestamp:Date.now()} as any);
  let punished:string[]=[];security.punish=async(_g,a)=>{punished.push(a);return 'Removed 1 dangerous role(s).';};security.revert=async()=>'Deleted created channel x.';
  try {
-  for(let n=0;n<4;n++)await security.audit(e('c'+n,'person',AuditLogEvent.ChannelCreate),guild);
+  for(let n=0;n<6;n++)await security.audit(e('c'+n,'person',AuditLogEvent.ChannelCreate),guild);
   assert.deepEqual(punished,[]);assert.equal(dms,1,'the person is told privately');
-  const card=pushed.at(-1);assert.equal(card.title,'Anti-nuke Warning');assert.match(card.description,/got a \*\*warning\*\*.*undone.*\*\*kicked\*\*/);
-  assert.match(card.fields.find((f:any)=>f.name==='Changes reverted').value,/4 undone/);
-  for(let n=0;n<4;n++)await security.audit(e('b'+n,'somebot',AuditLogEvent.ChannelCreate),guild);
+  const card=pushed.at(-1);assert.equal(card.title,'Anti-nuke Warning');assert.match(card.description,/got a \*\*warning\*\*.*undone.*\*\*stripped\*\*/);
+  assert.match(card.fields.find((f:any)=>f.name==='Changes reverted').value,/6 undone/);
+  for(let n=0;n<6;n++)await security.audit(e('b'+n,'somebot',AuditLogEvent.ChannelCreate),guild);
   assert.deepEqual(punished,['somebot'],'bots are punished straight away');
-  for(let n=0;n<3;n++)await security.audit(e('k'+n,'person',AuditLogEvent.MemberKick),guild);
+  for(let n=0;n<5;n++)await security.audit(e('k'+n,'person',AuditLogEvent.MemberKick),guild);
   assert.deepEqual(punished,['somebot','person'],'mass kicks never warn');
   store.run("UPDATE incidents SET at=? WHERE mode='warn'",Date.now()-2*3600000);
   store.run('DELETE FROM observations');punished=[];
-  for(let n=0;n<4;n++)await security.audit(e('d'+n,'person',AuditLogEvent.ChannelCreate),guild);
+  for(let n=0;n<6;n++)await security.audit(e('d'+n,'person',AuditLogEvent.ChannelCreate),guild);
   assert.deepEqual(punished,[],'an old warning (over an hour) does not count, so they get a fresh warning');
  } finally {store.close();}
 });
@@ -273,4 +273,20 @@ test('well-known verification bots can give ordinary roles freely, can be switch
   await give('x1','verified');
   assert.equal(store.all("SELECT * FROM observations WHERE rule='role_grant'").length,1,'switched off for this server');
  }finally{store.close();}
+});
+
+test('one step before a limit, staff get a single heads-up and nothing is done to the person',async()=>{
+ const pushed:any[]=[];
+ const store=new Store(':memory:');authorize(store);const st=store.settings('g');st.enabled=true;st.mode='enforce';store.save(st);
+ const security=new Security(store,{push:(_g:string,e:any)=>{pushed.push(e.toJSON());}} as any);
+ const guild:any={id:'g',ownerId:'owner',client:{user:{id:'vanguard'}},roles:{cache:new Collection()},members:{cache:new Collection(),fetch:async()=>null}};
+ let punished=0;security.punish=async()=>{punished++;return 'Removed 1 dangerous role(s).';};
+ try {
+  for(let n=0;n<2;n++)await security.audit({id:'d'+n,targetId:'c'+n,action:AuditLogEvent.ChannelDelete,executorId:'admin',createdTimestamp:Date.now()} as any,guild);
+  assert.equal(punished,0);
+  assert.equal(pushed.length,1);assert.equal(pushed[0].title,'Anti-nuke heads-up');assert.match(pushed[0].description,/\*\*2 of 3\*\*.*Nothing has been done.*stripped/s);
+  await security.audit({id:'d2',targetId:'c2',action:AuditLogEvent.ChannelDelete,executorId:'admin',createdTimestamp:Date.now()} as any,guild);
+  assert.equal(punished,1,'the third delete is acted on');
+  assert.equal(pushed.filter(p=>p.title==='Anti-nuke heads-up').length,1,'only one heads-up per window');
+ } finally {store.close();}
 });

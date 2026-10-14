@@ -12,7 +12,7 @@ test('whitelist check: owner, full bypass, role-based rules, warnings and quaran
         assert.match(whitelistCheck(store, guild, 'owner', [], false).toJSON().description!, /server owner/);
         assert.match(whitelistCheck(store, guild, 'nobody', [], false).toJSON().description!, /not whitelisted/);
         const plain = whitelistCheck(store, guild, 'nobody', [], false).toJSON();
-        assert.match(plain.fields!.find(f => f.name === 'Still checked')!.value, /Role Invite\*\*: 6 in 60s → strip \(warns first\)/);
+        assert.match(plain.fields!.find(f => f.name === 'Still checked')!.value, /Role Invite\*\*: 8 in 60s → strip \(warns first\)/);
 
         store.grant('g', 'staffrole', 'trust_role:role_grant', 'owner'); store.grant('g', 'staffrole', 'trust_role:role_update', 'owner');
         store.grant('g', 'person', 'trust:mass_ban', 'owner', 24);

@@ -33,8 +33,8 @@ test('readiness checks missing permissions, log overwrites and unmanaged role hi
 test('legacy disabled toggles and loosened limits cannot weaken the fixed preset',async()=>{
  const {store,security,guild}=setup();try {
  const s=store.settings('g');s.rules.mass_ban={count:50,seconds:5,enabled:false};s.ruleDefaults={count:100,seconds:5};store.save(s);
- for(const n of [1,2,3])await security.audit({id:`e${n}`,executorId:'actor',action:AuditLogEvent.MemberBanAdd,targetId:`t${n}`,createdTimestamp:Date.now()} as any,guild);
- assert.equal(store.all('SELECT * FROM incidents').length,1,'3 bans in 60s still triggers');
+ for(const n of [1,2,3,4,5])await security.audit({id:`e${n}`,executorId:'actor',action:AuditLogEvent.MemberBanAdd,targetId:`t${n}`,createdTimestamp:Date.now()} as any,guild);
+ assert.equal(store.all('SELECT * FROM incidents').length,1,'5 bans in 60s still triggers');
  }finally{store.close();}
 });
 
@@ -86,11 +86,11 @@ test('enable rejects missing permissions before saving a snapshot, but only warn
 test('incident report counts completed, failed and skipped reverts separately',async()=>{
  const {store,security,guild,logs}=setup();try {
  security.punish=async()=> 'Executor banned.';
- const outcomes=['Removed ban for target.','Created channel is already absent.','Webhook edit/deletion cannot be exactly undone; manual review required.'];
+ const outcomes=['Removed ban for target.','Created channel is already absent.','Webhook edit/deletion cannot be exactly undone; manual review required.','Created channel is already absent.','Created channel is already absent.'];
  security.revert=async()=>outcomes.shift()!;
- for(let n=0;n<3;n++)await security.audit({id:'e'+n,executorId:'actor',targetId:'target'+n,createdTimestamp:Date.now(),action:AuditLogEvent.MemberBanAdd} as any,guild);
- assert.match(store.get('SELECT result FROM incidents WHERE guild_id=?','g')!.result,/1 completed, 1 failed, 1 skipped/);
- const card=logs[0].toJSON();assert.equal(card.description,'<@actor> was **banned** for triggering anti-nuke.');assert.equal(card.fields.find((f:any)=>f.name==='Changes reverted').value,'1 undone · 1 failed · 1 skipped');assert.equal(card.fields.find((f:any)=>f.name==='Target').value,'`target2`');
+ for(let n=0;n<5;n++)await security.audit({id:'e'+n,executorId:'actor',targetId:'target'+n,createdTimestamp:Date.now(),action:AuditLogEvent.MemberBanAdd} as any,guild);
+ assert.match(store.get('SELECT result FROM incidents WHERE guild_id=?','g')!.result,/1 completed, 1 failed, 3 skipped/);
+ const card=logs.at(-1).toJSON();assert.equal(card.description,'<@actor> was **stripped** for triggering anti-nuke.');assert.equal(card.fields.find((f:any)=>f.name==='Changes reverted').value,'1 undone · 1 failed · 3 skipped');assert.equal(card.fields.find((f:any)=>f.name==='Target').value,'`target4`');
  }finally{store.close();}
 });
 
@@ -224,9 +224,9 @@ test('a rule-only whitelist skips just that rule; every other rule still catches
  const {store,security,guild}=setup();try {
  const now=Date.now();
  store.grant('g','mod','trust:mass_ban','owner');
- for(const n of [1,2,3])await security.audit({id:`b${n}`,executorId:'mod',action:AuditLogEvent.MemberBanAdd,targetId:`t${n}`,createdTimestamp:now} as any,guild);
+ for(const n of [1,2,3,4,5])await security.audit({id:`b${n}`,executorId:'mod',action:AuditLogEvent.MemberBanAdd,targetId:`t${n}`,createdTimestamp:now} as any,guild);
  assert.equal(store.all('SELECT * FROM incidents').length,0,'bans are skipped');
- for(const n of [1,2,3])await security.audit({id:`k${n}`,executorId:'mod',action:AuditLogEvent.MemberKick,targetId:`k${n}`,createdTimestamp:now} as any,guild);
+ for(const n of [1,2,3,4,5])await security.audit({id:`k${n}`,executorId:'mod',action:AuditLogEvent.MemberKick,targetId:`k${n}`,createdTimestamp:now} as any,guild);
  assert.equal(store.all('SELECT rule FROM incidents').map(r=>r.rule).join(),'mass_kick','kicks still trigger');
  }finally{store.close();}
 });

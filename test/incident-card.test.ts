@@ -19,8 +19,8 @@ test('anti-nuke card says who was stripped and for what', () => {
 });
 
 test('anti-nuke card is honest when the punishment failed or only observed', () => {
-    assert.match(incidentCard({ ...base, rule: rule('mass_ban'), result: 'Executor cannot be banned; check role hierarchy.' }).toJSON().description!, /could \*\*not\*\* be banned/);
-    assert.match(incidentCard({ ...base, mode: 'observe', rule: rule('mass_kick'), result: 'Observed only; no Discord actions taken.' }).toJSON().description!, /would have been \*\*banned\*\*.*watch-only/);
+    assert.match(incidentCard({ ...base, rule: rule('mass_ban'), result: 'Executor cannot be banned; check role hierarchy.' }).toJSON().description!, /could \*\*not\*\* be stripped/);
+    assert.match(incidentCard({ ...base, mode: 'observe', rule: rule('mass_kick'), result: 'Observed only; no Discord actions taken.' }).toJSON().description!, /would have been \*\*stripped\*\*.*watch-only/);
 });
 
 test('role permission changes list each permission granted or revoked', () => {

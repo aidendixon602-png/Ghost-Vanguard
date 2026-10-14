@@ -28,7 +28,7 @@ test('observe mode records incident at threshold without calling containment', a
         calls++;
         return 'contained';
     };
-    await Promise.all(['1', '2', '3', '4'].map(id => security.audit(entry(id), guild)));
+    await Promise.all(['1', '2', '3', '4', '5', '6'].map(id => security.audit(entry(id), guild)));
     assert.equal(store.all('SELECT * FROM incidents').length, 1);
     assert.equal(calls, 0);
     assert.equal(logs.length, 1);
@@ -43,7 +43,7 @@ test('enforce mode writes evidence before containment and stores the result', as
         assert.equal(store.all('SELECT * FROM incidents').length, 1);
         return 'contained';
     };
-    for (const id of ['1', '2', '3'])
+    for (const id of ['1', '2', '3', '4', '5'])
         await security.audit(entry(id), guild);
     assert.equal(calls, 1);
     assert.match(store.get('SELECT result FROM incidents')?.result, /^contained/);
@@ -62,7 +62,7 @@ test('owner, bot and explicitly trusted users are excluded from audit counting',
 test('security administrator grant alone does not bypass detection', async () => {
     const { store, security, guild, entry } = setup();
     store.grant('g', 'attacker', 'admin', 'owner');
-    for (const id of ['1', '2', '3'])
+    for (const id of ['1', '2', '3', '4', '5'])
         await security.audit(entry(id), guild);
     assert.equal(store.all('SELECT * FROM incidents').length, 1);
     store.close();
@@ -84,7 +84,7 @@ test('replayed and duplicate audit events cannot cause enforcement', async () =>
         calls++;
         return 'contained';
     };
-    for (const id of ['1', '2', '3'])
+    for (const id of ['1', '2', '3', '4', '5'])
         await security.audit(entry(id, 'attacker', AuditLogEvent.MemberBanAdd, Date.now() - 180000), guild);
     await security.audit(entry('1'), guild);
     assert.equal(calls, 0);
@@ -228,6 +228,7 @@ test('incident alerts offer Review restore only when the actor deleted channels 
     const security = new Security(store, { push: (_g: unknown, _e: unknown, rows: any[] = []) => pushed.push({ rows }) } as unknown as LogQueue);
     await security.audit(auditEntry('d1', AuditLogEvent.ChannelDelete, {}, 'nuker'), guild);
     await security.audit(auditEntry('d2', AuditLogEvent.ChannelDelete, {}, 'nuker'), guild);
+    await security.audit(auditEntry('d3', AuditLogEvent.ChannelDelete, {}, 'nuker'), guild);
     await security.audit(auditEntry('p1', AuditLogEvent.MemberPrune, {}, 'pruner'), guild);
     assert.equal(pushed.length, 2);
     assert.match(JSON.stringify(pushed[0]!.rows.map(r => r.toJSON())), /incident:restore:1/);
@@ -238,7 +239,7 @@ test('incident alerts offer Review restore only when the actor deleted channels 
 test('bans and kicks done through /moderation count against the moderator, not the exempt bot', async () => {
     const { store, security, guild } = setup();
     const viaBot = (id: string, reason: string | null, action: number = AuditLogEvent.MemberBanAdd) => auditEntry(id, action, { reason }, 'bot');
-    for (const n of ['1', '2', '3'])
+    for (const n of ['1', '2', '3', '4', '5'])
         await security.audit(viaBot(n, '223456789012345678: spam'), guild);
     assert.deepEqual(store.all('SELECT actor_id, rule FROM incidents').map(r => `${r.actor_id}:${r.rule}`), ['223456789012345678:mass_ban']);
     await security.audit(viaBot('k1', '223456789012345678: raid', AuditLogEvent.MemberKick), guild);
@@ -254,7 +255,7 @@ test('bans and kicks done through /moderation count against the moderator, not t
 test('trusted moderators acting through the bot stay exempt', async () => {
     const { store, security, guild } = setup();
     store.grant('g', '323456789012345678', 'trust', 'owner');
-    for (const n of ['1', '2', '3'])
+    for (const n of ['1', '2', '3', '4', '5'])
         await security.audit(auditEntry(n, AuditLogEvent.MemberBanAdd, { reason: '323456789012345678: cleanup' }, 'bot'), guild);
     assert.equal(store.all('SELECT * FROM observations').length, 0);
     store.close();

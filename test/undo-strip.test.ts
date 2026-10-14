@@ -27,7 +27,7 @@ test('a strip that removed roles gets an Undo strip button; other punishments do
         const ids = pushed.at(-1)!.rows.flatMap((r: any) => r.toJSON().components.map((c: any) => c.custom_id));
         assert.ok(ids.some((id: string) => /^incident:undo:\d+$/.test(id)), 'Undo strip offered');
         security.punish = async () => 'Banned the executor.';
-        for (let n = 0; n < 3; n++) await security.audit({ id: 'b' + n, executorId: 'banner', targetId: 't' + n, action: AuditLogEvent.MemberBanAdd, createdTimestamp: Date.now() } as any, guild);
+        for (let n = 0; n < 5; n++) await security.audit({ id: 'b' + n, executorId: 'banner', targetId: 't' + n, action: AuditLogEvent.MemberBanAdd, createdTimestamp: Date.now() } as any, guild);
         const banIds = pushed.at(-1)!.rows.flatMap((r: any) => r.toJSON().components.map((c: any) => c.custom_id));
         assert.ok(!banIds.some((id: string) => id.startsWith('incident:undo:')), 'no undo button for a ban');
     } finally { store.close(); }

@@ -1,5 +1,26 @@
 # Changelog
 
+## 2.34.0: gentler anti-nuke, still watching
+**Nobody is banned or kicked by anti-nuke any more.** Every rule now **strips** (removes their staff roles), which stops an attack just as well, and a false alarm can be undone in one click with **Undo strip**.
+
+| Rule | Before | Now |
+|---|---|---|
+| Ban | 3 in 60s → ban | **5 in 60s → strip** (bans undone) |
+| Kick | 3 in 120s → ban | **5 in 120s → strip** |
+| Channel Delete | 2 in 120s → ban | **3 in 120s → strip** |
+| Channel Create | 4 in 120s → kick | **6 in 120s → strip** (warns first) |
+| Bot Add | 1 → ban | **1 → strip** (the bot is still removed) |
+| Webhook | 1 → kick | **3 in 60s → strip** (warns first) |
+| Role Create | 5 in 120s | **8 in 120s** |
+| Role Invite | 6 in 60s | **8 in 60s** |
+| Server Update | 3 in 120s | **5 in 120s** |
+| Timeout | 8 in 120s | **10 in 120s** |
+| Channel / Role Update | 10 in 60s | **15 in 60s** |
+
+**Still instant:** Permission Grant (giving Administrator etc.), Member Prune, AutoMod.
+
+**New: heads-up.** One step before any limit, a blue **Anti-nuke heads-up** is posted in the security log ("@user is close to the Channel Delete limit: 2 of 3 in 120s. Nothing has been done."). Staff can see trouble coming without anyone being punished, at most once per person and rule per window.
+
 ## 2.33.4: reasons are optional
 - `reason` is now optional on `/mod ban`, `unban`, `kick`, `timeout`, `untimeout`, `/mod tempban`, `softban`, `massban`, `/network genreban`, `hardban`, `ungenreban` and `unhardban`. If it's left empty, **"No reason given"** is recorded in the case, the ban record and the audit log.
 - `/mod warn` still needs a reason, because the reason is the warning that gets DMed. `/case reason` and the Roblox blacklist also still need one.

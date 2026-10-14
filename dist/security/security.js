@@ -151,8 +151,12 @@ export class Security {
         if (!s.enabled || now - at > 120000 || at > now + 10000)
             return;
         const count = this.store.count(guild.id, actor, rule.key, now - active.seconds * 1000);
-        if (count < active.count)
+        if (count < active.count) {
+            // Still monitoring: one step before the limit, staff get a quiet heads-up (no action taken).
+            if (count === active.count - 1 && active.count >= 3 && s.mode === 'enforce')
+                this.headsUp(guild, actor, active, count, now);
             return;
+        }
         if (this.store.get("SELECT 1 FROM incidents WHERE guild_id=? AND actor_id=? AND rule=? AND at>? AND mode<>'warn'", guild.id, actor, rule.key, now - active.seconds * 1000))
             return;
         // Everyday rules warn first (people, not bots); a second offence within the hour gets the real punishment.
@@ -208,6 +212,20 @@ export class Security {
             buttons.push(new ButtonBuilder().setCustomId(`incident:restore:${incident}`).setLabel('Review restore').setStyle(ButtonStyle.Secondary));
         const rows = buttons.length ? [new ActionRowBuilder().addComponents(...buttons)] : [];
         this.logs.push(guild.id, incidentCard({ incident, actor, rule: active, mode: warnOnly ? 'warn' : s.mode, count, result, progress, deleted, targetId: entry.targetId ?? null }), rows);
+    }
+    headsUps = new Map();
+    /** "Close to the limit" note in the security log, at most once per person, rule and window. */
+    headsUp(guild, actor, rule, count, now) {
+        const key = `${guild.id}:${actor}:${rule.key}`;
+        if ((this.headsUps.get(key) ?? 0) > now)
+            return;
+        this.headsUps.set(key, now + rule.seconds * 1000);
+        if (this.headsUps.size > 5000)
+            for (const [k, until] of this.headsUps)
+                if (until <= now)
+                    this.headsUps.delete(k);
+        const next = WARN_FIRST.has(rule.key) ? 'a warning' : `being ${rule.punishment === 'ban' ? 'banned' : rule.punishment === 'kick' ? 'kicked' : 'stripped'}`;
+        this.logs.push(guild.id, embed('Anti-nuke heads-up', `<@${actor}> is close to the **${rule.title}** limit: **${count} of ${rule.count}** in ${rule.seconds}s. Nothing has been done. One more gets them ${next}.\n-# If this is normal for them, whitelist them with \`/antinuke whitelist add\`.`, Colors.Blue));
     }
     /** Tell someone privately that anti-nuke warned them, so a staff member doing normal work knows to slow down or ask for a whitelist. */
     async warnActor(guild, actor, what) {

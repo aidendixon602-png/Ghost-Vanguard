@@ -55,8 +55,8 @@ test('rule overrides do not mutate defaults', () => {
     const r = RULES[0]!;
     const copy = overrideRule(r, { mass_ban: { count: 1, seconds: 5 } });
     assert.notEqual(copy, r);
-    assert.equal(copy.count, 3);
-    assert.equal(r.count, 3);
+    assert.equal(copy.count, r.count);
+    assert.equal(r.count, 5);
 });
 
 test('verification provider disagreement blocks a link', () => {

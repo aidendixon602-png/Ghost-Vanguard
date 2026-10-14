@@ -26,20 +26,20 @@ function toBits(value) {
     }
 }
 export const RULES = [
-    { key: 'mass_ban', title: 'Ban', count: 3, seconds: 60, punishment: 'ban', revert: true, actions: [AuditLogEvent.MemberBanAdd] },
-    { key: 'bot_add', title: 'Bot Add', count: 1, seconds: 60, punishment: 'ban', revert: true, actions: [AuditLogEvent.BotAdd] },
-    { key: 'channel_create', title: 'Channel Create', count: 4, seconds: 120, punishment: 'kick', revert: true, actions: [AuditLogEvent.ChannelCreate] },
-    { key: 'channel_delete', title: 'Channel Delete', count: 2, seconds: 120, punishment: 'ban', revert: false, actions: [AuditLogEvent.ChannelDelete] },
-    { key: 'mass_kick', title: 'Kick', count: 3, seconds: 120, punishment: 'ban', revert: false, actions: [AuditLogEvent.MemberKick] },
+    { key: 'mass_ban', title: 'Ban', count: 5, seconds: 60, punishment: 'strip', revert: true, actions: [AuditLogEvent.MemberBanAdd] },
+    { key: 'bot_add', title: 'Bot Add', count: 1, seconds: 60, punishment: 'strip', revert: true, actions: [AuditLogEvent.BotAdd] },
+    { key: 'channel_create', title: 'Channel Create', count: 6, seconds: 120, punishment: 'strip', revert: true, actions: [AuditLogEvent.ChannelCreate] },
+    { key: 'channel_delete', title: 'Channel Delete', count: 3, seconds: 120, punishment: 'strip', revert: false, actions: [AuditLogEvent.ChannelDelete] },
+    { key: 'mass_kick', title: 'Kick', count: 5, seconds: 120, punishment: 'strip', revert: false, actions: [AuditLogEvent.MemberKick] },
     { key: 'dangerous_grant', title: 'Permission Grant', count: 1, seconds: 60, punishment: 'strip', revert: true, recipient: true, actions: [], singleEvent: true },
-    { key: 'role_create', title: 'Role Create', count: 5, seconds: 120, punishment: 'strip', revert: true, actions: [AuditLogEvent.RoleCreate] },
+    { key: 'role_create', title: 'Role Create', count: 8, seconds: 120, punishment: 'strip', revert: true, actions: [AuditLogEvent.RoleCreate] },
     { key: 'role_delete', title: 'Role Delete', count: 5, seconds: 120, punishment: 'strip', revert: false, actions: [AuditLogEvent.RoleDelete] },
-    { key: 'role_grant', title: 'Role Invite', count: 6, seconds: 60, punishment: 'strip', revert: true, actions: [AuditLogEvent.MemberRoleUpdate] },
-    { key: 'guild_update', title: 'Server Update', count: 3, seconds: 120, punishment: 'strip', revert: false, actions: [AuditLogEvent.GuildUpdate] },
-    { key: 'timeout', title: 'Timeout', count: 8, seconds: 120, punishment: 'strip', revert: true, actions: [] },
-    { key: 'webhook_change', title: 'Webhook', count: 1, seconds: 60, punishment: 'kick', revert: true, actions: [AuditLogEvent.WebhookCreate, AuditLogEvent.WebhookUpdate, AuditLogEvent.WebhookDelete] },
-    { key: 'channel_update', title: 'Channel Update', count: 10, seconds: 60, actions: [AuditLogEvent.ChannelUpdate, AuditLogEvent.ChannelOverwriteCreate, AuditLogEvent.ChannelOverwriteUpdate, AuditLogEvent.ChannelOverwriteDelete] },
-    { key: 'role_update', title: 'Role Update', count: 10, seconds: 60, actions: [AuditLogEvent.RoleUpdate] },
+    { key: 'role_grant', title: 'Role Invite', count: 8, seconds: 60, punishment: 'strip', revert: true, actions: [AuditLogEvent.MemberRoleUpdate] },
+    { key: 'guild_update', title: 'Server Update', count: 5, seconds: 120, punishment: 'strip', revert: false, actions: [AuditLogEvent.GuildUpdate] },
+    { key: 'timeout', title: 'Timeout', count: 10, seconds: 120, punishment: 'strip', revert: true, actions: [] },
+    { key: 'webhook_change', title: 'Webhook', count: 3, seconds: 60, punishment: 'strip', revert: true, actions: [AuditLogEvent.WebhookCreate, AuditLogEvent.WebhookUpdate, AuditLogEvent.WebhookDelete] },
+    { key: 'channel_update', title: 'Channel Update', count: 15, seconds: 60, actions: [AuditLogEvent.ChannelUpdate, AuditLogEvent.ChannelOverwriteCreate, AuditLogEvent.ChannelOverwriteUpdate, AuditLogEvent.ChannelOverwriteDelete] },
+    { key: 'role_update', title: 'Role Update', count: 15, seconds: 60, actions: [AuditLogEvent.RoleUpdate] },
     { key: 'member_prune', title: 'Member Prune', count: 1, seconds: 60, actions: [AuditLogEvent.MemberPrune], singleEvent: true },
     { key: 'automod_tamper', title: 'AutoMod', count: 1, seconds: 60, actions: [AuditLogEvent.AutoModerationRuleDelete], singleEvent: true },
     { key: 'join_flood', title: 'Join Flood', count: 12, seconds: 15, actions: [] },
@@ -63,7 +63,7 @@ export const KNOWN_ROLE_BOTS = {
 };
 /** What is recorded when a moderator leaves the (optional) reason empty. */
 export const NO_REASON = 'No reason given';
-export const WARN_FIRST = new Set(['role_grant', 'role_create', 'role_update', 'channel_create', 'channel_update', 'guild_update', 'timeout']);
+export const WARN_FIRST = new Set(['role_grant', 'role_create', 'role_update', 'channel_create', 'channel_update', 'guild_update', 'timeout', 'webhook_change']);
 export const WARNING_MEMORY_MS = 60 * 60 * 1000;
 export function ruleFor(action) {
     return RULES.find(r => r.actions.includes(action));

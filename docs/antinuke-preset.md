@@ -7,18 +7,20 @@ confirmation and stop detection/enforcement. Settings, incidents and backups are
 
 | Rule | Count | Window | Action | Revert |
 |---|---:|---:|---|---|
-| Ban | 3 | 60 seconds | ban | Yes |
-| Bot Add | 1 | 60 seconds | ban | Yes |
-| Channel Create | 4 | 120 seconds | kick | Yes |
-| Channel Delete | 2 | 120 seconds | ban | No |
-| Kick | 3 | 120 seconds | ban | No |
+| Ban | 5 | 60 seconds | strip | Yes |
+| Bot Add | 1 | 60 seconds | strip | Yes (the bot is removed) |
+| Channel Create | 6 | 120 seconds | strip (warns first) | Yes |
+| Channel Delete | 3 | 120 seconds | strip | No |
+| Kick | 5 | 120 seconds | strip | No |
 | Permission Grant | 1 | 60 seconds | strip | Yes, including member role grants (whitelisted role managers may grant moderator perms; Administrator and Manage Server always checked) |
-| Role Create | 5 | 120 seconds | strip | Yes |
+| Role Create | 8 | 120 seconds | strip (warns first) | Yes |
 | Role Delete | 5 | 120 seconds | strip | No |
-| Role Invite | 6 | 60 seconds | strip | Yes |
-| Server Update | 3 | 120 seconds | strip | No |
-| Timeout | 8 | 120 seconds | strip | Yes |
-| Webhook | 1 | 60 seconds | kick | Creation; other events need manual review |
+| Role Invite | 8 | 60 seconds | strip (warns first) | Yes |
+| Server Update | 5 | 120 seconds | strip (warns first) | No |
+| Timeout | 10 | 120 seconds | strip (warns first) | Yes |
+| Webhook | 3 | 60 seconds | strip (warns first) | Creation; other events need manual review |
+
+One step before any limit a heads-up is posted to the security log; nothing is done to the person.
 
 Role Invite means adding a role to a member, not creating a server invitation.
 Permission Grant detects newly granted Administrator, Ban Members, Kick Members,

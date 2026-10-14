@@ -4,20 +4,20 @@ Every authorized server runs the same 17-rule anti-nuke preset in **enforce** mo
 
 | Rule | Limit | Action |
 |---|---|---|
-| Ban | 3 in 60s | ban + revert |
-| Bot Add | 1 in 60s | ban + revert |
-| Channel Create | 4 in 120s | kick + revert |
-| Channel Delete | 2 in 120s | ban |
-| Kick | 3 in 120s | ban |
+| Ban | 5 in 60s | strip + revert |
+| Bot Add | 1 in 60s | strip + remove the bot |
+| Channel Create | 6 in 120s | warns first, then strip + revert |
+| Channel Delete | 3 in 120s | strip |
+| Kick | 5 in 120s | strip |
 | Permission Grant (administrator, ban/kick members, manage channels/server/webhooks) | 1 in 60s | strip + revert, including the recipient |
-| Role Create | 5 in 120s | strip + revert |
+| Role Create | 8 in 120s | warns first, then strip + revert |
 | Role Delete | 5 in 120s | strip |
-| Role Invite | 6 in 60s | strip + revert |
-| Server Update | 3 in 120s | strip |
-| Timeout | 8 in 120s | strip + revert |
-| Webhook | 1 in 60s | kick + revert |
-| Channel Update | 10 in 60s | strip |
-| Role Update | 10 in 60s | strip |
+| Role Invite | 8 in 60s | warns first, then strip + revert |
+| Server Update | 5 in 120s | warns first, then strip |
+| Timeout | 10 in 120s | warns first, then strip + revert |
+| Webhook | 3 in 60s | warns first, then strip + revert |
+| Channel Update | 15 in 60s | warns first, then strip |
+| Role Update | 15 in 60s | warns first, then strip |
 | Member Prune | 1 in 60s | strip |
 | AutoMod | 1 in 60s | strip |
 | Join Flood | 12 in 15s | alert only |
