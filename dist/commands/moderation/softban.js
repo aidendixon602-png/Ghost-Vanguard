@@ -1,3 +1,4 @@
+import { NO_REASON } from '../../core.js';
 import { Colors, PermissionFlagsBits, SlashCommandBuilder } from 'discord.js';
 import { defineCommand } from '../../bot/registry.js';
 import { AppError } from '../../errors.js';
@@ -8,9 +9,9 @@ import { existingBan } from '../../security/network-ban.js';
 import { classify, finish, outcomeEmbed } from '../../ui/progress.js';
 export default defineCommand(new SlashCommandBuilder().setName('softban').setDescription('Ban then immediately unban: kicks a member and deletes their recent messages')
     .addUserOption(o => o.setName('user').setDescription('Member').setRequired(true))
-    .addStringOption(o => o.setName('reason').setDescription('Reason').setRequired(true).setMaxLength(450))
+    .addStringOption(o => o.setName('reason').setDescription('Reason (optional)').setMaxLength(450))
     .addIntegerOption(o => o.setName('delete_messages').setDescription('How much of their history to delete (default 24 hours)').addChoices({ name: 'Last hour', value: 3600 }, { name: 'Last 24 hours', value: 86400 }, { name: 'Last 7 days', value: 604800 })), { category: 'moderation', access: 'member', requiredPermissions: [PermissionFlagsBits.BanMembers], botPermissions: [PermissionFlagsBits.BanMembers], cooldown: 1500 }, async (ctx, i) => {
-    const user = i.options.getUser('user', true), reason = i.options.getString('reason', true), seconds = i.options.getInteger('delete_messages') ?? 86400;
+    const user = i.options.getUser('user', true), reason = (i.options.getString('reason') ?? NO_REASON), seconds = i.options.getInteger('delete_messages') ?? 86400;
     const target = await memberOrNull(i.guild, user.id), me = await i.guild.members.fetchMe();
     if ([ctx.actor.id, me.id, i.guild.ownerId].includes(user.id))
         throw new AppError('VALIDATION_ERROR', 'You cannot target yourself, this bot, or the server owner.');

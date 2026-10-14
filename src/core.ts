@@ -83,6 +83,9 @@ export const KNOWN_ROLE_BOTS: Record<string, string> = {
     '159985870458322944': 'MEE6',
 };
 
+/** What is recorded when a moderator leaves the (optional) reason empty. */
+export const NO_REASON = 'No reason given';
+
 export const WARN_FIRST = new Set(['role_grant', 'role_create', 'role_update', 'channel_create', 'channel_update', 'guild_update', 'timeout']);
 export const WARNING_MEMORY_MS = 60 * 60 * 1000;
 

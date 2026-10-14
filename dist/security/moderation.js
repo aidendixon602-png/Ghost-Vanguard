@@ -1,5 +1,5 @@
 import { Colors, PermissionFlagsBits } from 'discord.js';
-import { clip } from '../core.js';
+import { clip, NO_REASON } from '../core.js';
 import { AppError } from '../errors.js';
 import { checkTarget, embed, memberOrNull } from '../ui/ui.js';
 import { RANKS, rankOf } from '../bot/ranks.js';
@@ -26,7 +26,8 @@ export async function moderate(i, store, logs, actor) {
         const rows = store.all('SELECT * FROM cases WHERE guild_id=? AND user_id=? ORDER BY id DESC LIMIT 10', i.guildId, user.id);
         return rows.map(r => `**Case #${r.number ?? r.id} · ${r.action}** · <t:${Math.floor(r.at / 1000)}:R>\n${clip(r.reason, 200)} · by <@${r.moderator_id}>`).join('\n\n') || 'No cases recorded for this user.';
     }
-    const reason = i.options.getString('reason', true);
+    // Optional for everything except /mod warn (where the reason is the warning itself, so Discord requires it).
+    const reason = i.options.getString('reason') ?? NO_REASON;
     const auditReason = clip(`${actor.id}: ${reason}`, 500);
     let targetId;
     let username = null;

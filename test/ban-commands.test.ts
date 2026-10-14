@@ -171,3 +171,11 @@ test('an expiring tempban does not lift a genreban or hardban placed since', asy
     assert.match(w.logged.at(-1)!, /still banned/);
     w.store.close();
 });
+
+test('ban reasons are optional: an empty reason is recorded as "No reason given"', async () => {
+    const w = world();
+    await w.run(tempbanCommand, { duration: 24 });
+    assert.match(title(w.clickReplies.at(-1)), /^✅ Tempban succeeded/);
+    assert.equal(w.store.readGuild(G, () => w.store.get('SELECT reason FROM cases WHERE guild_id=?', G))!.reason, 'No reason given');
+    w.store.close();
+});

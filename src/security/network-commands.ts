@@ -1,3 +1,4 @@
+import { NO_REASON } from '../core.js';
 import { SlashCommandBuilder } from 'discord.js';
 import { defineCommand, type CommandContext } from '../bot/registry.js';
 import { clip } from '../core.js';
@@ -47,7 +48,7 @@ export function issueCommand(kind: NetworkKind) {
         : 'Developer: ban a user from every authorized server until /network ungenreban';
     return defineCommand(new SlashCommandBuilder().setName(kind).setDescription(description)
         .addStringOption(o => o.setName('user').setDescription('User ID, @mention or username. IDs work even if they are in no server.').setRequired(true).setMaxLength(40))
-        .addStringOption(o => o.setName('reason').setDescription('Reason, shown in every server\'s log and audit log').setRequired(true).setMaxLength(400))
+        .addStringOption(o => o.setName('reason').setDescription('Reason, shown in every server\'s log and audit log (optional)').setMaxLength(400))
         .addStringOption(o => o.setName('evidence').setDescription('Evidence: links, message IDs or a short description').setMaxLength(1000))
         .addAttachmentOption(o => o.setName('evidence_file').setDescription('Evidence screenshot or file'))
         .addIntegerOption(o => o.setName('delete_messages').setDescription('Also delete their recent messages in every server').addChoices(...DELETE_MESSAGE_CHOICES)),
@@ -71,7 +72,7 @@ export function issueCommand(kind: NetworkKind) {
             return refuse(i, error, kind).then(() => undefined);
         }
         const target = user;
-        const reason = i.options.getString('reason', true);
+        const reason = (i.options.getString('reason') ?? NO_REASON);
         const evidence = i.options.getString('evidence');
         const file = i.options.getAttachment('evidence_file');
         const evidenceFile = file ? `[${clip(file.name, 80)}](${file.url})` : null;
@@ -121,12 +122,12 @@ export function revokeCommand(kind: NetworkKind) {
     const name = KIND_NAME[kind];
     const builder = new SlashCommandBuilder().setName(`un${kind}`).setDescription(`Developer: revoke a ${kind} and lift it in every authorized server`)
         .addStringOption(o => o.setName('user').setDescription('User ID, @mention, or the username recorded with the ban').setRequired(true).setMaxLength(40))
-        .addStringOption(o => o.setName('reason').setDescription('Reason for lifting it').setRequired(true).setMaxLength(400));
+        .addStringOption(o => o.setName('reason').setDescription('Reason for lifting it (optional)').setMaxLength(400));
     if (kind === 'hardban')
         builder.addBooleanOption(o => o.setName('unban').setDescription('Also unban them where the hardban banned them (default: yes)'));
     return defineCommand(builder, POLICY, async (ctx: CommandContext, i) => {
         const input = i.options.getString('user', true);
-        const reason = i.options.getString('reason', true);
+        const reason = (i.options.getString('reason') ?? NO_REASON);
         await showWorking(i, `Revoking ${kind}`, `Looking up the active ${kind} for \`${clip(input, 40)}\`…`);
         let ban: NetworkBan;
         try {

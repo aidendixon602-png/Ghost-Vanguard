@@ -1,3 +1,4 @@
+import { NO_REASON } from '../../core.js';
 import { Colors, PermissionFlagsBits, SlashCommandBuilder } from 'discord.js';
 import { defineCommand } from '../../bot/registry.js';
 import { AppError } from '../../errors.js';
@@ -23,7 +24,7 @@ export function parseIds(text) {
 }
 export default defineCommand(new SlashCommandBuilder().setName('massban').setDescription('Raid cleanup: ban up to 200 user IDs at once (whitelisted staff only)')
     .addStringOption(o => o.setName('user_ids').setDescription('IDs separated by spaces or commas').setRequired(true).setMaxLength(6000))
-    .addStringOption(o => o.setName('reason').setDescription('Reason').setRequired(true).setMaxLength(400))
+    .addStringOption(o => o.setName('reason').setDescription('Reason (optional)').setMaxLength(400))
     .addIntegerOption(o => o.setName('delete_messages').setDescription('Also delete their recent messages (default 24 hours)').addChoices({ name: 'Keep messages', value: 0 }, { name: 'Last hour', value: 3600 }, { name: 'Last 24 hours', value: 86400 }, { name: 'Last 7 days', value: 604800 })), { category: 'security', access: 'security', requiredPermissions: [PermissionFlagsBits.BanMembers], botPermissions: [PermissionFlagsBits.BanMembers], cooldown: 10000 }, async (ctx, i) => {
     const actor = ctx.actor;
     // Many bans in a minute is exactly what anti-nuke stops, so only people anti-nuke already trusts may do it.
@@ -36,7 +37,7 @@ export default defineCommand(new SlashCommandBuilder().setName('massban').setDes
     const skipped = all.length - ids.length;
     if (!ids.length)
         throw new AppError('VALIDATION_ERROR', 'Every ID was protected (you, the owner, developers, Vanguard or whitelisted accounts).');
-    const reason = i.options.getString('reason', true), seconds = i.options.getInteger('delete_messages') ?? 86400;
+    const reason = (i.options.getString('reason') ?? NO_REASON), seconds = i.options.getInteger('delete_messages') ?? 86400;
     await confirmDanger(ctx, i, {
         title: `Ban ${ids.length} account(s)`, summary: `**Reason:** ${reason}${skipped ? `\n${skipped} protected ID(s) were removed from the list.` : ''}`,
         consequences: [`${ids.length} account(s) are banned, including any not in the server.`, seconds ? 'Their recent messages are permanently deleted.' : 'Their messages are kept.', 'Members above Vanguard\'s role cannot be banned and are reported.', 'One case is recorded per account.'],

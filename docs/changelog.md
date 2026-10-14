@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.33.4: reasons are optional
+- `reason` is now optional on `/mod ban`, `unban`, `kick`, `timeout`, `untimeout`, `/mod tempban`, `softban`, `massban`, `/network genreban`, `hardban`, `ungenreban` and `unhardban`. If it's left empty, **"No reason given"** is recorded in the case, the ban record and the audit log.
+- `/mod warn` still needs a reason, because the reason is the warning that gets DMed. `/case reason` and the Roblox blacklist also still need one.
+
 ## 2.33.3: every ban command handles someone who is already banned
 - **`/mod tempban`** on someone already banned keeps their ban and gives it an **end date**: they are unbanned automatically when the time is up. A case is recorded, and their ban record shows "Temporary ban" with the end time.
 - **`/mod massban`** records the reason (a case, plus the ban record in `#bans`) for every account that was already banned, instead of skipping it silently.

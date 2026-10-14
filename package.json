@@ -1,6 +1,6 @@
 {
   "name": "midtown-vanguard",
-  "version": "2.33.3",
+  "version": "2.33.4",
   "private": true,
   "description": "Multi-server Midtown Vanguard with durable authorization, global command synchronization and centralized security",
   "type": "module",

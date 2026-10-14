@@ -1,3 +1,4 @@
+import { NO_REASON } from '../../core.js';
 import { Colors, PermissionFlagsBits, SlashCommandBuilder } from 'discord.js';
 import { sendBanNotice } from '../../features/appeals.js';
 import { defineCommand } from '../../bot/registry.js';
@@ -12,10 +13,10 @@ const DURATIONS = [['1 hour', 1], ['6 hours', 6], ['12 hours', 12], ['1 day', 24
 export default defineCommand(new SlashCommandBuilder().setName('tempban').setDescription('Ban a user for a set time; Vanguard lifts the ban automatically')
     .addUserOption(o => o.setName('user').setDescription('User').setRequired(true))
     .addIntegerOption(o => o.setName('duration').setDescription('How long').setRequired(true).addChoices(...DURATIONS.map(([name, value]) => ({ name, value }))))
-    .addStringOption(o => o.setName('reason').setDescription('Reason').setRequired(true).setMaxLength(450))
+    .addStringOption(o => o.setName('reason').setDescription('Reason (optional)').setMaxLength(450))
     .addIntegerOption(o => o.setName('delete_messages').setDescription('Also delete recent messages').addChoices({ name: 'Keep messages', value: 0 }, { name: 'Last hour', value: 3600 }, { name: 'Last 24 hours', value: 86400 }, { name: 'Last 7 days', value: 604800 }))
     .addStringOption(o => o.setName('evidence').setDescription('Evidence: links or a short description (shown in the ban log)').setMaxLength(500)), { category: 'moderation', access: 'member', requiredPermissions: [PermissionFlagsBits.BanMembers], botPermissions: [PermissionFlagsBits.BanMembers], cooldown: 1500 }, async (ctx, i) => {
-    const user = i.options.getUser('user', true), hours = i.options.getInteger('duration', true), reason = i.options.getString('reason', true), seconds = i.options.getInteger('delete_messages') ?? 0, evidence = i.options.getString('evidence');
+    const user = i.options.getUser('user', true), hours = i.options.getInteger('duration', true), reason = (i.options.getString('reason') ?? NO_REASON), seconds = i.options.getInteger('delete_messages') ?? 0, evidence = i.options.getString('evidence');
     const label = DURATIONS.find(([, h]) => h === hours)?.[0] ?? `${hours} hours`;
     const target = await memberOrNull(i.guild, user.id), me = await i.guild.members.fetchMe();
     if ([ctx.actor.id, me.id, i.guild.ownerId].includes(user.id))
