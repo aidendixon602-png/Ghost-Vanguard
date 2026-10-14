@@ -17,6 +17,7 @@ Anti-nuke protection: status, on/off, safety scan and the whitelist
 | `/antinuke whitelist add` | Whitelist a user or role: pick what anti-nuke lets them do and for how long | Owner or Head Admin |
 | `/antinuke whitelist remove` | Take a user or role off the whitelist completely | Owner or Head Admin |
 | `/antinuke whitelist list` | Show everyone on the whitelist, what they skip and when it expires | Head Admin+ |
+| `/antinuke whitelist check` | See exactly what anti-nuke lets someone do, and what would get them stripped | Head Admin+ |
 | `/antinuke whitelist bots` | Let a verification bot (Bloxlink, RoVer) give verified roles without tripping anti-nuke | Owner or Head Admin |
 
 ## /mod
@@ -205,6 +206,7 @@ Bot developers: diagnostics, updates, servers and the database
 | `/dev database status` | Show database health, storage, backup and migration status | Developer |
 | `/dev database backup` | Create a verified database backup now | Developer |
 | `/dev database backups` | List recent database backups | Developer |
+| `/dev database restore-settings` | Put back lost settings from an old backup file; anything newer is kept | Developer |
 | `/dev database verify` | Recheck backup checksum and database integrity | Developer |
 | `/dev autoreact add` | React to every message from a member (🐐 by default) | Developer |
 | `/dev autoreact remove` | Stop auto-reacting to a member | Developer |

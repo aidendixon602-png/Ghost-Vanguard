@@ -101,7 +101,9 @@ export class ScamProtection {
         const previous = this.readiness.get(guild.id);
         this.readiness.set(guild.id, { ready, reason, until: Date.now() + 60000 });
         if (!previous || previous.ready !== ready || previous.reason !== reason) {
-            logEvent('scam_startup', { guildId: guild.id, ready, reason });
+            // Console: only problems; "ready" in every server is noise.
+            if (!ready)
+                logEvent('scam_protection_unavailable', { server: guild.name ?? guild.id, reason });
             // Remembered across restarts: "ready" is posted only when the status changes; problems are always shown once.
             if (this.store.isAuthorized(guild.id) && shouldPost(this.store, guild.id, 'scam', JSON.stringify([ready, reason]), { quietIfNew: ready }))
                 this.logs.push(guild.id, new EmbedBuilder().setColor(ready ? Colors.Green : Colors.Orange).setTitle(ready ? 'Automatic scam protection ready' : 'Scam protection needs attention').setDescription(reason));

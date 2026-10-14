@@ -183,14 +183,16 @@ test('reverting that grant deletes the new role when Vanguard can, and keeps it 
  } finally {store.close();}
 });
 
-test('Role Invite allows normal role giving: five grants pass, the sixth in a minute triggers',async()=>{
+test('Role Invite allows normal role giving: five grants pass, the sixth warns, the seventh strips',async()=>{
  const {store,security,guild,entry}=fixture();
  try {
   guild.roles={cache:new Collection()};let punished=0;security.punish=async()=>{punished++;return 'Stripped actor.';};security.revert=async()=>'Removed 1 assigned role(s).';
   for(let n=1;n<=5;n++)await security.audit(entry('g'+n,'m'+n,AuditLogEvent.MemberRoleUpdate,[{key:'$add',new:[{id:'r'}]}]),guild);
   assert.equal(punished,0);assert.equal(store.all("SELECT * FROM incidents WHERE rule='role_grant'").length,0);
   await security.audit(entry('g6','m6',AuditLogEvent.MemberRoleUpdate,[{key:'$add',new:[{id:'r'}]}]),guild);
-  assert.equal(punished,1);assert.equal(store.all("SELECT * FROM incidents WHERE rule='role_grant'").length,1);
+  assert.equal(punished,0,'first time over the limit is a warning');assert.equal(store.get("SELECT mode FROM incidents WHERE rule='role_grant'")!.mode,'warn');
+  await security.audit(entry('g7','m7',AuditLogEvent.MemberRoleUpdate,[{key:'$add',new:[{id:'r'}]}]),guild);
+  assert.equal(punished,1,'carrying on after the warning strips');
  }finally{store.close();}
 });
 
@@ -227,5 +229,48 @@ test('Permission Grant only counts permissions the member did not already have',
   assert.equal(incidents(),0,'they already had Ban/Kick from another role');
   await give('e2','fresh','mod');
   assert.equal(incidents(),1,'someone without the role is still a new grant, and not being whitelisted still strips');
+ }finally{store.close();}
+});
+
+test('warnings: undone and logged, dangerous rules and bots get no warning, and the warning lasts an hour',async()=>{
+ const pushed:any[]=[];
+ const store=new Store(':memory:');authorize(store);const st=store.settings('g');st.enabled=true;st.mode='enforce';store.save(st);
+ const security=new Security(store,{push:(_g:string,e:any)=>{pushed.push(e.toJSON());}} as any);
+ const members=new Map<string,any>([['person',{id:'person',user:{bot:false},send:async()=>{dms++;}}],['somebot',{id:'somebot',user:{bot:true}}]]);
+ let dms=0;
+ const guild:any={id:'g',name:'Test',ownerId:'owner',client:{user:{id:'vanguard'}},roles:{cache:new Collection()},members:{cache:new Collection(),fetch:async({user}:any)=>members.get(user)??null}};
+ const e=(id:string,actor:string,action:number,changes:any[]=[])=>({id,targetId:'t'+id,action,changes,executorId:actor,createdTimestamp:Date.now()} as any);
+ let punished:string[]=[];security.punish=async(_g,a)=>{punished.push(a);return 'Removed 1 dangerous role(s).';};security.revert=async()=>'Deleted created channel x.';
+ try {
+  for(let n=0;n<4;n++)await security.audit(e('c'+n,'person',AuditLogEvent.ChannelCreate),guild);
+  assert.deepEqual(punished,[]);assert.equal(dms,1,'the person is told privately');
+  const card=pushed.at(-1);assert.equal(card.title,'Anti-nuke Warning');assert.match(card.description,/got a \*\*warning\*\*.*undone.*\*\*kicked\*\*/);
+  assert.match(card.fields.find((f:any)=>f.name==='Changes reverted').value,/4 undone/);
+  for(let n=0;n<4;n++)await security.audit(e('b'+n,'somebot',AuditLogEvent.ChannelCreate),guild);
+  assert.deepEqual(punished,['somebot'],'bots are punished straight away');
+  for(let n=0;n<3;n++)await security.audit(e('k'+n,'person',AuditLogEvent.MemberKick),guild);
+  assert.deepEqual(punished,['somebot','person'],'mass kicks never warn');
+  store.run("UPDATE incidents SET at=? WHERE mode='warn'",Date.now()-2*3600000);
+  store.run('DELETE FROM observations');punished=[];
+  for(let n=0;n<4;n++)await security.audit(e('d'+n,'person',AuditLogEvent.ChannelCreate),guild);
+  assert.deepEqual(punished,[],'an old warning (over an hour) does not count, so they get a fresh warning');
+ } finally {store.close();}
+});
+
+test('well-known verification bots can give ordinary roles freely, can be switched off, and never give dangerous ones',async()=>{
+ const BLOX='426537812993638400';
+ const {store,security,guild}=fixture('observe');
+ try {
+  const role=(id:string,bits:bigint)=>({id,managed:false,editable:true,permissions:{bitfield:bits}});
+  guild.roles={cache:new Collection<string,any>([['verified',role('verified',0n)],['mod',role('mod',PermissionFlagsBits.BanMembers)]])};
+  guild.members={cache:new Collection(),fetch:async()=>null};
+  const give=(id:string,r:string)=>security.audit({id,targetId:'m'+id,action:AuditLogEvent.MemberRoleUpdate,changes:[{key:'$add',new:[{id:r}]}],executorId:BLOX,createdTimestamp:Date.now()} as any,guild);
+  for(let n=0;n<10;n++)await give('v'+n,'verified');
+  assert.equal(store.all("SELECT * FROM observations WHERE rule='role_grant'").length,0,'Bloxlink giving verified roles is not counted');
+  await give('d1','mod');
+  assert.equal(store.all("SELECT * FROM observations WHERE rule='dangerous_grant'").length,1,'giving a Ban Members role is still checked');
+  store.grant('g',BLOX,'bot_denied','owner');
+  await give('x1','verified');
+  assert.equal(store.all("SELECT * FROM observations WHERE rule='role_grant'").length,1,'switched off for this server');
  }finally{store.close();}
 });

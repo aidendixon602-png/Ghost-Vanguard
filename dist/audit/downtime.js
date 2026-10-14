@@ -74,7 +74,9 @@ export async function catchUp(guild, store, logs, trusted, offlineSince, now = D
         logs.push(guild.id, noticeEmbed('🟢 Midtown Vanguard is back online', notice, offlineSince ? Colors.Green : Colors.Orange));
     if (settings.enabled) {
         const ready = readiness(guild, settings.logChannelId, store);
-        logEvent('protection_startup', { guildId: guild.id, mode: settings.mode, missingPermissions: ready.missing, hierarchyWarnings: ready.above });
+        // Console: one line per server only when something needs fixing (the ready banner already says how many servers are protected).
+        if (ready.missing.length || ready.above.length)
+            logEvent('protection_warning', { server: guild.name ?? guild.id, ...(ready.missing.length ? { missingPermissions: ready.missing } : {}), ...(ready.above.length ? { rolesAboveBot: ready.above } : {}) });
         const disabled = Object.values(settings.rules).filter(r => r.enabled === false).length;
         if (shouldPost(store, guild.id, 'protection', JSON.stringify([settings.mode, disabled, ready.missing, ready.above]), { quietIfNew: quick }))
             logs.push(guild.id, noticeEmbed('Saved protection loaded', [`**Mode:** ${settings.mode}`, `**Rules off:** ${disabled}`, ...ready.text.split('\n')], ready.missing.length || ready.above.length ? Colors.Orange : Colors.Green));

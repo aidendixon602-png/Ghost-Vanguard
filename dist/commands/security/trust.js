@@ -1,9 +1,11 @@
+import { KNOWN_ROLE_BOTS } from '../../core.js';
 import { Colors, SlashCommandBuilder } from 'discord.js';
 import { AppError } from '../../errors.js';
 import { defineCommand } from '../../bot/registry.js';
 import { trustListPage } from '../../ui/antinuke-panel.js';
 import { panelFor, trustPanel } from '../../ui/trust-panel.js';
 import { embed } from '../../ui/ui.js';
+import { whitelistCheck } from '../../ui/whitelist-check.js';
 export default defineCommand(new SlashCommandBuilder().setName('trust').setDescription('Anti-nuke whitelist: who anti-nuke leaves alone, and for what')
     .addSubcommand(s => s.setName('add').setDescription('Whitelist a user or role: pick what anti-nuke lets them do and for how long')
     .addUserOption(o => o.setName('user').setDescription('User to whitelist (optional)'))
@@ -14,6 +16,8 @@ export default defineCommand(new SlashCommandBuilder().setName('trust').setDescr
     .addSubcommand(s => s.setName('list').setDescription('Show everyone on the whitelist, what they skip and when it expires')
     .addIntegerOption(o => o.setName('page').setDescription('Page number').setMinValue(1).setMaxValue(100000))
     .addBooleanOption(o => o.setName('expired').setDescription('Include expired entries')))
+    .addSubcommand(s => s.setName('check').setDescription('See exactly what anti-nuke lets someone do, and what would get them stripped')
+    .addUserOption(o => o.setName('user').setDescription('The person to check').setRequired(true)))
     .addSubcommand(s => s.setName('bots').setDescription('Let a verification bot (Bloxlink, RoVer) give verified roles without tripping anti-nuke')
     .addUserOption(o => o.setName('bot').setDescription('The verification bot').setRequired(true))
     .addBooleanOption(o => o.setName('allowed').setDescription('True to allow, false to remove').setRequired(true))), { category: 'security', cooldown: 1500, access: 'security' }, async (ctx, i) => {
@@ -38,16 +42,28 @@ export default defineCommand(new SlashCommandBuilder().setName('trust').setDescr
         ctx.logs.push(i.guildId, embed('Whitelist entry removed', `By <@${actor.id}> · ${user ? `<@${id}>` : `<@&${id}>`} · ${kinds.length} permission(s) removed`, Colors.Orange));
         return `${user ? `<@${id}>` : `<@&${id}>`} is off the whitelist. Anti-nuke now treats them like everyone else.`;
     }
+    if (sub === 'check') {
+        const user = i.options.getUser('user', true);
+        const member = await i.guild.members.fetch({ user: user.id }).catch(() => null);
+        await i.editReply({ embeds: [whitelistCheck(ctx.store, i.guild, user.id, member ? [...member.roles.cache.keys()] : [], !!user.bot)], allowedMentions: { parse: [] } });
+        return;
+    }
     if (sub === 'bots') {
         const bot = i.options.getUser('bot', true), allowed = i.options.getBoolean('allowed', true);
         if (!bot.bot)
             throw new AppError('VALIDATION_ERROR', 'That is a person, not a bot. To whitelist a person use /antinuke whitelist add.');
-        if (allowed)
+        if (allowed) {
             ctx.store.grant(i.guildId, bot.id, 'bot', actor.id);
-        else
+            ctx.store.revokeGrant(i.guildId, bot.id, 'bot_denied', actor.id);
+        }
+        else {
             ctx.store.revokeGrant(i.guildId, bot.id, 'bot', actor.id);
+            if (bot.id in KNOWN_ROLE_BOTS)
+                ctx.store.grant(i.guildId, bot.id, 'bot_denied', actor.id);
+        }
         ctx.logs.push(i.guildId, embed('Verification bot exemption changed', `By <@${actor.id}> · ${allowed ? 'allowed' : 'removed'} <@${bot.id}> (member role updates only)`, Colors.Orange));
-        return `<@${bot.id}> ${allowed ? 'can now give verified roles without tripping anti-nuke. Every other rule still applies to it.' : 'no longer has the verification exemption.'}`;
+        const known = KNOWN_ROLE_BOTS[bot.id];
+        return `<@${bot.id}> ${allowed ? 'can now give verified roles without tripping anti-nuke. Every other rule still applies to it.' : `no longer has the verification exemption${known ? ` (${known} is normally exempt automatically; it is now switched off for this server)` : ''}.`}`;
     }
     // add: open the panel, preloaded with the chosen user/role and what they have saved.
     const user = i.options.getUser('user'), role = i.options.getRole('role');

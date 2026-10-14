@@ -307,14 +307,14 @@ test('command visibility is not the security boundary: no command hides itself b
     } finally { store.close(); }
 });
 
-test('/antinuke whitelist: add, remove, list and bots, under the clearer name', async () => {
+test('/antinuke whitelist: add, remove, list, check and bots, under the clearer name', async () => {
     const { store, registry } = await guardSetup();
     try {
         indexTree(registry);
         const antinuke = treeJson(registry).find(c => c.name === 'antinuke')!;
         const group = antinuke.options.find((o: any) => o.name === 'whitelist');
         assert.ok(group, '/antinuke whitelist exists');
-        assert.deepEqual(group.options.map((o: any) => o.name), ['add', 'remove', 'list', 'bots']);
+        assert.deepEqual(group.options.map((o: any) => o.name), ['add', 'remove', 'list', 'check', 'bots']);
         assert.ok(!antinuke.options.some((o: any) => o.name === 'trust'), 'the old name is gone');
         const trust = (await import('../src/commands/security/trust.js')).default;
         store.grant(G, TARGET, 'trust', OWNER); store.grant(G, TARGET, 'trust:mass_ban', OWNER);

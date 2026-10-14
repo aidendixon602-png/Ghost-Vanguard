@@ -1,6 +1,6 @@
 import { consumeApprovedRoleChange } from './role-authorizations.js';
 import { ActionRowBuilder, AuditLogEvent, PermissionFlagsBits, ButtonBuilder, ButtonStyle, Colors } from 'discord.js';
-import { dangerous, escalationAdded, KeyedQueue, overrideRule, ruleFor, RULES } from '../core.js';
+import { dangerous, escalationAdded, KeyedQueue, overrideRule, ruleFor, RULES, WARN_FIRST, WARNING_MEMORY_MS, KNOWN_ROLE_BOTS } from '../core.js';
 import { developers } from '../bot/developers.js';
 import { autoRaid } from '../features/antinuke-plus.js';
 import { AppError } from '../errors.js';
@@ -120,7 +120,7 @@ export class Security {
         const found = [];
         const primary = ruleFor(entry.action);
         // The verification bot exemption covers ordinary member-role updates only, never dangerous grants.
-        const verificationBot = entry.action === AuditLogEvent.MemberRoleUpdate && this.store.hasGrant(guild.id, actor, 'bot');
+        const verificationBot = entry.action === AuditLogEvent.MemberRoleUpdate && (this.store.hasGrant(guild.id, actor, 'bot') || (actor in KNOWN_ROLE_BOTS && !this.store.hasGrant(guild.id, actor, 'bot_denied')));
         const addsRole = entry.action !== AuditLogEvent.MemberRoleUpdate || changesOf(entry).some(c => c.key === '$add' && c.new?.length);
         if (primary && !verificationBot && addsRole)
             found.push({ rule: primary, eventId: entry.id });
@@ -153,20 +153,29 @@ export class Security {
         const count = this.store.count(guild.id, actor, rule.key, now - active.seconds * 1000);
         if (count < active.count)
             return;
-        if (this.store.get('SELECT 1 FROM incidents WHERE guild_id=? AND actor_id=? AND rule=? AND at>?', guild.id, actor, rule.key, now - active.seconds * 1000))
+        if (this.store.get("SELECT 1 FROM incidents WHERE guild_id=? AND actor_id=? AND rule=? AND at>? AND mode<>'warn'", guild.id, actor, rule.key, now - active.seconds * 1000))
             return;
+        // Everyday rules warn first (people, not bots); a second offence within the hour gets the real punishment.
+        const warnOnly = s.mode === 'enforce' && WARN_FIRST.has(rule.key)
+            && !this.store.get("SELECT 1 FROM incidents WHERE guild_id=? AND actor_id=? AND mode='warn' AND at>?", guild.id, actor, now - WARNING_MEMORY_MS)
+            && !(await memberOrNull(guild, actor).catch(() => null))?.user?.bot;
         // Write evidence before trying any Discord mutation.
-        const incident = this.store.incident(guild.id, actor, rule.key, s.mode, 'Pending');
+        const incident = this.store.incident(guild.id, actor, rule.key, warnOnly ? 'warn' : s.mode, 'Pending');
         let result = 'Observed only; no Discord actions taken.';
         const progress = { completed: 0, failed: 0, skipped: 0 };
         if (s.mode === 'enforce') {
-            try {
-                const ignoreRoles = entry.action === AuditLogEvent.MemberRoleUpdate && entry.targetId === actor ? (changesOf(entry).find(c => c.key === '$add')?.new ?? []).map((r) => r.id) : [];
-                result = await this.punish(guild, actor, active.punishment ?? 'strip', ignoreRoles);
+            if (warnOnly) {
+                result = 'Warning: no roles were removed. Doing this again within an hour gets the normal punishment.';
+                void this.warnActor(guild, actor, active.title);
             }
-            catch {
-                result = 'Containment failed. Check role hierarchy and Manage Roles.';
-            }
+            else
+                try {
+                    const ignoreRoles = entry.action === AuditLogEvent.MemberRoleUpdate && entry.targetId === actor ? (changesOf(entry).find(c => c.key === '$add')?.new ?? []).map((r) => r.id) : [];
+                    result = await this.punish(guild, actor, active.punishment ?? 'strip', ignoreRoles);
+                }
+                catch {
+                    result = 'Containment failed. Check role hierarchy and Manage Roles.';
+                }
             if (active.revert) {
                 const events = this.store.all('SELECT p.json FROM antinuke_event_payloads p JOIN observations o ON o.id=p.id AND o.guild_id=p.guild_id WHERE o.guild_id=? AND o.actor_id=? AND o.rule=? AND o.at>=? ORDER BY o.at DESC', guild.id, actor, rule.key, now - active.seconds * 1000);
                 let processed = 0;
@@ -198,7 +207,25 @@ export class Security {
         if (deleted.channels || deleted.roles)
             buttons.push(new ButtonBuilder().setCustomId(`incident:restore:${incident}`).setLabel('Review restore').setStyle(ButtonStyle.Secondary));
         const rows = buttons.length ? [new ActionRowBuilder().addComponents(...buttons)] : [];
-        this.logs.push(guild.id, incidentCard({ incident, actor, rule: active, mode: s.mode, count, result, progress, deleted, targetId: entry.targetId ?? null }), rows);
+        this.logs.push(guild.id, incidentCard({ incident, actor, rule: active, mode: warnOnly ? 'warn' : s.mode, count, result, progress, deleted, targetId: entry.targetId ?? null }), rows);
+    }
+    /** Tell someone privately that anti-nuke warned them, so a staff member doing normal work knows to slow down or ask for a whitelist. */
+    async warnActor(guild, actor, what) {
+        try {
+            const member = await memberOrNull(guild, actor);
+            if (!member || member.user?.bot)
+                return false;
+            await member.send({ embeds: [embed('⚠️ Anti-nuke warning', [
+                        `In **${guild.name ?? 'the server'}**, you triggered anti-nuke (**${what}**) by doing it too many times too quickly, so the change was undone.`,
+                        '',
+                        '**Nothing else happened this time.** If it happens again within the next hour, your staff roles will be removed.',
+                        'If this is part of your job, ask the server owner to add you with `/antinuke whitelist add`.',
+                    ].join('\n'), Colors.Yellow)] });
+            return true;
+        }
+        catch {
+            return false;
+        }
     }
     async punish(guild, actor, action, ignoreRoles = []) {
         this.store.assertAuthorized(guild.id);

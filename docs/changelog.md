@@ -1,5 +1,20 @@
 # Changelog
 
+## 2.31.0: warnings before strips, trusted bots, whitelist check, settings restore
+- **Warn before strip.** Everyday rules (Role Invite, Role Create, Role Update, Channel Create, Channel Update, Server Update, Timeout) now give a **warning** the first time:
+  - the change is undone, a yellow **Anti-nuke Warning** is posted, and the person is DMed telling them to slow down or ask for a whitelist
+  - doing it again within an hour gets the normal punishment
+  - bans, kicks, deletes, bot adds, webhooks, dangerous permission grants, prunes and AutoMod are still instant
+  - bots never get a warning
+  - `/antinuke status` marks these rules `[warns first]`
+- **Trusted verification bots.** Bloxlink, RoVer, Carl-bot, Dyno and MEE6 can give ordinary roles (verified, levels, reaction roles) without counting toward Role Invite. Giving roles with dangerous permissions is still checked. Switch one off for a server with `/antinuke whitelist bots allowed:false`.
+- **`/antinuke whitelist check @user`** shows exactly what anti-nuke lets someone do, including whitelists that come from their roles, with expiry times. It also shows what would still get them punished, whether they were warned in the last hour, and whether they're quarantined.
+- **`/dev database restore-settings`** (developers): upload an old `vanguard.db` or a daily `vanguard-YYYY-MM-DD.db.gz` backup and it puts back lost settings: whitelists, staff ranks, permission roles, command and feature switches, logging, auto-react, `/role` rules, anti-ping, scam and new-account settings.
+  - It shows a preview first and makes a safety backup before changing anything.
+  - Anything set now is kept, and whitelist entries removed on purpose since the backup stay removed.
+  - Running it twice adds nothing the second time.
+- **Cleaner console.** The 18 "scam startup" and "protection startup" lines on every restart are gone. The console only shows servers that need fixing, as one WARN line each (for example roles above the bot).
+
 ## 2.30.0: Undo strip button
 - When anti-nuke strips someone, the alert now has a green **↩️ Undo strip** button for false alarms.
 - **Only the server owner or a developer** can use it. It asks for confirmation first, then gives back every role that was removed (staff and admin roles included) and ends their quarantine, so anti-nuke stops re-removing staff roles from them.

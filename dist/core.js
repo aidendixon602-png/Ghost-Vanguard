@@ -44,6 +44,25 @@ export const RULES = [
     { key: 'automod_tamper', title: 'AutoMod', count: 1, seconds: 60, actions: [AuditLogEvent.AutoModerationRuleDelete], singleEvent: true },
     { key: 'join_flood', title: 'Join Flood', count: 12, seconds: 15, actions: [] },
 ];
+/**
+ * Everyday rules: the first time someone hits one, the change is undone and they get a warning instead of
+ * being stripped. Hitting any of them again within WARNING_MEMORY_MS gets the normal punishment. Bans, kicks,
+ * deletes, bot adds, webhooks, dangerous permission grants, prunes and AutoMod stay instant, and bots never get a warning.
+ */
+/**
+ * Well-known verification and role bots. They give ordinary roles all day (verified, level and reaction roles),
+ * so their member-role updates are exempt from Role Invite automatically. Dangerous permission grants and every
+ * other rule still apply. A server can switch one off with /antinuke whitelist bots allowed:false.
+ */
+export const KNOWN_ROLE_BOTS = {
+    '426537812993638400': 'Bloxlink',
+    '298796807323123712': 'RoVer',
+    '235148962103951360': 'Carl-bot',
+    '155149108183695360': 'Dyno',
+    '159985870458322944': 'MEE6',
+};
+export const WARN_FIRST = new Set(['role_grant', 'role_create', 'role_update', 'channel_create', 'channel_update', 'guild_update', 'timeout']);
+export const WARNING_MEMORY_MS = 60 * 60 * 1000;
 export function ruleFor(action) {
     return RULES.find(r => r.actions.includes(action));
 }

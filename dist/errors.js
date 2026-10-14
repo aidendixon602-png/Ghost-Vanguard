@@ -40,7 +40,7 @@ export function endStartupSummary() {
 const LEVEL_STYLE = { ERROR: style.red, WARN: style.yellow, INFO: style.cyan, DEBUG: style.dim };
 export function logEvent(event, fields = {}) {
     const sanitized = sanitize({ timestamp: new Date().toISOString(), event, ...fields });
-    const level = /fail|error|exception/.test(event) ? 'ERROR' : /unavailable|unverified|retry|pending/.test(event) ? 'WARN' : event === 'command_activity' ? 'DEBUG' : 'INFO';
+    const level = /fail|error|exception/.test(event) ? 'ERROR' : /unavailable|unverified|retry|pending|warning/.test(event) ? 'WARN' : event === 'command_activity' ? 'DEBUG' : 'INFO';
     const ranks = { debug: 0, info: 1, warn: 2, error: 3 };
     if ((ranks[level.toLowerCase()] ?? 1) < (ranks[config.logLevel] ?? 1))
         return;

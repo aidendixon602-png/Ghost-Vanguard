@@ -48,7 +48,7 @@ const LEVEL_STYLE: Record<string, (text: string) => string> = { ERROR: style.red
 
 export function logEvent(event: string, fields: Record<string, unknown> = {}) {
     const sanitized = sanitize({ timestamp: new Date().toISOString(), event, ...fields }) as Record<string, unknown>;
-    const level = /fail|error|exception/.test(event) ? 'ERROR' : /unavailable|unverified|retry|pending/.test(event) ? 'WARN' : event === 'command_activity' ? 'DEBUG' : 'INFO';
+    const level = /fail|error|exception/.test(event) ? 'ERROR' : /unavailable|unverified|retry|pending|warning/.test(event) ? 'WARN' : event === 'command_activity' ? 'DEBUG' : 'INFO';
     const ranks: Record<string, number> = { debug: 0, info: 1, warn: 2, error: 3 };
     if ((ranks[level.toLowerCase()] ?? 1) < (ranks[config.logLevel] ?? 1))
         return;
