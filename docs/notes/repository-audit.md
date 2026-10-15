@@ -2,7 +2,7 @@
 
 ## Scope
 
-Reviewed the remaining command routing and permission paths, component handlers, moderation and anti-nuke flows, Roblox verification and role synchronization, logging/outbox delivery, database maintenance, recovery, lifecycle and startup scheduling. The repository contains 158 TypeScript source modules, including 61 command modules; registration loads all 61 commands and 30 component handlers successfully.
+Reviewed the remaining command routing and permission paths, component handlers, moderation and anti-nuke flows, Roblox verification and role synchronization, logging/outbox delivery, database maintenance, recovery, lifecycle and startup scheduling. Registration loads all 61 commands and 30 component handlers successfully.
 
 This is a source review with local regression and integration tests. No production database, live Discord server, or real verification-provider account was used. Passing tests do not establish that every live Discord permission or provider response is correct.
 
@@ -23,14 +23,21 @@ The earlier changes remain separate: #1 (HTTP cancellation), #2 (verified startu
 | Rejoin role history | A later full departure with no ordinary roles left an older saved-role snapshot intact; partial departures could overwrite a complete snapshot. | Clear an old record on an authoritative empty departure, and preserve complete records when the departure is partial. |
 | Case search | Filtering for `tempban` missed cases stored as `tempban (1 day)` or other labeled variants. | Match both the exact action and its parenthesized variants. |
 | Inactive-server retention | Cleanup used an older table list and left newer operational data such as notes, staff roles, scam settings, temporary bans and saved rejoin roles behind. | Derive cleanup from the maintained guild-scoped table inventory, preserving authorization/network audit records and taking a verified safety backup first. |
+| Owner and backup recipients | Missing environment configuration silently selected a fixed owner account and sent trusted bot DMs, including database backups, to it. | Remove built-in identities, trim configured IDs, validate owner/recipient inputs, and display an unconfigured owner clearly. Explicit developers still work without an owner; no recipients are selected if both owner and trusted DM settings are blank. |
+| Staff-role history | Staff commands wrote incomplete history that either targeted the legacy table or had an unsupported component name. | Both commands snapshot role identity and the full current/legacy access rows. Rollback restores both tables transactionally after a verified backup, rechecks rank hierarchy, and records its actual before/after state so the rollback can itself be undone. Older incomplete entries require an explicit role change. |
+| Shared Roblox bans | Turning sharing on copied temporary-ban-linked blacklist entries to partners despite the local-only temporary-ban policy. | Skip those entries and remove any previously shared copy for this guild, preserving the local blacklist and other guilds' records. |
+| Quiet hours | A failed start could leave the ownership flag set and suppress retries; a partial unlock cleared the flag too early. | Claim ownership inside the lock operation, release it when no recoverable scheduled lockdown exists after failure, and retain it until failed unlocks have been retried. |
+| Updater request deadlines | A stalled GitHub response or response body could keep an update check pending indefinitely. | Abort each GitHub request after 15 seconds (one second for local API fixtures), including response-body reads. |
+| Updater installation result | Failed installs returned an installed result; both outcomes left the last-check status at installing. | Report the actual installation outcome, update the last-check status, and only schedule fallback promotion after a successful install. |
+| Manual missing-database restore | The restore command treated an absent live database as corruption and required the corruption override. | Skip live lease inspection only when the path is absent. Existing corrupt files still require the override; active leases block restoration even with it. |
 
 ## Validation
 
-- Added 31 tests covering the findings, including success paths, failures, expiry, authorization changes during awaits, and cross-server batch fairness.
+- Added 55 tests covering the findings, including success paths, failures, expiry, authorization changes during awaits, and cross-server batch fairness. Of the 24 follow-up tests, 22 fail against the earlier audit code; the two existing corruption/active-lease safeguards pass before and after.
 - Typecheck and build pass; regenerated output is committed with the source changes.
-- Full local suite on the audit branch: 517 passing.
-- Combined validation with #1–#4: all four patches apply cleanly, typecheck and build pass, and all 543 tests pass.
+- Full local suite on the expanded audit branch: 541 passing.
+- Combined validation with #1–#4: changes merge cleanly, typecheck and build pass, and all 567 tests pass.
 
 ## Live verification still needed
 
-Before deploying, use a test server to exercise verification with a plain role and a protected role, new-account Release/Kick/Ban controls with different staff roles, quarantine and release, and automatic temporary-ban expiry. Local tests use controlled Discord responses and cannot verify the host's actual role ordering, enabled intents, permissions, or provider credentials.
+Before deploying, use a test server to exercise verification with a plain role and a protected role, new-account Release/Kick/Ban controls with different staff roles, quarantine and release, staff-role rollback, quiet hours, and automatic temporary-ban expiry. Confirm `BOT_OWNER_ID` and `TRUSTED_DM_IDS` name your intended accounts before relying on owner access or backup DMs. Local tests use controlled Discord responses and cannot verify the host's actual role ordering, enabled intents, permissions, or provider credentials.

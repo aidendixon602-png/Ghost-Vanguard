@@ -218,8 +218,13 @@ test('server information spans four valid pages and bot information uses configu
         assert.ok(page.embeds[0]!.toJSON().fields!.length);
         assert.equal(page.components[0]!.toJSON().components.length, 2);
     }
-    assert.match(botInfo(ctx).toJSON().fields![0]!.value, /1277709272041394187/);
-    s.close();
+    const owner = config.ownerId;
+    try {
+        config.ownerId = '333333333333333333';
+        assert.match(botInfo(ctx).toJSON().fields![0]!.value, /333333333333333333/);
+        config.ownerId = '';
+        assert.equal(botInfo(ctx).toJSON().fields![0]!.value, 'Owner not configured.');
+    } finally { config.ownerId = owner; s.close(); }
 });
 
 test('offline restore verifies backup, requires confirmation, and restores prior guild configuration', async () => {

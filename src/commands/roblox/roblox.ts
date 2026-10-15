@@ -81,6 +81,10 @@ export default defineCommand(new SlashCommandBuilder().setName('roblox').setDesc
         // Partners only ever see a plain reason, never moderator names or Discord IDs.
         if (share) for (const r of ctx.store.all('SELECT roblox_id,reason FROM blocked_accounts WHERE guild_id=?', guild)) {
             const source = /Linked Discord account banned: (\d{17,20})/.exec(String(r.reason ?? ''))?.[1] ?? null;
+            if (source && ctx.store.get('SELECT 1 FROM tempbans WHERE guild_id=? AND user_id=?', guild, source)) {
+                ctx.store.run('DELETE FROM roblox_network WHERE guild_id=? AND roblox_id=?', guild, r.roblox_id);
+                continue; // A temporary ban must stay local even when sharing is enabled later.
+            }
             ctx.store.run('INSERT OR REPLACE INTO roblox_network(roblox_id,guild_id,reason,at,source_user) VALUES(?,?,?,?,?)', r.roblox_id, guild, source ? 'Banned member' : 'Blacklisted', Date.now(), source);
         }
         else ctx.store.run('DELETE FROM roblox_network WHERE guild_id=?', guild);

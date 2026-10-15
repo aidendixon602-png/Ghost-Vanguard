@@ -121,9 +121,9 @@ Copy [`.env.example`](.env.example) to `.env` and set at least:
 | `DISCORD_CLIENT_ID` | Yes | Application ID |
 | `DEVELOPER_IDS` | Yes | Comma-separated user IDs with Developer access (the top rank, full control) |
 | `DATABASE_PATH` | No | SQLite database location (default `./data/vanguard.db`) |
-| `BOT_OWNER_ID` | Recommended | The bot owner: Developer (the top rank), and the default for `TRUSTED_DM_IDS` |
+| `BOT_OWNER_ID` | Recommended | Your Discord user ID: Developer (the top rank), and the default for `TRUSTED_DM_IDS`. No owner account is built in. |
 | `SUPREME_LEADER_IDS` | No | Supreme Leaders: everything except the Developer-only tools. Nobody is built in; every start prints who has bot-wide access |
-| `TRUSTED_DM_IDS` | No | The only people the bot DMs about itself, including the daily database backup (default: `BOT_OWNER_ID`) |
+| `TRUSTED_DM_IDS` | No | The only people the bot DMs about itself, including the daily database backup (default: `BOT_OWNER_ID`; no recipients if both are blank) |
 | `UPDATE_REPO`, `UPDATE_TOKEN` | No | Enable automatic updates (see below) |
 | `ROVER_API_KEY`, `BLOXLINK_API_KEY` | No | Roblox verification providers |
 | `AI_ENABLED`, `OPENAI_API_KEY` | No | AI moderation and `/ask` |

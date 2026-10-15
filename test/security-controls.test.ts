@@ -12,6 +12,8 @@ import enable from '../src/commands/antinuke/enable.js';
 import trust from '../src/commands/security/trust.js';
 import { saveTrust, clearTrust, trustPanel, panelFor, kindsFor, registerTrustPanel } from '../src/ui/trust-panel.js';
 import { config } from '../src/config.js';
+// Explicit test owner; production has no built-in privileged account.
+config.ownerId = '1277709272041394187';
 
 function setup() {
  const store=new Store(':memory:');authorize(store);const s=store.settings('g');s.enabled=true;s.mode='enforce';s.logChannelId='log';store.save(s);

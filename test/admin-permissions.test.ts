@@ -6,6 +6,8 @@ import { Store } from '../src/database/db.js';
 import { Registry, type Definition } from '../src/bot/registry.js';
 import { Guard } from '../src/bot/guard.js';
 import { config } from '../src/config.js';
+// Explicit test owner; production has no built-in privileged account.
+config.ownerId = '1277709272041394187';
 import { rankOf, RANKS } from '../src/bot/ranks.js';
 
 /**

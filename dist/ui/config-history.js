@@ -4,6 +4,7 @@ import { addConfirmation } from './layout-ui.js';
 import { defaults } from '../bot/registry.js';
 import { isSafeAutomaticRole, isSafeQuarantineRole } from '../security/role-policy.js';
 import { embed } from './ui.js';
+import { assertStaffRoleChange, restoreStaffRoleState, staffRoleState, validateStaffRoleState } from '../database/staff-roles.js';
 export async function previewHistory(ctx, i, id) {
     const row = ctx.store.get('SELECT * FROM configuration_history WHERE guild_id=? AND id=?', i.guildId, id);
     if (!row)
@@ -12,6 +13,8 @@ export async function previewHistory(ctx, i, id) {
         throw new AppError('VALIDATION_ERROR', 'Authorization history is retained for audit. Authorization must be changed by a developer through /dev server authorize, /dev server deauthorize or /dev server info.');
     if (row.component === 'antiping')
         throw new AppError('VALIDATION_ERROR', 'Anti-ping changes are retained for audit. Use /security antiping to change Discord protection and keep its rule synchronized.');
+    if (row.component === 'permission-role' || String(row.component).startsWith('staff/'))
+        throw new AppError('VALIDATION_ERROR', 'This older staff-role history lacks a complete role snapshot. Use /setup staff role to change access and create restorable history.');
     const key = addConfirmation(ctx, { guild: i.guildId, user: i.user.id, snapshot: id, prune: false, fingerprint: row.before_json ?? 'null', action: 'history' });
     await i.editReply({ embeds: [embed('Confirm configuration rollback', `**History #${id} · ${row.component}**\nRestore the values from before this change. This can change Anti-Nuke mode, command access, or verification policy. A verified database backup is required before applying the rollback.\n\nPrevious values:\n${(row.before_json ?? 'Default/unconfigured state').slice(0, 2200)}\n\nExpires in two minutes.`)], components: [new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`history:apply:${key}`).setLabel('Restore previous configuration').setStyle(ButtonStyle.Danger), new ButtonBuilder().setCustomId(`history:cancel:${key}`).setLabel('Cancel').setStyle(ButtonStyle.Secondary))], allowedMentions: { parse: [] } });
 }
@@ -33,6 +36,11 @@ export function registerHistory(registry) {
             if (!ctx.databaseBackups)
                 throw new AppError('DATABASE_ERROR', 'Database backup service unavailable. No rollback performed.');
             const previous = row.before_json === null ? null : JSON.parse(row.before_json), current = row.after_json === null ? null : JSON.parse(row.after_json);
+            const staffRole = String(row.component).startsWith('staff-role:') ? String(row.component).slice('staff-role:'.length) : null;
+            if (row.component === 'permission-role' || String(row.component).startsWith('staff/'))
+                throw new AppError('VALIDATION_ERROR', 'This older staff-role history lacks a complete role snapshot. Configure the role again.');
+            if (staffRole !== null)
+                validateStaffRoleState(previous, i.guildId, staffRole);
             if (previous?.guild_id && previous.guild_id !== i.guildId || previous?.guildId && previous.guildId !== i.guildId)
                 throw new AppError('DATABASE_ERROR', 'Guild mismatch in configuration history.');
             if (row.component === 'settings') {
@@ -50,7 +58,15 @@ export function registerHistory(registry) {
             // Database backup service performs only internal operations; leave the caller guild scope explicitly.
             await ctx.databaseBackups.create('before-config-rollback');
             ctx.assertActive();
-            if (row.component === 'settings')
+            if (staffRole !== null) {
+                const actual = staffRoleState(ctx.store, i.guildId, staffRole);
+                assertStaffRoleChange(ctx.store, i.guildId, i.user.id, ctx.actor, actual, previous);
+                ctx.store.transaction(() => {
+                    restoreStaffRoleState(ctx.store, previous);
+                    ctx.store.history(i.guildId, row.component, actual, staffRoleState(ctx.store, i.guildId, staffRole), i.user.id);
+                });
+            }
+            else if (row.component === 'settings')
                 ctx.store.save({ ...previous, guildId: i.guildId, authorized: true }, i.user.id);
             else {
                 const mappings = { grant: { table: 'grants', key: 'user_id' }, 'permission-role': { table: 'permission_roles', key: 'role_id' }, provider: { table: 'provider_config', key: 'provider' }, command: { table: 'command_settings', key: 'command' }, feature: { table: 'feature_settings', key: 'feature' }, 'backup-config': { table: 'backup_config', key: 'guild_id' } };

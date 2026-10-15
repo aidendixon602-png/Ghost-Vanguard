@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import { DatabaseSync } from 'node:sqlite';
-import { readFile, readdir, copyFile, rename, unlink, mkdir, chmod } from 'node:fs/promises';
+import { readFile, readdir, copyFile, rename, unlink, mkdir, chmod, lstat } from 'node:fs/promises';
 import { resolve, join, dirname } from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 const args=process.argv.slice(2), option=name=>args[args.indexOf(name)+1];
@@ -19,7 +19,10 @@ const bytes=await readFile(source);if(createHash('sha256').update(bytes).digest(
 const check=new DatabaseSync(source,{readOnly:true});
 try{if(check.prepare('PRAGMA integrity_check').get()?.integrity_check!=='ok' || check.prepare('PRAGMA foreign_key_check').all().length)throw Error('Backup integrity or foreign-key verification failed.');}finally{check.close();}
 let live;
-try{live=new DatabaseSync(path,{readOnly:true});if(live.prepare("SELECT 1 FROM sqlite_master WHERE name='leases'").get()&&live.prepare('SELECT 1 FROM leases WHERE name=? AND until>?').get('bot',Date.now()))throw Error('Bot is still running or its process lease has not expired. Stop it and wait 30 seconds.');}
+// Only an absent path skips the live-database checks. Permission/I/O errors and
+// unreadable files must still require --allow-corrupt; active leases always block.
+const missing=await lstat(path).then(()=>false,error=>{if(error.code==='ENOENT')return true;throw error;});
+try{if(!missing){live=new DatabaseSync(path,{readOnly:true});if(live.prepare("SELECT 1 FROM sqlite_master WHERE name='leases'").get()&&live.prepare('SELECT 1 FROM leases WHERE name=? AND until>?').get('bot',Date.now()))throw Error('Bot is still running or its process lease has not expired. Stop it and wait 30 seconds.');}}
 catch(error){if(!args.includes('--allow-corrupt') || String(error).includes('still running'))throw error;console.warn('Restoring over an unreadable database; --allow-corrupt assumes the bot is stopped.');}
 finally{live?.close();}
 await mkdir(dirname(path),{recursive:true});

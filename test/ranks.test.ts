@@ -4,6 +4,8 @@ import { Collection, PermissionsBitField } from 'discord.js';
 import { Store } from '../src/database/db.js';
 import { authorize } from './helpers.js';
 import { config } from '../src/config.js';
+// Explicit test owner; production has no built-in privileged account.
+config.ownerId = '1277709272041394187';
 import { Guard } from '../src/bot/guard.js';
 import { defaults } from '../src/bot/registry.js';
 import { RANKS, rankOf, requiredRank } from '../src/bot/ranks.js';

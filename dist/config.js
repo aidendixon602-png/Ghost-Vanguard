@@ -17,16 +17,16 @@ export const config = {
     backupWeekly: Number(process.env.DATABASE_BACKUP_KEEP_WEEKLY ?? 8),
     logFormat: process.env.LOG_FORMAT || 'pretty',
     logLevel: process.env.LOG_LEVEL || 'info',
-    ownerId: process.env.BOT_OWNER_ID || '1277709272041394187',
+    ownerId: process.env.BOT_OWNER_ID?.trim() ?? '',
     /** Extra Supreme Leaders besides BOT_OWNER_ID (comma-separated IDs). */
     supremeExtra: parseIds(process.env.SUPREME_LEADER_IDS || ''),
     /** Optional uptime check URL (e.g. https://hc-ping.com/<uuid>); pinged every minute. */
     heartbeatUrl: /^https:\/\//.test(process.env.HEARTBEAT_URL?.trim() ?? '') ? process.env.HEARTBEAT_URL.trim() : '',
     /** The only people the bot DMs about itself (backup files, alerts). Default: BOT_OWNER_ID only. */
-    trustedDmIds: parseIds(process.env.TRUSTED_DM_IDS || process.env.BOT_OWNER_ID || '1277709272041394187'),
+    trustedDmIds: parseIds(process.env.TRUSTED_DM_IDS?.trim() || process.env.BOT_OWNER_ID?.trim() || ''),
     /** DM a gzipped database backup to the trusted DM list once a day. */
     dailyBackupDm: process.env.DAILY_BACKUP_DM !== 'false',
-    ownerUsername: process.env.BOT_OWNER_USERNAME || 'web_w2z',
+    ownerUsername: process.env.BOT_OWNER_USERNAME?.trim() || 'Not configured',
     snapshotActionDelayMs: Number(process.env.SNAPSHOT_ACTION_DELAY_MS || 0),
     dbPath: resolve(process.env.DATABASE_PATH || './data/vanguard.db'),
     host: process.env.HEALTH_HOST || '127.0.0.1',
@@ -46,6 +46,10 @@ export function validateConfig() {
         errors.push('Set DISCORD_CLIENT_ID to the Application ID from the Discord Developer Portal.');
     if (!config.developers.size)
         errors.push('Set DEVELOPER_IDS to your Discord user ID.');
+    if (config.ownerId && !/^\d{17,20}$/.test(config.ownerId))
+        errors.push('BOT_OWNER_ID must be a valid Discord user ID when set.');
+    if ((process.env.TRUSTED_DM_IDS ?? '').split(',').some(id => id.trim() && !/^\d{17,20}$/.test(id.trim())))
+        errors.push('Every TRUSTED_DM_IDS entry must be a valid Discord user ID.');
     if (!Number.isInteger(config.port) || config.port < 1 || config.port > 65535)
         errors.push('HEALTH_PORT must be between 1 and 65535.');
     if (config.aiEnabled && !config.openaiKey)
