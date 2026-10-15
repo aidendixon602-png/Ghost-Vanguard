@@ -554,7 +554,7 @@ export class Snapshots {
                 return false;
             }
         };
-        const reason = `Midtown Vanguard restore #${this.numberOf(guild.id, snapshotId)}; actor ${options.actor ?? 'recovery'}`;
+        const reason = `Ghost Vanguard restore #${this.numberOf(guild.id, snapshotId)}; actor ${options.actor ?? 'recovery'}`;
         const roles = [...data.roles].sort((a, b) => b.position - a.position || a.id.localeCompare(b.id));
         const me = await guild.members.fetchMe();
         if (components.includes('roles')) {

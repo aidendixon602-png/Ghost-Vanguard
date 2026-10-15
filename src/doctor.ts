@@ -6,7 +6,7 @@ import { Registry } from './bot/registry.js';
 const registry = new Registry();
 
 await registry.load();
-console.log(`Midtown Vanguard doctor · Node ${process.version}`);
+console.log(`Ghost Vanguard doctor · Node ${process.version}`);
 console.log(`.env present: ${existsSync('.env')}`);
 
 const errors = validateConfig();

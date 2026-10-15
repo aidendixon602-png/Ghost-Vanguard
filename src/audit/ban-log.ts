@@ -105,7 +105,7 @@ export function explainBan(store: Store, guild: Guild, userId: string, audit: Ve
             if (soft) { d.kind = 'softban'; d.duration = 'None (unbanned straight away)'; d.reason = soft[1]!; }
         } else {
             d.kind = 'automatic'; d.moderatorId = botId ?? null; d.moderatorRole = 'automatic';
-            d.reason = raw?.replace(/^Midtown Vanguard: /, '') ?? null;
+            d.reason = raw?.replace(/^(?:Midtown |Ghost )Vanguard: /, '') ?? null;
         }
     } else if (audit?.executorId) {
         d.moderatorId = audit.executorId; d.moderatorRole = 'manual'; d.kind = 'manual';
@@ -221,7 +221,7 @@ export async function onBanRemove(store: Store, logs: LogQueue, guild: Guild, us
             if (audit?.executorId === botId) {
                 const staff = /^(\d{17,20}): ([\s\S]*)$/.exec(reason ?? '');
                 if (staff) { by = staff[1]!; role = 'via-bot'; reason = staff[2]!; }
-                else { by = botId ?? null; role = 'automatic'; reason = reason?.replace(/^Midtown Vanguard: /, '') ?? null; if (/temporary ban expired/i.test(reason ?? '')) status = 'expired'; }
+                else { by = botId ?? null; role = 'automatic'; reason = reason?.replace(/^(?:Midtown |Ghost )Vanguard: /, '') ?? null; if (/temporary ban expired/i.test(reason ?? '')) status = 'expired'; }
             } else if (audit?.executorId) { by = audit.executorId; role = 'manual'; }
             const open = openRecord(store, guild.id, user.id);
             if (open) {
@@ -288,7 +288,7 @@ export function uncoverNetwork(store: Store, logs: LogQueue, guildId: string, us
 
 const who = (id: string | null, role: string | null) => {
     if (!id || role === 'unverified') return 'Unavailable (could not be verified)';
-    if (role === 'automatic') return `Midtown Vanguard (automatic)`;
+    if (role === 'automatic') return `Ghost Vanguard (automatic)`;
     return `<@${id}> (\`${id}\`)`;
 };
 const moderatorHeading = (r: BanRecord) => r.moderator_role === 'via-bot' ? 'Moderator (via bot)' : 'Banned By';
@@ -343,7 +343,7 @@ export interface BanButtonDeps {
     };
 }
 
-const NOT_ALLOWED = 'Only Admins, the server owner and Midtown Vanguard developers can use the ban log buttons.';
+const NOT_ALLOWED = 'Only Admins, the server owner and Ghost Vanguard developers can use the ban log buttons.';
 const networkLifter = (kind: NetworkKind) => kind === 'hardban' ? 'Developer' : 'Supreme Leader or Developer';
 const notNetwork = (kind: NetworkKind) => `This is a Midtown-wide **${kind}**: only a ${networkLifter(kind)} can lift it. Server Admins and owners can lift ordinary bans only.`;
 const LOCAL_FOOTER = 'Admins, the server owner and developers can do this';

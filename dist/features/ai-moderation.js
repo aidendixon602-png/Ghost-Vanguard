@@ -101,7 +101,7 @@ export async function aiModerate(store, logs, message, trusted, now = Date.now()
         const deleted = await message.delete().then(() => true, () => false);
         result = deleted ? '🗑 Message deleted automatically.' : '⚠ Could not delete the message (check Manage Messages).';
         if (action === 'delete+timeout' && message.member?.moderatable) {
-            await message.member.timeout(3600000, 'Midtown Vanguard AI moderation (strict mode)').then(() => {
+            await message.member.timeout(3600000, 'Ghost Vanguard AI moderation (strict mode)').then(() => {
                 result += ' ⏱ Timed out for 1 hour.';
                 store.recordCase(message.guild.id, message.author.id, message.client.user.id, 'timeout', `AI moderation: ${verdict.categories.map(x => LABELS[x] ?? x).join(', ')}`);
             }, () => { result += ' ⚠ Could not time them out.'; });

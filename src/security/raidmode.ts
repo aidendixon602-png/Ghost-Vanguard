@@ -42,7 +42,7 @@ export async function handleRaidJoin(store: Store, logs: LogQueue, member: Guild
     if (!state.enabled || member.user.bot || trusted(member.id)) return 'ignored';
     const ageDays = (now - member.user.createdTimestamp) / DAY;
     if (ageDays >= state.minAgeDays) return 'ignored';
-    const reason = `Midtown Vanguard raid mode: account ${Math.floor(ageDays)} day(s) old (minimum ${state.minAgeDays})`;
+    const reason = `Ghost Vanguard raid mode: account ${Math.floor(ageDays)} day(s) old (minimum ${state.minAgeDays})`;
     let result: 'kicked' | 'timed out' | 'failed' = 'failed';
     try {
         if (state.action === 'kick' && member.kickable) { await member.kick(reason); result = 'kicked'; }
@@ -75,7 +75,7 @@ export async function sweepTempbans(store: Store, logs: LogQueue, client: Client
                 return;
             }
             let outcome = 'unbanned';
-            try { await guild.bans.remove(row.user_id, `Midtown Vanguard: temporary ban expired (case #${row.case_number ?? '?'})`); }
+            try { await guild.bans.remove(row.user_id, `Ghost Vanguard: temporary ban expired (case #${row.case_number ?? '?'})`); }
             catch (error: any) { outcome = error?.code === 10026 ? 'already unbanned' : 'unban failed'; if (outcome === 'unban failed') return; }
             store.run('DELETE FROM tempbans WHERE guild_id=? AND user_id=?', guild.id, row.user_id);
             const number = store.recordCase(guild.id, row.user_id, client.user?.id ?? 'system', 'unban', `Temporary ban from case #${row.case_number ?? '?'} expired (${outcome}).`);

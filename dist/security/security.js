@@ -4,6 +4,7 @@ import { dangerous, escalationAdded, KeyedQueue, overrideRule, ruleFor, RULES, W
 import { developers } from '../bot/developers.js';
 import { autoRaid } from '../features/antinuke-plus.js';
 import { AppError } from '../errors.js';
+import { noteThreat } from './threat-board.js';
 import { embed, memberOrNull } from '../ui/ui.js';
 import { incidentCard } from '../ui/incident-card.js';
 /** How far back an incident alert looks for channels and roles the actor deleted. */
@@ -165,6 +166,9 @@ export class Security {
             && !(await memberOrNull(guild, actor).catch(() => null))?.user?.bot;
         // Write evidence before trying any Discord mutation.
         const incident = this.store.incident(guild.id, actor, rule.key, warnOnly ? 'warn' : s.mode, 'Pending');
+        // Every scored incident lands on the threat board, so one record feeds both halves:
+        // the defence that already happens here and the counter-attack the board decides on.
+        noteThreat(this.store, guild.id, actor, rule.key, `Anti-nuke ${active.title} (incident #${incident})`);
         let result = 'Observed only; no Discord actions taken.';
         const progress = { completed: 0, failed: 0, skipped: 0 };
         if (s.mode === 'enforce') {
@@ -256,9 +260,9 @@ export class Security {
             return 'Executor cannot be ' + (action === 'ban' ? 'banned' : 'kicked') + '; check membership, permissions and role hierarchy.';
         this.store.assertAuthorized(guild.id);
         if (action === 'ban')
-            await member.ban({ reason: 'Midtown Vanguard: anti-nuke rule triggered', deleteMessageSeconds: 0 });
+            await member.ban({ reason: 'Ghost Vanguard: anti-nuke rule triggered', deleteMessageSeconds: 0 });
         else
-            await member.kick('Midtown Vanguard: anti-nuke rule triggered');
+            await member.kick('Ghost Vanguard: anti-nuke rule triggered');
         return action === 'ban' ? 'Banned the executor.' : 'Kicked the executor.';
     }
     async revert(entry, guild, rule) {
@@ -269,7 +273,7 @@ export class Security {
         if (rule.key === 'dangerous_grant')
             return this.revertGrant(entry, guild);
         if (rule.key === 'mass_ban') {
-            await guild.bans.remove(id, 'Midtown Vanguard: revert anti-nuke bans');
+            await guild.bans.remove(id, 'Ghost Vanguard: revert anti-nuke bans');
             return 'Removed ban for ' + id + '.';
         }
         if (rule.key === 'bot_add') {
@@ -279,7 +283,7 @@ export class Security {
             if (!member?.user.bot || !member.bannable)
                 return 'Added bot cannot be removed; check role hierarchy.';
             this.store.assertAuthorized(guild.id);
-            await member.ban({ reason: 'Midtown Vanguard: revert unauthorized bot addition', deleteMessageSeconds: 0 });
+            await member.ban({ reason: 'Ghost Vanguard: revert unauthorized bot addition', deleteMessageSeconds: 0 });
             return 'Banned the added bot.';
         }
         if (rule.key === 'channel_create') {
@@ -287,7 +291,7 @@ export class Security {
             if (!channel)
                 return 'Created channel is already absent.';
             this.store.assertAuthorized(guild.id);
-            await channel.delete('Midtown Vanguard: revert channel creation');
+            await channel.delete('Ghost Vanguard: revert channel creation');
             return 'Deleted created channel ' + id + '.';
         }
         if (rule.key === 'role_create') {
@@ -297,7 +301,7 @@ export class Security {
             if (role.managed || !role.editable)
                 return 'Created role is managed or above Vanguard; kept it.';
             this.store.assertAuthorized(guild.id);
-            await role.delete('Midtown Vanguard: revert role creation');
+            await role.delete('Ghost Vanguard: revert role creation');
             return 'Deleted created role ' + id + '.';
         }
         if (rule.key === 'role_grant') {
@@ -308,7 +312,7 @@ export class Security {
             const ids = added.map((r) => r.id).filter((id) => guild.roles.cache.get(id)?.editable && !guild.roles.cache.get(id)?.managed && target.roles.cache.has(id));
             this.store.assertAuthorized(guild.id);
             if (ids.length)
-                await target.roles.remove(ids, 'Midtown Vanguard: revert role assignment');
+                await target.roles.remove(ids, 'Ghost Vanguard: revert role assignment');
             return 'Removed ' + ids.length + ' assigned role(s).';
         }
         if (rule.key === 'timeout') {
@@ -318,7 +322,7 @@ export class Security {
                 return 'Timeout has changed or cannot be managed; kept current state.';
             const old = change?.old ? Date.parse(String(change.old)) : NaN;
             this.store.assertAuthorized(guild.id);
-            await target.disableCommunicationUntil(Number.isFinite(old) && old > Date.now() ? old : null, 'Midtown Vanguard: revert unauthorized timeout');
+            await target.disableCommunicationUntil(Number.isFinite(old) && old > Date.now() ? old : null, 'Ghost Vanguard: revert unauthorized timeout');
             return 'Restored previous timeout for ' + id + '.';
         }
         if (rule.key === 'webhook_change') {
@@ -329,7 +333,7 @@ export class Security {
             if (!hook)
                 return 'Created webhook is already absent.';
             this.store.assertAuthorized(guild.id);
-            await hook.delete('Midtown Vanguard: revert webhook creation');
+            await hook.delete('Ghost Vanguard: revert webhook creation');
             return 'Deleted created webhook ' + id + '.';
         }
         return 'No automatic revert available for this event.';
@@ -350,7 +354,7 @@ export class Security {
             if (role.managed || !role.editable)
                 return 'The new role is managed or above Vanguard; kept it.';
             this.store.assertAuthorized(guild.id);
-            await role.delete('Midtown Vanguard: new role created with dangerous permissions');
+            await role.delete('Ghost Vanguard: new role created with dangerous permissions');
             return `Deleted the new role ${role.name}, which was created with dangerous permissions.`;
         }
         if (entry.action === AuditLogEvent.RoleUpdate) {
@@ -360,7 +364,7 @@ export class Security {
                 return 'The permission grant could not be undone (role missing, managed, or above Vanguard).';
             const added = escalationAdded(change?.old, change?.new);
             this.store.assertAuthorized(guild.id);
-            await role.setPermissions(role.permissions.bitfield & ~added, 'Midtown Vanguard: undo dangerous permission grant');
+            await role.setPermissions(role.permissions.bitfield & ~added, 'Ghost Vanguard: undo dangerous permission grant');
             return `Removed the newly granted permissions from role ${role.name}.`;
         }
         const roles = escalatingRolesAdded(entry, guild);
@@ -373,7 +377,7 @@ export class Security {
         if (!removable.length)
             return 'The granted roles are above Vanguard and could not be removed.';
         this.store.assertAuthorized(guild.id);
-        await target.roles.remove(removable, 'Midtown Vanguard: undo dangerous role grant');
+        await target.roles.remove(removable, 'Ghost Vanguard: undo dangerous role grant');
         return `Removed ${removable.length} newly granted role(s) from <@${target.id}>.`;
     }
     async join(member) {
@@ -406,7 +410,7 @@ export class Security {
         // Optional: during an automatic incident, remove an offending bot outright instead of stripping its roles.
         if (fromIncident && member.user?.bot && this.store.kickBots(guild.id) && member.kickable) {
             this.store.assertAuthorized(guild.id);
-            await member.kick('Midtown Vanguard containment: bot triggered anti-nuke');
+            await member.kick('Ghost Vanguard containment: bot triggered anti-nuke');
             return 'Removed the bot from the server (bot containment is set to kick).';
         }
         if (!member.manageable)
@@ -420,12 +424,12 @@ export class Security {
         const removable = member.roles.cache.filter(r => r.id !== guild.id && !r.managed && dangerous(r.permissions.bitfield) && me.roles.highest.comparePositionTo(r) > 0);
         this.store.assertAuthorized(guild.id);
         if (removable.size)
-            await member.roles.remove([...removable.keys()], 'Midtown Vanguard containment');
+            await member.roles.remove([...removable.keys()], 'Ghost Vanguard containment');
         const qId = this.store.settings(guild.id).quarantineRoleId;
         const q = qId ? guild.roles.cache.get(qId) : null;
         this.store.assertAuthorized(guild.id);
         if (q && !q.managed && !dangerous(q.permissions.bitfield) && q.editable)
-            await member.roles.add(q, 'Midtown Vanguard quarantine');
+            await member.roles.add(q, 'Ghost Vanguard quarantine');
         const fresh = await guild.members.fetch({ user: userId, force: true });
         const remaining = dangerous(fresh.permissions.bitfield);
         return `Removed ${removable.size} dangerous role(s). ${remaining ? 'Dangerous guild permissions remain; containment is incomplete.' : 'No dangerous guild permissions remain.'} Channel-specific overwrites and managed roles may still grant access.`;
@@ -446,7 +450,7 @@ export class Security {
                 this.store.run('UPDATE backups SET active=0 WHERE guild_id=? AND user_id=?', member.guild.id, member.id);
                 const q = this.store.settings(member.guild.id).quarantineRoleId;
                 if (q && member.roles.cache.has(q))
-                    await member.roles.remove(q, `Midtown Vanguard: quarantine lifted by ${by}`).catch(() => null);
+                    await member.roles.remove(q, `Ghost Vanguard: quarantine lifted by ${by}`).catch(() => null);
                 this.logs.push(member.guild.id, embed('Quarantine lifted', `<@${by}> gave <@${member.id}> a staff role, so Vanguard ended their quarantine instead of removing it.\nTo quarantine them again use \`/security quarantine\`.`, Colors.Green));
                 return;
             }
@@ -487,12 +491,12 @@ export class Security {
         this.store.run('UPDATE backups SET active=0 WHERE guild_id=? AND user_id=?', guild.id, userId);
         this.store.assertAuthorized(guild.id);
         if (restored.length)
-            await member.roles.add(restored, 'Midtown Vanguard authorized role restoration');
+            await member.roles.add(restored, 'Ghost Vanguard authorized role restoration');
         const q = this.store.settings(guild.id).quarantineRoleId;
         this.store.assertAuthorized(guild.id);
         this.store.assertAuthorized(guild.id);
         if (q && member.roles.cache.has(q))
-            await member.roles.remove(q, 'Midtown Vanguard release');
+            await member.roles.remove(q, 'Ghost Vanguard release');
         if (!skipped.length)
             this.store.run('DELETE FROM backups WHERE guild_id=? AND user_id=?', guild.id, userId);
         return `Restored ${restored.length} role(s); skipped ${skipped.length}. ${skipped.length ? 'Backup retained for another restoration attempt.' : 'Backup cleared.'}`;

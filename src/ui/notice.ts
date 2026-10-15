@@ -4,7 +4,7 @@ import { EmbedBuilder } from 'discord.js';
  * System notices (startup, protection, recovery) as tidy embeds: "**Name:** value" lines become
  * fields, everything else is the description. Same text as before, easier to read.
  */
-export function noticeEmbed(title: string, lines: string[], color: number, footer = 'Midtown Vanguard') {
+export function noticeEmbed(title: string, lines: string[], color: number, footer = 'Ghost Vanguard') {
     const e = new EmbedBuilder().setColor(color).setTitle(title).setTimestamp().setFooter({ text: footer });
     const text: string[] = [];
     const fields: { name: string; value: string; inline: boolean }[] = [];
@@ -27,7 +27,7 @@ const RECOVERY_TITLE: Record<string, string> = {
 export function recoveryEmbed(event: string, detail: string, botId: string | undefined, color: number) {
     const [first, ...rest] = detail.split('\n');
     const actor = /^Actor:\s*(\S+)/.exec(first ?? '')?.[1];
-    const by = !actor ? null : actor === botId ? 'Midtown Vanguard (automatic)' : /^\d{17,20}$/.test(actor) ? `<@${actor}>` : actor;
+    const by = !actor ? null : actor === botId ? 'Ghost Vanguard (automatic)' : /^\d{17,20}$/.test(actor) ? `<@${actor}>` : actor;
     const title = RECOVERY_TITLE[event.toLowerCase()] ?? `💾 ${event.charAt(0).toUpperCase()}${event.slice(1)}`;
-    return noticeEmbed(title, [...(actor ? rest : [first ?? '', ...rest]), ...(by ? [`**By:** ${by}`] : [])], color, 'Midtown Vanguard · recovery');
+    return noticeEmbed(title, [...(actor ? rest : [first ?? '', ...rest]), ...(by ? [`**By:** ${by}`] : [])], color, 'Ghost Vanguard · recovery');
 }

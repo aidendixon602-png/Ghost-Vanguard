@@ -7,6 +7,6 @@ export const developers = {
     },
     require(id) {
         if (!this.has(id))
-            throw new AppError('PERMISSION_ERROR', 'Only approved Midtown Vanguard developers can use this action.');
+            throw new AppError('PERMISSION_ERROR', 'Only approved Ghost Vanguard developers can use this action.');
     },
 };

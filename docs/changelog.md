@@ -1,5 +1,22 @@
 # Changelog
 
+## 3.0.0: Ghost Vanguard — the two bots are one, and the balance is the point
+- **The product is called Ghost Vanguard.** Midtown Vanguard and the separate Midtown Desk ticket bot are now one bot with one name, one database and one set of ranks. The repository stays `midtown-vanguard`.
+- **One language.** The ticket desk was ported from the Python Midtown Desk into this codebase, so there is a single Node.js/TypeScript bot to run; midtown-desk is retired. Its desk-owner tools (desk-wide authorization, maintenance, broadcast, backup) were deliberately not ported — Ghost Vanguard already has `/setup`, `/recovery` and `/dev` for those.
+- **The threat board: defence and counter-attack, balanced.**
+  - Every confirmed incident now scores the member behind it: mass ban 40, bot additions and dangerous grants 35, mass kicks 30, deletions and AutoMod tampering 25, prunes and webhook changes 20, server and role changes and confirmed scams 15, anti-ping, join floods, channel or role creation, role grants and mass timeouts 10, small changes 5, anything unrecognised 5.
+  - Levels: 🟢 Quiet, 🟡 Watch (25+), 🟠 High (55+), 🔴 Critical (85+).
+  - **Watch records and shows; High strips their dangerous roles and puts the damage back; Critical does that and then bans.** Defence reacts, offence answers — and staff can always step in one step earlier.
+  - It never acts on whitelisted people, the bot itself, the server owner, an unauthorized or protection-off server, or in observe mode, and never twice against the same person within ten minutes.
+  - A quiet attacker cools off: scores halve once per quiet day and entries expire seven days after the last incident. Clearing a false alarm is respected — that member starts again from their next incident.
+  - **Every automatic action is logged and reversible:** it is written to the board, the server's log channel and the case, and `/security threats release` unbans and clears it.
+  - New commands: `/security threats list`, `view`, `clear`, `release` (Head Admin+) and `strike` (Head Admin+). `/security threats list` and `view` need Admin.
+  - The board is swept every minute for every ready server, and it is fed straight from anti-nuke, confirmed scam detection and mention protection.
+- **Ticket desk, ported and rebuilt for this bot.** Panel-driven tickets with per-type categories, claim/unclaim/transfer, priority, renames, a 60-second per-member cooldown and an open-ticket limit; closing posts a full transcript, waits five seconds, then deletes the channel; the requester is DMed a rating, idle tickets close themselves and staff get a weekly report. New: `/ticket panel`, `settings`, `setup`, `stats`, `types`, `claim`, `close`, `history` and a block list.
+- **A dashboard.** One self-contained page — no build step, no external fonts, scripts or images, so it runs on a host with no internet — showing servers, protection, the threat board, the ticket desk and recent incidents, refreshing every 15 seconds. The bot serves it on its health port next to `/healthz`; `npm run dashboard` serves the same routes standalone against the same database, and `npm run dashboard:demo` shows it with seeded sample data. Read-only (GET only) and per-server scoped; set `DASHBOARD_TOKEN` to require a token.
+- **A style of its own.** The Ghost Vanguard mark, and one palette used everywhere: violet `#6d5ae6` for structure, teal `#2aa5a0` for defence, red `#e0483f` for the counter-attack.
+- **Under the hood:** three new tables (`threat_scores`, `threat_events`, `threat_actions`), schema version stays 3, and the weekly report's window is now inclusive at both ends.
+
 ## 2.38.0: Developer is the top rank; who can lift which ban
 - **Developer is now the top rank.** It is the bot owner (`BOT_OWNER_ID`) and anyone in `DEVELOPER_IDS`, set only in `.env`. Supreme Leader is the rank below it.
 - **Developer-only tools.** Nobody below Developer can use these, whatever their rank or Discord permissions:

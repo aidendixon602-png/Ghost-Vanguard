@@ -1,6 +1,6 @@
 # Hosting
 
-Midtown Vanguard is a single-process bot backed by SQLite. It uses one managed connection, WAL, a busy timeout, transactions and SQLite's online backup API, so there is no database server to run.
+Ghost Vanguard is a single-process bot backed by SQLite. It uses one managed connection, WAL, a busy timeout, transactions and SQLite's online backup API, so there is no database server to run.
 
 ## Persistent storage is required
 

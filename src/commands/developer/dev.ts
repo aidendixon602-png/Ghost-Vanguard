@@ -36,7 +36,7 @@ export default defineCommand(new SlashCommandBuilder().setName('dev').setDescrip
     const sub = i.options.getSubcommand();
     if (sub === 'restart') {
         await confirmDanger(ctx, i, {
-            title: 'Restart Midtown Vanguard',
+            title: 'Restart Ghost Vanguard',
             summary: `Version **${VERSION}** · ${ctx.client.guilds.cache.size} server(s)`,
             consequences: [
                 'The bot goes offline for about 10 seconds in every server, then comes back on its own.',
@@ -49,12 +49,12 @@ export default defineCommand(new SlashCommandBuilder().setName('dev').setDescrip
                 const ok = await askRestart(b.user.id);
                 if (ok === null) {
                     const fallback = fallbackRestart();
-                    if (fallback === 'scheduled') return '🔄 **Restarting.** Midtown Vanguard will be back in about 10 seconds; run `/info ping` to check.\n-# The launcher on the host is an older version, so this used the backup method. Press Restart in the Wispbyte panel once to load the newest launcher.';
+                    if (fallback === 'scheduled') return '🔄 **Restarting.** Ghost Vanguard will be back in about 10 seconds; run `/info ping` to check.\n-# The launcher on the host is an older version, so this used the backup method. Press Restart in the Wispbyte panel once to load the newest launcher.';
                     if (fallback === 'too-soon') throw new AppError('VALIDATION_ERROR', 'The bot started less than 3 minutes ago. Wait a minute and try again (restarting this early could make the launcher undo the latest update).');
                     throw new AppError('VALIDATION_ERROR', 'Restarting from Discord needs the bot to be started with `node launch.js`. Use Restart in the Wispbyte panel instead.');
                 }
                 if (!ok) throw new AppError('VALIDATION_ERROR', 'An update or restart is already in progress. Try again in a minute.');
-                return '🔄 **Restarting.** Midtown Vanguard will be back in about 10 seconds; run `/info ping` to check.';
+                return '🔄 **Restarting.** Ghost Vanguard will be back in about 10 seconds; run `/info ping` to check.';
             },
         });
         return;
@@ -107,7 +107,7 @@ export default defineCommand(new SlashCommandBuilder().setName('dev').setDescrip
     }
     if (sub === 'status-reset') {
         clearPresenceOverride(ctx.store);
-        ctx.client.user?.setPresence({ activities: [{ name: 'Custom Status', type: ActivityType.Custom, state: ctx.stats ? presenceLines(ctx.stats.get())[0]! : 'Midtown Vanguard' }], status: 'online' });
+        ctx.client.user?.setPresence({ activities: [{ name: 'Custom Status', type: ActivityType.Custom, state: ctx.stats ? presenceLines(ctx.stats.get())[0]! : 'Ghost Vanguard' }], status: 'online' });
         return 'Back to the normal rotating status.';
     }
     return `**Database:** ${ctx.store.get('PRAGMA quick_check')?.quick_check}\n**Connected servers:** ${ctx.client.guilds.cache.size}\n**Loaded commands:** ${ctx.registry.commands.size}\n**Version:** ${VERSION}${codeVersion()}\n**RoVer configured:** ${!!config.roverKey}\n**Bloxlink configured:** ${!!config.bloxlinkKey}\n**AI configured:** ${config.aiEnabled && !!config.openaiKey}\n**Uptime:** ${Math.floor(process.uptime())} seconds`;

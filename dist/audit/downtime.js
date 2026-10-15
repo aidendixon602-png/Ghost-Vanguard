@@ -34,7 +34,7 @@ export function restartNotice(store, settings, offlineSince, now = Date.now()) {
     const logging = eventLogConfig(store, settings.guildId);
     return [
         offlineSince ? `Offline for about ${formatDuration(now - offlineSince)} (last seen <t:${Math.floor(offlineSince / 1000)}:t>).` : 'Started for the first time with this database.',
-        ...(offlineSince ? [] : ['⚠️ If this server was set up before, its settings were not found. Tell a Midtown Vanguard developer: they can be restored from a backup.']),
+        ...(offlineSince ? [] : ['⚠️ If this server was set up before, its settings were not found. Tell a Ghost Vanguard developer: they can be restored from a backup.']),
         `**Anti-nuke:** ${settings.enabled ? `on · ${settings.mode} mode` : 'off'}`,
         `**Rules:** ${RULES.length}${customized ? ` (${customized} with custom limits)` : ''}${settings.ruleDefaults ? ' · shared "All" limit set' : ''}`,
         `**Whitelist:** ${trusted} user(s)/role(s)`,
@@ -71,7 +71,7 @@ export async function catchUp(guild, store, logs, trusted, offlineSince, now = D
     const quick = !!offlineSince && now - offlineSince < QUIET_RESTART_MS;
     const notice = restartNotice(store, settings, offlineSince, now);
     if (shouldPost(store, guild.id, 'restart', JSON.stringify(notice.filter(l => l.startsWith('**'))), { quietIfNew: quick, force: !quick }))
-        logs.push(guild.id, noticeEmbed('🟢 Midtown Vanguard is back online', notice, offlineSince ? Colors.Green : Colors.Orange));
+        logs.push(guild.id, noticeEmbed('🟢 Ghost Vanguard is back online', notice, offlineSince ? Colors.Green : Colors.Orange));
     if (settings.enabled) {
         const ready = readiness(guild, settings.logChannelId, store);
         // Console: one line per server only when something needs fixing (the ready banner already says how many servers are protected).

@@ -84,7 +84,7 @@ export async function restoreRoles(store, guild, actorId, userId) {
         catch (error) {
             withdraw.forEach(w => w());
             throw new AppError(error?.code === 50013 ? 'PERMISSION_ERROR' : 'VALIDATION_ERROR', error?.code === 50013
-                ? 'Discord refused: Midtown Vanguard is missing Manage Roles or its role is not high enough.' : 'Discord did not make the change. Nothing was restored.');
+                ? 'Discord refused: Ghost Vanguard is missing Manage Roles or its role is not high enough.' : 'Discord did not make the change. Nothing was restored.');
         }
     }
     // Keep the record while something is still missing, so someone with more access can finish the job.

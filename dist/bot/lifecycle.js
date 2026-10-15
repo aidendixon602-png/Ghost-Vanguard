@@ -157,8 +157,8 @@ export class GuildLifecycle {
                 if (!plain.isSendable())
                     return false;
                 sent = await plain.send({ content: kind === 'pending'
-                        ? 'Midtown Vanguard is waiting for an approved developer to run /dev server authorize within 120 seconds of joining; otherwise it leaves.'
-                        : 'Midtown Vanguard is online and anti-nuke protection is running. Give it Embed Links to see the setup panel, then run /setup logs setup.', allowedMentions: { parse: [] } });
+                        ? 'Ghost Vanguard is waiting for an approved developer to run /dev server authorize within 120 seconds of joining; otherwise it leaves.'
+                        : 'Ghost Vanguard is online and anti-nuke protection is running. Give it Embed Links to see the setup panel, then run /setup logs setup.', allowedMentions: { parse: [] } });
             }
             else {
                 // No staff-only channel: tell the owner privately rather than posting in public.
@@ -296,7 +296,7 @@ export class GuildLifecycle {
         if (this.leaving.has(guild.id))
             throw new AppError('AUTHORIZATION_ERROR', 'This server is already leaving. Invite the bot again.');
         if (this.store.get('SELECT 1 FROM server_bans WHERE guild_id=?', guild.id))
-            throw new AppError('AUTHORIZATION_ERROR', 'This server is banned from Midtown Vanguard.');
+            throw new AppError('AUTHORIZATION_ERROR', 'This server is banned from Ghost Vanguard.');
         const row = this.store.authorization(guild.id);
         if (!row || !['PENDING_AUTHORIZATION', 'AUTHORIZED'].includes(row.state))
             throw new AppError('AUTHORIZATION_ERROR', 'The authorization window is closed. Invite the bot again.');
@@ -324,9 +324,9 @@ export class GuildLifecycle {
                 // Turn the countdown into the goodbye, rather than posting another message.
                 const countdown = await this.pendingMessage(guild).catch(() => null);
                 if (countdown)
-                    await countdown.edit({ content: 'Midtown Vanguard was not authorized within 120 seconds and has left this server.', embeds: [], components: [] }).catch(() => undefined);
+                    await countdown.edit({ content: 'Ghost Vanguard was not authorized within 120 seconds and has left this server.', embeds: [], components: [] }).catch(() => undefined);
                 else
-                    await this.notice(guild, 'Midtown Vanguard was not authorized within 120 seconds and is leaving this server.');
+                    await this.notice(guild, 'Ghost Vanguard was not authorized within 120 seconds and is leaving this server.');
             };
             await Promise.race([leaving(), new Promise(resolve => {
                     const timer = setTimeout(resolve, 3000);

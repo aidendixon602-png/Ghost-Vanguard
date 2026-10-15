@@ -365,7 +365,11 @@ test('the reorganized command list: the expected top-level commands and groups',
     try {
         indexTree(registry);
         const tree = treeJson(registry);
-        assert.deepEqual(tree.map(c => c.name), ['antinuke', 'mod', 'security', 'setup', 'recovery', 'info', 'network', 'dev', 'help', 'verify', 'roblox', 'ask', 'role']);
+        assert.deepEqual(tree.map(c => c.name), ['antinuke', 'mod', 'security', 'setup', 'ticket', 'recovery', 'info', 'network', 'dev', 'help', 'verify', 'roblox', 'ask', 'role']);
+        const ticket = tree.find(c => c.name === 'ticket')!;
+        assert.deepEqual(ticket.options.map((o: any) => o.name),
+            ['setup', 'panel', 'types', 'settings', 'stats', 'claim', 'unclaim', 'transfer', 'priority', 'close', 'closerequest', 'add', 'remove', 'rename', 'history', 'block', 'unblock', 'blocked']);
+        assert.deepEqual(ticket.options.find((o: any) => o.name === 'types').options.map((o: any) => o.name), ['add', 'edit', 'remove', 'list', 'reset']);
         const subs = (name: string) => tree.find(c => c.name === name)!.options.map((o: any) => o.name);
         assert.deepEqual(subs('antinuke'), ['status', 'enable', 'disable', 'check', 'scan', 'settings', 'whitelist']);
         assert.deepEqual(subs('network'), ['genreban', 'ungenreban', 'hardban', 'unhardban', 'exceptions']);

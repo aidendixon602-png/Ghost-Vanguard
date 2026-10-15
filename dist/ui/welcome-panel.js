@@ -27,7 +27,7 @@ export function registerWelcomePanel(registry) {
                 return 'The setup panel was refreshed with the current state.';
             }
             if (!i.guild.members.me?.permissions.has(PermissionFlagsBits.ManageChannels))
-                throw new AppError('PERMISSION_ERROR', 'Midtown Vanguard needs Manage Channels to create the log channels. Give it Administrator (recommended) or Manage Channels, then press the button again.');
+                throw new AppError('PERMISSION_ERROR', 'Ghost Vanguard needs Manage Channels to create the log channels. Give it Administrator (recommended) or Manage Channels, then press the button again.');
             const result = await setupLogChannels(ctx.store, i.guild, i.user.id);
             const bans = await checkChannel(i.guild, result.bans.channel.id, 'ban logs');
             const logging = await checkChannel(i.guild, result.logging.channel.id, 'server logs');

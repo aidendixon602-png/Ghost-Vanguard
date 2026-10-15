@@ -108,7 +108,7 @@ async function punish(store: Store, logs: LogQueue, message: Message<true>, minu
     const member = message.member;
     let result = 'Messages deleted.';
     if (member?.moderatable) {
-        await member.timeout(minutes * 60000, `Midtown Vanguard automod: ${reason}`).then(() => { result = `Messages deleted and timed out for ${minutes} minutes.`; }, () => { result = 'Messages deleted; the timeout failed (check Vanguard\'s role position).'; });
+        await member.timeout(minutes * 60000, `Ghost Vanguard automod: ${reason}`).then(() => { result = `Messages deleted and timed out for ${minutes} minutes.`; }, () => { result = 'Messages deleted; the timeout failed (check Vanguard\'s role position).'; });
         store.recordCase(message.guild.id, message.author.id, message.client.user.id, 'automod timeout', `${title}: ${reason}`);
     } else result = 'Messages deleted; Vanguard cannot time this member out (role position).';
     logs.push(message.guild.id, embed(`Automod · ${title}`, `**Member:** <@${message.author.id}> (${message.author.tag})\n**Channel:** <#${message.channelId}>\n**What happened:** ${reason}\n**Result:** ${result}${deleted ? ` (${deleted} message${deleted === 1 ? '' : 's'})` : ''}`, Colors.Orange));

@@ -26,7 +26,7 @@ export async function sendBanNotice(store, guild, user, reason, extra = '') {
 export function appealBlock(store, guild, user, now = Date.now()) {
     const network = activeBan(store, 'hardban', user) ?? activeBan(store, 'genreban', user);
     if (network)
-        return `You are banned from every server Midtown Vanguard protects (${network.kind} ${recordId(network)}). Server staff cannot lift that ban, so it cannot be appealed here.`;
+        return `You are banned from every server Ghost Vanguard protects (${network.kind} ${recordId(network)}). Server staff cannot lift that ban, so it cannot be appealed here.`;
     if (store.get("SELECT 1 FROM appeals WHERE guild_id=? AND user_id=? AND status='pending'", guild, user))
         return 'You already have an appeal waiting for the staff team.';
     const denied = store.get("SELECT decided_at FROM appeals WHERE guild_id=? AND user_id=? AND status='denied' ORDER BY id DESC LIMIT 1", guild, user);

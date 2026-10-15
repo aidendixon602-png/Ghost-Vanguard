@@ -80,7 +80,7 @@ test('strip respects hierarchy: never yourself, the owner, the bot, developers, 
         assert.match(canStrip(g, m(MOD, 5), m(OWNER, 1), BOT)!, /owner/);
         assert.match(canStrip(g, m(MOD, 5), m(DEV, 1), BOT)!, /developers/);
         assert.match(canStrip(g, m(MOD, 3), m(ADMIN, 5), BOT)!, /equal to or above yours/);
-        assert.match(canStrip(g, m(MOD, 9), m(ADMIN, 5, false), BOT)!, /at or above Midtown Vanguard/);
+        assert.match(canStrip(g, m(MOD, 9), m(ADMIN, 5, false), BOT)!, /at or above Ghost Vanguard/);
         assert.equal(canStrip(g, m(OWNER, 1), m(ADMIN, 5), BOT), null, 'the owner can strip anyone below the bot');
         assert.match(canStrip(g, m(MOD, 5), null, BOT)!, /not in this server/);
     } finally { config.developers.delete(DEV); }

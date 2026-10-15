@@ -8,7 +8,7 @@ const when = (expires: unknown) => expires ? `until <t:${Math.floor(Number(expir
 /** What anti-nuke lets this person do, where each exemption comes from, and what would still get them punished. */
 export function whitelistCheck(store: Store, guild: Guild, userId: string, roleIds: string[], isBot: boolean, now = Date.now()): EmbedBuilder {
     const e = new EmbedBuilder().setTitle('Anti-nuke check').setFooter({ text: `User ID: ${userId}` }).setTimestamp();
-    const auto = userId === guild.ownerId ? 'the server owner' : developers.has(userId) ? 'a Midtown Vanguard developer' : userId === guild.client?.user?.id ? 'Midtown Vanguard itself' : null;
+    const auto = userId === guild.ownerId ? 'the server owner' : developers.has(userId) ? 'a Ghost Vanguard developer' : userId === guild.client?.user?.id ? 'Ghost Vanguard itself' : null;
     if (auto)
         return e.setColor(Colors.Green).setDescription(`<@${userId}> is **${auto}**, so anti-nuke never acts on them.`);
     const live = (kind: string, id = userId) => store.get('SELECT expires FROM grants WHERE guild_id=? AND user_id=? AND kind=? AND (expires IS NULL OR expires>?)', guild.id, id, kind, now);

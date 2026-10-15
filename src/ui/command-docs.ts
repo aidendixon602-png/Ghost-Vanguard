@@ -57,11 +57,29 @@ const NOTES: Record<string, string> = {
     '/mod unban': 'ordinary bans only; a genreban needs an Overseer+ for a one-server exception, or a Supreme Leader+ to lift it everywhere; a hardban needs a Developer',
     '/dev update': 'anyone with /dev sees the status; installing now needs a Developer',
     '/network exceptions revoke': 'exceptions are granted by Overseers and higher through `/mod unban`',
+    '/security threats list': 'Admin and above; the bot acts by itself above 25 points, always reversibly',
+    '/security threats view': 'Admin and above; shows every scored incident and automatic action',
+    '/security threats clear': 'Head Admin and above; clears the board entry only, cases and bans stay',
+    '/security threats release': 'Head Admin and above; unbans if they were struck',
+    '/security threats strike': 'Head Admin and above; the manual version of the automatic counter-attack',
+    '/ticket claim': 'ticket staff role, Manage Server or a Vanguard rank',
+    '/ticket unclaim': 'the staff member who claimed it, or an admin',
+    '/ticket transfer': 'ticket staff only',
+    '/ticket priority': 'ticket staff only',
+    '/ticket close': 'the member who opened the ticket, or ticket staff',
+    '/ticket closerequest': 'ticket staff only',
+    '/ticket add': 'ticket staff only',
+    '/ticket remove': 'ticket staff only',
+    '/ticket rename': 'ticket staff only',
+    '/ticket history': 'ticket staff only',
+    '/ticket block': 'ticket staff only; bots and staff cannot be blocked',
+    '/ticket unblock': 'ticket staff only',
+    '/ticket blocked': 'ticket staff only',
 };
 
 export function commandsDoc(registry: Registry): string {
     const leaves = commandLeaves(registry);
-    const out = ['# Commands', '', 'Generated from the bot itself (`npm run docs`). Type `/` in Discord and pick **Midtown Vanguard**; `/help` shows only what you can use. For the same list grouped by rank, see [ranks.md](ranks.md).', ''];
+    const out = ['# Commands', '', 'Generated from the bot itself (`npm run docs`). Type `/` in Discord and pick **Ghost Vanguard**; `/help` shows only what you can use. For the same list grouped by rank, see [ranks.md](ranks.md).', ''];
     for (const top of treeJson(registry) as any[]) {
         const rows = leaves.filter(l => l.top === top.name);
         if (!rows.length) continue;

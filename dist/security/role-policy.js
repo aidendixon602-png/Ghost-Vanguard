@@ -46,7 +46,7 @@ export function decideRoleChange({ store, guild, actor, target, role, me, op }) 
     if (role.managed)
         return { ok: false, kind: 'role', reason: `<@&${role.id}> belongs to a bot or integration, so only Discord can assign it.` };
     if (me.roles.highest.comparePositionTo(role) <= 0)
-        return { ok: false, kind: 'hierarchy', reason: `<@&${role.id}> is at or above Midtown Vanguard's highest role. Move Vanguard's role above it first.` };
+        return { ok: false, kind: 'hierarchy', reason: `<@&${role.id}> is at or above Ghost Vanguard's highest role. Move Vanguard's role above it first.` };
     if (!target)
         return { ok: false, kind: 'member', reason: 'That user is not in this server (or Discord could not find them).' };
     const noop = op === 'add' && target.roles.cache.has(role.id) ? `<@${target.id}> already has <@&${role.id}>. Nothing was changed.`

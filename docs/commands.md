@@ -1,6 +1,6 @@
 # Commands
 
-Generated from the bot itself (`npm run docs`). Type `/` in Discord and pick **Midtown Vanguard**; `/help` shows only what you can use. For the same list grouped by rank, see [ranks.md](ranks.md).
+Generated from the bot itself (`npm run docs`). Type `/` in Discord and pick **Ghost Vanguard**; `/help` shows only what you can use. For the same list grouped by rank, see [ranks.md](ranks.md).
 
 ## /antinuke
 
@@ -109,6 +109,11 @@ Raids, lockdowns, automod, scam links and ping protection
 | `/security scam exclude` | Exclude or include a channel and its threads | Admin+ |
 | `/security scam vision` | Opt in to sending images to OpenAI for text scanning; alerts only | Admin+ |
 | `/security slowmode` | Set how often members can send messages in a channel | Moderator+ or Manage Channels |
+| `/security threats list` | The threat board for this server | Admin+ (Admin and above; the bot acts by itself above 25 points, always reversibly) |
+| `/security threats view` | Everything recorded about one member | Admin+ (Admin and above; shows every scored incident and automatic action) |
+| `/security threats clear` | Clear a member from the board (nothing else changes) | Owner or Head Admin (Head Admin and above; clears the board entry only, cases and bans stay) |
+| `/security threats release` | Undo an automatic strike: unban and clear the board entry | Owner or Head Admin (Head Admin and above; unbans if they were struck) |
+| `/security threats strike` | Counter-attack now: strip, put their damage back and ban | Owner or Head Admin (Head Admin and above; the manual version of the automatic counter-attack) |
 | `/security unlock` | End the lockdown and restore every channel exactly as it was | Admin+ |
 | `/security webhooks` | List every webhook in the server and delete ones you do not trust | Admin+ |
 
@@ -144,6 +149,35 @@ Server setup: logs, staff ranks, welcome, config, permissions
 | `/setup staff check` | Show someone's Vanguard rank here | Helper+ |
 | `/setup welcome setup` | Turn welcome messages on or off | Admin+ |
 | `/setup welcome test` | Send the welcome message for yourself to check how it looks | Admin+ |
+
+## /ticket
+
+Support tickets: the panel, types, settings, stats and staff tools
+
+| Command | What it does | Who |
+|---|---|---|
+| `/ticket panel` | Post the ticket menu members use to open tickets | Admin+ or Manage Guild |
+| `/ticket settings` | View or change this server’s ticket settings | Admin+ or Manage Guild |
+| `/ticket setup` | Set up the ticket desk: staff role, category, log channel and the ticket panel | Admin+ or Manage Guild |
+| `/ticket stats` | Ticket statistics and the staff leaderboard | Admin+ or Manage Guild |
+| `/ticket types add` | Add a ticket type to the menu | Admin+ or Manage Guild |
+| `/ticket types edit` | Rename a ticket type or change its emoji or description | Admin+ or Manage Guild |
+| `/ticket types remove` | Remove a ticket type from the menu | Admin+ or Manage Guild |
+| `/ticket types list` | Show every ticket type | Admin+ or Manage Guild |
+| `/ticket types reset` | Replace the ticket types with the defaults | Admin+ or Manage Guild |
+| `/ticket claim` | Claim this ticket so you are the one handling it | Everyone (ticket staff role, Manage Server or a Vanguard rank) |
+| `/ticket unclaim` | Release this ticket so another staff member can take it | Everyone (the staff member who claimed it, or an admin) |
+| `/ticket transfer` | Hand this ticket to another staff member | Everyone (ticket staff only) |
+| `/ticket priority` | Set how urgent this ticket is | Everyone (ticket staff only) |
+| `/ticket close` | Close this ticket and save the transcript | Everyone (the member who opened the ticket, or ticket staff) |
+| `/ticket closerequest` | Ask the member if their issue is solved and the ticket can close | Everyone (ticket staff only) |
+| `/ticket add` | Add someone to this ticket | Everyone (ticket staff only) |
+| `/ticket remove` | Remove someone from this ticket | Everyone (ticket staff only) |
+| `/ticket rename` | Rename this ticket channel | Everyone (ticket staff only) |
+| `/ticket history` | See a member's past tickets in this server | Everyone (ticket staff only) |
+| `/ticket block` | Stop a member from opening tickets in this server | Everyone (ticket staff only; bots and staff cannot be blocked) |
+| `/ticket unblock` | Let a blocked member open tickets again | Everyone (ticket staff only) |
+| `/ticket blocked` | List members blocked from opening tickets | Everyone (ticket staff only) |
 
 ## /recovery
 

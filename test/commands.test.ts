@@ -96,7 +96,7 @@ test('registry rejects duplicate command names and missing handlers with exact s
 test('full loader discovers every module, validates every subcommand and sets guild context', async () => {
     const r = new Registry();
     await r.load();
-    assert.equal(r.commands.size, 61);
+    assert.equal(r.commands.size, 68);
     for (const d of r.commands.values()) {
         assert.deepEqual(d.data.contexts, [0]);
         assert.equal(d.metadata.dmAllowed, false);
@@ -201,7 +201,7 @@ test('unexpected SDK errors show reference only and redact secrets from full int
     try {
         const f = failure(new Error('SDK fail TOP_SECRET_TOKEN Authorization=BearerPassword password=dbsecret https://discord.com/api/webhooks/123/secret'));
         assert.match(f.reference, /^MV-CMD-[A-F0-9]{12}$/);
-        assert.equal(f.message, 'Midtown Vanguard could not complete this action.');
+        assert.equal(f.message, 'Ghost Vanguard could not complete this action.');
         assert.ok(!f.details.includes('TOP_SECRET_TOKEN'));
         assert.ok(!f.details.includes('dbsecret'));
         assert.ok(!f.details.includes('/webhooks/'));

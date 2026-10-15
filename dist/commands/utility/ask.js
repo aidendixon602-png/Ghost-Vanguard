@@ -17,7 +17,7 @@ export default defineCommand(new SlashCommandBuilder().setName('ask').setDescrip
         const { default: OpenAI } = await import('openai');
         const openai = new OpenAI({ apiKey: config.openaiKey, timeout: 45000, maxRetries: 1 });
         const response = await openai.responses.create({ model: config.openaiModel,
-            instructions: 'You are Midtown Vanguard, a helpful Discord community assistant. Keep replies concise. You have no access to server controls, records, permissions, user accounts or tools. Never claim you performed moderation or changed the server.',
+            instructions: 'You are Ghost Vanguard, a helpful Discord community assistant. Keep replies concise. You have no access to server controls, records, permissions, user accounts or tools. Never claim you performed moderation or changed the server.',
             input: i.options.getString('prompt', true), max_output_tokens: 800, store: false });
         return clip(response.output_text || 'No text was returned.', 3800);
     }

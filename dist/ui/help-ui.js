@@ -10,7 +10,8 @@ import { embed } from './ui.js';
 export const HELP_SECTIONS = [
     { key: 'antinuke', label: 'Anti-nuke', emoji: '🛡️', blurb: 'Stops raids and nukes; manage the whitelist', commands: ['antinuke', 'antinuke-plus', 'trust'] },
     { key: 'moderation', label: 'Moderation', emoji: '🔨', blurb: 'Ban, kick, timeout, cases, notes and appeals', commands: ['moderation', 'tempban', 'softban', 'massban', 'role', 'bans', 'case', 'warnings', 'note', 'appeals', 'nick'] },
-    { key: 'security', label: 'Security', emoji: '🚨', blurb: 'Automod, raid mode, lockdowns and scam links', commands: ['security', 'emergency', 'automod', 'raidmode', 'newaccounts', 'lockdown', 'unlock', 'slowmode', 'scam', 'antiping', 'webhooks', 'health'] },
+    { key: 'security', label: 'Security', emoji: '🚨', blurb: 'Automod, raid mode, lockdowns and scam links', commands: ['security', 'threats', 'emergency', 'automod', 'raidmode', 'newaccounts', 'lockdown', 'unlock', 'slowmode', 'scam', 'antiping', 'webhooks', 'health'] },
+    { key: 'tickets', label: 'Tickets', emoji: '🎫', blurb: 'Support desk: the panel, staff tools and transcripts', commands: ['ticket', 'ticket-setup', 'ticket-panel', 'ticket-type', 'ticket-settings', 'ticket-stats'] },
     { key: 'configuration', label: 'Server Setup', emoji: '⚙️', blurb: 'Staff ranks, welcome, logs and permissions', commands: ['panel', 'staff', 'welcome', 'logs', 'guild-config', 'perm', 'config-history'] },
     { key: 'recovery', label: 'Backups', emoji: '💾', blurb: 'Save and restore the server layout', commands: ['snapshot', 'backup', 'copylayout'] },
     { key: 'verification', label: 'Roblox', emoji: '🎮', blurb: 'Verification, lookups, blacklist and group ranks', commands: ['verify', 'roblox'] },
@@ -79,7 +80,7 @@ const section = (key) => HELP_SECTIONS.find(s => s.key === key);
 export function helpPage(ctx, guild, user, requested = '', requestedPage = 0) {
     const groups = helpCategories(ctx, guild, user);
     if (!groups.length)
-        return { embeds: [embed('Midtown Vanguard · Commands', 'No commands are available to your account in this server.')], components: [], allowedMentions: { parse: [] } };
+        return { embeds: [embed('Ghost Vanguard · Commands', 'No commands are available to your account in this server.')], components: [], allowedMentions: { parse: [] } };
     const prefix = `helpui:${guild}:${user}:`;
     const menu = new ActionRowBuilder().addComponents(new StringSelectMenuBuilder().setCustomId(prefix + 'category').setPlaceholder('Pick a category')
         .addOptions({ label: 'Overview', value: 'home', emoji: '🏠', description: 'All categories at a glance', default: !requested || requested === 'home' }, ...groups.map(g => ({ label: g.label, value: g.key, emoji: section(g.key)?.emoji, description: `${section(g.key)?.blurb ?? ''} · ${g.lines.length} command${g.lines.length === 1 ? '' : 's'}`.slice(0, 100), default: g.key === requested }))));
@@ -87,7 +88,7 @@ export function helpPage(ctx, guild, user, requested = '', requestedPage = 0) {
     if (!requested || requested === 'home' || !groups.some(g => g.key === requested)) {
         const total = groups.reduce((n, g) => n + g.lines.length, 0);
         const body = groups.map(g => `${section(g.key)?.emoji ?? '•'} **${g.label}** · ${g.lines.length}\n-# ${section(g.key)?.blurb ?? ''}`).join('\n');
-        return { embeds: [embed('Midtown Vanguard · Commands', `Type \`/\` and pick **Midtown Vanguard** to see the main commands:\n\`/antinuke\` \`/mod\` \`/role\` \`/security\` \`/setup\` \`/recovery\` \`/info\` \`/roblox\` \`/verify\`\n\n${body}\n\n-# ${total} commands available to you · pick a category below`)], components: [menu], allowedMentions: { parse: [] } };
+        return { embeds: [embed('Ghost Vanguard · Commands', `Type \`/\` and pick **Ghost Vanguard** to see the main commands:\n\`/antinuke\` \`/mod\` \`/role\` \`/security\` \`/setup\` \`/recovery\` \`/info\` \`/roblox\` \`/verify\`\n\n${body}\n\n-# ${total} commands available to you · pick a category below`)], components: [menu], allowedMentions: { parse: [] } };
     }
     const group = groups.find(g => g.key === requested);
     const pages = Math.ceil(group.lines.length / PER_PAGE), page = Math.min(Math.max(0, requestedPage), pages - 1);

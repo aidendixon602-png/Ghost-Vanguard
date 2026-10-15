@@ -98,7 +98,7 @@ export async function lockGuild(ctx, guild, actorId, notice, reason, progress) {
         .sort((a, b) => (a.rawPosition ?? 0) - (b.rawPosition ?? 0));
     // Recorded first, so /security unlock works even if the bot stops partway through.
     store.run('INSERT INTO lockdowns(guild_id,started_by,started_at,reason,message) VALUES(?,?,?,?,?)', guild.id, actorId, Date.now(), reason, notice);
-    const auditReason = `Midtown Vanguard lockdown by ${actorId}: ${reason}`.slice(0, 500);
+    const auditReason = `Ghost Vanguard lockdown by ${actorId}: ${reason}`.slice(0, 500);
     const exempt = exemptFor(guild);
     const result = { locked: 0, notices: 0, skipped: 0, failed: 0, total: channels.length };
     for (const [index, channel] of channels.entries()) {
@@ -144,7 +144,7 @@ export async function unlockGuild(ctx, guild, actorId, message, removeNotices, p
     const byChannel = new Map();
     for (const r of rows)
         byChannel.set(r.channel_id, [...(byChannel.get(r.channel_id) ?? []), { targetId: r.target_id, type: Number(r.target_type), existed: !!r.existed, allow: BigInt(r.allow), deny: BigInt(r.deny), bits: BigInt(r.bits) }]);
-    const auditReason = `Midtown Vanguard lockdown lifted by ${actorId}`;
+    const auditReason = `Ghost Vanguard lockdown lifted by ${actorId}`;
     const result = { restored: 0, missing: 0, failed: 0, noticesRemoved: 0, messages: 0, total: byChannel.size };
     let done = 0;
     for (const [channelId, records] of byChannel) {

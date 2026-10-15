@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { logEvent } from '../errors.js';
 import { config } from '../config.js';
 import { clip, Cooldowns, KeyedQueue } from '../core.js';
+import { noteThreat } from './threat-board.js';
 import { fingerprint, imageMatch, blockedDomain, suspiciousText, downloadImage, digest, MAX_IMAGE_BYTES, MAX_IMAGE_PIXELS } from './scam-matching.js';
 import { shouldPost } from '../audit/notices.js';
 const MAX_IMAGE_SCANS = 2, MAX_IMAGE_WAITERS = 25, FINGERPRINT_CACHE = 500;
@@ -65,10 +66,10 @@ export class ScamProtection {
                 const channels = await guild.channels.fetch();
                 if (!active())
                     return false;
-                channel = channels.find(c => c?.type === ChannelType.GuildText && c.topic === 'Midtown Vanguard • managed security log') ?? null;
+                channel = channels.find(c => c?.type === ChannelType.GuildText && c.topic === 'Ghost Vanguard • managed security log') ?? null;
                 if (!channel) {
                     channel = await guild.channels.create({ name: 'vanguard-security', type: ChannelType.GuildText,
-                        topic: 'Midtown Vanguard • managed security log', reason: 'Automatic scam protection setup',
+                        topic: 'Ghost Vanguard • managed security log', reason: 'Automatic scam protection setup',
                         permissionOverwrites: [{ id: guild.id, deny: [PermissionFlagsBits.ViewChannel] },
                             { id: me.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.EmbedLinks, PermissionFlagsBits.ReadMessageHistory] }] });
                 }
@@ -308,7 +309,10 @@ export class ScamProtection {
         else
             outcome.push('Staff review only; no deletion or ban.');
         const detail = { reason: reason || uncertain || 'Incomplete scan', outcome, warnings, text: clip(text, 1200), attachments: images.map(a => ({ id: a.id, name: a.name, url: a.url })) };
-        this.store.run('INSERT OR IGNORE INTO scam_events(guild_id,message_id,revision,user_id,at,confirmed,json) VALUES(?,?,?,?,?,?,?)', guild.id, message.id, revision, message.author.id, Date.now(), Number(!!confirmed), JSON.stringify(detail));
+        const recorded = this.store.run('INSERT OR IGNORE INTO scam_events(guild_id,message_id,revision,user_id,at,confirmed,json) VALUES(?,?,?,?,?,?,?)', guild.id, message.id, revision, message.author.id, Date.now(), Number(!!confirmed), JSON.stringify(detail));
+        // Only a confirmed scam scores: an uncertain one stays a human decision, never automatic.
+        if (confirmed && recorded.changes)
+            noteThreat(this.store, guild.id, message.author.id, 'scam_post', `Confirmed scam in <#${message.channelId}>: ${detail.reason}`);
         if (!confirmed && !this.cooldowns.take(`alert:${guild.id}:${message.author.id}`, 30000))
             return;
         this.logs.push(guild.id, new EmbedBuilder().setColor(confirmed ? Colors.Red : Colors.Orange).setTitle(confirmed ? 'Scam post blocked' : 'Possible scam • staff review')

@@ -3,7 +3,7 @@ import { clip } from '../core.js';
 import { AppError } from '../errors.js';
 export function embed(title, description, color = Colors.Blurple) {
     return new EmbedBuilder().setColor(color).setTitle(title).setDescription(clip(description, 3900))
-        .setFooter({ text: 'Midtown Vanguard' }).setTimestamp();
+        .setFooter({ text: 'Ghost Vanguard' }).setTimestamp();
 }
 export function checkTarget(actor, target, bot) {
     if ([actor.id, bot.id, actor.guild.ownerId].includes(target.id))

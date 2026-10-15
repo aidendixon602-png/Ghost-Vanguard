@@ -1,5 +1,5 @@
 /**
- * Midtown Vanguard: copy ONE server's settings and history from one database into another.
+ * Ghost Vanguard: copy ONE server's settings and history from one database into another.
  *
  *   node merge-guild.mjs --bot <bot folder> --from <folder with source vanguard.db>
  *                        --into <folder with target vanguard.db> --guild <server ID> --out <new file>
@@ -24,7 +24,7 @@ const bot = resolve(opt('bot') ?? '.'), from = opt('from'), into = opt('into'), 
 const fail = message => { console.error(`ERROR: ${message}`); process.exit(1); };
 if (!from || !into || !guild || !out) fail('Usage: --bot <bot folder> --from <folder> --into <folder> --guild <server ID> --out <file>');
 if (!/^\d{17,20}$/.test(guild)) fail(`"${guild}" is not a Discord server ID.`);
-if (!existsSync(join(bot, 'dist', 'database', 'db.js'))) fail(`No Midtown Vanguard build in ${bot} (dist\\database\\db.js is missing).`);
+if (!existsSync(join(bot, 'dist', 'database', 'db.js'))) fail(`No Ghost Vanguard build in ${bot} (dist\\database\\db.js is missing).`);
 if (existsSync(out)) fail(`${out} already exists. Pick a new output name so nothing is overwritten.`);
 
 // Tables that only hold short-lived working state, or rows tied to bot-wide records.

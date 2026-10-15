@@ -39,7 +39,7 @@ export function broadcastTargets(store, guildIds) {
 }
 export async function broadcast(store, logs, guildIds, title, message, developerId) {
     const { deliver } = broadcastTargets(store, guildIds);
-    const notice = embed(`📢 ${title}`, `${message}\n\n— Midtown Vanguard developers`, Colors.Blurple);
+    const notice = embed(`📢 ${title}`, `${message}\n\n— Ghost Vanguard developers`, Colors.Blurple);
     let sent = 0;
     for (const id of deliver)
         await store.withAuthorized(id, async () => {

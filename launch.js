@@ -1,5 +1,5 @@
 /**
- * Midtown Vanguard launcher for hosts that only let you pick a "main file" (Wispbyte).
+ * Ghost Vanguard launcher for hosts that only let you pick a "main file" (Wispbyte).
  * Startup:  cd /home/container && node launch.js
  *
  * 1. Installs dependencies if node_modules is missing.

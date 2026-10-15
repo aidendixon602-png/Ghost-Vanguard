@@ -11,7 +11,9 @@ import { AppError, redact } from '../errors.js';
  * both built from this one list, and test/schema.test.ts fails if a table with a guild
  * column is missing from it, so a new table cannot quietly escape the guard.
  */
-export const GUILD_SCOPED_TABLES = ['scam_config', 'scam_domains', 'scam_images', 'scam_exclusions', 'scam_events', 'antinuke_presets', 'antinuke_event_payloads', 'antiping_config', 'antiping_targets', 'antinuke_options', 'event_log_config', 'event_log', 'lockdowns', 'lockdown_overwrites', 'lockdown_notices', 'guild_config', 'antinuke_rules', 'antinuke_defaults', 'provider_config', 'permission_roles', 'command_settings', 'feature_settings', 'backup_config', 'configuration_history', 'grants', 'observations', 'incidents', 'backups', 'cases', 'links', 'blocked_accounts', 'snapshots', 'snapshot_metadata', 'recovery_mappings', 'recovery_history', 'outbox', 'member_notes', 'tempbans', 'raidmode', 'newaccount_config', 'staff_roles', 'guild_features', 'appeals', 'duty_sessions', 'autoreact_users', 'ban_records', 'role_rules', 'left_roles', 'panel_actions'];
+export const GUILD_SCOPED_TABLES = ['scam_config', 'scam_domains', 'scam_images', 'scam_exclusions', 'scam_events', 'antinuke_presets', 'antinuke_event_payloads', 'antiping_config', 'antiping_targets', 'antinuke_options', 'event_log_config', 'event_log', 'lockdowns', 'lockdown_overwrites', 'lockdown_notices', 'guild_config', 'antinuke_rules', 'antinuke_defaults', 'provider_config', 'permission_roles', 'command_settings', 'feature_settings', 'backup_config', 'configuration_history', 'grants', 'observations', 'incidents', 'backups', 'cases', 'links', 'blocked_accounts', 'snapshots', 'snapshot_metadata', 'recovery_mappings', 'recovery_history', 'outbox', 'member_notes', 'tempbans', 'raidmode', 'newaccount_config', 'staff_roles', 'guild_features', 'appeals', 'duty_sessions', 'autoreact_users', 'ban_records', 'role_rules', 'left_roles', 'panel_actions',
+    'ticket_config', 'ticket_types', 'ticket_panels', 'ticket_records', 'ticket_blocks',
+    'threat_scores', 'threat_events', 'threat_actions'];
 /** Tables carrying a guild column that are intentionally not scope-guarded. */
 // roblox_network is shared on purpose: servers that opt in share their Roblox blacklist with each other.
 export const UNSCOPED_GUILD_TABLES = ['guild_data', 'guild_authorization', 'server_bans', 'authorization_events', 'recovery_events', 'leases', 'roblox_network', 'network_partners', 'network_ban_results', 'network_exceptions'];
@@ -205,6 +207,56 @@ export class Store {
         // 2.35: every control-panel action: who, whom, what, when.
         this.db.exec(`CREATE TABLE IF NOT EXISTS panel_actions (id INTEGER PRIMARY KEY AUTOINCREMENT, guild_id TEXT NOT NULL REFERENCES guild_data(guild_id) ON DELETE CASCADE, at INTEGER NOT NULL, staff_id TEXT NOT NULL, target_id TEXT, action TEXT NOT NULL, detail TEXT);
             CREATE INDEX IF NOT EXISTS panel_actions_guild ON panel_actions(guild_id, at);`);
+        // 3.0 support desk (the ticket bot merged into Ghost Vanguard). One row per server for the desk
+        // settings, plus that server's ticket types, posted panels, ticket history and ticket blocks.
+        this.db.exec(`CREATE TABLE IF NOT EXISTS ticket_config (
+                guild_id TEXT PRIMARY KEY REFERENCES guild_data(guild_id) ON DELETE CASCADE,
+                staff_role_id TEXT, category_id TEXT, log_channel_id TEXT, panel_channel_id TEXT,
+                ticket_limit INTEGER NOT NULL DEFAULT 1 CHECK(ticket_limit BETWEEN 1 AND 10),
+                autoclose_hours INTEGER NOT NULL DEFAULT 48 CHECK(autoclose_hours BETWEEN 0 AND 720),
+                dm_transcripts INTEGER NOT NULL DEFAULT 1 CHECK(dm_transcripts IN (0,1)),
+                ask_rating INTEGER NOT NULL DEFAULT 1 CHECK(ask_rating IN (0,1)),
+                weekly_report INTEGER NOT NULL DEFAULT 1 CHECK(weekly_report IN (0,1)),
+                counter INTEGER NOT NULL DEFAULT 0, last_report_at INTEGER, by_id TEXT, at INTEGER);
+            CREATE TABLE IF NOT EXISTS ticket_types (
+                id INTEGER PRIMARY KEY AUTOINCREMENT, guild_id TEXT NOT NULL REFERENCES guild_data(guild_id) ON DELETE CASCADE,
+                name TEXT NOT NULL, emoji TEXT, description TEXT, position INTEGER NOT NULL DEFAULT 0);
+            CREATE INDEX IF NOT EXISTS ticket_types_guild ON ticket_types(guild_id, position, id);
+            CREATE TABLE IF NOT EXISTS ticket_panels (
+                guild_id TEXT NOT NULL REFERENCES guild_data(guild_id) ON DELETE CASCADE,
+                message_id TEXT NOT NULL, channel_id TEXT NOT NULL, at INTEGER NOT NULL, PRIMARY KEY(guild_id, message_id));
+            CREATE TABLE IF NOT EXISTS ticket_records (
+                id INTEGER PRIMARY KEY AUTOINCREMENT, guild_id TEXT NOT NULL REFERENCES guild_data(guild_id) ON DELETE CASCADE,
+                number INTEGER NOT NULL, channel_id TEXT NOT NULL, welcome_message_id TEXT, user_id TEXT NOT NULL,
+                type TEXT NOT NULL, subject TEXT NOT NULL DEFAULT '', details TEXT NOT NULL DEFAULT '',
+                claimed_by TEXT, priority TEXT NOT NULL DEFAULT 'normal' CHECK(priority IN ('urgent','high','normal','low')),
+                status TEXT NOT NULL DEFAULT 'open' CHECK(status IN ('open','closing','closed')),
+                opened_at INTEGER NOT NULL, last_activity INTEGER NOT NULL, warned INTEGER NOT NULL DEFAULT 0,
+                closed_at INTEGER, closed_by TEXT, close_reason TEXT, rating INTEGER);
+            CREATE INDEX IF NOT EXISTS ticket_records_channel ON ticket_records(guild_id, channel_id);
+            CREATE INDEX IF NOT EXISTS ticket_records_user ON ticket_records(guild_id, user_id, status);
+            CREATE UNIQUE INDEX IF NOT EXISTS ticket_records_number ON ticket_records(guild_id, number);
+            CREATE TABLE IF NOT EXISTS ticket_blocks (
+                guild_id TEXT NOT NULL REFERENCES guild_data(guild_id) ON DELETE CASCADE, user_id TEXT NOT NULL,
+                reason TEXT, by_id TEXT NOT NULL, at INTEGER NOT NULL, PRIMARY KEY(guild_id, user_id));`);
+        // 3.0 threat board: one row per person under suspicion, the incidents that put them there,
+        // and every automatic action the bot has taken. Nothing here is hidden from staff.
+        this.db.exec(`CREATE TABLE IF NOT EXISTS threat_scores (
+                guild_id TEXT NOT NULL REFERENCES guild_data(guild_id) ON DELETE CASCADE, user_id TEXT NOT NULL,
+                score INTEGER NOT NULL DEFAULT 0, level TEXT NOT NULL DEFAULT 'quiet' CHECK(level IN ('quiet','watch','high','critical')),
+                first_at INTEGER NOT NULL, last_at INTEGER NOT NULL, last_rule TEXT NOT NULL DEFAULT '',
+                strikes INTEGER NOT NULL DEFAULT 0, last_action TEXT, last_action_at INTEGER, cleared_at INTEGER, cleared_by TEXT,
+                PRIMARY KEY(guild_id, user_id));
+            CREATE INDEX IF NOT EXISTS threat_scores_board ON threat_scores(guild_id, score DESC);
+            CREATE TABLE IF NOT EXISTS threat_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT, guild_id TEXT NOT NULL REFERENCES guild_data(guild_id) ON DELETE CASCADE,
+                user_id TEXT NOT NULL, rule TEXT NOT NULL, points INTEGER NOT NULL, detail TEXT NOT NULL, at INTEGER NOT NULL);
+            CREATE INDEX IF NOT EXISTS threat_events_user ON threat_events(guild_id, user_id, at DESC);
+            CREATE TABLE IF NOT EXISTS threat_actions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT, guild_id TEXT NOT NULL REFERENCES guild_data(guild_id) ON DELETE CASCADE,
+                user_id TEXT NOT NULL, action TEXT NOT NULL, detail TEXT NOT NULL, by_id TEXT NOT NULL, at INTEGER NOT NULL,
+                undone_at INTEGER, undone_by TEXT);
+            CREATE INDEX IF NOT EXISTS threat_actions_guild ON threat_actions(guild_id, at DESC);`);
         // 2.32: roles a member had when they left, so staff can give them all back in one click if they rejoin.
         this.db.exec(`CREATE TABLE IF NOT EXISTS left_roles (guild_id TEXT NOT NULL REFERENCES guild_data(guild_id) ON DELETE CASCADE, user_id TEXT NOT NULL, roles TEXT NOT NULL, left_at INTEGER NOT NULL, PRIMARY KEY(guild_id, user_id));`);
         this.db.exec(`CREATE TABLE IF NOT EXISTS autoreact_users (guild_id TEXT NOT NULL REFERENCES guild_data(guild_id) ON DELETE CASCADE, user_id TEXT NOT NULL, emoji TEXT NOT NULL, by_id TEXT NOT NULL, at INTEGER NOT NULL, PRIMARY KEY(guild_id, user_id));`);
@@ -251,6 +303,10 @@ export class Store {
         if (!match || args[(sql.slice(0, match.index).match(/\?/g) ?? []).length] !== active.guild)
             throw new AppError('DATABASE_ERROR', 'Cross-guild or unscoped database read was blocked.');
         this.assertAuthorized(active.guild);
+    }
+    /** The server this store is currently scoped to, if any (set by readGuild / withAuthorized). */
+    currentGuildId() {
+        return this.active.getStore()?.guild ?? null;
     }
     readGuild(guild, fn) {
         const current = this.active.getStore();

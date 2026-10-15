@@ -39,7 +39,7 @@ export default defineCommand(new SlashCommandBuilder().setName('antinuke').setDe
         ctx.store.save(s, i.user.id);
         setAntinukeChoice(ctx.store, i.guildId, true);
         ctx.logs.push(i.guildId, embed('Anti-nuke enabled', `By <@${actor.id}> · baseline #${snapshot} · default preset · enforce mode`, Colors.Green));
-        return `The default preset is loaded: ${RULES.length} rules enabled in **enforce** mode. Baseline snapshot **#${snapshot}** saved. The preset is fixed; use /antinuke whitelist for approved exceptions and /antinuke status to review it.\n${ready.text}${ready.above.length ? '\n-# To fix the warning, drag the Midtown Vanguard role above those roles in Server Settings → Roles, or whitelist them with `/antinuke whitelist add`.' : ''}`;
+        return `The default preset is loaded: ${RULES.length} rules enabled in **enforce** mode. Baseline snapshot **#${snapshot}** saved. The preset is fixed; use /antinuke whitelist for approved exceptions and /antinuke status to review it.\n${ready.text}${ready.above.length ? '\n-# To fix the warning, drag the Ghost Vanguard role above those roles in Server Settings → Roles, or whitelist them with `/antinuke whitelist add`.' : ''}`;
     }
     if (sub === 'disable') {
         await confirmDanger(ctx, i, {

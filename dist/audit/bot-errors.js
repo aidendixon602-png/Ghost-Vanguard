@@ -20,7 +20,7 @@ export function reportBotError(store, logs, guildId, task, error, now = Date.now
         return false;
     last.set(key, now);
     try {
-        logs.push(guildId, embed(`⚠️ Bot error · ${task}`, `Midtown Vanguard hit an error while running **${task}**.\n**Error:** ${clip(redact(message), 300)}\nIt keeps running; if this repeats, check the bot's permissions and role position with \`/security health\`.`, Colors.DarkOrange));
+        logs.push(guildId, embed(`⚠️ Bot error · ${task}`, `Ghost Vanguard hit an error while running **${task}**.\n**Error:** ${clip(redact(message), 300)}\nIt keeps running; if this repeats, check the bot's permissions and role position with \`/security health\`.`, Colors.DarkOrange));
         return true;
     }
     catch {

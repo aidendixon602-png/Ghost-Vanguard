@@ -98,7 +98,7 @@ export function renderEvent(event: LogEvent): EmbedBuilder {
     if (fields.length) e.addFields(fields);
     if (event.image) e.setImage(event.image);
     const ids = [event.targetId && `${event.targetLabel ? `${event.targetLabel} ` : ''}ID: ${event.targetId}`, event.actorId && `By: ${event.actorId}`].filter(Boolean).join(' · ');
-    e.setFooter({ text: ids || 'Midtown Vanguard' });
+    e.setFooter({ text: ids || 'Ghost Vanguard' });
     return e;
 }
 

@@ -5,7 +5,7 @@ import type { Registry } from './registry.js';
  * How commands appear in Discord's "/" menu. Discord lists a bot's commands A→Z and that order
  * cannot be changed, so related commands are grouped under a few top-level commands:
  *
- *   /antinuke  /mod  /security  /setup  /recovery  /info  /network  /dev   (+ /help /verify /roblox /ask /role)
+ *   /antinuke  /mod  /security  /ticket  /setup  /recovery  /info  /network  /dev   (+ /help /verify /roblox /ask /role)
  *
  * Every command module stays exactly as it was. Discord sees the grouped tree; when someone uses
  * it, the interaction is re-shaped (commandName, subcommand, options) so the original module runs
@@ -29,10 +29,16 @@ export const UMBRELLAS: Umbrella[] = [
     { name: 'security', description: 'Raids, lockdowns, automod, scam links and ping protection', entries: [
         { child: 'security', mode: 'flat' }, { child: 'lockdown', mode: 'single' }, { child: 'unlock', mode: 'single' }, { child: 'slowmode', mode: 'single' }, { child: 'webhooks', mode: 'single' }, { child: 'health', mode: 'single' },
         { child: 'emergency', mode: 'group' }, { child: 'raidmode', mode: 'group' }, { child: 'newaccounts', mode: 'group' }, { child: 'automod', mode: 'group' }, { child: 'scam', mode: 'group' },
-        { child: 'antiping', mode: 'group' }] },
+        { child: 'antiping', mode: 'group' }, { child: 'threats', mode: 'group' }] },
     { name: 'setup', description: 'Server setup: logs, staff ranks, welcome, config, permissions', entries: [
         { child: 'logs', mode: 'group' }, { child: 'staff', mode: 'group' }, { child: 'welcome', mode: 'group' }, { child: 'guild-config', mode: 'group', as: 'config' },
         { child: 'perm', mode: 'group', as: 'permissions' }, { child: 'config-history', mode: 'group', as: 'history' }, { child: 'panel', mode: 'single' }] },
+    // Setup and configuration first, then the staff tools, so the list reads in the order people need it.
+    { name: 'ticket', description: 'Support tickets: the panel, types, settings, stats and staff tools', entries: [
+        { child: 'ticket-setup', mode: 'single', as: 'setup' }, { child: 'ticket-panel', mode: 'single', as: 'panel' },
+        { child: 'ticket-type', mode: 'group', as: 'types' },
+        { child: 'ticket-settings', mode: 'single', as: 'settings' }, { child: 'ticket-stats', mode: 'single', as: 'stats' },
+        { child: 'ticket', mode: 'flat' }] },
     { name: 'recovery', description: 'Server backups and snapshots: save, restore, copy layout', entries: [
         { child: 'snapshot', mode: 'group' }, { child: 'backup', mode: 'group' }, { child: 'copylayout', mode: 'single' }] },
     { name: 'info', description: 'Look things up: users, roles, the server and the bot', entries: [

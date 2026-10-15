@@ -15,8 +15,8 @@ import { remapOverwrites } from '../src/recovery/snapshots.js';
 import { memberOrNull } from '../src/ui/ui.js';
 
 test('all modular commands serialize with unique names and no duplicate trust aliases', () => {
-    assert.equal(commandJSON.length, 61);
-    assert.equal(new Set(commandJSON.map(c => c.name )).size, 61);
+    assert.equal(commandJSON.length, 68);
+    assert.equal(new Set(commandJSON.map(c => c.name )).size, 68);
     assert.ok(!commandJSON.some(c => ['antinukeunauth', 'antinukeauthlist'].includes(c.name)));
     for (const c of commandJSON)
         assert.deepEqual(c.contexts, [0]);

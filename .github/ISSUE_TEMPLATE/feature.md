@@ -1,6 +1,6 @@
 ---
 name: Feature request
-about: Something new for Midtown Vanguard
+about: Something new for Ghost Vanguard
 labels: enhancement
 ---
 

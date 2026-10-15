@@ -98,7 +98,7 @@ export class Interactions {
                 };
                 const result = policy.requiresAuthorization && !recovery ? await this.queue.run(guildId, run) : await run();
                 if (typeof result === 'string' && !i.isAutocomplete())
-                    await respond(i, result, policy.responseKind === 'info' ? 'Midtown Vanguard · Information' : '✓ Action completed', policy.responseKind === 'info' ? Colors.Blurple : Colors.Green);
+                    await respond(i, result, policy.responseKind === 'info' ? 'Ghost Vanguard · Information' : '✓ Action completed', policy.responseKind === 'info' ? Colors.Blurple : Colors.Green);
             } finally {
                 this.depths.set(guildId, Math.max(0, (this.depths.get(guildId) ?? 1) - 1));
             }

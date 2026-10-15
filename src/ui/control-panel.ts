@@ -43,7 +43,7 @@ export function recordPanelAction(store: Store, logs: LogQueue, guildId: string,
             { name: 'Target', value: targetId ? `<@${targetId}> (\`${targetId}\`)` : '—', inline: true },
             { name: 'When', value: `<t:${Math.floor(at / 1000)}:f>`, inline: true },
             { name: 'Result', value: clip(detail, 1000) || '—' },
-        ).setFooter({ text: 'Midtown Vanguard control panel' }).setTimestamp(at));
+        ).setFooter({ text: 'Ghost Vanguard control panel' }).setTimestamp(at));
 }
 
 // ---------------------------------------------------------------- the panel message
@@ -55,7 +55,7 @@ export function panelMessage(store: Store, guildId: string, now = Date.now()) {
     const warnings = Number(store.get("SELECT COUNT(*) AS n FROM incidents WHERE guild_id=? AND at>? AND mode='warn'", guildId, now - 86400000)?.n ?? 0);
     const cases = Number(store.get('SELECT COUNT(*) AS n FROM cases WHERE guild_id=? AND at>?', guildId, now - 86400000)?.n ?? 0);
     const last = store.get('SELECT * FROM panel_actions WHERE guild_id=? ORDER BY at DESC LIMIT 1', guildId);
-    const embed = new EmbedBuilder().setColor(Colors.Blurple).setTitle('🛡️ Midtown Vanguard · Control Panel')
+    const embed = new EmbedBuilder().setColor(Colors.Blurple).setTitle('🛡️ Ghost Vanguard · Control Panel')
         .setDescription('Manage moderation and anti-nuke actions with the buttons below.\nOnly the server owner and authorized staff can use them. Anything that changes roles asks you to confirm first, and every action is logged.')
         .addFields(
             { name: 'Anti-nuke', value: !s.enabled ? '🔴 Off' : s.mode === 'enforce' ? '🟢 On' : '🟠 Watch-only', inline: true },
@@ -104,7 +104,7 @@ export async function setupPanel(store: Store, guild: Guild, by: string): Promis
         channel = (guild.channels.cache.find(c => c.type === ChannelType.GuildText && c.name === PANEL_CHANNEL) as TextChannel | undefined) ?? null;
     let created = false;
     if (!channel) {
-        channel = await guild.channels.create({ name: PANEL_CHANNEL, type: ChannelType.GuildText, topic: 'Midtown Vanguard control panel: authorized staff only. Every action here is logged.',
+        channel = await guild.channels.create({ name: PANEL_CHANNEL, type: ChannelType.GuildText, topic: 'Ghost Vanguard control panel: authorized staff only. Every action here is logged.',
             permissionOverwrites: overwrites, reason: `${by}: /setup panel` });
         created = true;
     } else await channel.permissionOverwrites.set(overwrites, `${by}: /setup panel (refresh access)`);
@@ -135,8 +135,8 @@ export function canStrip(guild: Pick<Guild, 'ownerId'>, actor: GuildMember, targ
     if (!target) return 'That user is not in this server.';
     if (target.id === actor.id) return 'You cannot strip yourself.';
     if (target.id === guild.ownerId) return 'The server owner cannot be stripped.';
-    if (target.id === botId || developers.has(target.id)) return 'Midtown Vanguard and its developers cannot be stripped.';
-    if (!target.manageable) return `<@${target.id}> has a role at or above Midtown Vanguard's highest role, so the bot cannot change their roles. Move the bot's role above theirs first.`;
+    if (target.id === botId || developers.has(target.id)) return 'Ghost Vanguard and its developers cannot be stripped.';
+    if (!target.manageable) return `<@${target.id}> has a role at or above Ghost Vanguard's highest role, so the bot cannot change their roles. Move the bot's role above theirs first.`;
     if (!isBoss(guild, actor.id) && actor.roles.highest.comparePositionTo(target.roles.highest) <= 0) return `<@${target.id}>'s highest role is equal to or above yours.`;
     return null;
 }
@@ -164,7 +164,7 @@ export function recentActivity(store: Store, guildId: string, limit = 15): strin
     for (const r of store.all('SELECT * FROM panel_actions WHERE guild_id=? ORDER BY at DESC LIMIT ?', guildId, limit))
         rows.push({ at: Number(r.at), line: `🛡️ **${r.action}** · ${r.target_id ? `<@${r.target_id}>` : '—'} · by <@${r.staff_id}> · ${clip(String(r.detail ?? ''), 80)}` });
     for (const r of store.all('SELECT * FROM incidents WHERE guild_id=? ORDER BY at DESC LIMIT ?', guildId, limit))
-        rows.push({ at: Number(r.at), line: `${r.mode === 'warn' ? '⚠️ **Anti-nuke warning**' : '🚨 **Anti-nuke**'} · <@${r.actor_id}> · ${r.rule} · by Midtown Vanguard${/ Undone by (\d+)\./.test(String(r.result)) ? ' · undone' : ''}` });
+        rows.push({ at: Number(r.at), line: `${r.mode === 'warn' ? '⚠️ **Anti-nuke warning**' : '🚨 **Anti-nuke**'} · <@${r.actor_id}> · ${r.rule} · by Ghost Vanguard${/ Undone by (\d+)\./.test(String(r.result)) ? ' · undone' : ''}` });
     for (const r of store.all('SELECT * FROM cases WHERE guild_id=? ORDER BY at DESC LIMIT ?', guildId, limit))
         rows.push({ at: Number(r.at), line: `🔨 **${r.action}** · <@${r.user_id}> · by <@${r.moderator_id}> · ${clip(String(r.reason ?? ''), 60)}` });
     rows.sort((a, b) => b.at - a.at);

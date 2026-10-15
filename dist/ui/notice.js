@@ -3,7 +3,7 @@ import { EmbedBuilder } from 'discord.js';
  * System notices (startup, protection, recovery) as tidy embeds: "**Name:** value" lines become
  * fields, everything else is the description. Same text as before, easier to read.
  */
-export function noticeEmbed(title, lines, color, footer = 'Midtown Vanguard') {
+export function noticeEmbed(title, lines, color, footer = 'Ghost Vanguard') {
     const e = new EmbedBuilder().setColor(color).setTitle(title).setTimestamp().setFooter({ text: footer });
     const text = [];
     const fields = [];
@@ -28,7 +28,7 @@ const RECOVERY_TITLE = {
 export function recoveryEmbed(event, detail, botId, color) {
     const [first, ...rest] = detail.split('\n');
     const actor = /^Actor:\s*(\S+)/.exec(first ?? '')?.[1];
-    const by = !actor ? null : actor === botId ? 'Midtown Vanguard (automatic)' : /^\d{17,20}$/.test(actor) ? `<@${actor}>` : actor;
+    const by = !actor ? null : actor === botId ? 'Ghost Vanguard (automatic)' : /^\d{17,20}$/.test(actor) ? `<@${actor}>` : actor;
     const title = RECOVERY_TITLE[event.toLowerCase()] ?? `💾 ${event.charAt(0).toUpperCase()}${event.slice(1)}`;
-    return noticeEmbed(title, [...(actor ? rest : [first ?? '', ...rest]), ...(by ? [`**By:** ${by}`] : [])], color, 'Midtown Vanguard · recovery');
+    return noticeEmbed(title, [...(actor ? rest : [first ?? '', ...rest]), ...(by ? [`**By:** ${by}`] : [])], color, 'Ghost Vanguard · recovery');
 }

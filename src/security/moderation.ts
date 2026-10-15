@@ -64,7 +64,7 @@ export async function moderate(i: ChatInputCommandInteraction<'cached'>, store: 
             const existing = await existingBan(i.guild, targetId);
             // A genreban or hardban belongs to the developers; its reason and record stay theirs.
             if (existing && banTypeFromReason(existing.reason) !== 'local')
-                throw new AppError('VALIDATION_ERROR', `That user is already banned here by a Midtown Vanguard ${banTypeFromReason(existing.reason)}, which only a developer can change. Nothing was recorded.`);
+                throw new AppError('VALIDATION_ERROR', `That user is already banned here by a Ghost Vanguard ${banTypeFromReason(existing.reason)}, which only a developer can change. Nothing was recorded.`);
             if (existing) alreadyBanned = true;
             const deleteMessageSeconds = alreadyBanned ? 0 : i.options.getInteger('delete_messages') ?? 0;
             if (!alreadyBanned) {
