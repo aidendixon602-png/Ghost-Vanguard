@@ -5,15 +5,16 @@ import { config } from '../../config.js';
 import { embed } from '../../ui/ui.js';
 import { activityReport, REPORT_DEFAULTS } from '../../features/schedules.js';
 import { setFeature } from '../../features/settings.js';
+import { developers } from '../../bot/developers.js';
 import { RANKS, RANK_LABEL, SERVER_LEVELS, rankName, rankOf, supremeLeaders, isSupreme } from '../../bot/ranks.js';
 const label = (r) => r ? RANK_LABEL[rankName(r)] : 'No rank';
 export default defineCommand(new SlashCommandBuilder().setName('staff').setDescription('Vanguard staff ranks: who can use which commands')
     .addSubcommand(s => s.setName('role').setDescription('Link a Discord role to a server rank (Head Admin, Admin, Moderator, Helper)')
     .addRoleOption(o => o.setName('role').setDescription('Discord role').setRequired(true))
     .addStringOption(o => o.setName('rank').setDescription('Rank for this role').setRequired(true).addChoices({ name: 'Head Admin', value: 'headadmin' }, { name: 'Admin', value: 'admin' }, { name: 'Moderator', value: 'moderator' }, { name: 'Helper', value: 'helper' }, { name: 'Remove rank', value: 'none' })))
-    .addSubcommand(s => s.setName('global').setDescription('Supreme Leader: make someone Supreme Leader, Overseer or Bot Manager in every server')
+    .addSubcommand(s => s.setName('global').setDescription('Developer: make someone Supreme Leader, Overseer or Bot Manager in every server')
     .addUserOption(o => o.setName('user').setDescription('User').setRequired(true))
-    .addStringOption(o => o.setName('rank').setDescription('Bot-wide rank').setRequired(true).addChoices({ name: 'Supreme Leader (full control, every server)', value: 'supreme' }, { name: 'Overseer', value: 'overseer' }, { name: 'Bot Manager', value: 'botmanager' }, { name: 'Remove rank', value: 'none' })))
+    .addStringOption(o => o.setName('rank').setDescription('Bot-wide rank').setRequired(true).addChoices({ name: 'Supreme Leader (everything except the Developer-only tools)', value: 'supreme' }, { name: 'Overseer', value: 'overseer' }, { name: 'Bot Manager', value: 'botmanager' }, { name: 'Remove rank', value: 'none' })))
     .addSubcommand(s => s.setName('report').setDescription('Staff activity: actions per staff member')
     .addIntegerOption(o => o.setName('days').setDescription('How many days back (default 7)').setMinValue(1).setMaxValue(365))
     .addBooleanOption(o => o.setName('weekly').setDescription('Also turn the automatic weekly report on or off')))
@@ -39,9 +40,9 @@ export default defineCommand(new SlashCommandBuilder().setName('staff').setDescr
         const global = ctx.store.db.prepare('SELECT user_id,level FROM bot_staff ORDER BY level DESC').all();
         return [
             '**Bot-wide**',
-            `Supreme Leader: ${[...new Set([...supremeLeaders(), ...global.filter(g => g.level === 'supreme').map(g => g.user_id)])].map(id => `<@${id}>`).join(' ') || 'not set (BOT_OWNER_ID)'}`,
-            // The bot owner is also a developer; extra Supreme Leaders are listed only once, above.
-            `Bot Developer: ${[...new Set([config.ownerId, ...config.developers])].filter(id => id && !config.supremeExtra.has(id)).map(id => `<@${id}>`).join(' ') || 'none'}`,
+            // The bot owner and DEVELOPER_IDS are Developers (the top rank); they are not listed again as Supreme Leaders.
+            `Developer: ${[...new Set([config.ownerId, ...config.developers])].filter(Boolean).map(id => `<@${id}>`).join(' ') || 'none'}`,
+            `Supreme Leader: ${[...new Set([...supremeLeaders(), ...global.filter(g => g.level === 'supreme').map(g => g.user_id)])].filter(id => !developers.has(id)).map(id => `<@${id}>`).join(' ') || 'none'}`,
             ...['overseer', 'botmanager'].map(l => `${RANK_LABEL[l]}: ${global.filter(g => g.level === l).map(g => `<@${g.user_id}>`).join(' ') || 'none'}`),
             '', '**This server**', `Server Owner: <@${i.guild.ownerId}>`,
             ...[...SERVER_LEVELS].reverse().map(l => `${RANK_LABEL[l]}: ${roles.filter(r => r.level === l).map(r => `<@&${r.role_id}>`).join(' ') || 'none'}`),
@@ -49,13 +50,13 @@ export default defineCommand(new SlashCommandBuilder().setName('staff').setDescr
         ].join('\n');
     }
     if (sub === 'global') {
-        if (myRank < RANKS.supreme)
-            throw new AppError('PERMISSION_ERROR', 'Only the Supreme Leader can give or remove bot-wide ranks.');
+        if (myRank < RANKS.developer)
+            throw new AppError('PERMISSION_ERROR', 'Only a Developer can give or remove bot-wide ranks.');
         const user = i.options.getUser('user', true), rank = i.options.getString('rank', true);
         if (user.bot)
             throw new AppError('VALIDATION_ERROR', 'Ranks are for people, not bots.');
-        if (isSupreme(user.id))
-            throw new AppError('VALIDATION_ERROR', `<@${user.id}> is a built-in Supreme Leader (set in the bot settings), so this command cannot change their rank.`);
+        if (developers.has(user.id) || isSupreme(user.id))
+            throw new AppError('VALIDATION_ERROR', `<@${user.id}> has their rank set in the bot settings (\`.env\`), so this command cannot change it.`);
         if (rank === 'none')
             ctx.store.db.prepare('DELETE FROM bot_staff WHERE user_id=?').run(user.id);
         else

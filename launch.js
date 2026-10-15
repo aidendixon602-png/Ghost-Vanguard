@@ -38,7 +38,8 @@ function envFile() {
     return out;
 }
 const env = { ...envFile(), ...process.env };
-const REPO = (env.UPDATE_REPO ?? '').trim();
+// Accepts owner/repo or the full link (https://github.com/owner/repo, with or without .git).
+const REPO = (env.UPDATE_REPO ?? '').trim().replace(/^(https?:\/\/)?(www\.)?github\.com\//i, '').replace(/\.git$/i, '').replace(/\/+$/, '');
 const TOKEN = (env.UPDATE_TOKEN ?? '').trim();
 const BRANCH = (env.UPDATE_BRANCH ?? 'main').trim();
 const WORKFLOW = 'CI';
@@ -48,6 +49,14 @@ const API = (env.UPDATE_API_BASE || 'https://api.github.com').replace(/\/$/, '')
 const REMOTE = env.UPDATE_REMOTE_URL || `https://github.com/${REPO}.git`;
 const HEALTHY_MS = Number(env.UPDATE_HEALTHY_SECONDS ?? 120) * 1000;
 const updatesOn = /^[\w.-]+\/[\w.-]+$/.test(REPO) && TOKEN.length > 20;
+/** Why automatic updates are off, in plain words (null when they are on). */
+const updatesOffReason = () => !REPO && !TOKEN ? 'UPDATE_REPO and UPDATE_TOKEN are not set in .env'
+    : !/^[\w.-]+\/[\w.-]+$/.test(REPO) ? `UPDATE_REPO should look like owner/repo (it is "${REPO || 'empty'}")`
+    : !TOKEN ? 'UPDATE_TOKEN is empty in .env'
+    : TOKEN.length <= 20 ? 'UPDATE_TOKEN looks too short; paste the whole github_pat_… token'
+    : !existsSync(join(root, '.git')) ? 'this folder is not a git checkout yet (restart once so the launcher can set it up)'
+    : null;
+if ((env.UPDATE_REPO || env.UPDATE_TOKEN) && updatesOffReason()) say(`Automatic updates are off: ${updatesOffReason()}`, '⚠');
 const hide = text => TOKEN ? String(text).split(TOKEN).join('[token hidden]') : String(text);
 
 // ------------------------------------------------------------ git, with the token passed per command (never saved to disk)
@@ -289,7 +298,7 @@ async function answerBot(c, message) {
     }
     if (!message || message.type !== 'vg-update' || !c?.connected) return;
     const reply = data => { try { if (c.connected) c.send({ type: 'vg-update-result', id: message.id, ...data }); } catch { } };
-    const status = { enabled: updatesOn && existsSync(join(root, '.git')), repo: REPO || null, branch: BRANCH, running: head(), fallback: lastGood, intervalMinutes: CHECK_MS / 60000, lastCheck, rejected: [...rejected] };
+    const status = { enabled: updatesOn && existsSync(join(root, '.git')), why: updatesOffReason(), repo: REPO || null, branch: BRANCH, running: head(), fallback: lastGood, intervalMinutes: CHECK_MS / 60000, lastCheck, rejected: [...rejected] };
     if (message.op !== 'now' || !status.enabled) return reply(status);
     const result = await checkForUpdate(async found => { reply({ ...status, result: found }); await new Promise(r => setTimeout(r, 2500)); });
     if (result.state !== 'installing' && result.state !== 'installed') reply({ ...status, result });

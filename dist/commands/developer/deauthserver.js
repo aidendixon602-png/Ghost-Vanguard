@@ -1,7 +1,7 @@
 import { SlashCommandBuilder } from 'discord.js';
 import { defineCommand } from '../../bot/registry.js';
 import { confirmDanger } from '../../ui/danger-ui.js';
-export default defineCommand(new SlashCommandBuilder().setName('deauthserver').setDescription('Supreme Leader: remove this server\'s authorization and leave')
+export default defineCommand(new SlashCommandBuilder().setName('deauthserver').setDescription('Developer: remove this server\'s authorization and leave')
     .addStringOption(o => o.setName('confirm').setDescription('Type DEAUTHORIZE').setRequired(true).setMaxLength(11).addChoices({ name: 'DEAUTHORIZE', value: 'DEAUTHORIZE' })), { category: 'developer', developerOnly: true, requiresAuthorization: false }, async (ctx, i) => {
     await confirmDanger(ctx, i, {
         title: 'Revoke this server and leave',

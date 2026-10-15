@@ -5,7 +5,7 @@ import { randomUUID } from 'node:crypto';
  * the bot was started by launch.js (it gives the bot a private message channel).
  */
 export interface UpdateStatus {
-    enabled: boolean; repo: string | null; branch: string; running: string | null; fallback: string | null;
+    enabled: boolean; why?: string | null; repo: string | null; branch: string; running: string | null; fallback: string | null;
     intervalMinutes: number; lastCheck: { at: number; result: string }; rejected: string[];
     result?: { state: string; sha?: string; why?: string };
 }
@@ -26,7 +26,7 @@ const short = (sha?: string | null) => sha ? `\`${sha.slice(0, 7)}\`` : 'unknown
 
 export function describeUpdate(s: UpdateStatus | null, op: 'status' | 'now'): string {
     if (!s) return 'Automatic updates are not available: the bot was not started with `node launch.js`, or the launcher did not answer.';
-    if (!s.enabled) return '**Automatic updates are off.** Add `UPDATE_REPO` and `UPDATE_TOKEN` to `.env` and restart to turn them on.';
+    if (!s.enabled) return `**Automatic updates are off.** ${s.why ? `Reason: ${s.why}.` : 'Add `UPDATE_REPO` and `UPDATE_TOKEN` to `.env`.'}\nFix it in \`.env\`, then press Restart in the hosting panel (the launcher reads \`.env\` only when it starts).`;
     const lines = [
         `**Repository:** \`${s.repo}\` · branch \`${s.branch}\``,
         `**Running:** ${short(s.running)}${s.fallback && s.fallback !== s.running ? ` · falls back to ${short(s.fallback)} if it crashes` : ''}`,

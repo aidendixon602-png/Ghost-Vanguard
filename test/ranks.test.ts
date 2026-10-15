@@ -21,7 +21,7 @@ function setup() {
 test('rank comes from BOT_OWNER, developers, bot-wide staff, server owner, staff roles and older access settings', () => {
     const store = setup(), dev = '723456789012345678'; config.developers.add(dev);
     try {
-        assert.equal(rankOf(store, G, config.ownerId!, member(config.ownerId!)), RANKS.supreme);
+        assert.equal(rankOf(store, G, config.ownerId!, member(config.ownerId!)), RANKS.developer, 'the bot owner is a Developer, the top rank');
         assert.equal(rankOf(store, G, dev, member(dev)), RANKS.developer);
         store.db.prepare("INSERT INTO bot_staff(user_id,level) VALUES('ov','overseer'),('bm','botmanager')").run();
         assert.equal(rankOf(store, G, 'ov', member('ov')), RANKS.overseer);
@@ -56,7 +56,7 @@ test('each rank opens exactly its commands, without needing Discord permissions'
     store.close();
 });
 
-test('/staff: you can only hand out ranks below your own; bot-wide ranks are Supreme Leader only', async () => {
+test('/staff: you can only hand out ranks below your own; bot-wide ranks are Developer only', async () => {
     const store = setup();
     const run = (actor: any, sub: string, o: any) => staff.execute({ store, actor, logs: { push: () => {} } } as any, { guildId: G, user: { id: actor.id }, guild: { ownerId: 'owner', members: { fetch: async () => member('t') } },
         options: { getSubcommand: () => sub, getRole: () => ({ id: o.role ?? 'new-role', managed: false }), getString: () => o.rank, getUser: () => o.user ?? null } } as any);
@@ -66,7 +66,7 @@ test('/staff: you can only hand out ranks below your own; bot-wide ranks are Sup
     await assert.rejects(run(head, 'role', { rank: 'none', role: 'r-head' }), /above Head Admin/, 'cannot demote your own level');
     assert.match(await run(member('owner'), 'role', { rank: 'headadmin', role: 'other' }) as string, /Head Admin/, 'server owner can make Head Admins');
     await assert.rejects(run(member('a', ['r-admin']), 'role', { rank: 'helper', role: 'x' }), /Head Admins and above/);
-    await assert.rejects(run(member('owner'), 'global', { rank: 'overseer', user: { id: 'z', bot: false } }), /Supreme Leader/);
+    await assert.rejects(run(member('owner'), 'global', { rank: 'overseer', user: { id: 'z', bot: false } }), /Only a Developer/);
     assert.match(await run(member(config.ownerId!), 'global', { rank: 'overseer', user: { id: 'z', bot: false } }) as string, /Overseer\*\* in every server/);
     assert.equal(rankOf(store, 'anywhere', 'z', null), RANKS.overseer);
     const list = await run(head, 'list', {}) as string;

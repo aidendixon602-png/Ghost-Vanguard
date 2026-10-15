@@ -45,7 +45,7 @@ Midtown Vanguard protects a network of Discord servers from account takeovers, r
 |---|---|
 | **Moderation suite** | Ban, tempban, softban, massban, kick, timeout, warnings with automatic escalation, cases, notes and appeals. Reasons are optional. |
 | **Ban records** | One record per ban (`BAN-0001`) in `#bans` with reason, evidence, moderator, duration and expiry, including bans made by hand or by other bots. |
-| **Network bans** | Developer-issued genrebans and hardbans across every server, enforced on join. Server staff cannot lift them: genrebans are lifted by a Developer (or excepted for one server by an Overseer+), hardbans only by a Supreme Leader. |
+| **Network bans** | Developer-issued genrebans and hardbans across every server, enforced on join. Server staff cannot lift them: genrebans are lifted by a Supreme Leader or Developer (or excepted for one server by an Overseer+), hardbans only by a Developer. |
 | **Role management** | `/role` with full hierarchy checks, per-role giving rules, and one-click role restore for members who leave and rejoin. |
 
 ### Operations
@@ -62,8 +62,8 @@ Every command has a minimum rank, and each rank includes everything below it. Bo
 
 | Rank | Scope | Can do |
 |---|---|---|
-| **Supreme Leader** | All servers | Everything, including the tools that can break the bot: restarts, installing updates, restoring database settings, removing or banning servers, giving bot-wide ranks, lifting hardbans |
-| **Developer** | All servers | Day-to-day maintenance: diagnostics, update status, database health and backups, issuing genrebans and hardbans, lifting genrebans |
+| **Developer** | All servers | The bot owner (`BOT_OWNER_ID`) and `DEVELOPER_IDS`. Everything, including the tools that can break the bot: restarts, installing updates, restoring database settings, removing or banning servers, giving bot-wide ranks, lifting hardbans |
+| **Supreme Leader** | All servers | Everything except the Developer-only tools: diagnostics, update status, database health and backups, genrebans and hardbans, lifting genrebans |
 | **Overseer** | All servers | Bot Manager, plus inspecting and authorizing servers and one-server genreban exceptions |
 | **Bot Manager** | All servers | Head Admin in every server, plus bot status, diagnostics and announcements |
 | **Server Owner** | Own server | Head Admin, plus security admins, undoing setting changes and undoing strips |
@@ -72,15 +72,15 @@ Every command has a minimum rank, and each rank includes everything below it. Bo
 | **Moderator** | One server | Bans, kicks, tempbans, purges, ban records, denying appeals |
 | **Helper** | One server | Warnings, short timeouts, cases and notes |
 
-**Developer access is deliberately limited.** Anything that can take the bot offline, change its data or affect every server at once needs a Supreme Leader, so developer access is safe to give to someone who is still learning.
+**Developer is the top rank and is set only in `.env`.** Anything that can take the bot offline, change its data or affect every server at once is Developer only, so Supreme Leader (or any lower rank) is safe to give to someone who is still learning.
 
 **Who can lift a ban**
 
 | Ban | Lifted by |
 |---|---|
 | Ordinary server ban | Admin rank, Discord Administrator or the server owner (`/mod unban`, ban log buttons, accepting an appeal) |
-| Genreban | A Developer, everywhere (`/network ungenreban`); an Overseer or higher can let the person back into one server (`/mod unban`) |
-| Hardban | A Supreme Leader only (`/network unhardban`) |
+| Genreban | A Supreme Leader or Developer, everywhere (`/network ungenreban`); an Overseer or higher can let the person back into one server (`/mod unban`) |
+| Hardban | A Developer only (`/network unhardban`) |
 
 Anti-nuke watches every rank except Developers, Supreme Leaders, server owners and whitelisted entries. The complete list of commands for each rank is in **[docs/ranks.md](docs/ranks.md)**.
 
@@ -99,7 +99,7 @@ Commands are grouped under a small number of top-level entries:
 | `/info` | Users, roles, server, bot, latency |
 | `/roblox` | Verification, lookups, blacklist, group binds |
 | `/network` | Genrebans, hardbans and their exceptions (developers) |
-| `/dev` | Diagnostics, updates, restarts, servers, database (bot-wide ranks; the risky tools need a Supreme Leader) |
+| `/dev` | Diagnostics, updates, restarts, servers, database (bot-wide ranks; the risky tools are Developer only) |
 
 `/help` in Discord lists only the commands available to you. The full reference is in **[docs/commands.md](docs/commands.md)**.
 
@@ -119,10 +119,10 @@ Copy [`.env.example`](.env.example) to `.env` and set at least:
 |---|---|---|
 | `DISCORD_TOKEN` | Yes | Bot token from the Discord Developer Portal |
 | `DISCORD_CLIENT_ID` | Yes | Application ID |
-| `DEVELOPER_IDS` | Yes | Comma-separated user IDs with developer access |
+| `DEVELOPER_IDS` | Yes | Comma-separated user IDs with Developer access (the top rank, full control) |
 | `DATABASE_PATH` | No | SQLite database location (default `./data/vanguard.db`) |
-| `BOT_OWNER_ID` | Recommended | The bot owner: Supreme Leader, and the default for `TRUSTED_DM_IDS` |
-| `SUPREME_LEADER_IDS` | No | Additional Supreme Leaders. Nobody is built in; every start prints who has bot-wide access |
+| `BOT_OWNER_ID` | Recommended | The bot owner: Developer (the top rank), and the default for `TRUSTED_DM_IDS` |
+| `SUPREME_LEADER_IDS` | No | Supreme Leaders: everything except the Developer-only tools. Nobody is built in; every start prints who has bot-wide access |
 | `TRUSTED_DM_IDS` | No | The only people the bot DMs about itself, including the daily database backup (default: `BOT_OWNER_ID`) |
 | `UPDATE_REPO`, `UPDATE_TOKEN` | No | Enable automatic updates (see below) |
 | `ROVER_API_KEY`, `BLOXLINK_API_KEY` | No | Roblox verification providers |
@@ -157,7 +157,7 @@ push to main → CI (typecheck, build, tests, secret scan) → launcher installs
 - Only commits that passed CI are installed.
 - A version that stops within two minutes of installing is rolled back automatically and skipped.
 - `.env` and `data/` are never modified.
-- Developers can check the update status with `/dev update`. Installing immediately (`action: now`) and `/dev restart` need a Supreme Leader.
+- Developers can check the update status with `/dev update`. Installing immediately (`action: now`) and `/dev restart` are Developer only.
 
 ### Backups
 

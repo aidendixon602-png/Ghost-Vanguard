@@ -1,20 +1,22 @@
 # Changelog
 
-## 2.38.0: safer developer access, and who can lift which ban
-- **Developer no longer means "everything".** These now need a **Supreme Leader**, and developers do not bypass them:
-  - `/dev restart` and installing an update now (`/dev update action: now`; developers can still see the status)
+## 2.38.0: Developer is the top rank; who can lift which ban
+- **Developer is now the top rank.** It is the bot owner (`BOT_OWNER_ID`) and anyone in `DEVELOPER_IDS`, set only in `.env`. Supreme Leader is the rank below it.
+- **Developer-only tools.** Nobody below Developer can use these, whatever their rank or Discord permissions:
+  - `/dev restart` and installing an update now (`/dev update action: now`); anyone with `/dev` can still see the status
   - `/dev database restore-settings`
   - `/dev server deauthorize`, `ban` and `unban`
   - `/setup staff global` (bot-wide ranks)
   - `/network unhardban` and lifting a hardban from its ban record
-- Developers keep everyday tools: diagnostics, update status, database health and backups, server info, genrebans, hardbans and lifting genrebans.
+- **Supreme Leaders** keep everything else: diagnostics, update status, database health and backups, server info, genrebans, hardbans and lifting genrebans. Give this to someone who needs bot-wide tools but should not be able to break the bot.
 - **Lifting ordinary bans is for Admins and owners.** `/mod unban` needs the Admin rank, Discord's Administrator permission or the server owner. Ban Members alone no longer unlocks it. Moderators can still ban.
   - The **Unban / Reban buttons** on ban records now work for Admins and owners, not only developers.
   - **Accepting a ban appeal** (which unbans) needs Admin too. Moderators can still deny.
 - **Network bans need bot-wide staff:**
-  - Genreban: lifted everywhere by a Developer, and a one-server exception now needs an **Overseer or higher**. Server owners and Head Admins can no longer grant it.
-  - Hardban: lifted only by a Supreme Leader.
-- `/help`, the README access table and `docs/ranks.md` show the new split.
+  - Genreban: lifted everywhere by a Supreme Leader or Developer. A one-server exception needs an **Overseer or higher**; server owners and Head Admins can no longer grant it.
+  - Hardban: lifted only by a Developer.
+- `/setup staff list`, the startup Access block, `/help`, the README and `docs/ranks.md` show Developer at the top.
+- **Automatic updates: `UPDATE_REPO` now accepts the full GitHub link** as well as `owner/repo`. Before, a full link silently turned updates off. When updates are off, the launcher and `/dev update` now say exactly why.
 
 ## 2.37.0: no built-in access, and a startup access check
 - **Removed the built-in Supreme Leader** (`843909457616044092`). It used to have full control in every server, and received the daily database backup, unless `SUPREME_LEADER_IDS` was set.

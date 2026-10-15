@@ -27,7 +27,7 @@ export async function tellDevelopers(client, text) {
 export async function offerGenrebanException(ctx, i, ban, reason) {
     const guild = i.guild;
     if (!canGrantException(ctx.store, guild, ctx.actor))
-        throw new AppError('PERMISSION_ERROR', `<@${ban.user_id}> has a Midtown-wide **genreban** (${recordId(ban)}). Server owners and admins cannot lift it: an **Overseer or higher** can let them back into this server only, and a developer can lift it everywhere with \`/network ungenreban\`.`);
+        throw new AppError('PERMISSION_ERROR', `<@${ban.user_id}> has a Midtown-wide **genreban** (${recordId(ban)}). Server owners and admins cannot lift it: an **Overseer or higher** can let them back into this server only, and a Supreme Leader or Developer can lift it everywhere with \`/network ungenreban\`.`);
     await confirmDanger(ctx, i, {
         title: 'Let a genrebanned user back into this server',
         summary: `<@${ban.user_id}> is genrebanned from every Midtown server (**${recordId(ban)}**: ${clip(ban.reason, 200)}).\n**Your reason:** ${clip(reason, 300)}`,

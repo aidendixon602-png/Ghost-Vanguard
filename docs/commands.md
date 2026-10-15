@@ -38,7 +38,7 @@ Moderation: ban, kick, timeout, bans, cases, notes, appeals
 | `/mod case search` | Find cases by member, staff member, action, words in the reason or date | Helper+ or Moderate Members |
 | `/mod case recent` | The latest cases in this server | Helper+ or Moderate Members |
 | `/mod ban` | Ban a user (asks to confirm) | Moderator+ or Ban Members |
-| `/mod unban` | Admins and owners: lift a ban by user ID (genrebans and hardbans need bot-wide staff) | Admin+ or Administrator (ordinary bans only; a genreban needs an Overseer+ for a one-server exception, or a Developer to lift it everywhere; a hardban needs a Supreme Leader) |
+| `/mod unban` | Admins and owners: lift a ban by user ID (genrebans and hardbans need bot-wide staff) | Admin+ or Administrator (ordinary bans only; a genreban needs an Overseer+ for a one-server exception, or a Supreme Leader+ to lift it everywhere; a hardban needs a Developer) |
 | `/mod kick` | Kick a member | Moderator+ or Kick Members |
 | `/mod timeout` | Time out a member for a number of minutes | Helper+ or Moderate Members (Helpers up to 60 minutes; Moderators longer) |
 | `/mod untimeout` | Remove a timeout | Moderator+ or Moderate Members |
@@ -138,7 +138,7 @@ Server setup: logs, staff ranks, welcome, config, permissions
 | `/setup permissions list` | Browse the roles that hold Vanguard command access | Head Admin+ |
 | `/setup permissions discord` | Roles holding Administrator or Manage Roles, which can reorder the hierarchy | Head Admin+ |
 | `/setup staff role` | Link a Discord role to a server rank (Head Admin, Admin, Moderator, Helper) | Owner |
-| `/setup staff global` | Supreme Leader: make someone Supreme Leader, Overseer or Bot Manager in every server | Supreme Leader |
+| `/setup staff global` | Developer: make someone Supreme Leader, Overseer or Bot Manager in every server | Developer |
 | `/setup staff report` | Staff activity: actions per staff member | Owner |
 | `/setup staff list` | Show every rank in this server and bot-wide | Helper+ |
 | `/setup staff check` | Show someone's Vanguard rank here | Helper+ |
@@ -180,12 +180,12 @@ Developers: genrebans and hardbans across every Midtown server
 
 | Command | What it does | Who |
 |---|---|---|
-| `/network genreban` | Developer: ban a user from every authorized server until /network ungenreban | Developer |
-| `/network hardban` | Developer: permanently ban a user from every authorized server until /network unhardban | Developer |
-| `/network exceptions list` | Active genreban exceptions, newest first | Developer |
-| `/network exceptions revoke` | Cancel an exception: the genreban applies in that server again | Developer (exceptions are granted by Overseers and higher through `/mod unban`) |
-| `/network ungenreban` | Developer: revoke a genreban and lift it in every authorized server | Developer |
-| `/network unhardban` | Supreme Leader: revoke a hardban and lift it in every authorized server | Supreme Leader |
+| `/network genreban` | Developer: ban a user from every authorized server until /network ungenreban | Supreme Leader+ |
+| `/network hardban` | Developer: permanently ban a user from every authorized server until /network unhardban | Supreme Leader+ |
+| `/network exceptions list` | Active genreban exceptions, newest first | Supreme Leader+ |
+| `/network exceptions revoke` | Cancel an exception: the genreban applies in that server again | Supreme Leader+ (exceptions are granted by Overseers and higher through `/mod unban`) |
+| `/network ungenreban` | Supreme Leader+: revoke a genreban and lift it in every authorized server | Supreme Leader+ |
+| `/network unhardban` | Developer: revoke a hardban and lift it in every authorized server | Developer |
 
 ## /dev
 
@@ -195,25 +195,25 @@ Bot developers: diagnostics, updates, servers and the database
 |---|---|---|
 | `/dev server list` | Developer: list every server Vanguard is authorized in | Bot Manager+ |
 | `/dev server authorize` | Developer: authorize this server so Vanguard protects it | Overseer+ |
-| `/dev autoreact add` | React to every message from a member (🐐 by default) | Developer |
-| `/dev autoreact remove` | Stop auto-reacting to a member | Developer |
-| `/dev autoreact list` | Members the bot auto-reacts to in this server | Developer |
-| `/dev server ban` | Supreme Leader: ban a server from Vanguard | Supreme Leader |
-| `/dev database status` | Show database health, storage, backup and migration status | Developer |
-| `/dev database backup` | Create a verified database backup now | Developer |
-| `/dev database backups` | List recent database backups | Developer |
-| `/dev database restore-settings` | Supreme Leader: put back lost settings from an old backup file; anything newer is kept | Supreme Leader |
-| `/dev database verify` | Recheck backup checksum and database integrity | Developer |
-| `/dev server deauthorize` | Supreme Leader: remove this server's authorization and leave | Supreme Leader |
+| `/dev autoreact add` | React to every message from a member (🐐 by default) | Supreme Leader+ |
+| `/dev autoreact remove` | Stop auto-reacting to a member | Supreme Leader+ |
+| `/dev autoreact list` | Members the bot auto-reacts to in this server | Supreme Leader+ |
+| `/dev server ban` | Developer: ban a server from Vanguard | Developer |
+| `/dev database status` | Show database health, storage, backup and migration status | Supreme Leader+ |
+| `/dev database backup` | Create a verified database backup now | Supreme Leader+ |
+| `/dev database backups` | List recent database backups | Supreme Leader+ |
+| `/dev database restore-settings` | Developer: put back lost settings from an old backup file; anything newer is kept | Developer |
+| `/dev database verify` | Recheck backup checksum and database integrity | Supreme Leader+ |
+| `/dev server deauthorize` | Developer: remove this server's authorization and leave | Developer |
 | `/dev diagnostics` | Inspect runtime health without secrets | Bot Manager+ |
 | `/dev inspect` | Read-only overview of any server Vanguard knows | Overseer+ |
 | `/dev broadcast` | Post an announcement to every authorized server's log channel | Bot Manager+ |
 | `/dev status` | Show a custom bot status instead of the rotation | Bot Manager+ |
 | `/dev status-reset` | Return to the normal rotating status | Bot Manager+ |
-| `/dev restart` | Supreme Leader: restart the bot (about 10 seconds offline); settings are kept | Supreme Leader |
-| `/dev update` | Automatic GitHub updates: see the status (developers), or install now (Supreme Leader) | Developer (anyone with /dev sees the status; installing now needs a Supreme Leader) |
+| `/dev restart` | Developer: restart the bot (about 10 seconds offline); settings are kept | Developer |
+| `/dev update` | Automatic GitHub updates: see the status, or install now (Developer) | Supreme Leader+ (anyone with /dev sees the status; installing now needs a Developer) |
 | `/dev server info` | Developer: show this server's authorization details | Bot Manager+ |
-| `/dev server unban` | Supreme Leader: remove a server ban | Supreme Leader |
+| `/dev server unban` | Developer: remove a server ban | Developer |
 
 ## /help
 

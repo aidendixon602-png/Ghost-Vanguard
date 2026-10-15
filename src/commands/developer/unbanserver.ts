@@ -3,7 +3,7 @@ import { defineCommand } from '../../bot/registry.js';
 import { confirmDanger } from '../../ui/danger-ui.js';
 import { classify, finish, outcomeEmbed } from '../../ui/progress.js';
 
-export default defineCommand(new SlashCommandBuilder().setName('unbanserver').setDescription('Supreme Leader: remove a server ban')
+export default defineCommand(new SlashCommandBuilder().setName('unbanserver').setDescription('Developer: remove a server ban')
     .addStringOption(o => o.setName('guild_id').setDescription('Server ID').setRequired(true).setMinLength(17).setMaxLength(20)), { category: 'developer', developerOnly: true, requiresAuthorization: false }, async (ctx, i) => {
     const id = i.options.getString('guild_id', true);
     const name = ctx.store.authorization(id)?.name ?? 'Unknown server';

@@ -2,8 +2,8 @@ import { displayPath, RETIRED, treeJson } from '../bot/command-tree.js';
 import { requiredRank } from '../bot/ranks.js';
 import { accessLabel } from './help-ui.js';
 const LEVELS = [
-    [8, '👑 Supreme Leader', 'The bot owner and anyone they choose. Everything, plus the tools that can take the bot down or reach every server at once: restarts, installing updates, restoring database settings, removing or banning servers, bot-wide ranks and lifting hardbans. Set by `BOT_OWNER_ID` / `SUPREME_LEADER_IDS` in `.env`, or given with `/setup staff global`.'],
-    [7, '🧰 Developer', 'Day-to-day bot maintenance in every server without needing Discord permissions: diagnostics, update status, database health and backups, genrebans and hardbans, lifting genrebans. Cannot restart, install updates, restore data, remove servers, give bot-wide ranks or lift hardbans. Ignored by anti-nuke. Added only through `DEVELOPER_IDS` in `.env`.'],
+    [8, '🧰 Developer', 'The top rank: the bot owner (`BOT_OWNER_ID`) and anyone in `DEVELOPER_IDS`. Everything, including the tools that can take the bot down or reach every server at once: restarts, installing updates, restoring database settings, removing or banning servers, giving bot-wide ranks and lifting hardbans. Ignored by anti-nuke. Set only in `.env`.'],
+    [7, '👑 Supreme Leader', 'Bot-wide, every server: everything except the Developer-only tools. Diagnostics, update status, database health and backups, genrebans and hardbans, lifting genrebans. Ignored by anti-nuke. Given with `/setup staff global` or `SUPREME_LEADER_IDS`.'],
     [6, '🔭 Overseer', 'Bot-wide, every server: Bot Manager plus inspecting and authorizing servers, and letting a genrebanned person back into one server. Given with `/setup staff global`.'],
     [5, '🛠️ Bot Manager', 'Bot-wide, every server: Head Admin everywhere plus bot status, diagnostics and announcements. Given with `/setup staff global`.'],
     [4.5, '🏠 Server Owner', 'The owner of a server, in that server: everything a Head Admin can do, plus security admins and undoing setting changes. Cannot lift genrebans or hardbans. Ignored by anti-nuke.'],
@@ -47,8 +47,8 @@ const NOTES = {
     '/role who-can-give': 'staff roles: owner only',
     '/mod massban': 'must also be on the anti-nuke whitelist',
     '/mod timeout': 'Helpers up to 60 minutes; Moderators longer',
-    '/mod unban': 'ordinary bans only; a genreban needs an Overseer+ for a one-server exception, or a Developer to lift it everywhere; a hardban needs a Supreme Leader',
-    '/dev update': 'anyone with /dev sees the status; installing now needs a Supreme Leader',
+    '/mod unban': 'ordinary bans only; a genreban needs an Overseer+ for a one-server exception, or a Supreme Leader+ to lift it everywhere; a hardban needs a Developer',
+    '/dev update': 'anyone with /dev sees the status; installing now needs a Developer',
     '/network exceptions revoke': 'exceptions are granted by Overseers and higher through `/mod unban`',
 };
 export function commandsDoc(registry) {
@@ -68,10 +68,10 @@ export function commandsDoc(registry) {
 export function ranksDoc(registry) {
     const leaves = commandLeaves(registry).sort((a, b) => a.path.localeCompare(b.path));
     const out = ['# Ranks', '', 'Generated from the bot itself (`npm run docs`). Every rank can also use everything listed under the ranks below it.', '',
-        '- **Bot-wide ranks** (Supreme Leader, Developer, Overseer, Bot Manager) work in every server.',
+        '- **Bot-wide ranks** (Developer, Supreme Leader, Overseer, Bot Manager) work in every server.',
         '- **Server ranks** (Owner, Head Admin, Admin, Moderator, Helper) work only in the server they were given in.',
-        '- **Developer is not "everything".** Restarts, installing updates, restoring data, removing servers, bot-wide ranks and lifting hardbans are Supreme Leader only, so a developer who is still learning cannot break the bot.',
-        '- **Unbans:** ordinary bans are lifted by Admins and server owners; genrebans by Developers (or a one-server exception from an Overseer+); hardbans only by a Supreme Leader.',
+        '- **Developer is the top rank** (the bot owner and `DEVELOPER_IDS`). Restarts, installing updates, restoring data, removing servers, bot-wide ranks and lifting hardbans are Developer only, so giving someone Supreme Leader or lower cannot break the bot.',
+        '- **Unbans:** ordinary bans are lifted by Admins and server owners; genrebans by a Supreme Leader or Developer (or a one-server exception from an Overseer+); hardbans only by a Developer.',
         '- **Anti-nuke** ignores only Developers, Supreme Leaders, the server owner and whitelisted people. Every other rank is still watched.',
         '- Check anyone with `/setup staff check user:@them`; see all ranks with `/setup staff list`.', ''];
     for (const [level, title, about] of LEVELS) {

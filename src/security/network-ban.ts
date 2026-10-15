@@ -18,7 +18,7 @@ import { embed } from '../ui/ui.js';
  *   in any authorized server. Lifted with /network ungenreban.
  * - A hardban (/network hardban) is stricter: the user must stay banned everywhere. If anyone
  *   unbans them, they join, or a periodic check finds them unbanned, the bot bans them
- *   again. Lifted only with /network unhardban (Supreme Leader).
+ *   again. Lifted only with /network unhardban (Developer).
  *
  * Both are developer-only, stored in network_bans (never deleted, so revoked bans keep
  * their history) with one row per server outcome in network_ban_results. Only servers
@@ -309,7 +309,7 @@ export async function banIn(deps: NetworkDeps, guild: Guild, ban: NetworkBan, wh
                 ban.evidence_file ? `**Evidence file:** ${ban.evidence_file}` : '',
                 why === 'issued'
                     ? ban.kind === 'hardban'
-                        ? 'This user is banned from every server Midtown Vanguard protects and is re-banned if unbanned. Only a Supreme Leader can lift it, with /network unhardban.'
+                        ? 'This user is banned from every server Midtown Vanguard protects and is re-banned if unbanned. Only a Developer can lift it, with /network unhardban.'
                         : 'This user is banned from every server Midtown Vanguard protects and is banned again if they join. Only a developer can lift it, with /network ungenreban.'
                     : WHY_NOTE[why](ban.kind),
             ].filter(Boolean).join('\n'), Colors.DarkRed));
@@ -576,7 +576,7 @@ export async function existingBan(guild: Guild, userId: string): Promise<{ reaso
 export async function assertLocalUnban(store: Store, guild: Guild, userId: string, existing?: { reason: string | null } | null) {
     const network = activeBan(store, 'hardban', userId) ?? activeBan(store, 'genreban', userId);
     if (network)
-        throw new AppError('PERMISSION_ERROR', `This user has an active ${network.kind}, **${recordId(network)}**, placed by a Midtown Vanguard developer. Server staff cannot lift it: only ${network.kind === 'hardban' ? 'a Supreme Leader' : 'a developer'} can, with \`/network un${network.kind}\`.${network.kind === 'hardban' ? ' Unbanning them by hand is undone immediately.' : ' If they were unbanned by hand they would be banned again on joining.'}`);
+        throw new AppError('PERMISSION_ERROR', `This user has an active ${network.kind}, **${recordId(network)}**, placed by a Midtown Vanguard developer. Server staff cannot lift it: only ${network.kind === 'hardban' ? 'a Developer' : 'a Supreme Leader or Developer'} can, with \`/network un${network.kind}\`.${network.kind === 'hardban' ? ' Unbanning them by hand is undone immediately.' : ' If they were unbanned by hand they would be banned again on joining.'}`);
     const ban = existing === undefined ? await existingBan(guild, userId) : existing;
     const type = banTypeFromReason(ban?.reason);
     if (type !== 'local')

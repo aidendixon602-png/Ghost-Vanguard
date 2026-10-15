@@ -1,8 +1,9 @@
 import { config } from '../config.js';
 import { AppError } from '../errors.js';
 export const developers = {
+    /** DEVELOPER_IDS plus the bot owner (BOT_OWNER_ID): the top rank. */
     has(id) {
-        return config.developers.has(id);
+        return config.developers.has(id) || !!id && id === config.ownerId;
     },
     require(id) {
         if (!this.has(id))

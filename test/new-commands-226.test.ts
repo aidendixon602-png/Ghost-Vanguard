@@ -57,6 +57,7 @@ test('/dev update talks to launch.js, and explains when it is not available', as
     const silent: any = new EventEmitter(); silent.connected = true; silent.send = () => {};
     assert.equal(await askLauncher('status', 50, silent), null, 'no answer → null, never hangs');
     assert.match(describeUpdate({ enabled: false } as any, 'status'), /Automatic updates are off/);
+    assert.match(describeUpdate({ enabled: false, why: 'UPDATE_TOKEN is empty in .env' } as any, 'status'), /Reason: UPDATE_TOKEN is empty in \.env\.[\s\S]*Restart in the hosting panel/, 'says exactly why');
 });
 
 test('/dev restart asks launch.js and reports when it cannot', async () => {

@@ -280,22 +280,24 @@ test('developers can use every command without Administrator or any server role'
     } finally { config.developers.delete(DEV); store.close(); }
 });
 
-test('the risky tools need a Supreme Leader: developers, Overseers and server owners cannot use them', async () => {
+test('the risky tools are Developer only: Supreme Leaders, Overseers and server owners cannot use them', async () => {
     const { store, can } = await guardSetup();
     const SUPREME = '888888888888888881';
-    config.developers.add(DEV);
+    config.supremeExtra.add(SUPREME);
     store.run("INSERT INTO bot_staff(user_id,level,by_id,at) VALUES(?,?,?,0)", MEMBER, 'overseer', OWNER);
+    store.run("INSERT INTO bot_staff(user_id,level,by_id,at) VALUES(?,?,?,0)", ADMIN, 'supreme', OWNER);
     const risky = ['dev/restart', 'database/restore-settings', 'deauthserver', 'banserver', 'unbanserver', 'staff/global', 'unhardban'];
     try {
         for (const key of risky) {
-            assert.equal(can(plainMember(DEV), key), false, `developer must not use /${key}`);
+            assert.equal(can(plainMember(SUPREME), key), false, `Supreme Leader (SUPREME_LEADER_IDS) must not use /${key}`);
+            assert.equal(can(plainMember(ADMIN), key), false, `Supreme Leader (/setup staff global) must not use /${key}`);
             assert.equal(can(plainMember(MEMBER), key), false, `Overseer must not use /${key}`);
             assert.equal(can(plainMember(OWNER, PermissionFlagsBits.Administrator), key), false, `server owner must not use /${key}`);
         }
-        config.supremeExtra.add(SUPREME);
-        for (const key of risky) assert.equal(can(plainMember(SUPREME), key), true, `Supreme Leader can use /${key}`);
-        store.run("INSERT INTO bot_staff(user_id,level,by_id,at) VALUES(?,?,?,0)", ADMIN, 'supreme', OWNER);
-        assert.equal(can(plainMember(ADMIN), 'dev/restart'), true, 'a Supreme Leader given with /setup staff global counts too');
+        for (const key of ['genreban', 'ungenreban', 'hardban', 'dev/diagnostics', 'dev/update', 'database/backup'])
+            assert.equal(can(plainMember(SUPREME), key), true, `Supreme Leader can still use /${key}`);
+        config.developers.add(DEV);
+        for (const key of risky) assert.equal(can(plainMember(DEV), key), true, `Developer can use /${key}`);
     } finally { config.developers.delete(DEV); config.supremeExtra.delete(SUPREME); store.close(); }
 });
 

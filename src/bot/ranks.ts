@@ -5,15 +5,15 @@ import { developers } from './developers.js';
 
 /**
  * Vanguard staff ranks. Each rank can do everything the ranks below it can.
- * Bot-wide (by user ID): Supreme Leader (BOT_OWNER_ID), Bot Developer (DEVELOPER_IDS), Overseer, botmanager.
+ * Bot-wide (by user ID): Developer (BOT_OWNER_ID + DEVELOPER_IDS, the top rank), Supreme Leader, Overseer, Bot Manager.
  * Per server (by Discord role, /setup staff role): headadmin, admin, moderator, helper.
  * The server owner ranks just above headadmin in their own server.
  */
-export const RANKS = { helper: 1, moderator: 2, admin: 3, headadmin: 4, owner: 4.5, botmanager: 5, overseer: 6, developer: 7, supreme: 8 } as const;
+export const RANKS = { helper: 1, moderator: 2, admin: 3, headadmin: 4, owner: 4.5, botmanager: 5, overseer: 6, supreme: 7, developer: 8 } as const;
 export type RankName = keyof typeof RANKS;
 export const RANK_LABEL: Record<RankName, string> = {
     helper: 'Helper', moderator: 'Moderator', admin: 'Admin', headadmin: 'Head Admin', owner: 'Server Owner',
-    botmanager: 'Bot Manager', overseer: 'Overseer', developer: 'Bot Developer', supreme: 'Supreme Leader',
+    botmanager: 'Bot Manager', overseer: 'Overseer', supreme: 'Supreme Leader', developer: 'Developer',
 };
 export const SERVER_LEVELS = ['helper', 'moderator', 'admin', 'headadmin'] as const;
 export const GLOBAL_LEVELS = ['botmanager', 'overseer'] as const;
@@ -71,9 +71,10 @@ export function rankOf(store: Store, guildId: string | null, userId: string, mem
 
 /** Rank from Vanguard itself only: developers, Supreme Leaders, owner, grants and staff roles. */
 export function explicitRank(store: Store, guildId: string | null, userId: string, member?: GuildMember | null): number {
+    // Developers (the bot owner and DEVELOPER_IDS) are the top rank.
+    if (developers.has(userId)) return RANKS.developer;
     if (isSupreme(userId)) return RANKS.supreme;
     if ((store.db.prepare('SELECT level FROM bot_staff WHERE user_id=?').get(userId) as { level?: string } | undefined)?.level === 'supreme') return RANKS.supreme;
-    if (developers.has(userId)) return RANKS.developer;
     let rank = 0;
     const global = store.db.prepare('SELECT level FROM bot_staff WHERE user_id=?').get(userId) as { level?: string } | undefined;
     if (global?.level && global.level in RANKS) rank = RANKS[global.level as RankName];
@@ -111,22 +112,22 @@ export const COMMAND_RANK: Record<string, number> = {
     authorizedservers: 5, serverauth: 5, 'dev/diagnostics': 5, 'dev/status': 5, 'dev/status-reset': 5, 'dev/broadcast': 5, 'staff/list': 1, 'staff/check': 1,
     // Overseer
     'dev/inspect': 6, authserver: 6,
-    // Bot Developer: everyday developer tools. Installing updates (`/dev update action:now`) is checked in the command.
+    // Supreme Leader (and Developers): everyday bot tools. Installing updates (`/dev update action:now`) is checked in the command.
     dev: 7, 'dev/update': 7, database: 7, autoreact: 7,
-    // Network bans: Developers issue them and lift genrebans. Hardbans are lifted only by a Supreme Leader.
+    // Network bans: Supreme Leaders issue them and lift genrebans. Hardbans are lifted only by a Developer.
     genreban: 7, ungenreban: 7, hardban: 7, netexception: 7,
-    // Supreme Leader only: anything that can take the bot down, rewrite its data or reach every server at once.
-    // Developers do NOT bypass these (see needsSupreme).
+    // Developer only (the bot owner and DEVELOPER_IDS): anything that can take the bot down, rewrite its data or
+    // reach every server at once. No Discord permission, server role or lower rank unlocks these.
     'dev/restart': 8, 'database/restore-settings': 8, deauthserver: 8, banserver: 8, unbanserver: 8, 'staff/global': 8, unhardban: 8,
 };
 
-/** Commands above Developer: a developer's usual bypass does not reach them. */
-export const needsSupreme = (key: string | undefined) => (requiredRank(key) ?? 0) > RANKS.developer;
-export const SUPREME_MESSAGE = 'Only a **Supreme Leader** can do this. It affects the bot in every server (restarts, updates, the database, removing servers, bot-wide ranks or lifting hardbans), so ordinary developer access does not include it.';
+/** Commands above Supreme Leader: only Developers. */
+export const needsDeveloper = (key: string | undefined) => (requiredRank(key) ?? 0) > RANKS.supreme;
+export const DEVELOPER_ONLY_MESSAGE = 'Only a **Developer** (the bot owner, or someone in `DEVELOPER_IDS`) can do this. It affects the bot in every server (restarts, updates, the database, removing servers, bot-wide ranks or lifting hardbans).';
 
-/** Who may lift a network ban everywhere: genreban = Developer or higher, hardban = Supreme Leader only. */
+/** Who may lift a network ban everywhere: genreban = Supreme Leader or Developer, hardban = Developer only. */
 export function canLiftNetworkBan(store: Store, userId: string, kind: 'genreban' | 'hardban'): boolean {
-    return explicitRank(store, null, userId) >= (kind === 'hardban' ? RANKS.supreme : RANKS.developer);
+    return explicitRank(store, null, userId) >= (kind === 'hardban' ? RANKS.developer : RANKS.supreme);
 }
 
 /** "moderation/timeout" → its own entry, else "moderation". */

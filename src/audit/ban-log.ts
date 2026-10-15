@@ -344,7 +344,7 @@ export interface BanButtonDeps {
 }
 
 const NOT_ALLOWED = 'Only Admins, the server owner and Midtown Vanguard developers can use the ban log buttons.';
-const networkLifter = (kind: NetworkKind) => kind === 'hardban' ? 'Supreme Leader' : 'developer';
+const networkLifter = (kind: NetworkKind) => kind === 'hardban' ? 'Developer' : 'Supreme Leader or Developer';
 const notNetwork = (kind: NetworkKind) => `This is a Midtown-wide **${kind}**: only a ${networkLifter(kind)} can lift it. Server Admins and owners can lift ordinary bans only.`;
 const LOCAL_FOOTER = 'Admins, the server owner and developers can do this';
 const confirmRow = (id: number, action: 'unban' | 'reban', label?: string) => new ActionRowBuilder<ButtonBuilder>().addComponents(
@@ -377,7 +377,7 @@ async function bannedNow(guild: Guild, userId: string): Promise<boolean | null> 
 /**
  * Handles every ban-log button and form. Checked on every single interaction:
  * ordinary bans: Admin rank (or Discord Administrator), the owner or a developer;
- * genrebans: developers; hardbans: Supreme Leaders.
+ * genrebans: Supreme Leaders and Developers; hardbans: Developers.
  */
 export async function handleBanLogInteraction(i: ButtonInteraction<'cached'> | ModalSubmitInteraction<'cached'>, deps: BanButtonDeps) {
     const [, action, raw] = i.customId.split(':');

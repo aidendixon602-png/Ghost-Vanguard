@@ -2,28 +2,28 @@
 
 Generated from the bot itself (`npm run docs`). Every rank can also use everything listed under the ranks below it.
 
-- **Bot-wide ranks** (Supreme Leader, Developer, Overseer, Bot Manager) work in every server.
+- **Bot-wide ranks** (Developer, Supreme Leader, Overseer, Bot Manager) work in every server.
 - **Server ranks** (Owner, Head Admin, Admin, Moderator, Helper) work only in the server they were given in.
-- **Developer is not "everything".** Restarts, installing updates, restoring data, removing servers, bot-wide ranks and lifting hardbans are Supreme Leader only, so a developer who is still learning cannot break the bot.
-- **Unbans:** ordinary bans are lifted by Admins and server owners; genrebans by Developers (or a one-server exception from an Overseer+); hardbans only by a Supreme Leader.
+- **Developer is the top rank** (the bot owner and `DEVELOPER_IDS`). Restarts, installing updates, restoring data, removing servers, bot-wide ranks and lifting hardbans are Developer only, so giving someone Supreme Leader or lower cannot break the bot.
+- **Unbans:** ordinary bans are lifted by Admins and server owners; genrebans by a Supreme Leader or Developer (or a one-server exception from an Overseer+); hardbans only by a Developer.
 - **Anti-nuke** ignores only Developers, Supreme Leaders, the server owner and whitelisted people. Every other rank is still watched.
 - Check anyone with `/setup staff check user:@them`; see all ranks with `/setup staff list`.
 
-## 👑 Supreme Leader
-
-The bot owner and anyone they choose. Everything, plus the tools that can take the bot down or reach every server at once: restarts, installing updates, restoring database settings, removing or banning servers, bot-wide ranks and lifting hardbans. Set by `BOT_OWNER_ID` / `SUPREME_LEADER_IDS` in `.env`, or given with `/setup staff global`.
-
-- `/dev database restore-settings`: Supreme Leader: put back lost settings from an old backup file; anything newer is kept
-- `/dev restart`: Supreme Leader: restart the bot (about 10 seconds offline); settings are kept
-- `/dev server ban`: Supreme Leader: ban a server from Vanguard
-- `/dev server deauthorize`: Supreme Leader: remove this server's authorization and leave
-- `/dev server unban`: Supreme Leader: remove a server ban
-- `/network unhardban`: Supreme Leader: revoke a hardban and lift it in every authorized server
-- `/setup staff global`: Supreme Leader: make someone Supreme Leader, Overseer or Bot Manager in every server
-
 ## 🧰 Developer
 
-Day-to-day bot maintenance in every server without needing Discord permissions: diagnostics, update status, database health and backups, genrebans and hardbans, lifting genrebans. Cannot restart, install updates, restore data, remove servers, give bot-wide ranks or lift hardbans. Ignored by anti-nuke. Added only through `DEVELOPER_IDS` in `.env`.
+The top rank: the bot owner (`BOT_OWNER_ID`) and anyone in `DEVELOPER_IDS`. Everything, including the tools that can take the bot down or reach every server at once: restarts, installing updates, restoring database settings, removing or banning servers, giving bot-wide ranks and lifting hardbans. Ignored by anti-nuke. Set only in `.env`.
+
+- `/dev database restore-settings`: Developer: put back lost settings from an old backup file; anything newer is kept
+- `/dev restart`: Developer: restart the bot (about 10 seconds offline); settings are kept
+- `/dev server ban`: Developer: ban a server from Vanguard
+- `/dev server deauthorize`: Developer: remove this server's authorization and leave
+- `/dev server unban`: Developer: remove a server ban
+- `/network unhardban`: Developer: revoke a hardban and lift it in every authorized server
+- `/setup staff global`: Developer: make someone Supreme Leader, Overseer or Bot Manager in every server
+
+## 👑 Supreme Leader
+
+Bot-wide, every server: everything except the Developer-only tools. Diagnostics, update status, database health and backups, genrebans and hardbans, lifting genrebans. Ignored by anti-nuke. Given with `/setup staff global` or `SUPREME_LEADER_IDS`.
 
 - `/dev autoreact add`: React to every message from a member (🐐 by default)
 - `/dev autoreact list`: Members the bot auto-reacts to in this server
@@ -32,12 +32,12 @@ Day-to-day bot maintenance in every server without needing Discord permissions: 
 - `/dev database backups`: List recent database backups
 - `/dev database status`: Show database health, storage, backup and migration status
 - `/dev database verify`: Recheck backup checksum and database integrity
-- `/dev update`: Automatic GitHub updates: see the status (developers), or install now (Supreme Leader) _(anyone with /dev sees the status; installing now needs a Supreme Leader)_
+- `/dev update`: Automatic GitHub updates: see the status, or install now (Developer) _(anyone with /dev sees the status; installing now needs a Developer)_
 - `/network exceptions list`: Active genreban exceptions, newest first
 - `/network exceptions revoke`: Cancel an exception: the genreban applies in that server again _(exceptions are granted by Overseers and higher through `/mod unban`)_
 - `/network genreban`: Developer: ban a user from every authorized server until /network ungenreban
 - `/network hardban`: Developer: permanently ban a user from every authorized server until /network unhardban
-- `/network ungenreban`: Developer: revoke a genreban and lift it in every authorized server
+- `/network ungenreban`: Supreme Leader+: revoke a genreban and lift it in every authorized server
 
 ## 🔭 Overseer
 
@@ -120,7 +120,7 @@ Server rank: lifting ordinary bans and accepting appeals, raid tools, automod, s
 
 - `/antinuke scan`: Safety scan: powerful roles, roles above Vanguard, bots with Administrator
 - `/mod massban`: Raid cleanup: ban up to 200 user IDs at once (whitelisted staff only) _(must also be on the anti-nuke whitelist)_
-- `/mod unban`: Admins and owners: lift a ban by user ID (genrebans and hardbans need bot-wide staff) _(ordinary bans only; a genreban needs an Overseer+ for a one-server exception, or a Developer to lift it everywhere; a hardban needs a Supreme Leader)_
+- `/mod unban`: Admins and owners: lift a ban by user ID (genrebans and hardbans need bot-wide staff) _(ordinary bans only; a genreban needs an Overseer+ for a one-server exception, or a Supreme Leader+ to lift it everywhere; a hardban needs a Developer)_
 - `/security antiping bypass`: Allow or disallow a role to mention protected staff
 - `/security antiping disable`: Disable staff mention blocking
 - `/security antiping enable`: Enable blocking mentions of configured staff

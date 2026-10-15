@@ -17,7 +17,7 @@ export function describeUpdate(s, op) {
     if (!s)
         return 'Automatic updates are not available: the bot was not started with `node launch.js`, or the launcher did not answer.';
     if (!s.enabled)
-        return '**Automatic updates are off.** Add `UPDATE_REPO` and `UPDATE_TOKEN` to `.env` and restart to turn them on.';
+        return `**Automatic updates are off.** ${s.why ? `Reason: ${s.why}.` : 'Add `UPDATE_REPO` and `UPDATE_TOKEN` to `.env`.'}\nFix it in \`.env\`, then press Restart in the hosting panel (the launcher reads \`.env\` only when it starts).`;
     const lines = [
         `**Repository:** \`${s.repo}\` · branch \`${s.branch}\``,
         `**Running:** ${short(s.running)}${s.fallback && s.fallback !== s.running ? ` · falls back to ${short(s.fallback)} if it crashes` : ''}`,
