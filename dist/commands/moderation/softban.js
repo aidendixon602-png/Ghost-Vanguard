@@ -28,6 +28,12 @@ export default defineCommand(new SlashCommandBuilder().setName('softban').setDes
                 // that would lift their real ban (including a genreban or hardban).
                 if (await existingBan(b.guild, user.id))
                     throw new AppError('VALIDATION_ERROR', 'That user is already banned. A softban ends by unbanning, so it would set them free: nothing was changed. To add your reason to their ban, use `/mod ban` instead.');
+                // Roles and server ownership can change while the confirmation is open.
+                const target = await memberOrNull(b.guild, user.id), me = await b.guild.members.fetchMe({ force: true });
+                if ([c.actor.id, me.id, b.guild.ownerId].includes(user.id))
+                    throw new AppError('VALIDATION_ERROR', 'You cannot target yourself, this bot, or the server owner.');
+                if (target)
+                    checkTarget(c.actor, target, me);
                 await b.guild.members.ban(user.id, { reason: staffReason(c.actor.id, `softban: ${reason}`), deleteMessageSeconds: seconds });
                 // Never report a softban as done while they are still banned.
                 const lifted = await b.guild.members.unban(user.id, staffReason(c.actor.id, 'softban: lifting the ban')).then(() => true, () => false);

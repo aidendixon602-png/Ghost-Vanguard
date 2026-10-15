@@ -62,9 +62,10 @@ function world(o: { bans?: Record<string, string>; unbanFails?: boolean; banErro
     const registry = new Registry();
     registerDangerConfirm(registry);
     const confirm = registry.components.find(c => c.prefix === 'dangerconfirm:')!;
-    const run = async (def: any, options: Record<string, unknown>) => {
+    const run = async (def: any, options: Record<string, unknown>, beforeConfirm?: () => void) => {
         ctx.policy = def.metadata; ctx.actionKey = def.data.name;
         await def.execute(ctx, interaction(options));
+        beforeConfirm?.();
         click.customId = String(replies.at(-1).components[0].components[0].data.custom_id);
         await confirm.execute(ctx, click);
     };
@@ -72,6 +73,98 @@ function world(o: { bans?: Record<string, string>; unbanFails?: boolean; banErro
 }
 
 const title = (p: any) => String(p.embeds[0].data.title);
+
+for (const command of [tempbanCommand, softbanCommand]) {
+    for (const change of ['target promoted', 'moderator demoted', 'bot lowered', 'owner changed', 'membership unavailable'] as const) {
+        test(`/mod ${command.data.name} rechecks target safety on confirmation: ${change}`, async () => {
+            const w = world();
+            const positions = { actor: 10, bot: 20 };
+            const target = { id: TARGET, roles: { highest: { position: 1 } } };
+            w.actor.roles.highest = { comparePositionTo: (role: any) => positions.actor - role.position };
+            w.guild.members.me.roles.highest = { comparePositionTo: (role: any) => positions.bot - role.position };
+            let unavailable = false;
+            w.guild.members.fetch = async ({ user, force }: any) => {
+                assert.equal(force, true);
+                if (user === 'mod') return w.actor;
+                if (unavailable) throw { code: 50013 };
+                return target;
+            };
+            try {
+                await w.run(command, { duration: 24, reason: 'test' }, () => {
+                    if (change === 'target promoted') target.roles.highest.position = 10;
+                    if (change === 'moderator demoted') positions.actor = 1;
+                    if (change === 'bot lowered') positions.bot = 1;
+                    if (change === 'owner changed') w.guild.ownerId = TARGET;
+                    if (change === 'membership unavailable') unavailable = true;
+                });
+                assert.deepEqual(w.calls.banned, [], 'no ban after the target safety check becomes invalid');
+                assert.deepEqual(w.calls.unbanned, []);
+                assert.equal(w.store.readGuild(G, () => w.store.get('SELECT COUNT(*) AS n FROM cases WHERE guild_id=?', G))!.n, 0);
+                assert.equal(w.store.readGuild(G, () => w.store.get('SELECT COUNT(*) AS n FROM tempbans WHERE guild_id=?', G))!.n, 0);
+                const text = JSON.stringify(w.clickReplies.at(-1));
+                assert.match(text, /equal or higher role|role hierarchy|server owner|Could not confirm target membership/);
+            } finally { w.store.close(); }
+        });
+    }
+    test(`/mod ${command.data.name} still accepts a safe target after confirmation`, async () => {
+        const w = world();
+        const target = { id: TARGET, roles: { highest: {} } };
+        w.guild.members.fetch = async ({ user }: any) => user === 'mod' ? w.actor : target;
+        try {
+            await w.run(command, { duration: 24, reason: 'test' });
+            assert.deepEqual(w.calls.banned, [TARGET]);
+            assert.equal(w.store.readGuild(G, () => w.store.get('SELECT COUNT(*) AS n FROM cases WHERE guild_id=?', G))!.n, 1);
+        } finally { w.store.close(); }
+    });
+}
+
+test('/mod massban refuses confirmation after the moderator loses whitelist access', async () => {
+    const w = world();
+    let trusted = true;
+    w.store.grant(G, 'mod', 'admin', 'owner');
+    w.ctx.security.trusted = (_guild: any, id: string) => id === 'mod' && trusted;
+    try {
+        await assert.rejects(w.run(massbanCommand, { user_ids: TARGET }, () => { trusted = false; }), /Mass bans are limited/);
+        assert.deepEqual(w.calls.banned, []);
+        assert.equal(w.store.readGuild(G, () => w.store.get('SELECT COUNT(*) AS n FROM cases WHERE guild_id=?', G))!.n, 0);
+    } finally { w.store.close(); }
+});
+
+for (const change of ['whitelisted', 'server owner'] as const)
+test(`/mod massban protects a target who becomes ${change} before confirmation`, async () => {
+    const w = world();
+    let protectedTarget = false;
+    w.store.grant(G, 'mod', 'admin', 'owner');
+    w.ctx.security.trusted = (_guild: any, id: string) => id === 'mod' || id === TARGET && protectedTarget;
+    try {
+        await w.run(massbanCommand, { user_ids: TARGET }, () => {
+            if (change === 'whitelisted') protectedTarget = true;
+            else w.guild.ownerId = TARGET;
+        });
+        assert.deepEqual(w.calls.banned, []);
+        assert.equal(w.store.readGuild(G, () => w.store.get('SELECT COUNT(*) AS n FROM cases WHERE guild_id=?', G))!.n, 0);
+        assert.match(JSON.stringify(w.clickReplies.at(-1)), /protected/i);
+    } finally { w.store.close(); }
+});
+
+test('/mod massban rechecks protection for each account while the batch is running', async () => {
+    const w = world();
+    const first = '400000000000000002';
+    let protectedTarget = false;
+    w.store.grant(G, 'mod', 'admin', 'owner');
+    w.ctx.security.trusted = (_guild: any, id: string) => id === 'mod' || id === TARGET && protectedTarget;
+    const ban = w.guild.members.ban;
+    w.guild.members.ban = async (id: string, options: any) => {
+        await ban(id, options);
+        protectedTarget = true;
+    };
+    try {
+        await w.run(massbanCommand, { user_ids: `${first} ${TARGET}` });
+        assert.deepEqual(w.calls.banned, [first]);
+        assert.equal(w.store.readGuild(G, () => w.store.get('SELECT COUNT(*) AS n FROM cases WHERE guild_id=?', G))!.n, 1);
+        assert.match(JSON.stringify(w.clickReplies.at(-1)), /protected/i);
+    } finally { w.store.close(); }
+});
 
 test('/mod tempban shows loading, then success; a user already banned is reported, not re-banned', async () => {
     let w = world();

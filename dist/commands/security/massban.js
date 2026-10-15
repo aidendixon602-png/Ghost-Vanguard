@@ -11,6 +11,12 @@ import { BOT_BELOW_TARGET, classify, finish } from '../../ui/progress.js';
 import { liveProgress, summaryEmbed } from '../../ui/network-ui.js';
 import { banTypeFromReason } from '../../security/network-ban.js';
 import { caseId, recordExistingBan } from '../../audit/ban-log.js';
+function requireMassbanAccess(ctx, guild) {
+    const actor = ctx.actor;
+    // Many bans in a minute is exactly what anti-nuke stops, so only people anti-nuke already trusts may do it.
+    if (!(actor.id === guild.ownerId || actor.id === config.ownerId || developers.has(actor.id) || ctx.security.trusted(guild, actor.id)))
+        throw new AppError('PERMISSION_ERROR', 'Mass bans are limited to the server owner, Vanguard developers and staff on the anti-nuke whitelist. Otherwise anti-nuke would treat it as a nuke and punish you.');
+}
 export function parseIds(text) {
     const ids = [...new Set(text.split(/[\s,;]+/).map(s => s.replace(/[<@!>]/g, '')).filter(Boolean))];
     const bad = ids.filter(id => !/^\d{17,20}$/.test(id));
@@ -27,9 +33,7 @@ export default defineCommand(new SlashCommandBuilder().setName('massban').setDes
     .addStringOption(o => o.setName('reason').setDescription('Reason (optional)').setMaxLength(400))
     .addIntegerOption(o => o.setName('delete_messages').setDescription('Also delete their recent messages (default 24 hours)').addChoices({ name: 'Keep messages', value: 0 }, { name: 'Last hour', value: 3600 }, { name: 'Last 24 hours', value: 86400 }, { name: 'Last 7 days', value: 604800 })), { category: 'security', access: 'security', requiredPermissions: [PermissionFlagsBits.BanMembers], botPermissions: [PermissionFlagsBits.BanMembers], cooldown: 10000 }, async (ctx, i) => {
     const actor = ctx.actor;
-    // Many bans in a minute is exactly what anti-nuke stops, so only people anti-nuke already trusts may do it.
-    if (!(actor.id === i.guild.ownerId || actor.id === config.ownerId || developers.has(actor.id) || ctx.security.trusted(i.guild, actor.id)))
-        throw new AppError('PERMISSION_ERROR', 'Mass bans are limited to the server owner, Vanguard developers and staff on the anti-nuke whitelist. Otherwise anti-nuke would treat it as a nuke and punish you.');
+    requireMassbanAccess(ctx, i.guild);
     const me = await i.guild.members.fetchMe();
     const protectedIds = new Set([actor.id, me.id, i.guild.ownerId, config.ownerId]);
     const all = parseIds(i.options.getString('user_ids', true));
@@ -43,6 +47,7 @@ export default defineCommand(new SlashCommandBuilder().setName('massban').setDes
         consequences: [`${ids.length} account(s) are banned, including any not in the server.`, seconds ? 'Their recent messages are permanently deleted.' : 'Their messages are kept.', 'Members above Vanguard\'s role cannot be banned and are reported.', 'One case is recorded per account.'],
         label: `Ban ${ids.length}`, reversal: '`/mod unban` per account. Deleted messages are gone.',
         run: async (c, b) => {
+            requireMassbanAccess(c, b.guild);
             // One row per account, shown with the same live progress and summary as network bans.
             const view = { working: `Mass-banning ${ids.length} account(s)`, verb: 'Banned', action: 'Mass ban', unit: 'account',
                 header: `**Moderator:** <@${c.actor.id}>\n**Reason:** ${reason}${skipped ? `\n${skipped} protected ID(s) were removed from the list.` : ''}` };
@@ -54,7 +59,10 @@ export default defineCommand(new SlashCommandBuilder().setName('massban').setDes
             for (const id of ids) {
                 const row = (outcome, why, reference) => ({ guildId: id, name: `\`${id}\``, outcome, reason: why, reference });
                 const member = b.guild.members.cache.get(id);
-                if (already.has(id)) {
+                // Protection may have been granted after the prompt, or while earlier accounts were processed.
+                if ([c.actor.id, me.id, b.guild.ownerId, config.ownerId].includes(id) || developers.has(id) || c.security.trusted(b.guild, id))
+                    results.push(row('not-allowed', 'This account is now protected; no action was taken.'));
+                else if (already.has(id)) {
                     const type = banTypeFromReason(already.get(id) ?? null);
                     if (type !== 'local')
                         results.push(row('already', `Already banned by a ${type}; left as it is.`));
