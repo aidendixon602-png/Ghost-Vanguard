@@ -30,6 +30,8 @@ export const config = {
     snapshotActionDelayMs: Number(process.env.SNAPSHOT_ACTION_DELAY_MS || 0),
     dbPath: resolve(process.env.DATABASE_PATH || './data/vanguard.db'),
     host: process.env.HEALTH_HOST || '127.0.0.1',
+    /** Optional: when set, the dashboard needs ?token=… (or a bearer header). */
+    dashboardToken: process.env.DASHBOARD_TOKEN?.trim() || undefined,
     port: Number(process.env.HEALTH_PORT || 7475),
     roverKey: process.env.ROVER_API_KEY?.trim() ?? '',
     bloxlinkKey: process.env.BLOXLINK_API_KEY?.trim() ?? '',

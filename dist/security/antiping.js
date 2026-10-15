@@ -1,5 +1,6 @@
 import { AutoModerationRuleTriggerType, Colors, EmbedBuilder } from 'discord.js';
 import { AppError } from '../errors.js';
+import { noteThreat } from './threat-board.js';
 export const ANTIPING_RULE_NAME = 'Vanguard Staff Anti-Ping';
 export async function configureAntiPing(ctx, guild, actor, enabled, targets) {
     ctx.assertActive();
@@ -87,6 +88,7 @@ export async function processStaffMention(ctx, input) {
             results.push('Deletion failed; check Manage Messages.');
         }
         active();
+        noteThreat(ctx.store, guild.id, message.author.id, 'antiping', `Mention-fired message in <#${message.channelId}>: ${results.join(' ')}`);
         ctx.logs.push(guild.id, new EmbedBuilder().setColor(Colors.Orange).setTitle('Protected mention detected').setDescription(`<@${message.author.id}> in <#${message.channelId}>\n${results.join(' ')}`));
     });
 }

@@ -44,6 +44,9 @@ export const ADMIN_RESTRICTED = new Set<string>([
     // Switching protection off, weakening it, or exempting people from it
     'antinuke/disable', 'disable', 'antinuke-plus/settings', 'trust/add', 'trust/remove', 'trust/bots', 'tp', 'trustlist',
     'security/release', 'emergency/start', 'emergency/stop', 'emergency/panel', 'emergency', 'botq',
+    // Acting on the threat board (contain, strike, release, clear) can ban people, so Discord's
+    // Administrator permission alone is not enough; the board itself stays readable for Admins.
+    'threats/strike', 'threats/release', 'threats/clear',
     // Destructive restoration and deleting recovery points
     'backup/restore', 'snapshot/restore', 'config-history/restore', 'restore', 'layoutselect', 'incident',
     'backup/delete', 'snapshot/delete', 'snapshot/cleanup', 'snapshotdelete', 'case/delete',
@@ -104,6 +107,9 @@ export const COMMAND_RANK: Record<string, number> = {
     // Admin. The ticket desk is set up and configured by Admins; answering tickets only needs the
     // ticket staff role, which /ticket checks inside the command.
     'ticket-setup': 3, 'ticket-panel': 3, 'ticket-type': 3, 'ticket-settings': 3, 'ticket-stats': 3,
+    // Reading the threat board is for Admins (it names suspects and what the bot did); acting on it is Head Admin.
+    'threats': 3, 'threats/list': 3, 'threats/view': 3,
+    'threats/strike': 4, 'threats/release': 4, 'threats/clear': 4,
     raidmode: 3, vgwelcome: 3, vgcommands: 0, lockdown: 3, unlock: 3, massban: 3, newaccounts: 3, scam: 3, logs: 3, antiping: 3, mention: 3, health: 3,
     // Head Admin
     // Owner-level actions that also sit under Head Admin commands: handing out security admins, undoing setting changes.

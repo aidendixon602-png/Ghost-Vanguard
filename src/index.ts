@@ -49,6 +49,8 @@ import { activeBan, assertLocalUnban, enforceOnJoin, enforceOnUnban, existingBan
 import { handleBanLogInteraction, onBanAdd, onBanRemove, registerBanLogRenderer } from './audit/ban-log.js';
 import { reportBotError } from './audit/bot-errors.js';
 import { forgetGuildTickets, isTicketChannel, loadTicketChannels, markTicketActivity, runTicketMaintenance, ticketChannelGone } from './features/tickets.js';
+import { sweepThreats } from './security/threat-board.js';
+import { answer as dashboardAnswer } from './dashboard/router.js';
 import { handleTicketDm } from './ui/ticket-ui.js';
 import { recoveryEmbed } from './ui/notice.js';
 import { warnEmptyDatabase } from './features/bot-health.js';
@@ -367,9 +369,11 @@ client.on(Events.ShardDisconnect, () => console.warn('[discord] Gateway disconne
 client.on(Events.ShardResume, () => console.log('[discord] Gateway resumed.'));
 
 const server = createServer((req, res) => {
-    if (req.url !== '/healthz') {
-        res.writeHead(404);
-        res.end();
+    // /healthz is the liveness probe uptime monitors use; everything else is the dashboard.
+    if ((req.url ?? '').split('?')[0] !== '/healthz') {
+        const result = dashboardAnswer(store, req, { token: config.dashboardToken });
+        res.writeHead(result.status, { 'Content-Type': result.type, 'Cache-Control': result.cache, 'X-Robots-Tag': 'noindex' });
+        res.end(req.method === 'HEAD' ? undefined : result.encoding === 'base64' ? Buffer.from(result.body, 'base64') : result.body);
         return;
     }
     const databaseHealth = store.health();
@@ -383,7 +387,11 @@ server.on('error', () => {
     task('shutdown', shutdown(1));
 });
 
-server.listen(config.port, config.host, () => logEvent('health_listening', { url: healthUrl }));
+server.listen(config.port, config.host, () => {
+    logEvent('health_listening', { url: healthUrl, dashboard: `http://${config.host}:${config.port}/`, token: config.dashboardToken ? 'required' : 'none' });
+    if (config.logFormat !== 'json')
+        console.log(`  ${style.dim('Dashboard:')} ${config.host}:${config.port}/  ${config.dashboardToken ? style.dim('(DASHBOARD_TOKEN required)') : style.dim('(set DASHBOARD_TOKEN before exposing it)')}`);
+});
 timers.push(setInterval(() => task('logs', logs.flush()), 2000));
 timers.push(setInterval(() => task('temporary bans', sweepTempbans(store, logs, client, id => lifecycle.isReady(id))), 60000));
 timers.push(setInterval(() => task('verification refresh', roblox.refresh(client, id => lifecycle.isReady(id))), 60000));
@@ -403,6 +411,14 @@ timers.push(setInterval(() => task('heartbeat', heartbeat()), 60000));
 timers.push(setInterval(() => { if (startupReady) task('daily backup DM', dailyBackupDm(store, client, kind => databaseBackups.create(kind))); }, 600000));
 timers.push(setInterval(() => task('network ban sweep', sweepNetworkBans(network)), 600000));
 timers.push(setInterval(() => { if (startupReady) task('ticket upkeep', runTicketMaintenance({ store, client, ready: id => startupReady && lifecycle.isReady(id) })); }, 600000));
+// The threat board: defence and counter-attack, balanced by planResponse and only inside ready servers.
+timers.push(setInterval(() => { if (startupReady) task('threat board', sweepThreats({
+    store, client, logs, ready: id => startupReady && lifecycle.isReady(id),
+    trusted: (guild, id) => security.trusted(guild, id),
+    contain: (guild, id, reason) => security.contain(guild, id),
+    isBanned: (guild, id) => guild.bans.fetch({ user: id, force: true }).then(() => true, () => false),
+    ban: (guild, id, reason) => guild.bans.create(id, { reason }).then(() => true),
+})); }, 60000));
 timers.push(setInterval(() => task('inactive guild cleanup', databaseBackups.purgeInactive()), 3600000));
 timers.push(setInterval(() => {
     for (const guild of client.guilds.cache.values())

@@ -109,6 +109,11 @@ Raids, lockdowns, automod, scam links and ping protection
 | `/security scam exclude` | Exclude or include a channel and its threads | Admin+ |
 | `/security scam vision` | Opt in to sending images to OpenAI for text scanning; alerts only | Admin+ |
 | `/security slowmode` | Set how often members can send messages in a channel | Moderator+ or Manage Channels |
+| `/security threats list` | The threat board for this server | Admin+ (Admin and above; the bot acts by itself above 25 points, always reversibly) |
+| `/security threats view` | Everything recorded about one member | Admin+ (Admin and above; shows every scored incident and automatic action) |
+| `/security threats clear` | Clear a member from the board (nothing else changes) | Owner or Head Admin (Head Admin and above; clears the board entry only, cases and bans stay) |
+| `/security threats release` | Undo an automatic strike: unban and clear the board entry | Owner or Head Admin (Head Admin and above; unbans if they were struck) |
+| `/security threats strike` | Counter-attack now: strip, put their damage back and ban | Owner or Head Admin (Head Admin and above; the manual version of the automatic counter-attack) |
 | `/security unlock` | End the lockdown and restore every channel exactly as it was | Admin+ |
 | `/security webhooks` | List every webhook in the server and delete ones you do not trust | Admin+ |
 

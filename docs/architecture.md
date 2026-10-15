@@ -8,7 +8,8 @@
 | `src/bot/` | Command registry, interaction routing, access guard, guild lifecycle, command synchronization, invite links |
 | `src/commands/` | One module per slash command, in category folders |
 | `src/database/` | SQLite store, versioned migrations, scheduled verified backups |
-| `src/security/` | Anti-nuke engine, staff anti-ping, moderation, protection statistics |
+| `src/security/` | Anti-nuke engine, the threat board, staff anti-ping, moderation, protection statistics |
+| `src/dashboard/` | The read-only page, its JSON API (a pure function of the store), and the standalone server |
 | `src/recovery/` | Snapshots, the restore engine, operation locks, rate-limit handling |
 | `src/integrations/` | Roblox provider lookups and the shared rate-limited HTTP reader |
 | `src/ui/` | Embeds, buttons, select menus and paged views |

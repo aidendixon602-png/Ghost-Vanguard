@@ -346,20 +346,21 @@ export function ticketStats(store, guildId) {
 export function weeklyReport(store, guildId, end = Date.now()) {
     const start = end - 7 * 86400000, previous = start - 7 * 86400000;
     const count = (sql, ...args) => Number(store.get(sql, guildId, ...args)?.c ?? 0);
-    const ratings = store.get('SELECT AVG(rating) a, COUNT(rating) n FROM ticket_records WHERE guild_id=? AND rating IS NOT NULL AND closed_at>=? AND closed_at<?', guildId, start, end);
-    const top = store.get('SELECT type, COUNT(*) c FROM ticket_records WHERE guild_id=? AND opened_at>=? AND opened_at<? GROUP BY type ORDER BY c DESC LIMIT 1', guildId, start, end);
-    const hours = store.get("SELECT AVG((closed_at-opened_at)/3600000.0) h FROM ticket_records WHERE guild_id=? AND status='closed' AND closed_at>=? AND closed_at<?", guildId, start, end);
+    const ratings = store.get('SELECT AVG(rating) a, COUNT(rating) n FROM ticket_records WHERE guild_id=? AND rating IS NOT NULL AND closed_at>=? AND closed_at<=?', guildId, start, end);
+    const top = store.get('SELECT type, COUNT(*) c FROM ticket_records WHERE guild_id=? AND opened_at>=? AND opened_at<=? GROUP BY type ORDER BY c DESC LIMIT 1', guildId, start, end);
+    const hours = store.get("SELECT AVG((closed_at-opened_at)/3600000.0) h FROM ticket_records WHERE guild_id=? AND status='closed' AND closed_at>=? AND closed_at<=?", guildId, start, end);
     return {
-        opened: count('SELECT COUNT(*) c FROM ticket_records WHERE guild_id=? AND opened_at>=? AND opened_at<?', start, end),
+        // The window ends inclusively: a ticket opened in the same millisecond as the report counts.
+        opened: count('SELECT COUNT(*) c FROM ticket_records WHERE guild_id=? AND opened_at>=? AND opened_at<=?', start, end),
         openedPrev: count('SELECT COUNT(*) c FROM ticket_records WHERE guild_id=? AND opened_at>=? AND opened_at<?', previous, start),
-        closed: count("SELECT COUNT(*) c FROM ticket_records WHERE guild_id=? AND status='closed' AND closed_at>=? AND closed_at<?", start, end),
+        closed: count("SELECT COUNT(*) c FROM ticket_records WHERE guild_id=? AND status='closed' AND closed_at>=? AND closed_at<=?", start, end),
         openNow: count("SELECT COUNT(*) c FROM ticket_records WHERE guild_id=? AND status='open'"),
         unclaimed: count("SELECT COUNT(*) c FROM ticket_records WHERE guild_id=? AND status='open' AND claimed_by IS NULL"),
         urgent: count("SELECT COUNT(*) c FROM ticket_records WHERE guild_id=? AND status='open' AND priority IN ('urgent','high')"),
         average: ratings?.n ? Number(ratings.a) : null, ratingCount: Number(ratings?.n ?? 0),
         topType: top ? { name: String(top.type), count: Number(top.c) } : null,
         hoursToClose: hours?.h === null || hours?.h === undefined ? null : Number(hours.h),
-        staff: store.all('SELECT claimed_by, COUNT(*) c, AVG(rating) r FROM ticket_records WHERE guild_id=? AND status=\'closed\' AND claimed_by IS NOT NULL AND closed_at>=? AND closed_at<? GROUP BY claimed_by ORDER BY c DESC LIMIT 5', guildId, start, end)
+        staff: store.all('SELECT claimed_by, COUNT(*) c, AVG(rating) r FROM ticket_records WHERE guild_id=? AND status=\'closed\' AND claimed_by IS NOT NULL AND closed_at>=? AND closed_at<=? GROUP BY claimed_by ORDER BY c DESC LIMIT 5', guildId, start, end)
             .map(r => ({ id: String(r.claimed_by), count: Number(r.c), rating: r.r === null ? null : Number(r.r) })),
     };
 }

@@ -96,7 +96,7 @@ test('registry rejects duplicate command names and missing handlers with exact s
 test('full loader discovers every module, validates every subcommand and sets guild context', async () => {
     const r = new Registry();
     await r.load();
-    assert.equal(r.commands.size, 67);
+    assert.equal(r.commands.size, 68);
     for (const d of r.commands.values()) {
         assert.deepEqual(d.data.contexts, [0]);
         assert.equal(d.metadata.dmAllowed, false);

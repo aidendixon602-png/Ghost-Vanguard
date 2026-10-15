@@ -103,6 +103,9 @@ Server rank: anti-nuke, whitelist, control panel, backups and staff ranks. Given
 - `/security quarantine`: Contain a member and save their roles
 - `/security release`: Restore a quarantined member’s saved roles
 - `/security status`: Show security health and configuration
+- `/security threats clear`: Clear a member from the board (nothing else changes) _(Head Admin and above; clears the board entry only, cases and bans stay)_
+- `/security threats release`: Undo an automatic strike: unban and clear the board entry _(Head Admin and above; unbans if they were struck)_
+- `/security threats strike`: Counter-attack now: strip, put their damage back and ban _(Head Admin and above; the manual version of the automatic counter-attack)_
 - `/setup config backups`: Configure scheduled server layout backups
 - `/setup config command`: Turn one Vanguard command on/off or change its cooldown
 - `/setup config feature`: Turn moderation, verification, AI or backups on/off
@@ -160,6 +163,8 @@ Server rank: lifting ordinary bans and accepting appeals, raid tools, automod, s
 - `/security scam status`: Show automatic protection, scan limits and readiness
 - `/security scam test`: Check text or an image without deletion, bans or AI requests
 - `/security scam vision`: Opt in to sending images to OpenAI for text scanning; alerts only
+- `/security threats list`: The threat board for this server _(Admin and above; the bot acts by itself above 25 points, always reversibly)_
+- `/security threats view`: Everything recorded about one member _(Admin and above; shows every scored incident and automatic action)_
 - `/security unlock`: End the lockdown and restore every channel exactly as it was
 - `/security webhooks`: List every webhook in the server and delete ones you do not trust
 - `/setup logs bot-changes`: Skip routine bot changes, like member-count channel renames

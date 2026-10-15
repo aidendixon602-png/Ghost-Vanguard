@@ -17,7 +17,9 @@
     "database:restore": "node scripts/restore-database.mjs",
     "database:drop-csb": "node scripts/drop-csb-tables.mjs",
     "scam:setup": "node scripts/scam-setup.mjs",
-    "docs": "node --import tsx scripts/commands-doc.ts"
+    "docs": "node --import tsx scripts/commands-doc.ts",
+    "dashboard": "node dist/dashboard/server.js",
+    "dashboard:demo": "node --import tsx scripts/dashboard-demo.mjs"
   },
   "dependencies": {
     "discord.js": "14.27.0",

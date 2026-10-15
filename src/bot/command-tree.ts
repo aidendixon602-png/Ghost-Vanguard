@@ -29,7 +29,7 @@ export const UMBRELLAS: Umbrella[] = [
     { name: 'security', description: 'Raids, lockdowns, automod, scam links and ping protection', entries: [
         { child: 'security', mode: 'flat' }, { child: 'lockdown', mode: 'single' }, { child: 'unlock', mode: 'single' }, { child: 'slowmode', mode: 'single' }, { child: 'webhooks', mode: 'single' }, { child: 'health', mode: 'single' },
         { child: 'emergency', mode: 'group' }, { child: 'raidmode', mode: 'group' }, { child: 'newaccounts', mode: 'group' }, { child: 'automod', mode: 'group' }, { child: 'scam', mode: 'group' },
-        { child: 'antiping', mode: 'group' }] },
+        { child: 'antiping', mode: 'group' }, { child: 'threats', mode: 'group' }] },
     { name: 'setup', description: 'Server setup: logs, staff ranks, welcome, config, permissions', entries: [
         { child: 'logs', mode: 'group' }, { child: 'staff', mode: 'group' }, { child: 'welcome', mode: 'group' }, { child: 'guild-config', mode: 'group', as: 'config' },
         { child: 'perm', mode: 'group', as: 'permissions' }, { child: 'config-history', mode: 'group', as: 'history' }, { child: 'panel', mode: 'single' }] },

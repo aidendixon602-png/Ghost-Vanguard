@@ -43,7 +43,8 @@ export interface Row {
  * column is missing from it, so a new table cannot quietly escape the guard.
  */
 export const GUILD_SCOPED_TABLES = ['scam_config', 'scam_domains', 'scam_images', 'scam_exclusions', 'scam_events', 'antinuke_presets', 'antinuke_event_payloads', 'antiping_config', 'antiping_targets', 'antinuke_options', 'event_log_config', 'event_log', 'lockdowns', 'lockdown_overwrites', 'lockdown_notices', 'guild_config', 'antinuke_rules', 'antinuke_defaults', 'provider_config', 'permission_roles', 'command_settings', 'feature_settings', 'backup_config', 'configuration_history', 'grants', 'observations', 'incidents', 'backups', 'cases', 'links', 'blocked_accounts', 'snapshots', 'snapshot_metadata', 'recovery_mappings', 'recovery_history', 'outbox', 'member_notes', 'tempbans', 'raidmode', 'newaccount_config', 'staff_roles', 'guild_features', 'appeals', 'duty_sessions', 'autoreact_users', 'ban_records', 'role_rules', 'left_roles', 'panel_actions',
-    'ticket_config', 'ticket_types', 'ticket_panels', 'ticket_records', 'ticket_blocks'] as const;
+    'ticket_config', 'ticket_types', 'ticket_panels', 'ticket_records', 'ticket_blocks',
+    'threat_scores', 'threat_events', 'threat_actions'] as const;
 
 /** Tables carrying a guild column that are intentionally not scope-guarded. */
 // roblox_network is shared on purpose: servers that opt in share their Roblox blacklist with each other.
@@ -275,6 +276,24 @@ export class Store {
             CREATE TABLE IF NOT EXISTS ticket_blocks (
                 guild_id TEXT NOT NULL REFERENCES guild_data(guild_id) ON DELETE CASCADE, user_id TEXT NOT NULL,
                 reason TEXT, by_id TEXT NOT NULL, at INTEGER NOT NULL, PRIMARY KEY(guild_id, user_id));`);
+        // 3.0 threat board: one row per person under suspicion, the incidents that put them there,
+        // and every automatic action the bot has taken. Nothing here is hidden from staff.
+        this.db.exec(`CREATE TABLE IF NOT EXISTS threat_scores (
+                guild_id TEXT NOT NULL REFERENCES guild_data(guild_id) ON DELETE CASCADE, user_id TEXT NOT NULL,
+                score INTEGER NOT NULL DEFAULT 0, level TEXT NOT NULL DEFAULT 'quiet' CHECK(level IN ('quiet','watch','high','critical')),
+                first_at INTEGER NOT NULL, last_at INTEGER NOT NULL, last_rule TEXT NOT NULL DEFAULT '',
+                strikes INTEGER NOT NULL DEFAULT 0, last_action TEXT, last_action_at INTEGER, cleared_at INTEGER, cleared_by TEXT,
+                PRIMARY KEY(guild_id, user_id));
+            CREATE INDEX IF NOT EXISTS threat_scores_board ON threat_scores(guild_id, score DESC);
+            CREATE TABLE IF NOT EXISTS threat_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT, guild_id TEXT NOT NULL REFERENCES guild_data(guild_id) ON DELETE CASCADE,
+                user_id TEXT NOT NULL, rule TEXT NOT NULL, points INTEGER NOT NULL, detail TEXT NOT NULL, at INTEGER NOT NULL);
+            CREATE INDEX IF NOT EXISTS threat_events_user ON threat_events(guild_id, user_id, at DESC);
+            CREATE TABLE IF NOT EXISTS threat_actions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT, guild_id TEXT NOT NULL REFERENCES guild_data(guild_id) ON DELETE CASCADE,
+                user_id TEXT NOT NULL, action TEXT NOT NULL, detail TEXT NOT NULL, by_id TEXT NOT NULL, at INTEGER NOT NULL,
+                undone_at INTEGER, undone_by TEXT);
+            CREATE INDEX IF NOT EXISTS threat_actions_guild ON threat_actions(guild_id, at DESC);`);
         // 2.32: roles a member had when they left, so staff can give them all back in one click if they rejoin.
         this.db.exec(`CREATE TABLE IF NOT EXISTS left_roles (guild_id TEXT NOT NULL REFERENCES guild_data(guild_id) ON DELETE CASCADE, user_id TEXT NOT NULL, roles TEXT NOT NULL, left_at INTEGER NOT NULL, PRIMARY KEY(guild_id, user_id));`);
         this.db.exec(`CREATE TABLE IF NOT EXISTS autoreact_users (guild_id TEXT NOT NULL REFERENCES guild_data(guild_id) ON DELETE CASCADE, user_id TEXT NOT NULL, emoji TEXT NOT NULL, by_id TEXT NOT NULL, at INTEGER NOT NULL, PRIMARY KEY(guild_id, user_id));`);

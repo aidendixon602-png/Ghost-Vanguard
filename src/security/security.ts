@@ -6,6 +6,7 @@ import { developers } from '../bot/developers.js';
 import { autoRaid } from '../features/antinuke-plus.js';
 import { AppError } from '../errors.js';
 import type { LogQueue } from '../logging.js';
+import { noteThreat } from './threat-board.js';
 import { embed, memberOrNull } from '../ui/ui.js';
 import { incidentCard } from '../ui/incident-card.js';
 
@@ -175,6 +176,9 @@ export class Security {
             && !(await memberOrNull(guild, actor).catch(() => null))?.user?.bot;
         // Write evidence before trying any Discord mutation.
         const incident = this.store.incident(guild.id, actor, rule.key, warnOnly ? 'warn' : s.mode, 'Pending');
+        // Every scored incident lands on the threat board, so one record feeds both halves:
+        // the defence that already happens here and the counter-attack the board decides on.
+        noteThreat(this.store, guild.id, actor, rule.key, `Anti-nuke ${active.title} (incident #${incident})`);
         let result = 'Observed only; no Discord actions taken.';
         const progress = {completed:0,failed:0,skipped:0};
         if (s.mode === 'enforce') {

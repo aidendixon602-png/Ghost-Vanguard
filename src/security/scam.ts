@@ -5,6 +5,7 @@ import { config } from '../config.js';
 import { clip, Cooldowns, KeyedQueue } from '../core.js';
 import type { Store } from '../database/db.js';
 import type { LogQueue } from '../logging.js';
+import { noteThreat } from './threat-board.js';
 import { fingerprint, imageMatch, blockedDomain, suspiciousText, downloadImage, digest, MAX_IMAGE_BYTES, MAX_IMAGE_PIXELS, type Fingerprint } from './scam-matching.js';
 import { shouldPost } from '../audit/notices.js';
 
@@ -229,7 +230,10 @@ export class ScamProtection {
             }
         } else outcome.push('Staff review only; no deletion or ban.');
         const detail = { reason: reason || uncertain || 'Incomplete scan', outcome, warnings, text: clip(text, 1200), attachments: images.map(a => ({ id: a.id, name: a.name, url: a.url })) };
-        this.store.run('INSERT OR IGNORE INTO scam_events(guild_id,message_id,revision,user_id,at,confirmed,json) VALUES(?,?,?,?,?,?,?)', guild.id, message.id, revision, message.author.id, Date.now(), Number(!!confirmed), JSON.stringify(detail));
+        const recorded = this.store.run('INSERT OR IGNORE INTO scam_events(guild_id,message_id,revision,user_id,at,confirmed,json) VALUES(?,?,?,?,?,?,?)', guild.id, message.id, revision, message.author.id, Date.now(), Number(!!confirmed), JSON.stringify(detail));
+        // Only a confirmed scam scores: an uncertain one stays a human decision, never automatic.
+        if (confirmed && recorded.changes)
+            noteThreat(this.store, guild.id, message.author.id, 'scam_post', `Confirmed scam in <#${message.channelId}>: ${detail.reason}`);
         if (!confirmed && !this.cooldowns.take(`alert:${guild.id}:${message.author.id}`, 30000)) return;
         this.logs.push(guild.id, new EmbedBuilder().setColor(confirmed ? Colors.Red : Colors.Orange).setTitle(confirmed ? 'Scam post blocked' : 'Possible scam • staff review')
             .setDescription(clip(`**Sender:** <@${message.author.id}> (${message.author.id})\n**Channel:** <#${message.channelId}>\n**Message ID:** ${message.id}\n**Match:** ${detail.reason}\n${outcome.join('\n')}\n${warnings.join('\n')}\n**Evidence:**\n${clip(text || '[Image attachment]', 1000)}`, 3800)).setTimestamp());

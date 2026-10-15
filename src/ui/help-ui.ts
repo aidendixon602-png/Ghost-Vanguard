@@ -12,7 +12,7 @@ import { embed } from './ui.js';
 export const HELP_SECTIONS: { key: string; label: string; emoji: string; blurb: string; commands: string[] }[] = [
     { key: 'antinuke', label: 'Anti-nuke', emoji: '🛡️', blurb: 'Stops raids and nukes; manage the whitelist', commands: ['antinuke', 'antinuke-plus', 'trust'] },
     { key: 'moderation', label: 'Moderation', emoji: '🔨', blurb: 'Ban, kick, timeout, cases, notes and appeals', commands: ['moderation', 'tempban', 'softban', 'massban', 'role', 'bans', 'case', 'warnings', 'note', 'appeals', 'nick'] },
-    { key: 'security', label: 'Security', emoji: '🚨', blurb: 'Automod, raid mode, lockdowns and scam links', commands: ['security', 'emergency', 'automod', 'raidmode', 'newaccounts', 'lockdown', 'unlock', 'slowmode', 'scam', 'antiping', 'webhooks', 'health'] },
+    { key: 'security', label: 'Security', emoji: '🚨', blurb: 'Automod, raid mode, lockdowns and scam links', commands: ['security', 'threats', 'emergency', 'automod', 'raidmode', 'newaccounts', 'lockdown', 'unlock', 'slowmode', 'scam', 'antiping', 'webhooks', 'health'] },
     { key: 'tickets', label: 'Tickets', emoji: '🎫', blurb: 'Support desk: the panel, staff tools and transcripts', commands: ['ticket', 'ticket-setup', 'ticket-panel', 'ticket-type', 'ticket-settings', 'ticket-stats'] },
     { key: 'configuration', label: 'Server Setup', emoji: '⚙️', blurb: 'Staff ranks, welcome, logs and permissions', commands: ['panel', 'staff', 'welcome', 'logs', 'guild-config', 'perm', 'config-history'] },
     { key: 'recovery', label: 'Backups', emoji: '💾', blurb: 'Save and restore the server layout', commands: ['snapshot', 'backup', 'copylayout'] },
