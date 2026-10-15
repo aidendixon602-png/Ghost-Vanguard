@@ -34,6 +34,10 @@ When upgrading, replace the whole `dist/` folder rather than extracting over it,
 
 This is not a sharded or distributed deployment. Run exactly one instance; a database lease rejects a second one.
 
+When started with `node launch.js`, a missing database is recovered from the newest valid backup in `DATABASE_BACKUP_DIRECTORY`, using `DATABASE_PATH` as the destination. Recovery checks the metadata, file size, SHA-256 checksum, SQLite integrity and foreign keys before publishing the restored file. Invalid backups are skipped in favor of older valid ones. Existing databases and source backups are left untouched.
+
+If backup files exist but none pass verification, the launcher stops with an error rather than starting with an empty database. A fresh installation with no backups can start normally. Recovery includes only data saved in the selected backup; later changes are not recovered.
+
 ## Health endpoint
 
 `/healthz` returns **503** until the database, command registry, global command sync and guild reconciliation have all succeeded, then **200** once the gateway is ready. It reports version, uptime, guild count, database health and protection statistics.
