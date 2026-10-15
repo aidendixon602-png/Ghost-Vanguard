@@ -8,17 +8,17 @@ Anti-nuke protection: status, on/off, safety scan and the whitelist
 
 | Command | What it does | Who |
 |---|---|---|
-| `/antinuke scan` | Safety scan: powerful roles, roles above Vanguard, bots with Administrator | Admin+ |
-| `/antinuke settings` | Turn the extra protection layers on or off (all on by default) | Owner or Head Admin |
-| `/antinuke status` | Is anti-nuke on? Its 17 rules, their limits and the whitelist | Head Admin+ |
-| `/antinuke enable` | Turn anti-nuke on (saves a backup of the server first) | Head Admin+ |
-| `/antinuke disable` | Turn anti-nuke off (stays off after restarts) | Owner or Head Admin |
-| `/antinuke check` | Check Vanguard's permissions and role position | Head Admin+ |
-| `/antinuke whitelist add` | Whitelist a user or role: pick what anti-nuke lets them do and for how long | Owner or Head Admin |
-| `/antinuke whitelist remove` | Take a user or role off the whitelist completely | Owner or Head Admin |
-| `/antinuke whitelist list` | Show everyone on the whitelist, what they skip and when it expires | Head Admin+ |
-| `/antinuke whitelist check` | See exactly what anti-nuke lets someone do, and what would get them stripped | Head Admin+ |
-| `/antinuke whitelist bots` | Let a verification bot (Bloxlink, RoVer) give verified roles without tripping anti-nuke | Owner or Head Admin |
+| `/antinuke scan` | Safety scan: powerful roles, roles above Vanguard, bots with Administrator | Server owner or Developer |
+| `/antinuke settings` | Turn the extra protection layers on or off (all on by default) | Server owner or Developer |
+| `/antinuke status` | Is anti-nuke on? Its 17 rules, their limits and the whitelist | Server owner or Developer |
+| `/antinuke enable` | Turn anti-nuke on (saves a backup of the server first) | Server owner or Developer |
+| `/antinuke disable` | Turn anti-nuke off (stays off after restarts) | Server owner or Developer |
+| `/antinuke check` | Check Vanguard's permissions and role position | Server owner or Developer |
+| `/antinuke whitelist add` | Whitelist a user or role: pick what anti-nuke lets them do and for how long | Server owner or Developer |
+| `/antinuke whitelist remove` | Take a user or role off the whitelist completely | Server owner or Developer |
+| `/antinuke whitelist list` | Show everyone on the whitelist, what they skip and when it expires | Server owner or Developer |
+| `/antinuke whitelist check` | See exactly what anti-nuke lets someone do, and what would get them stripped | Server owner or Developer |
+| `/antinuke whitelist bots` | Let a verification bot (Bloxlink, RoVer) give verified roles without tripping anti-nuke | Server owner or Developer |
 
 ## /mod
 
@@ -64,11 +64,11 @@ Raids, lockdowns, automod, scam links and ping protection
 | Command | What it does | Who |
 |---|---|---|
 | `/security status` | Show security health and configuration | Head Admin+ |
-| `/security config` | Set the security log channel and Roblox verification options | Head Admin+ |
+| `/security config` | Set the security log channel and Roblox verification options | Server owner or Developer |
 | `/security admin` | Server owner: add, remove or list security admins | Owner |
 | `/security incidents` | View recent anti-nuke incidents | Head Admin+ |
-| `/security quarantine` | Contain a member and save their roles | Head Admin+ |
-| `/security release` | Restore a quarantined member’s saved roles | Owner or Head Admin |
+| `/security quarantine` | Contain a member and save their roles | Server owner or Developer |
+| `/security release` | Restore a quarantined member’s saved roles | Server owner or Developer |
 | `/security antiping status` | Show staff mention protection and configured targets | Admin+ |
 | `/security antiping enable` | Enable blocking mentions of configured staff | Admin+ |
 | `/security antiping disable` | Disable staff mention blocking | Admin+ |
@@ -125,7 +125,7 @@ Server setup: logs, staff ranks, welcome, config, permissions
 | `/setup config command` | Turn one Vanguard command on/off or change its cooldown | Owner |
 | `/setup config feature` | Turn moderation, verification, AI or backups on/off | Owner |
 | `/setup config backups` | Configure scheduled server layout backups | Owner |
-| `/setup logs setup` | Create or reuse #bans and #midtown-vanguard-logging, check access and send a test | Admin+ |
+| `/setup logs setup` | Create or reuse #bans and #midtown-vanguard-logging, check access and send a test | Server owner or Developer |
 | `/setup logs check` | Check both log channels and the bot permissions, then send a test embed | Admin+ |
 | `/setup logs exclude` | Stop (or start again) logging events from a channel | Admin+ |
 | `/setup logs bot-changes` | Skip routine bot changes, like member-count channel renames | Admin+ |

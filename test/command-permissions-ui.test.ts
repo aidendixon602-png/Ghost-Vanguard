@@ -34,6 +34,7 @@ test('help categories show allowed subcommands and omit disabled commands and in
 });
 test('anti-nuke buttons honor the parent command disable setting',async()=>{
  const {store,i}=fixture();try {
+ i.user.id='owner';i.member.id='owner';i.guild.id='g';i.guild.ownerId='owner';
  store.run('INSERT INTO command_settings(guild_id,command,enabled,cooldown_ms) VALUES(?,?,?,?)','g','antinuke',0,0);
  await assert.rejects(new Guard(store).check(i,{...defaults},'anpanel/',false),/disabled/);
  }finally{store.close();}

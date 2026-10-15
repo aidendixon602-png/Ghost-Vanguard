@@ -5,8 +5,7 @@ import { DANGEROUS, dangerous } from '../core.js';
 import { embed } from '../ui/ui.js';
 import { defaults, type Registry } from '../bot/registry.js';
 import { AppError, logEvent } from '../errors.js';
-import { RANKS, rankOf, isSupreme } from '../bot/ranks.js';
-import { developers } from '../bot/developers.js';
+import { canManageAntinuke, requireAntinukeManager, ANTINUKE_OWNER_MESSAGE } from '../bot/antinuke-access.js';
 import { raidState, setRaidMode } from '../security/raidmode.js';
 import { getFeature } from './settings.js';
 
@@ -17,7 +16,7 @@ import { getFeature } from './settings.js';
  *    filter, notification default and system/rules channels by anyone who is not whitelisted are
  *    put back straight away (the anti-nuke rule still punishes the person).
  *  - Bot quarantine: a new bot with powerful permissions, added by anyone other than the server
- *    owner or a Supreme Leader/Developer, has those permissions removed until a Head Admin approves.
+ *    owner or a configured Developer, has those permissions removed until an owner/developer approves.
  *  - Permission audit: who can do damage, at a glance.
  */
 export interface PlusConfig { raidAuto: boolean; raidAutoHours: number; settingsLock: boolean; botQuarantine: boolean }
@@ -153,13 +152,13 @@ export async function quarantineNewBot(store: Store, logs: LogQueue, member: Gui
     if (!ok) return;
     const entry = await member.guild.fetchAuditLogs({ type: AuditLogEvent.BotAdd, limit: 5 }).then(l => l.entries.find(e => e.targetId === member.id), () => undefined);
     const adder = entry?.executorId ?? null;
-    // The server owner, Supreme Leaders and Developers may add powerful bots: give the permissions straight back.
-    if (adder && (adder === member.guild.ownerId || isSupreme(adder) || developers.has(adder))) {
+    // Only owners and configured developers may make this anti-nuke approval decision.
+    if (adder && canManageAntinuke(adder, member.guild.ownerId)) {
         await role.setPermissions(role.permissions.bitfield | held, 'Midtown Vanguard: bot added by a trusted person').catch(() => { });
         return;
     }
     store.run('INSERT INTO runtime_meta(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value', metaKey(member.guild.id, member.id), JSON.stringify({ perms: String(held), adder }));
-    logs.push(member.guild.id, embed('🤖 New bot held for approval', `<@${member.id}> was added${adder ? ` by <@${adder}>` : ''} asking for powerful permissions. Vanguard removed them until it is approved.\n**Asked for:** ${permNames(held)}\n-# Approve: the server owner, a Supreme Leader, or a Head Admin who has those permissions (not the person who added it).`, Colors.Orange),
+    logs.push(member.guild.id, embed('🤖 New bot held for approval', `<@${member.id}> was added${adder ? ` by <@${adder}>` : ''} asking for powerful permissions. Vanguard removed them until it is approved.\n**Asked for:** ${permNames(held)}\n-# Only the current server owner or a configured Vanguard developer may approve or reject it.`, Colors.Orange),
         [new ActionRowBuilder<ButtonBuilder>().addComponents(
             new ButtonBuilder().setCustomId(`botq:approve:${member.id}`).setLabel('Approve (give permissions back)').setStyle(ButtonStyle.Success),
             new ButtonBuilder().setCustomId(`botq:kick:${member.id}`).setLabel('Kick bot').setStyle(ButtonStyle.Danger))]);
@@ -170,25 +169,21 @@ export function forgetHeldBot(store: Store, guild: string, bot: string) {
     store.run('DELETE FROM runtime_meta WHERE key=?', metaKey(guild, bot));
 }
 
-/** Who may approve a held bot. Pure, for tests. */
-export function canApproveBot(opts: { user: string; ownerId: string; adder: string | null; supreme: boolean; rank: number; userPerms: bigint; held: bigint }): string | null {
-    if (opts.user === opts.ownerId || opts.supreme) return null;
-    if (opts.adder && opts.user === opts.adder) return 'The person who added a bot cannot approve it themselves.';
-    if (opts.rank < RANKS.headadmin) return 'Only Head Admins and above can approve bots.';
-    const admin = (opts.userPerms & BigInt(PermissionFlagsBits.Administrator)) !== 0n;
-    if (!admin && (opts.held & ~opts.userPerms) !== 0n) return 'You can only approve permissions you have yourself. Ask the server owner or a Supreme Leader.';
-    return null;
+/** Held-bot decisions use identities, not inherited ranks or Discord permissions. */
+export function canApproveBot(opts: { user: string; ownerId: string }): string | null {
+    // Rank, whitelist and Discord permissions cannot delegate anti-nuke decisions.
+    return canManageAntinuke(opts.user, opts.ownerId) ? null : ANTINUKE_OWNER_MESSAGE;
 }
 
 export function registerBotQuarantineControls(registry: Registry) {
     registry.component({ prefix: 'botq:', kinds: ['button'], metadata: { ...defaults, category: 'antinuke', access: 'member', cooldown: 1000 }, execute: async (ctx, i) => {
+        requireAntinukeManager(i.user.id, i.guild.ownerId);
         const [, action, botId] = i.customId.split(':');
         const key = metaKey(i.guildId, botId!), saved = ctx.store.get('SELECT value FROM runtime_meta WHERE key=?', key);
         const held = saved ? readHeld(saved.value) : { perms: '0', adder: null };
-        const rank = rankOf(ctx.store, i.guildId, i.user.id, ctx.actor, 'botq');
         if (action === 'kick') {
-            if (rank < RANKS.headadmin && i.user.id !== i.guild.ownerId) throw new AppError('PERMISSION_ERROR', 'Only Head Admins and above can reject bots.');
             const bot = await i.guild.members.fetch(botId!).catch(() => null);
+            requireAntinukeManager(i.user.id, i.guild.ownerId);
             // No staff ID in the reason: Vanguard did it, so anti-nuke must not count it against the clicker.
             if (bot) await bot.kick('Midtown Vanguard: held bot rejected');
             forgetHeldBot(ctx.store, i.guildId, botId!);
@@ -200,10 +195,11 @@ export function registerBotQuarantineControls(registry: Registry) {
         const bot = await i.guild.members.fetch(botId!).catch(() => null);
         if (!bot?.roles.botRole) { forgetHeldBot(ctx.store, i.guildId, botId!); await i.message?.edit({ components: [] }).catch(() => { }); return 'That bot is no longer in the server.'; }
         const heldBits = BigInt(held.perms) & DANGEROUS_MASK;
-        const denied = canApproveBot({ user: i.user.id, ownerId: i.guild.ownerId, adder: held.adder, supreme: isSupreme(i.user.id) || rank >= RANKS.supreme, rank, userPerms: i.memberPermissions?.bitfield ?? 0n, held: heldBits });
+        const denied = canApproveBot({ user: i.user.id, ownerId: i.guild.ownerId });
         if (denied) throw new AppError('PERMISSION_ERROR', denied);
         // Only give back the powerful bits that were removed, on top of whatever the role has now.
         const role = bot.roles.botRole;
+        requireAntinukeManager(i.user.id, i.guild.ownerId);
         await role.setPermissions(role.permissions.bitfield | heldBits, 'Midtown Vanguard: held bot approved');
         forgetHeldBot(ctx.store, i.guildId, botId!);
         await i.message?.edit({ components: [] }).catch(() => { });

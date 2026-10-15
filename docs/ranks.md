@@ -1,9 +1,10 @@
 # Ranks
 
-Generated from the bot itself (`npm run docs`). Every rank can also use everything listed under the ranks below it.
+Generated from the bot itself (`npm run docs`). Ranks normally inherit lower-rank commands; anti-nuke access is an identity-based exception.
 
 - **Bot-wide ranks** (Developer, Supreme Leader, Overseer, Bot Manager) work in every server.
 - **Server ranks** (Owner, Head Admin, Admin, Moderator, Helper) work only in the server they were given in.
+- **Anti-nuke controls:** only the current server owner or a configured Developer. Administrator, whitelist grants, security-admin grants and every lower bot-wide rank cannot delegate this access.
 - **Developer is the top rank** (the bot owner and `DEVELOPER_IDS`). Restarts, installing updates, restoring data, removing servers, bot-wide ranks and lifting hardbans are Developer only, so giving someone Supreme Leader or lower cannot break the bot.
 - **Unbans:** ordinary bans are lifted by Admins and server owners; genrebans by a Supreme Leader or Developer (or a one-server exception from an Overseer+); hardbans only by a Developer.
 - **Anti-nuke** ignores only Developers, Supreme Leaders, the server owner and whitelisted people. Every other rank is still watched.
@@ -23,7 +24,7 @@ The top rank: the bot owner (`BOT_OWNER_ID`) and anyone in `DEVELOPER_IDS`. Ever
 
 ## 👑 Supreme Leader
 
-Bot-wide, every server: everything except the Developer-only tools. Diagnostics, update status, database health and backups, genrebans and hardbans, lifting genrebans. Ignored by anti-nuke. Given with `/setup staff global` or `SUPREME_LEADER_IDS`.
+Bot-wide, every server: everything except Developer-only tools and owner/developer anti-nuke controls. Diagnostics, update status, database health and backups, genrebans and hardbans, lifting genrebans. Given with `/setup staff global` or `SUPREME_LEADER_IDS`.
 
 - `/dev autoreact add`: React to every message from a member (🐐 by default)
 - `/dev autoreact list`: Members the bot auto-reacts to in this server
@@ -61,16 +62,10 @@ Bot-wide, every server: Head Admin everywhere plus bot status, diagnostics and a
 
 The owner of a server, in that server: everything a Head Admin can do, plus security admins and undoing setting changes. Cannot lift genrebans or hardbans. Ignored by anti-nuke.
 
-- `/security admin`: Server owner: add, remove or list security admins
-- `/setup history restore`: Server owner: undo a setting change by its number
-
-## 🛡️ Head Admin
-
-Server rank: anti-nuke, whitelist, control panel, backups and staff ranks. Given by linking a role with `/setup staff role`, or `/security admin` (owner). Discord's Administrator permission counts as Head Admin, except for actions that weaken protection.
-
 - `/antinuke check`: Check Vanguard's permissions and role position
 - `/antinuke disable`: Turn anti-nuke off (stays off after restarts)
 - `/antinuke enable`: Turn anti-nuke on (saves a backup of the server first)
+- `/antinuke scan`: Safety scan: powerful roles, roles above Vanguard, bots with Administrator
 - `/antinuke settings`: Turn the extra protection layers on or off (all on by default)
 - `/antinuke status`: Is anti-nuke on? Its 17 rules, their limits and the whitelist
 - `/antinuke whitelist add`: Whitelist a user or role: pick what anti-nuke lets them do and for how long
@@ -78,6 +73,17 @@ Server rank: anti-nuke, whitelist, control panel, backups and staff ranks. Given
 - `/antinuke whitelist check`: See exactly what anti-nuke lets someone do, and what would get them stripped
 - `/antinuke whitelist list`: Show everyone on the whitelist, what they skip and when it expires
 - `/antinuke whitelist remove`: Take a user or role off the whitelist completely
+- `/security admin`: Server owner: add, remove or list security admins
+- `/security config`: Set the security log channel and Roblox verification options
+- `/security quarantine`: Contain a member and save their roles
+- `/security release`: Restore a quarantined member’s saved roles
+- `/setup history restore`: Server owner: undo a setting change by its number
+- `/setup logs setup`: Create or reuse #bans and #midtown-vanguard-logging, check access and send a test
+
+## 🛡️ Head Admin
+
+Server rank: control panel, backups and staff ranks. Anti-nuke controls and quarantine changes require the actual server owner or a configured Developer. Given by linking a role with `/setup staff role`, or `/security admin` (owner). Discord's Administrator permission counts as Head Admin, except for restricted actions.
+
 - `/mod appeals setup`: Turn appeals on or off and pick the staff channel they go to
 - `/mod case delete`: Security admins: permanently delete a case record
 - `/mod warnings pardon`: Wipe someone's active warnings (cases stay in their history)
@@ -98,10 +104,7 @@ Server rank: anti-nuke, whitelist, control panel, backups and staff ranks. Given
 - `/roblox partner`: Add or remove a partner server for the ban network (do it in both servers)
 - `/roblox unbind`: Stop giving a role from group ranks
 - `/role who-can-give`: Choose who can give a role, or see the list (leave everything empty) _(staff roles: owner only)_
-- `/security config`: Set the security log channel and Roblox verification options
 - `/security incidents`: View recent anti-nuke incidents
-- `/security quarantine`: Contain a member and save their roles
-- `/security release`: Restore a quarantined member’s saved roles
 - `/security status`: Show security health and configuration
 - `/setup config backups`: Configure scheduled server layout backups
 - `/setup config command`: Turn one Vanguard command on/off or change its cooldown
@@ -118,7 +121,6 @@ Server rank: anti-nuke, whitelist, control panel, backups and staff ranks. Given
 
 Server rank: lifting ordinary bans and accepting appeals, raid tools, automod, scam protection and logging. Given with `/setup staff role`; Discord's Administrator permission also works for unbans.
 
-- `/antinuke scan`: Safety scan: powerful roles, roles above Vanguard, bots with Administrator
 - `/mod massban`: Raid cleanup: ban up to 200 user IDs at once (whitelisted staff only) _(must also be on the anti-nuke whitelist)_
 - `/mod unban`: Admins and owners: lift a ban by user ID (genrebans and hardbans need bot-wide staff) _(ordinary bans only; a genreban needs an Overseer+ for a one-server exception, or a Supreme Leader+ to lift it everywhere; a hardban needs a Developer)_
 - `/security antiping bypass`: Allow or disallow a role to mention protected staff
@@ -168,7 +170,6 @@ Server rank: lifting ordinary bans and accepting appeals, raid tools, automod, s
 - `/setup logs disable`: Turn off event logging (stored history is kept)
 - `/setup logs enable`: Turn on event logging
 - `/setup logs exclude`: Stop (or start again) logging events from a channel
-- `/setup logs setup`: Create or reuse #bans and #midtown-vanguard-logging, check access and send a test
 - `/setup logs status`: Show event logging settings
 - `/setup logs view`: Browse logged events from the last 30 days
 - `/setup staff report`: Staff activity: actions per staff member

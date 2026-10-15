@@ -267,7 +267,7 @@ test('configuration rollback requires confirmation, verified backup, and keeps i
                 backups++;
                 throw Error('backup failed');
             } } };
-    const i: any = { guildId: 'g', guild: { roles: { fetch: async () => null } }, user: { id: user }, editReply: async () => { } };
+    const i: any = { guildId: 'g', guild: { ownerId: user, roles: { fetch: async () => null } }, user: { id: user }, editReply: async () => { } };
     await previewHistory(ctx, i, entry.id);
     let key = [...ctx.confirmations.keys()][0];
     const control = registry.components[0]!;

@@ -5,10 +5,13 @@ import { defaults } from '../bot/registry.js';
 import { isSafeAutomaticRole, isSafeQuarantineRole } from '../security/role-policy.js';
 import { embed } from './ui.js';
 import { assertStaffRoleChange, restoreStaffRoleState, staffRoleState, validateStaffRoleState } from '../database/staff-roles.js';
+import { isAntinukeHistory, requireAntinukeManager } from '../bot/antinuke-access.js';
 export async function previewHistory(ctx, i, id) {
     const row = ctx.store.get('SELECT * FROM configuration_history WHERE guild_id=? AND id=?', i.guildId, id);
     if (!row)
         throw new AppError('VALIDATION_ERROR', 'Configuration history entry not found in this guild.');
+    if (isAntinukeHistory(String(row.component), JSON.parse(row.before_json ?? 'null'), JSON.parse(row.after_json ?? 'null')))
+        requireAntinukeManager(i.user.id, i.guild.ownerId);
     if (row.component === 'authorization')
         throw new AppError('VALIDATION_ERROR', 'Authorization history is retained for audit. Authorization must be changed by a developer through /dev server authorize, /dev server deauthorize or /dev server info.');
     if (row.component === 'antiping')
@@ -36,6 +39,9 @@ export function registerHistory(registry) {
             if (!ctx.databaseBackups)
                 throw new AppError('DATABASE_ERROR', 'Database backup service unavailable. No rollback performed.');
             const previous = row.before_json === null ? null : JSON.parse(row.before_json), current = row.after_json === null ? null : JSON.parse(row.after_json);
+            const antinuke = isAntinukeHistory(String(row.component), previous, current);
+            if (antinuke)
+                requireAntinukeManager(i.user.id, i.guild.ownerId);
             const staffRole = String(row.component).startsWith('staff-role:') ? String(row.component).slice('staff-role:'.length) : null;
             if (row.component === 'permission-role' || String(row.component).startsWith('staff/'))
                 throw new AppError('VALIDATION_ERROR', 'This older staff-role history lacks a complete role snapshot. Configure the role again.');
@@ -58,6 +64,8 @@ export function registerHistory(registry) {
             // Database backup service performs only internal operations; leave the caller guild scope explicitly.
             await ctx.databaseBackups.create('before-config-rollback');
             ctx.assertActive();
+            if (antinuke)
+                requireAntinukeManager(i.user.id, i.guild.ownerId);
             if (staffRole !== null) {
                 const actual = staffRoleState(ctx.store, i.guildId, staffRole);
                 assertStaffRoleChange(ctx.store, i.guildId, i.user.id, ctx.actor, actual, previous);

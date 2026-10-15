@@ -44,7 +44,7 @@ test('each rank opens exactly its commands, without needing Discord permissions'
     assert.equal(can(['r-help'], 'moderation/ban'), false, 'helpers cannot ban');
     assert.equal(can(['r-mod'], 'moderation/ban'), true, 'moderators can ban without Discord Ban Members');
     assert.equal(can(['r-mod'], 'raidmode/on'), false); assert.equal(can(['r-admin'], 'raidmode/on'), true);
-    assert.equal(can(['r-admin'], 'antinuke/status'), false); assert.equal(can(['r-head'], 'antinuke/status'), true);
+    assert.equal(can(['r-admin'], 'antinuke/status'), false); assert.equal(can(['r-head'], 'antinuke/status'), false, 'Head Admin cannot manage anti-nuke');
     assert.equal(can(['r-head'], 'dev/status', { developerOnly: true }), false, 'server ranks never reach bot tools');
     store.db.prepare("INSERT INTO bot_staff(user_id,level) VALUES('u','botmanager')").run();
     assert.equal(can([], 'dev/status', { developerOnly: true }), true, 'Bot Manager: bot status');

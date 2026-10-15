@@ -30,13 +30,14 @@ The earlier changes remain separate: #1 (HTTP cancellation), #2 (verified startu
 | Updater request deadlines | A stalled GitHub response or response body could keep an update check pending indefinitely. | Abort each GitHub request after 15 seconds (one second for local API fixtures), including response-body reads. |
 | Updater installation result | Failed installs returned an installed result; both outcomes left the last-check status at installing. | Report the actual installation outcome, update the last-check status, and only schedule fallback promotion after a successful install. |
 | Manual missing-database restore | The restore command treated an absent live database as corruption and required the corruption override. | Skip live lease inspection only when the path is absent. Existing corrupt files still require the override; active leases block restoration even with it. |
+| Owner/developer anti-nuke access | Rank inheritance allowed Head Admins and higher bot-wide ranks to manage protection and whitelist settings. Related panels, bot approvals, command switches and history could offer alternate paths. | Require the current server owner or a configured Developer before rank inheritance for all anti-nuke commands and panels, whitelist controls, held-bot/incident controls, security configuration, quarantine/release and shared log setup. Apply the same identity check to anti-nuke command switches, saved-setting rollback and control-panel containment/release; recheck confirmation and post-backup ownership. Staff grants, Discord Administrator, whitelist entries and lower bot-wide ranks do not delegate control. Held bots added by Supreme Leaders now await owner/developer approval. |
 
 ## Validation
 
-- Added 55 tests covering the findings, including success paths, failures, expiry, authorization changes during awaits, and cross-server batch fairness. Of the 24 follow-up tests, 22 fail against the earlier audit code; the two existing corruption/active-lease safeguards pass before and after.
+- Added 66 tests covering the findings, including 11 owner/developer access tests with rank/permission matrices, ownership transfers, stale confirmations, help visibility and indirect mutation paths. Of the earlier 24 follow-up tests, 22 fail against the earlier audit code; the two existing corruption/active-lease safeguards pass before and after.
 - Typecheck and build pass; regenerated output is committed with the source changes.
-- Full local suite on the expanded audit branch: 541 passing.
-- Combined validation with #1–#4: changes merge cleanly, typecheck and build pass, and all 567 tests pass.
+- Full local suite on the expanded audit branch: 552 passing.
+- Combined validation with #1–#4: typecheck and build pass, and all 578 tests pass with the owner/developer restriction in place.
 
 ## Live verification still needed
 

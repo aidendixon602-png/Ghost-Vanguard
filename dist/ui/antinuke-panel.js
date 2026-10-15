@@ -1,11 +1,10 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, UserSelectMenuBuilder, RoleSelectMenuBuilder, StringSelectMenuBuilder } from 'discord.js';
 import { defaults } from '../bot/registry.js';
 import { AppError } from '../errors.js';
-import { config } from '../config.js';
-import { developers } from '../bot/developers.js';
 import { RULES } from '../core.js';
 import { antinukeStatus } from './antinuke-status.js';
 import { embed } from './ui.js';
+import { requireAntinukeManager } from '../bot/antinuke-access.js';
 export function statusPanel(ctx, guild, user) {
     return { embeds: [antinukeStatus(ctx.store, guild)], components: [new ActionRowBuilder().addComponents(...[['refresh', 'Refresh'], ['incidents', 'View Incidents'], ['whitelist', 'Manage Whitelist']].map(([action, label]) => new ButtonBuilder().setCustomId(`anpanel:${guild}:${user}:${action}`).setLabel(label).setStyle(ButtonStyle.Secondary)))], allowedMentions: { parse: [] } };
 }
@@ -68,18 +67,12 @@ export function scopeName(rules) {
             have.delete(r);
     return [...kept.map(p => p.title), ...[...have].map(friendly)].join(' + ') + (kept.length ? '' : ' only');
 }
-export function canManageOwnTrust(actorId, guildOwnerId) {
-    return actorId === config.ownerId || developers.has(actorId) || !!guildOwnerId && actorId === guildOwnerId;
-}
 export const DURATIONS = [
     { hours: 24, label: '24 hours' }, { hours: 168, label: '7 days' }, { hours: 720, label: '30 days' }, { hours: 0, label: 'Permanent (until removed)' },
 ];
 const durationLabel = (hours) => DURATIONS.find(d => d.hours === hours)?.label ?? `${hours} hours`;
 export function changeTrust(ctx, guild, target, role, add, hours, choice) {
-    // Granting yourself a bypass is what a hijacked admin account would do before a nuke, so it needs someone else.
-    // Removing a bypass only reduces access and is always allowed.
-    if (add && !canManageOwnTrust(ctx.actor.id, ctx.actor.guild?.ownerId) && (target === ctx.actor.id || role && ctx.actor.roles.cache.has(target)))
-        throw new AppError('PERMISSION_ERROR', 'Another security administrator (or the server owner) must grant a bypass to you or to a role you hold. You can still remove it yourself.');
+    requireAntinukeManager(ctx.actor.id, ctx.actor?.guild?.ownerId);
     const rules = rulesFor(choice);
     if (rules.some(rule => !RULES.some(r => r.key === rule)))
         throw new AppError('VALIDATION_ERROR', 'Unknown anti-nuke rule.');
