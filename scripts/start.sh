@@ -1,5 +1,5 @@
 #!/bin/sh
-# Midtown Vanguard host start script (Wispbyte / Linux).
+# Ghost Vanguard host start script (Wispbyte / Linux).
 # Startup command:  cd /home/container/midtown-vanguard && sh scripts/start.sh
 #
 # 1. Installs production dependencies.

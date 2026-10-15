@@ -245,7 +245,7 @@ test('bans and kicks done through /moderation count against the moderator, not t
     await security.audit(viaBot('k1', '223456789012345678: raid', AuditLogEvent.MemberKick), guild);
     assert.equal(store.all("SELECT * FROM observations WHERE rule='mass_kick' AND actor_id='223456789012345678'").length, 1);
     // The bot's own restores and containment, and reasons without a moderator ID, stay exempt.
-    await security.audit(viaBot('r1', 'Midtown Vanguard restore #1; actor 223456789012345678'), guild);
+    await security.audit(viaBot('r1', 'Ghost Vanguard restore #1; actor 223456789012345678'), guild);
     await security.audit(viaBot('r2', null), guild);
     await security.audit(viaBot('r3', 'owner: not an id'), guild);
     assert.equal(store.all("SELECT * FROM observations WHERE actor_id<>'223456789012345678'").length, 0);

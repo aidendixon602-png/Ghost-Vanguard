@@ -33,7 +33,7 @@ export async function handleRaidJoin(store, logs, member, trusted, now = Date.no
     const ageDays = (now - member.user.createdTimestamp) / DAY;
     if (ageDays >= state.minAgeDays)
         return 'ignored';
-    const reason = `Midtown Vanguard raid mode: account ${Math.floor(ageDays)} day(s) old (minimum ${state.minAgeDays})`;
+    const reason = `Ghost Vanguard raid mode: account ${Math.floor(ageDays)} day(s) old (minimum ${state.minAgeDays})`;
     let result = 'failed';
     try {
         if (state.action === 'kick' && member.kickable) {
@@ -79,7 +79,7 @@ export async function sweepTempbans(store, logs, client, ready, now = Date.now()
             }
             let outcome = 'unbanned';
             try {
-                await guild.bans.remove(row.user_id, `Midtown Vanguard: temporary ban expired (case #${row.case_number ?? '?'})`);
+                await guild.bans.remove(row.user_id, `Ghost Vanguard: temporary ban expired (case #${row.case_number ?? '?'})`);
             }
             catch (error) {
                 outcome = error?.code === 10026 ? 'already unbanned' : 'unban failed';

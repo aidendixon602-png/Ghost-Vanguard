@@ -106,14 +106,14 @@ export async function lockServerSettings(store, logs, entry, guild, trusted, tru
         Object.assign(edit, p.edit);
         restored.push(p.label);
     }
-    let ok = restored.length > 0 && await guild.edit({ ...edit, reason: 'Midtown Vanguard: server settings lock' }).then(() => true, () => false);
+    let ok = restored.length > 0 && await guild.edit({ ...edit, reason: 'Ghost Vanguard: server settings lock' }).then(() => true, () => false);
     // If the combined edit was refused (e.g. a banner needs boosts), try each part on its own.
     if (!ok && restored.length > 1) {
         const single = [...restored];
         restored.length = 0;
         for (const p of parts.filter(p => single.includes(p.label))) {
             const fields = Object.fromEntries(Object.keys(p.edit).map(k => [k, edit[k]]));
-            if (await guild.edit({ ...fields, reason: 'Midtown Vanguard: server settings lock' }).then(() => true, () => false))
+            if (await guild.edit({ ...fields, reason: 'Ghost Vanguard: server settings lock' }).then(() => true, () => false))
                 restored.push(p.label);
             else
                 failed.push(p.label);
@@ -165,14 +165,14 @@ export async function quarantineNewBot(store, logs, member) {
         return;
     }
     // Strip first (seconds matter during a nuke), then check who added it.
-    const ok = await role.setPermissions(before & ~DANGEROUS_MASK, 'Midtown Vanguard: new bot held for approval').then(() => true, () => false);
+    const ok = await role.setPermissions(before & ~DANGEROUS_MASK, 'Ghost Vanguard: new bot held for approval').then(() => true, () => false);
     if (!ok)
         return;
     const entry = await member.guild.fetchAuditLogs({ type: AuditLogEvent.BotAdd, limit: 5 }).then(l => l.entries.find(e => e.targetId === member.id), () => undefined);
     const adder = entry?.executorId ?? null;
     // The server owner, Supreme Leaders and Developers may add powerful bots: give the permissions straight back.
     if (adder && (adder === member.guild.ownerId || isSupreme(adder) || developers.has(adder))) {
-        await role.setPermissions(role.permissions.bitfield | held, 'Midtown Vanguard: bot added by a trusted person').catch(() => { });
+        await role.setPermissions(role.permissions.bitfield | held, 'Ghost Vanguard: bot added by a trusted person').catch(() => { });
         return;
     }
     store.run('INSERT INTO runtime_meta(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value', metaKey(member.guild.id, member.id), JSON.stringify({ perms: String(held), adder }));
@@ -207,7 +207,7 @@ export function registerBotQuarantineControls(registry) {
                 const bot = await i.guild.members.fetch(botId).catch(() => null);
                 // No staff ID in the reason: Vanguard did it, so anti-nuke must not count it against the clicker.
                 if (bot)
-                    await bot.kick('Midtown Vanguard: held bot rejected');
+                    await bot.kick('Ghost Vanguard: held bot rejected');
                 forgetHeldBot(ctx.store, i.guildId, botId);
                 await i.message?.edit({ components: [] }).catch(() => { });
                 ctx.logs.push(i.guildId, embed('Bot rejected', `<@${botId}> was kicked by <@${i.user.id}>.`, Colors.Red));
@@ -229,7 +229,7 @@ export function registerBotQuarantineControls(registry) {
                 throw new AppError('PERMISSION_ERROR', denied);
             // Only give back the powerful bits that were removed, on top of whatever the role has now.
             const role = bot.roles.botRole;
-            await role.setPermissions(role.permissions.bitfield | heldBits, 'Midtown Vanguard: held bot approved');
+            await role.setPermissions(role.permissions.bitfield | heldBits, 'Ghost Vanguard: held bot approved');
             forgetHeldBot(ctx.store, i.guildId, botId);
             await i.message?.edit({ components: [] }).catch(() => { });
             ctx.logs.push(i.guildId, embed('Bot approved', `<@${botId}> got back **${permNames(heldBits)}**. Approved by <@${i.user.id}>.`, Colors.Green));

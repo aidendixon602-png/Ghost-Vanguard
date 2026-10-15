@@ -63,8 +63,8 @@ test('bot actions done for staff count against that staff member for every actio
     const guild: any = { client: { user: { id: 'bot' } } };
     for (const action of [AuditLogEvent.MemberBanAdd, AuditLogEvent.MemberKick, AuditLogEvent.MemberRoleUpdate, AuditLogEvent.ChannelUpdate, AuditLogEvent.MemberUpdate])
         assert.equal(responsibleActor({ executorId: 'bot', action, reason: `${MOD}: /role add Admin` } as any, guild), MOD, String(action));
-    assert.equal(responsibleActor({ executorId: 'bot', action: AuditLogEvent.ChannelUpdate, reason: 'Midtown Vanguard lockdown by 423456789012345678: raid' } as any, guild), 'bot', 'lockdown stays the bot');
-    assert.equal(responsibleActor({ executorId: 'bot', action: AuditLogEvent.MemberKick, reason: 'Midtown Vanguard raid mode: account 0 day(s) old' } as any, guild), 'bot');
+    assert.equal(responsibleActor({ executorId: 'bot', action: AuditLogEvent.ChannelUpdate, reason: 'Ghost Vanguard lockdown by 423456789012345678: raid' } as any, guild), 'bot', 'lockdown stays the bot');
+    assert.equal(responsibleActor({ executorId: 'bot', action: AuditLogEvent.MemberKick, reason: 'Ghost Vanguard raid mode: account 0 day(s) old' } as any, guild), 'bot');
     assert.equal(responsibleActor({ executorId: 'human', action: AuditLogEvent.MemberBanAdd, reason: `${MOD}: x` } as any, guild), 'human', 'only the bot\'s own entries are re-attributed');
 });
 

@@ -33,7 +33,7 @@ export default defineCommand(new SlashCommandBuilder().setName('tempban').setDes
             const existing = await existingBan(b.guild, user.id);
             // A genreban or hardban is the developers' to change: never put a timer on it.
             if (existing && banTypeFromReason(existing.reason) !== 'local')
-                throw new AppError('VALIDATION_ERROR', `That user is already banned here by a Midtown Vanguard ${banTypeFromReason(existing.reason)}, which only a developer can change. Nothing was recorded.`);
+                throw new AppError('VALIDATION_ERROR', `That user is already banned here by a Ghost Vanguard ${banTypeFromReason(existing.reason)}, which only a developer can change. Nothing was recorded.`);
             const until = Date.now() + hours * 3600000;
             // Already banned (by hand or another bot): keep the ban and give it an end date instead of refusing.
             if (!existing) {

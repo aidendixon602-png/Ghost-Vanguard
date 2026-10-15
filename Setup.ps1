@@ -5,7 +5,7 @@ if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
     throw 'Install Node.js 24 or newer, then reopen PowerShell and run this script again.'
 }
 $nodeMajor = [int](& node -p "process.versions.node.split('.')[0]")
-if ($nodeMajor -lt 24) { throw 'Midtown Vanguard requires Node.js 24 or newer.' }
+if ($nodeMajor -lt 24) { throw 'Ghost Vanguard requires Node.js 24 or newer.' }
 if (-not (Get-Command npm.cmd -ErrorAction SilentlyContinue)) { throw 'npm was not found. Repair your Node.js installation.' }
 
 function Invoke-NpmStep {
@@ -14,7 +14,7 @@ function Invoke-NpmStep {
     if ($LASTEXITCODE -ne 0) { throw "npm step failed: $($Arguments -join ' ')" }
 }
 
-Write-Host 'Installing Midtown Vanguard dependencies...' -ForegroundColor Cyan
+Write-Host 'Installing Ghost Vanguard dependencies...' -ForegroundColor Cyan
 Invoke-NpmStep -Arguments @('ci')
 Invoke-NpmStep -Arguments @('run', 'build')
 Invoke-NpmStep -Arguments @('test')

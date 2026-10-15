@@ -79,7 +79,7 @@ test('enable rejects missing permissions before saving a snapshot, but only warn
  guild.members.me.permissions.has=()=>false;
  await assert.rejects(enable.execute(ctx,i),/Protection was not enabled/);assert.equal(snapshots,0);
  guild.members.me.permissions.has=()=>true;guild.roles.cache.set('higher',{id:'higher',position:12,name:'Staff',managed:false});
- const reply=String(await enable.execute(ctx,i));assert.match(reply,/Hierarchy warning/);assert.match(reply,/drag the Midtown Vanguard role/);assert.equal(snapshots,1);
+ const reply=String(await enable.execute(ctx,i));assert.match(reply,/Hierarchy warning/);assert.match(reply,/drag the Ghost Vanguard role/);assert.equal(snapshots,1);
  }finally{store.close();}
 });
 

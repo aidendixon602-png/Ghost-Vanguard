@@ -84,7 +84,7 @@ test('/mod tempban shows loading, then success; a user already banned is reporte
     w = world({ bans: { [TARGET]: `${TAG.hardban} HB-00001 ${DEV}: raiding` } });
     await w.run(tempbanCommand, { duration: 24, reason: 'spam' });
     assert.match(title(w.clickReplies.at(-1)), /already done/);
-    assert.match(String(w.clickReplies.at(-1).embeds[0].data.description), /by a Midtown Vanguard hardban/);
+    assert.match(String(w.clickReplies.at(-1).embeds[0].data.description), /by a Ghost Vanguard hardban/);
     assert.equal(w.store.get('SELECT COUNT(*) AS n FROM tempbans')!.n, 0, 'no tempban or case was recorded');
     w.store.close();
 });

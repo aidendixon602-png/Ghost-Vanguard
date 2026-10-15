@@ -174,6 +174,15 @@ Server rank: lifting ordinary bans and accepting appeals, raid tools, automod, s
 - `/setup staff report`: Staff activity: actions per staff member
 - `/setup welcome setup`: Turn welcome messages on or off
 - `/setup welcome test`: Send the welcome message for yourself to check how it looks
+- `/ticket panel`: Post the ticket menu members use to open tickets
+- `/ticket settings`: View or change this server’s ticket settings
+- `/ticket setup`: Set up the ticket desk: staff role, category, log channel and the ticket panel
+- `/ticket stats`: Ticket statistics and the staff leaderboard
+- `/ticket types add`: Add a ticket type to the menu
+- `/ticket types edit`: Rename a ticket type or change its emoji or description
+- `/ticket types list`: Show every ticket type
+- `/ticket types remove`: Remove a ticket type from the menu
+- `/ticket types reset`: Replace the ticket types with the defaults
 
 ## 🔨 Moderator
 
@@ -232,4 +241,17 @@ Any member. Some of these check more inside the command (noted next to them).
 - `/role add`: Give a member a role _(checked role by role: Manage Roles or a Moderator rank, and staff roles need `/role who-can-give`)_
 - `/role remove`: Take a role from a member _(checked role by role, like `/role add`)_
 - `/role restore`: Give a member back the roles they had before they left the server _(gives back only roles the person could give with `/role add`)_
+- `/ticket add`: Add someone to this ticket _(ticket staff only)_
+- `/ticket block`: Stop a member from opening tickets in this server _(ticket staff only; bots and staff cannot be blocked)_
+- `/ticket blocked`: List members blocked from opening tickets _(ticket staff only)_
+- `/ticket claim`: Claim this ticket so you are the one handling it _(ticket staff role, Manage Server or a Vanguard rank)_
+- `/ticket close`: Close this ticket and save the transcript _(the member who opened the ticket, or ticket staff)_
+- `/ticket closerequest`: Ask the member if their issue is solved and the ticket can close _(ticket staff only)_
+- `/ticket history`: See a member's past tickets in this server _(ticket staff only)_
+- `/ticket priority`: Set how urgent this ticket is _(ticket staff only)_
+- `/ticket remove`: Remove someone from this ticket _(ticket staff only)_
+- `/ticket rename`: Rename this ticket channel _(ticket staff only)_
+- `/ticket transfer`: Hand this ticket to another staff member _(ticket staff only)_
+- `/ticket unblock`: Let a blocked member open tickets again _(ticket staff only)_
+- `/ticket unclaim`: Release this ticket so another staff member can take it _(the staff member who claimed it, or an admin)_
 - `/verify`: Sync your linked Roblox account, role and nickname

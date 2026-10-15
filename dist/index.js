@@ -47,11 +47,13 @@ import { forgetHeldBot, lockServerSettings, quarantineNewBot } from './features/
 import { activeBan, assertLocalUnban, enforceOnJoin, enforceOnUnban, existingBan, liftNetworkBan, networkDeps, recordId, sweepNetworkBans } from './security/network-ban.js';
 import { handleBanLogInteraction, onBanAdd, onBanRemove, registerBanLogRenderer } from './audit/ban-log.js';
 import { reportBotError } from './audit/bot-errors.js';
+import { forgetGuildTickets, isTicketChannel, loadTicketChannels, markTicketActivity, runTicketMaintenance, ticketChannelGone } from './features/tickets.js';
+import { handleTicketDm } from './ui/ticket-ui.js';
 import { recoveryEmbed } from './ui/notice.js';
 import { warnEmptyDatabase } from './features/bot-health.js';
 const errors = validateConfig();
 if (errors.length) {
-    console.error(`\n${style.red('✖ Midtown Vanguard cannot start.')} Fix these settings in .env:\n${errors.map(e => `  • ${e}`).join('\n')}\n`);
+    console.error(`\n${style.red('✖ Ghost Vanguard cannot start.')} Fix these settings in .env:\n${errors.map(e => `  • ${e}`).join('\n')}\n`);
     process.exit(1);
 }
 const healthUrl = `http://${config.host}:${config.port}/healthz`;
@@ -64,6 +66,8 @@ if (!store.acquireLease('bot', owner)) {
 }
 // Read before anything updates it: when this database's bot was last running.
 const offlineSince = lastSeen(store);
+// Tickets left mid-close by a crash are usable again, and open ticket channels are known in memory.
+loadTicketChannels(store);
 const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers, GatewayIntentBits.GuildModeration, GatewayIntentBits.GuildMessages, ...(config.messageContentEnabled ? [GatewayIntentBits.MessageContent] : [])], partials: [Partials.Message, Partials.GuildMember],
     rest: { rejectOnRateLimit: rejectRecoveryWait },
     allowedMentions: { parse: [], repliedUser: false } });
@@ -97,6 +101,7 @@ const lifecycle = new GuildLifecycle(store, client, id => {
     scam.clearGuild(id);
     clearAutomod(id);
     roblox.clearGuild(id);
+    forgetGuildTickets(store, id);
 }, async (guild) => {
     await scam.initialize(guild);
     store.save(store.settings(guild.id));
@@ -142,7 +147,7 @@ function presence(soon = false) {
 }
 databaseBackups.onFailure = async (message) => {
     // Only the trusted DM list (TRUSTED_DM_IDS, default the bot owner) is told; no credentials or database records are sent.
-    if (!await dmTrusted(client, { content: `Midtown Vanguard: ${message}`, allowedMentions: { parse: [] } }))
+    if (!await dmTrusted(client, { content: `Ghost Vanguard: ${message}`, allowedMentions: { parse: [] } }))
         logEvent('trusted_alert_unavailable', {});
 };
 async function scheduledLayouts() {
@@ -217,6 +222,9 @@ client.on(Events.InteractionCreate, i => {
     // Appeal buttons and forms in DMs have no server, so they skip the normal router.
     if (!i.inGuild() && (i.isButton() || i.isModalSubmit()) && i.customId.startsWith('appealdm:'))
         return task('appeal', handleAppealDm(i, store, client));
+    // Ticket rating buttons are DM'd to the member who opened the ticket, so they skip the router too.
+    if (!i.inGuild() && (i.isButton() || i.isModalSubmit()) && i.customId.startsWith('vgticketdm:'))
+        return task('ticket rating', handleTicketDm(i, store));
     // Ban log buttons live on log messages, outside the command menus (which are tidied up automatically).
     if (i.inCachedGuild() && (i.isButton() || i.isModalSubmit()) && i.customId.startsWith('banrec:')) {
         if (!startupReady || !lifecycle.isReady(i.guildId))
@@ -246,6 +254,15 @@ client.on(Events.MessageCreate, m => {
         protectedTask('staff mentions', m.guild.id, () => processStaffMention({ store, security, logs, client }, m));
     if (m.guild)
         protectedTask('auto reactions', m.guild.id, () => autoReact(store, m));
+    // Only ticket channels are tracked, so ordinary chat costs one Set lookup.
+    if (m.guild && isTicketChannel(m.channelId))
+        protectedTask('ticket activity', m.guild.id, async () => { markTicketActivity(store, m.channelId); });
+});
+client.on(Events.ChannelDelete, channel => {
+    // A ticket channel removed by hand (or by a nuke) must not stay "open" in the desk.
+    if (channel.isDMBased() || isTicketChannel(channel.id) === false)
+        return;
+    protectedTask('ticket channel deleted', channel.guild.id, async () => { ticketChannelGone(store, channel.guild.id, channel.id); });
 });
 client.on(Events.MessageDelete, m => {
     if (m.guildId)
@@ -337,7 +354,7 @@ const server = createServer((req, res) => {
     const databaseHealth = store.health();
     const healthy = databaseHealth.connected && client.isReady() && startupReady && !shuttingDown;
     res.writeHead(healthy ? 200 : 503, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ service: 'Midtown Vanguard', version: VERSION, ready: healthy, uptimeSeconds: Math.floor(process.uptime()), connectedSince: readyAt || null, guilds: client.guilds.cache.size, database: databaseHealth, protection: stats.get() }));
+    res.end(JSON.stringify({ service: 'Ghost Vanguard', version: VERSION, ready: healthy, uptimeSeconds: Math.floor(process.uptime()), connectedSince: readyAt || null, guilds: client.guilds.cache.size, database: databaseHealth, protection: stats.get() }));
 });
 server.on('error', () => {
     console.error('Health server failed to bind. Check HEALTH_HOST/HEALTH_PORT and stop duplicate processes.');
@@ -363,6 +380,8 @@ timers.push(setInterval(() => task('heartbeat', heartbeat()), 60000));
 timers.push(setInterval(() => { if (startupReady)
     task('daily backup DM', dailyBackupDm(store, client, kind => databaseBackups.create(kind))); }, 600000));
 timers.push(setInterval(() => task('network ban sweep', sweepNetworkBans(network)), 600000));
+timers.push(setInterval(() => { if (startupReady)
+    task('ticket upkeep', runTicketMaintenance({ store, client, ready: id => startupReady && lifecycle.isReady(id) })); }, 600000));
 timers.push(setInterval(() => task('inactive guild cleanup', databaseBackups.purgeInactive()), 3600000));
 timers.push(setInterval(() => {
     for (const guild of client.guilds.cache.values())

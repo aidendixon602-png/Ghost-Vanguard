@@ -65,7 +65,7 @@ export async function checkChannel(guild, channelId, label, sendTest = true) {
     if (sendTest && !missing.length) {
         try {
             await channel.send({ embeds: [new EmbedBuilder().setColor(Colors.Green).setTitle('✅ Log channel test')
-                        .setDescription(`Midtown Vanguard can post **${label}** here.`).setFooter({ text: `Channel ID: ${channel.id}` }).setTimestamp()], allowedMentions: { parse: [] } });
+                        .setDescription(`Ghost Vanguard can post **${label}** here.`).setFooter({ text: `Channel ID: ${channel.id}` }).setTimestamp()], allowedMentions: { parse: [] } });
             test = 'sent';
         }
         catch (e) {
@@ -93,7 +93,7 @@ export function describeCheck(label, check) {
 }
 /** Set up (or repair) both channels and save them. */
 export async function setupLogChannels(store, guild, by, chosen = {}) {
-    const reason = `Midtown Vanguard log setup by ${by}`;
+    const reason = `Ghost Vanguard log setup by ${by}`;
     const current = logChannels(store, guild.id);
     const bans = await resolveChannel(store, guild, BANS_CHANNEL, chosen.bans ?? null, current.bansChannelId, reason);
     const logging = await resolveChannel(store, guild, LOGGING_CHANNEL, chosen.logging ?? null, eventLogConfig(store, guild.id).channelId, reason);

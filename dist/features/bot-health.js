@@ -19,7 +19,7 @@ const dmLeaders = dmTrusted;
 export async function announceComeback(client, offlineSince, now = Date.now()) {
     if (!offlineSince || now - offlineSince < 3 * 60000)
         return;
-    await dmLeaders(client, { embeds: [embed('🟢 Midtown Vanguard is back online', `It was offline for about **${formatDuration(now - offlineSince)}** (from <t:${Math.floor(offlineSince / 1000)}:f> to <t:${Math.floor(now / 1000)}:f>).\nVersion ${VERSION}. Anti-nuke checked the audit log for anything that happened while it was down.`, Colors.Green)], allowedMentions: { parse: [] } });
+    await dmLeaders(client, { embeds: [embed('🟢 Ghost Vanguard is back online', `It was offline for about **${formatDuration(now - offlineSince)}** (from <t:${Math.floor(offlineSince / 1000)}:f> to <t:${Math.floor(now / 1000)}:f>).\nVersion ${VERSION}. Anti-nuke checked the audit log for anything that happened while it was down.`, Colors.Green)], allowedMentions: { parse: [] } });
 }
 export async function heartbeat() {
     if (!config.heartbeatUrl)
@@ -61,7 +61,7 @@ export async function dailyBackupDm(store, client, create, now = Date.now()) {
  */
 export async function warnEmptyDatabase(client, servers) {
     const text = [
-        '⚠️ **Midtown Vanguard started with an empty database** while it is in **' + servers + '** server(s).',
+        '⚠️ **Ghost Vanguard started with an empty database** while it is in **' + servers + '** server(s).',
         'If this was not on purpose (a reinstall, a Clone, a wiped `data` folder), every server\'s settings are missing: whitelists, staff ranks, logs, cases and ban records.',
         '',
         '**To get them back:** use a **📦 Daily database backup** this bot DMed you before it happened (a `.db.gz` file: unzip it), the `data` archive you downloaded, or `data/database-backups` if it still exists. Stop the bot, put the file at `data/vanguard.db`, and start it again.',

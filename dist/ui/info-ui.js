@@ -13,7 +13,7 @@ export function serverInfo(ctx, guild, user, requested = 0) {
     const total = ctx.store.get('SELECT COUNT(*) AS n FROM snapshots WHERE guild_id=?', guild.id)?.n ?? 0;
     const latest = ctx.store.get('SELECT at FROM snapshots WHERE guild_id=? ORDER BY id DESC LIMIT 1', guild.id);
     const titles = ['Overview', 'Channels & assets', 'Server configuration', 'Vanguard protection'];
-    const embed = new EmbedBuilder().setTitle(`${guild.name} · ${titles[page]}`).setColor(Colors.Blurple).setFooter({ text: `Midtown Vanguard ${VERSION} · ${page + 1}/4` }).setTimestamp();
+    const embed = new EmbedBuilder().setTitle(`${guild.name} · ${titles[page]}`).setColor(Colors.Blurple).setFooter({ text: `Ghost Vanguard ${VERSION} · ${page + 1}/4` }).setTimestamp();
     const icon = guild.iconURL?.({ size: 256 });
     if (icon)
         embed.setThumbnail(icon);
@@ -34,7 +34,7 @@ export function serverInfo(ctx, guild, user, requested = 0) {
 }
 export function botInfo(ctx) {
     const stats = (ctx.stats ?? new ProtectionStats(ctx.client, ctx.store)).get();
-    return new EmbedBuilder().setTitle('Midtown Vanguard').setColor(Colors.Blurple).setDescription('Multi-server security, Anti-Nuke detection, moderation, Roblox verification, and recoverable server layouts.')
+    return new EmbedBuilder().setTitle('Ghost Vanguard').setColor(Colors.Blurple).setDescription('Multi-server security, Anti-Nuke detection, moderation, Roblox verification, and recoverable server layouts.')
         .addFields({ name: 'Owner / Developer', value: `<@${config.ownerId}>\nUsername: ${config.ownerUsername}\nUser ID: ${config.ownerId}` }, { name: 'Version', value: VERSION, inline: true }, { name: 'Uptime', value: `${Math.floor(process.uptime() / 3600)}h ${Math.floor(process.uptime() / 60) % 60}m`, inline: true }, { name: 'Guilds protected', value: String(stats.guilds), inline: true }, { name: 'Discord users protected', value: `${stats.users.toLocaleString()} unique${stats.complete ? '' : ' known users · partial roster coverage'}`, inline: true }, { name: 'Roblox users protected / monitored', value: `${stats.robloxUsers.toLocaleString()} distinct stored verified accounts`, inline: true }, { name: 'Registered commands', value: String(ctx.registry.commands.size), inline: true }, { name: 'Current status', value: ctx.client.isReady() ? 'Online' : 'Reconnecting', inline: true }, { name: 'Statistics refreshed', value: timestamp(stats.refreshedAt), inline: true })
         .setThumbnail(ctx.client.user?.displayAvatarURL() ?? null).setFooter({ text: 'Developer identity is the Discord user ID; usernames may change.' }).setTimestamp();
 }

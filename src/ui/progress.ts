@@ -32,8 +32,8 @@ export interface Classified {
 const code = (error: unknown) => typeof error === 'object' && error && 'code' in error ? Number((error as any).code) : NaN;
 const status = (error: unknown) => typeof error === 'object' && error && 'status' in error ? Number((error as any).status) : NaN;
 
-export const MISSING_BAN_PERMISSION = 'Midtown Vanguard is missing the **Ban Members** permission.';
-export const BOT_BELOW_TARGET = 'Role hierarchy: Midtown Vanguard’s highest role is not above the user’s highest role. Move the bot’s role higher in Server Settings → Roles.';
+export const MISSING_BAN_PERMISSION = 'Ghost Vanguard is missing the **Ban Members** permission.';
+export const BOT_BELOW_TARGET = 'Role hierarchy: Ghost Vanguard’s highest role is not above the user’s highest role. Move the bot’s role higher in Server Settings → Roles.';
 
 /** Turns any error from a ban (or similar) action into a staff-readable outcome. */
 export function classify(error: unknown, context = 'action'): Classified {
@@ -53,7 +53,7 @@ export function classify(error: unknown, context = 'action'): Classified {
             return { outcome: 'already', reason: error.message };
         if (/bot role above|role is not above|equal or higher role/i.test(error.message))
             return { outcome: 'hierarchy', reason: /bot role above/i.test(error.message) ? BOT_BELOW_TARGET : `Role hierarchy: ${error.message}` };
-        if (/Midtown Vanguard is missing/i.test(error.message))
+        if (/Ghost Vanguard is missing/i.test(error.message))
             return { outcome: 'missing-permissions', reason: error.message };
         if (/user ID|no user|no Discord account|not banned here|could not find/i.test(error.message))
             return { outcome: 'invalid-target', reason: error.message };

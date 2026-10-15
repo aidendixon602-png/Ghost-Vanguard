@@ -57,10 +57,10 @@ export class ScamProtection {
                 // Fetch the list before creating, so restarts and concurrent scans cannot duplicate it.
                 const channels = await guild.channels.fetch();
                 if (!active()) return false;
-                channel = channels.find(c => c?.type === ChannelType.GuildText && c.topic === 'Midtown Vanguard • managed security log') ?? null;
+                channel = channels.find(c => c?.type === ChannelType.GuildText && c.topic === 'Ghost Vanguard • managed security log') ?? null;
                 if (!channel) {
                     channel = await guild.channels.create({ name: 'vanguard-security', type: ChannelType.GuildText,
-                        topic: 'Midtown Vanguard • managed security log', reason: 'Automatic scam protection setup',
+                        topic: 'Ghost Vanguard • managed security log', reason: 'Automatic scam protection setup',
                         permissionOverwrites: [{ id: guild.id, deny: [PermissionFlagsBits.ViewChannel] },
                             { id: me.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.EmbedLinks, PermissionFlagsBits.ReadMessageHistory] }] });
                 }

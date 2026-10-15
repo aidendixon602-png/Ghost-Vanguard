@@ -85,7 +85,7 @@ export function explainBan(store, guild, userId, audit, fallbackReason, now = Da
             d.kind = 'automatic';
             d.moderatorId = botId ?? null;
             d.moderatorRole = 'automatic';
-            d.reason = raw?.replace(/^Midtown Vanguard: /, '') ?? null;
+            d.reason = raw?.replace(/^(?:Midtown |Ghost )Vanguard: /, '') ?? null;
         }
     }
     else if (audit?.executorId) {
@@ -204,7 +204,7 @@ export async function onBanRemove(store, logs, guild, user) {
                 else {
                     by = botId ?? null;
                     role = 'automatic';
-                    reason = reason?.replace(/^Midtown Vanguard: /, '') ?? null;
+                    reason = reason?.replace(/^(?:Midtown |Ghost )Vanguard: /, '') ?? null;
                     if (/temporary ban expired/i.test(reason ?? ''))
                         status = 'expired';
                 }
@@ -276,7 +276,7 @@ const who = (id, role) => {
     if (!id || role === 'unverified')
         return 'Unavailable (could not be verified)';
     if (role === 'automatic')
-        return `Midtown Vanguard (automatic)`;
+        return `Ghost Vanguard (automatic)`;
     return `<@${id}> (\`${id}\`)`;
 };
 const moderatorHeading = (r) => r.moderator_role === 'via-bot' ? 'Moderator (via bot)' : 'Banned By';
@@ -317,7 +317,7 @@ export function renderRecord(r) {
     const row = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`${REF}:unban:${r.id}`).setLabel('Unban').setStyle(ButtonStyle.Success).setDisabled(!banned), new ButtonBuilder().setCustomId(`${REF}:reban:${r.id}`).setLabel('Reban').setStyle(ButtonStyle.Danger).setDisabled(banned));
     return { embeds: [e.toJSON()], components: [row.toJSON()] };
 }
-const NOT_ALLOWED = 'Only Admins, the server owner and Midtown Vanguard developers can use the ban log buttons.';
+const NOT_ALLOWED = 'Only Admins, the server owner and Ghost Vanguard developers can use the ban log buttons.';
 const networkLifter = (kind) => kind === 'hardban' ? 'Developer' : 'Supreme Leader or Developer';
 const notNetwork = (kind) => `This is a Midtown-wide **${kind}**: only a ${networkLifter(kind)} can lift it. Server Admins and owners can lift ordinary bans only.`;
 const LOCAL_FOOTER = 'Admins, the server owner and developers can do this';

@@ -80,7 +80,8 @@ export function explicitRank(store, guildId, userId, member) {
         rank = RANKS[global.level];
     if (!guildId)
         return rank;
-    if (member && member.id === member.guild?.ownerId)
+    // Both ids must be present: a member object without them must never count as the owner.
+    if (member?.guild && member.id && member.id === member.guild.ownerId)
         rank = Math.max(rank, RANKS.owner);
     // Older access settings still count: security admins = Head Admin, Vanguard moderator roles = Moderator.
     if (store.hasGrant(guildId, userId, 'admin'))
@@ -103,7 +104,9 @@ export const COMMAND_RANK = {
     // Moderator. Lifting a ban is Admin: Moderators can ban, but only Admins and owners undo bans.
     'moderation/unban': 3,
     moderation: 2, bans: 2, tempban: 2, softban: 2, 'role/who-can-give': 4, nick: 2, slowmode: 2, 'case/reason': 2, 'note/remove': 2, newacct: 2,
-    // Admin
+    // Admin. The ticket desk is set up and configured by Admins; answering tickets only needs the
+    // ticket staff role, which /ticket checks inside the command.
+    'ticket-setup': 3, 'ticket-panel': 3, 'ticket-type': 3, 'ticket-settings': 3, 'ticket-stats': 3,
     raidmode: 3, vgwelcome: 3, vgcommands: 0, lockdown: 3, unlock: 3, massban: 3, newaccounts: 3, scam: 3, logs: 3, antiping: 3, mention: 3, health: 3,
     // Head Admin
     // Owner-level actions that also sit under Head Admin commands: handing out security admins, undoing setting changes.

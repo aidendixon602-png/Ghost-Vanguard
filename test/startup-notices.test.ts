@@ -35,7 +35,7 @@ function setup() {
     return { store, guild, above, restart };
 }
 
-const BACK = '🟢 Midtown Vanguard is back online', SAVED = 'Saved protection loaded';
+const BACK = '🟢 Ghost Vanguard is back online', SAVED = 'Saved protection loaded';
 
 test('the first start with a database announces itself and the saved protection', async () => {
     const { store, restart } = setup();

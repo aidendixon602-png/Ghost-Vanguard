@@ -121,7 +121,7 @@ test('tempbans show duration and expiry; when they expire the same record is upd
         assert.match(f.Expires, new RegExp(`<t:${Math.floor(until / 1000)}:f>`));
         assert.equal(f.Reason, 'spam');
         await w.logs.flush();
-        await w.discordUnban(BOT, 'Midtown Vanguard: temporary ban expired (case #1)');
+        await w.discordUnban(BOT, 'Midtown Vanguard: temporary ban expired (case #1)')  // old name: still recognized;
         const record = latestRecord(w.store, G, USER)!;
         assert.equal(record.status, 'expired');
         assert.equal(w.store.get('SELECT COUNT(*) AS n FROM ban_records')!.n, 1);
@@ -129,7 +129,7 @@ test('tempbans show duration and expiry; when they expire the same record is upd
         assert.equal(w.sent.length, 1, 'no second post');
         assert.equal(w.edits.length, 1, 'the original message was edited');
         f = fieldsOf(w.edits[0].p);
-        assert.match(f.Status, /Expired\*\* by Midtown Vanguard \(automatic\)/);
+        assert.match(f.Status, /Expired\*\* by Ghost Vanguard \(automatic\)/);
         assert.equal(f.Reason, 'spam', 'the original ban details are kept');
         assert.equal(w.edits[0].p.embeds[0].author.name, 'urloffy - Ban expired');
     } finally { w.store.close(); }
@@ -185,7 +185,7 @@ test('staff without the Admin rank cannot press Unban or Reban, checked on every
         for (const id of [`banrec:unban:${record.id}`, `banrec:cunban:${record.id}`, `banrec:reban:${record.id}`, `banrec:creban:${record.id}`]) {
             const c = click(w, id, STAFF);
             await run(w, c);
-            assert.match(c.replies[0].content, /Only Admins, the server owner and Midtown Vanguard developers/);
+            assert.match(c.replies[0].content, /Only Admins, the server owner and Ghost Vanguard developers/);
         }
         assert.ok(w.bans.has(USER), 'nothing changed');
     } finally { w.store.close(); }
@@ -346,7 +346,7 @@ test('a Developer can lift a hardban straight from its record: it confirms, then
         assert.equal(getRecord(w.store, G, record.id)!.status, 'unbanned');
         const staff = click(w, `banrec:cunban:${record.id}`, STAFF);
         await handleBanLogInteraction(staff.i, deps);
-        assert.match(staff.replies[0].content, /Only Admins, the server owner and Midtown Vanguard developers/, 'ordinary staff still cannot');
+        assert.match(staff.replies[0].content, /Only Admins, the server owner and Ghost Vanguard developers/, 'ordinary staff still cannot');
     } finally { config.developers.delete(DEV); w.store.close(); }
 });
 

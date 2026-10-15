@@ -33,8 +33,8 @@ export function checklist(store: Store | null, guild: Guild): Checklist {
     const audit = s.admin || !!guild.members?.me?.permissions?.has(PermissionFlagsBits.ViewAuditLog);
     const logsReady = !!store && !!logChannels(store, guild.id).bansChannelId && !!eventLogConfig(store, guild.id).channelId;
     const items = [
-        { ok: s.admin, label: 'Administrator permission', fix: 'Server Settings → Roles → Midtown Vanguard → turn on Administrator' },
-        { ok: s.top, label: `Role position ${s.rank ? `#${s.rank} of ${s.total}` : 'unknown'}`, fix: 'Drag the Midtown Vanguard role to the very top' },
+        { ok: s.admin, label: 'Administrator permission', fix: 'Server Settings → Roles → Ghost Vanguard → turn on Administrator' },
+        { ok: s.top, label: `Role position ${s.rank ? `#${s.rank} of ${s.total}` : 'unknown'}`, fix: 'Drag the Ghost Vanguard role to the very top' },
         { ok: audit, label: 'View Audit Log', fix: 'Needed to see who did what (anti-nuke and logs)' },
         { ok: logsReady, label: 'Log channels', fix: 'Press **Set up logs** below' },
     ];
@@ -52,14 +52,14 @@ export function welcomePanel(store: Store | null, guild: Guild, inviter: string 
         ? `Authorized by approved developer <@${inviter}>, so **${guild.name}** is protected straight away.`
         : `**${guild.name}** is authorized and protected.`;
     const e = new EmbedBuilder().setColor(all ? Colors.Green : Colors.Gold)
-        .setTitle('🛡️ Midtown Vanguard is online')
+        .setTitle('🛡️ Ghost Vanguard is online')
         .setDescription(`${intro}\nProtection starts automatically. There's nothing to switch on.`)
         .addFields(
             { name: 'Protection', value: on ? `🟢 **Anti-nuke on** · ${RULES.length} rules · enforce mode` : '🔴 **Anti-nuke off** (switched off by staff) · `/antinuke enable`', inline: false },
             { name: `Setup ${bar(c.ready, c.items.length)} ${c.ready}/${c.items.length}`, value: c.items.map(i => `${i.ok ? '✅' : '⚠️'} **${i.label}**${i.ok ? '' : `\n-# ${i.fix}`}`).join('\n') },
             { name: 'Good to know', value: '`/help` lists every command you can use · `/antinuke status` shows the rules · `/role` gives roles safely' },
         )
-        .setFooter({ text: `Midtown Vanguard v${VERSION} · ${all ? 'fully set up' : 'buttons below finish the setup'}` }).setTimestamp();
+        .setFooter({ text: `Ghost Vanguard v${VERSION} · ${all ? 'fully set up' : 'buttons below finish the setup'}` }).setTimestamp();
     const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
         new ButtonBuilder().setCustomId(`${WELCOME_PREFIX}logs:${inviter ?? '0'}`).setLabel(c.logsReady ? 'Re-check logs' : 'Set up logs').setEmoji('🗂️').setStyle(c.logsReady ? ButtonStyle.Secondary : ButtonStyle.Primary),
         new ButtonBuilder().setCustomId(`${WELCOME_PREFIX}check:${inviter ?? '0'}`).setLabel('Re-check').setEmoji('🔄').setStyle(ButtonStyle.Secondary),
@@ -70,14 +70,14 @@ export function welcomePanel(store: Store | null, guild: Guild, inviter: string 
 
 /** Before authorization: a live countdown, no buttons (protected features are off until then). */
 export function pendingPanel(guild: Guild, deadline: number) {
-    const e = new EmbedBuilder().setColor(Colors.Blurple).setTitle('⏳ Waiting for a Midtown Vanguard developer')
+    const e = new EmbedBuilder().setColor(Colors.Blurple).setTitle('⏳ Waiting for a Ghost Vanguard developer')
         .setDescription([
-            `An approved developer needs to run \`/dev server authorize\` here **<t:${Math.floor(deadline / 1000)}:R>**, or Midtown Vanguard leaves on its own.`,
+            `An approved developer needs to run \`/dev server authorize\` here **<t:${Math.floor(deadline / 1000)}:R>**, or Ghost Vanguard leaves on its own.`,
             '',
             'Until then protection, logs and moderation commands stay off.',
             '-# If a developer invited the bot, this happens automatically when Vanguard can read the audit log.',
         ].join('\n'))
-        .setFooter({ text: `Midtown Vanguard v${VERSION}` }).setTimestamp();
+        .setFooter({ text: `Ghost Vanguard v${VERSION}` }).setTimestamp();
     return { embeds: [e], allowedMentions: { parse: [] as never[] } };
 }
 

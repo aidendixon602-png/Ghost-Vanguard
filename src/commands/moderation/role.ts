@@ -52,7 +52,7 @@ export default defineCommand(new SlashCommandBuilder().setName('role').setDescri
     } catch (error: any) {
         withdraw();
         throw new AppError(error?.code === 50013 ? 'PERMISSION_ERROR' : 'VALIDATION_ERROR', error?.code === 50013
-            ? 'Discord refused the change: Midtown Vanguard is missing Manage Roles or its role is not high enough.'
+            ? 'Discord refused the change: Ghost Vanguard is missing Manage Roles or its role is not high enough.'
             : error?.code === 10007 ? 'That member left the server before the change was made.' : `Discord did not make the change (${clip(error?.message ?? 'unknown error', 150)}). Nothing was changed.`);
     }
     // Only now, after Discord confirmed it, is it logged as done.

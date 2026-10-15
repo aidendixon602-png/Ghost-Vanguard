@@ -410,7 +410,7 @@ test('/genreban shows loading, asks to confirm, then reports the result with the
     assert.match(String(last.embeds[0].data.description), /Evidence:\*\* clip link/);
     assert.equal(f.dms.length, 1, 'the user gets one DM');
     const dm = String(f.dms[0].embeds[0].data.description);
-    assert.match(String(f.dms[0].embeds[0].data.title), /genrebanned by Midtown Vanguard/);
+    assert.match(String(f.dms[0].embeds[0].data.title), /genrebanned by Ghost Vanguard/);
     assert.match(dm, /\*\*Reason:\*\* raiding/);
     assert.match(dm, /\*\*Record:\*\* GB-00001/);
     assert.match(dm, /2\*\* servers/);

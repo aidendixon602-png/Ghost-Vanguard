@@ -21,7 +21,7 @@ export function redact(value: string): string {
 export function failure(error: unknown) {
     const reference = `MV-CMD-${randomBytes(6).toString('hex').toUpperCase()}`;
     const category: ErrorCategory = error instanceof AppError ? error.category : error instanceof Error && (/sqlite/i.test(error.name + error.message) || 'code' in error && /^ERR_SQLITE/.test(String(error.code))) ? 'DATABASE_ERROR' : typeof error === 'object' && error && 'code' in error ? 'DISCORD_API_ERROR' : 'INTERNAL_ERROR';
-    return { reference, category, message: error instanceof AppError ? error.message : 'Midtown Vanguard could not complete this action.',
+    return { reference, category, message: error instanceof AppError ? error.message : 'Ghost Vanguard could not complete this action.',
         details: redact(error instanceof Error ? [error.stack || error.message, error.cause instanceof Error ? error.cause.stack : ''].filter(Boolean).join('\nCaused by: ') : String(error)) };
 }
 
@@ -59,7 +59,7 @@ const SPECIAL_LINES: Record<string, (e: Record<string, unknown>) => string[] | n
         const lines: string[] = [];
         if (!attentionHeader) {
             attentionHeader = true;
-            lines.push('', `  ${style.yellow('⚠ Roles above the bot')}  ${style.dim('anti-nuke cannot act on people with these · drag Midtown Vanguard above them in Server Settings → Roles')}`);
+            lines.push('', `  ${style.yellow('⚠ Roles above the bot')}  ${style.dim('anti-nuke cannot act on people with these · drag Ghost Vanguard above them in Server Settings → Roles')}`);
         }
         const above = Array.isArray(e.rolesAboveBot) && e.rolesAboveBot.length ? (e.rolesAboveBot as string[]).join(', ') : '';
         const missing = Array.isArray(e.missingPermissions) && e.missingPermissions.length ? style.yellow(`bot is missing ${(e.missingPermissions as string[]).join(', ')}`) : '';

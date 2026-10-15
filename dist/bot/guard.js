@@ -61,11 +61,11 @@ export class Guard {
     }
     async check(i, policy, key, consumeCooldown = true, refreshMember = false) {
         if (!i.inCachedGuild()) {
-            const link = /^\d{17,20}$/.test(config.clientId) ? `\n[Invite Midtown Vanguard to this server](${inviteUrl(config.clientId, i.guildId ?? undefined)})` : '';
-            throw new AppError('VALIDATION_ERROR', `Midtown Vanguard is not connected to this server. Install the bot using the invite link, then retry. If it is already a server member, wait for reconnection.${link}`);
+            const link = /^\d{17,20}$/.test(config.clientId) ? `\n[Invite Ghost Vanguard to this server](${inviteUrl(config.clientId, i.guildId ?? undefined)})` : '';
+            throw new AppError('VALIDATION_ERROR', `Ghost Vanguard is not connected to this server. Install the bot using the invite link, then retry. If it is already a server member, wait for reconnection.${link}`);
         }
         if (this.store.get('SELECT 1 FROM server_bans WHERE guild_id=?', i.guildId))
-            throw new AppError('AUTHORIZATION_ERROR', 'This server is banned from Midtown Vanguard.');
+            throw new AppError('AUTHORIZATION_ERROR', 'This server is banned from Ghost Vanguard.');
         if (policy.requiresAuthorization) {
             this.store.assertAuthorized(i.guildId);
             if (this.ready && !this.ready(i.guildId))
@@ -82,9 +82,9 @@ export class Guard {
         const me = i.guild.members.me ?? await i.guild.members.fetchMe();
         const missing = policy.botPermissions.filter(p => !me.permissions.has(p));
         if (missing.length)
-            throw new AppError('PERMISSION_ERROR', `Midtown Vanguard is missing:\n${permissionNames(missing).map(p => `• ${p}`).join('\n')}`);
+            throw new AppError('PERMISSION_ERROR', `Ghost Vanguard is missing:\n${permissionNames(missing).map(p => `• ${p}`).join('\n')}`);
         const rankOk = developers.has(i.user.id) || (requiredRank(key) ?? Infinity) <= rankOf(this.store, i.guildId, i.user.id, actor, key);
-        for (const [member, permissions, label] of [[me, policy.channelPermissions ?? [], 'Midtown Vanguard'], [actor, rankOk ? [] : policy.userChannelPermissions ?? [], 'You']]) {
+        for (const [member, permissions, label] of [[me, policy.channelPermissions ?? [], 'Ghost Vanguard'], [actor, rankOk ? [] : policy.userChannelPermissions ?? [], 'You']]) {
             if (!permissions.length)
                 continue;
             const channel = i.channel;

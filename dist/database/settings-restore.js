@@ -68,7 +68,7 @@ export function readBackup(bytes) {
         if (ok !== 'ok')
             throw new AppError('VALIDATION_ERROR', 'That database file is damaged (integrity check failed).');
         if (!db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='grants'").get())
-            throw new AppError('VALIDATION_ERROR', 'That database is not from Midtown Vanguard.');
+            throw new AppError('VALIDATION_ERROR', 'That database is not from Ghost Vanguard.');
     }
     catch (error) {
         close();

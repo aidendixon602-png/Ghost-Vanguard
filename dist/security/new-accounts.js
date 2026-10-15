@@ -95,7 +95,7 @@ export async function handleNewAccountJoin(store, logs, member, trusted, now = D
     const ageDays = Math.floor(ageMs / DAY), releaseAt = member.user.createdTimestamp + config.minAgeDays * DAY;
     const matches = await evasionMatches(member, banned).catch(() => []);
     let result = 'alerted', detail = 'Staff alerted; no action taken.';
-    const reason = `Midtown Vanguard new-account gate: account ${ageDays} day(s) old (minimum ${config.minAgeDays})`;
+    const reason = `Ghost Vanguard new-account gate: account ${ageDays} day(s) old (minimum ${config.minAgeDays})`;
     try {
         if (config.action === 'hold') {
             if (!member.moderatable) {

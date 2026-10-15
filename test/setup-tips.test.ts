@@ -45,7 +45,7 @@ test('the welcome panel shows protection, a live checklist and buttons that do t
         assert.deepEqual(setupStatus(weak), { admin: false, top: false, rank: 3, total: 5 });
         const panel = welcomePanel(store, weak, '1277709272041394187');
         const e = panel.embeds[0]!.toJSON();
-        assert.equal(e.title, '🛡️ Midtown Vanguard is online');
+        assert.equal(e.title, '🛡️ Ghost Vanguard is online');
         assert.match(e.description!, /Authorized by approved developer <@1277709272041394187>/);
         assert.doesNotMatch(JSON.stringify(e), /antinuke enable/, 'no outdated "run /antinuke enable" advice: it is already on');
         const f = fields(panel);
@@ -68,7 +68,7 @@ test('a fresh invite posts the countdown, then the welcome panel once authorized
     await lifecycle.joined(guild, true);
     await settle();
     assert.equal(sent.length, 1);
-    assert.equal(title(sent[0]), '⏳ Waiting for a Midtown Vanguard developer');
+    assert.equal(title(sent[0]), '⏳ Waiting for a Ghost Vanguard developer');
     assert.match(sent[0].embeds[0].toJSON().description, /<t:\d+:R>/, 'a live countdown');
     await lifecycle.joined(guild, false);
     await settle();
@@ -84,7 +84,7 @@ test('re-adding the bot to an authorized server posts the panel, but not again w
     const lifecycle = new GuildLifecycle(store, { guilds: { cache: new Collection([[guild.id, guild]]) } } as any, () => { }, async () => { });
     await lifecycle.joined(guild, true);
     await settle();
-    assert.deepEqual(sent.map(title), ['🛡️ Midtown Vanguard is online']);
+    assert.deepEqual(sent.map(title), ['🛡️ Ghost Vanguard is online']);
     await lifecycle.joined(guild, true);
     await settle();
     assert.equal(sent.length, 1, 'kicking and re-adding cannot spam the channel');
@@ -132,7 +132,7 @@ test('one message per join: the countdown turns into the welcome panel when a de
         await settle();
         assert.equal(sent.length, 1, 'no second message');
         assert.equal(edits.length, 1, 'the countdown was edited');
-        assert.equal(edits[0].embeds[0].toJSON().title, '🛡️ Midtown Vanguard is online');
+        assert.equal(edits[0].embeds[0].toJSON().title, '🛡️ Ghost Vanguard is online');
     } finally { config.developers.delete('1277709272041394187'); lifecycle.close(); store.close(); }
 });
 
@@ -159,7 +159,7 @@ test('setup messages only go to a staff-only channel; with none, the owner gets 
         assert.equal(sent.length, 0, 'never posted in a channel everyone can see');
         assert.equal(dms.length, 1);
         assert.match(dms[0].content, /No staff-only channel was found/);
-        assert.equal(dms[0].embeds[0].toJSON().title, '🛡️ Midtown Vanguard is online');
+        assert.equal(dms[0].embeds[0].toJSON().title, '🛡️ Ghost Vanguard is online');
     } finally { lifecycle.close(); store.close(); }
 });
 
