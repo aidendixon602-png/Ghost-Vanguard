@@ -11,8 +11,11 @@ export class HttpReads {
             if (key.startsWith(prefix))
                 this.cache.delete(key);
         for (const [key, controller] of this.controllers)
-            if (key.startsWith(prefix))
+            if (key.startsWith(prefix)) {
+                this.inflight.delete(key);
+                this.controllers.delete(key);
                 controller.abort();
+            }
     }
     async get(key, url, headers) {
         for (const [key, row] of this.cache)
@@ -30,7 +33,21 @@ export class HttpReads {
             if (this.active >= 4) {
                 if (this.waiters.length >= 100)
                     throw new Error('Integration request queue is full');
-                await new Promise(resolve => this.waiters.push(resolve));
+                await new Promise((resolve, reject) => {
+                    const ready = () => {
+                        controller.signal.removeEventListener('abort', cancel);
+                        resolve();
+                    };
+                    const cancel = () => {
+                        const index = this.waiters.indexOf(ready);
+                        if (index >= 0)
+                            this.waiters.splice(index, 1);
+                        reject(controller.signal.reason);
+                    };
+                    controller.signal.throwIfAborted();
+                    this.waiters.push(ready);
+                    controller.signal.addEventListener('abort', cancel, { once: true });
+                });
             }
             else
                 this.active++;
@@ -71,8 +88,11 @@ export class HttpReads {
             return (await pending).clone();
         }
         finally {
-            this.inflight.delete(key);
-            this.controllers.delete(key);
+            // An older canceled request may finish after a replacement has started.
+            if (this.controllers.get(key) === controller) {
+                this.inflight.delete(key);
+                this.controllers.delete(key);
+            }
         }
     }
 }
