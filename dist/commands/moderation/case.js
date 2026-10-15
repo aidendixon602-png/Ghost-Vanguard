@@ -32,8 +32,8 @@ export default defineCommand(new SlashCommandBuilder().setName('case').setDescri
             args.push(mod.id);
         }
         if (action) {
-            where.push('action=?');
-            args.push(action);
+            where.push('(action=? OR action LIKE ?)');
+            args.push(action, `${action} (%`);
         }
         if (words) {
             where.push("reason LIKE ? ESCAPE '\\'");

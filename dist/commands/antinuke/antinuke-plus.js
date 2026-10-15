@@ -10,7 +10,7 @@ export default defineCommand(new SlashCommandBuilder().setName('antinuke-plus').
     .addBooleanOption(o => o.setName('raid_auto').setDescription('A join flood switches raid mode on by itself'))
     .addIntegerOption(o => o.setName('raid_hours').setDescription('How long automatic raid mode lasts (default 1)').setMinValue(1).setMaxValue(24))
     .addBooleanOption(o => o.setName('settings_lock').setDescription('Put back server name/icon/settings changed by non-whitelisted people'))
-    .addBooleanOption(o => o.setName('bot_quarantine').setDescription('New powerful bots lose their permissions until a Head Admin approves'))), { category: 'antinuke', access: 'security', cooldown: 3000 }, async (ctx, i) => {
+    .addBooleanOption(o => o.setName('bot_quarantine').setDescription('New powerful bots lose permissions until the server owner or a developer approves'))), { category: 'antinuke', access: 'security', cooldown: 3000 }, async (ctx, i) => {
     if (i.options.getSubcommand() === 'scan')
         return permissionAudit(i.guild);
     const cur = plusConfig(ctx.store, i.guildId);

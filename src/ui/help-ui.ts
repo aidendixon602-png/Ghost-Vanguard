@@ -7,6 +7,7 @@ import { Guard } from '../bot/guard.js';
 import { defaults, type CommandContext, type Registry } from '../bot/registry.js';
 import { AppError } from '../errors.js';
 import { embed } from './ui.js';
+import { isAntinukeAction } from '../bot/antinuke-access.js';
 
 /** Sections in the order staff need them, and the order of commands inside each section. */
 export const HELP_SECTIONS: { key: string; label: string; emoji: string; blurb: string; commands: string[] }[] = [
@@ -21,6 +22,7 @@ export const HELP_SECTIONS: { key: string; label: string; emoji: string; blurb: 
 ];
 /** Who can use a command, shown next to it in /help. */
 export function accessLabel(policy:Policy,key:string):string {
+    if(isAntinukeAction(policy,key))return 'Server owner or Developer';
     // Developer tools that a bot-wide rank also unlocks (Bot Manager, Overseer) say so.
     if(policy.developerOnly){const need=requiredRank(key);return need===undefined||need>RANKS.supreme?'Developer':`${RANK_LABEL[rankName(need)!]}+`;}
     if(policy.access==='owner')return 'Owner';

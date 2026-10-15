@@ -1,6 +1,7 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, Colors, EmbedBuilder, OverwriteType, PermissionFlagsBits, StringSelectMenuBuilder, UserSelectMenuBuilder } from 'discord.js';
 import { AppError } from '../errors.js';
 import { developers } from '../bot/developers.js';
+import { requireAntinukeManager } from '../bot/antinuke-access.js';
 import { defaults } from '../bot/registry.js';
 import { getFeature, setFeature } from '../features/settings.js';
 import { confirmDanger } from './danger-ui.js';
@@ -42,7 +43,7 @@ export function panelMessage(store, guildId, now = Date.now()) {
     const cases = Number(store.get('SELECT COUNT(*) AS n FROM cases WHERE guild_id=? AND at>?', guildId, now - 86400000)?.n ?? 0);
     const last = store.get('SELECT * FROM panel_actions WHERE guild_id=? ORDER BY at DESC LIMIT 1', guildId);
     const embed = new EmbedBuilder().setColor(Colors.Blurple).setTitle('🛡️ Midtown Vanguard · Control Panel')
-        .setDescription('Manage moderation and anti-nuke actions with the buttons below.\nOnly the server owner and authorized staff can use them. Anything that changes roles asks you to confirm first, and every action is logged.')
+        .setDescription('Manage moderation and anti-nuke actions with the buttons below.\nAnti-nuke strips and quarantine releases require the current server owner or a configured developer. Other actions use normal staff permissions. Role changes ask for confirmation and every action is logged.')
         .addFields({ name: 'Anti-nuke', value: !s.enabled ? '🔴 Off' : s.mode === 'enforce' ? '🟢 On' : '🟠 Watch-only', inline: true }, { name: 'Last 24 hours', value: `${alerts} alert(s) · ${warnings} warning(s) · ${cases} case(s)`, inline: true }, { name: 'Stripped right now', value: stripped.length ? `${stripped.slice(0, 8).map(id => `<@${id}>`).join(' ')}${stripped.length > 8 ? ` +${stripped.length - 8}` : ''}` : 'Nobody', inline: false }, { name: 'Last panel action', value: last ? `**${last.action}** · <@${last.target_id ?? last.staff_id}> by <@${last.staff_id}> · <t:${Math.floor(Number(last.at) / 1000)}:R>` : 'None yet', inline: false }, { name: 'Buttons', value: '🟢 **Restore Roles**: give back roles the bot removed\n🔴 **Strip Roles**: remove someone\'s staff/admin roles\n↩️ **Revert Action**: undo a recent strip or ban made by the bot\n📋 **View Logs** · 🔄 **Refresh Panel**', inline: false }).setFooter({ text: 'Updated' }).setTimestamp(now);
     const row = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`${PREFIX}restore`).setLabel('Restore Roles').setEmoji('🟢').setStyle(ButtonStyle.Success), new ButtonBuilder().setCustomId(`${PREFIX}strip`).setLabel('Strip Roles').setEmoji('🔴').setStyle(ButtonStyle.Danger), new ButtonBuilder().setCustomId(`${PREFIX}revert`).setLabel('Revert Action').setEmoji('↩️').setStyle(ButtonStyle.Danger), new ButtonBuilder().setCustomId(`${PREFIX}logs`).setLabel('View Logs').setEmoji('📋').setStyle(ButtonStyle.Secondary), new ButtonBuilder().setCustomId(`${PREFIX}refresh`).setLabel('Refresh Panel').setEmoji('🔄').setStyle(ButtonStyle.Secondary));
     return { embeds: [embed], components: [row], allowedMentions: { parse: [] } };
@@ -169,6 +170,8 @@ export function registerControlPanel(registry) {
             const [, action, sub] = i.customId.split(':');
             const guild = i.guild;
             const actorId = i.user.id;
+            if (action === 'strip' || action === 'pick' && sub === 'strip')
+                requireAntinukeManager(actorId, guild.ownerId);
             if (action === 'refresh') {
                 await i.message?.edit(panelMessage(ctx.store, guild.id)).catch(() => null);
                 return 'Panel refreshed.';
@@ -215,6 +218,7 @@ export function registerControlPanel(registry) {
                             const again = canStrip(guild, a2, t2, guild.client.user.id);
                             if (again)
                                 throw new AppError('PERMISSION_ERROR', again);
+                            requireAntinukeManager(actorId, guild.ownerId);
                             const result = await c.security.contain(guild, targetId, false);
                             if (/^Protected/.test(result))
                                 throw new AppError('VALIDATION_ERROR', `<@${targetId}> is on the anti-nuke whitelist (full bypass), so they cannot be stripped. Remove them with \`/antinuke whitelist remove\` first.`);
@@ -227,6 +231,8 @@ export function registerControlPanel(registry) {
                 }
                 // Restore: roles a strip saved (quarantine backup) come first; otherwise roles they had before leaving.
                 const backup = ctx.store.get('SELECT roles FROM backups WHERE guild_id=? AND user_id=?', guild.id, targetId);
+                if (backup)
+                    requireAntinukeManager(actorId, guild.ownerId);
                 const left = !backup ? savedRoles(ctx.store, guild.id, targetId) : null;
                 if (!backup && !left)
                     return `No saved roles for <@${targetId}>: nothing was stripped from them, and they have not left and rejoined in the last 90 days.`;
@@ -244,6 +250,7 @@ export function registerControlPanel(registry) {
                             const target = await guild.members.fetch({ user: targetId, force: true }).catch(() => null);
                             if (!target)
                                 throw new AppError('VALIDATION_ERROR', `<@${targetId}> is not in the server; their saved roles are kept for when they come back.`);
+                            requireAntinukeManager(actorId, guild.ownerId);
                             result = await c.security.release(guild, targetId, isBoss(guild, actorId));
                         }
                         else {

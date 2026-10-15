@@ -4,6 +4,7 @@ import { dangerous, escalationAdded, KeyedQueue, overrideRule, ruleFor, RULES, W
 import { developers } from '../bot/developers.js';
 import { autoRaid } from '../features/antinuke-plus.js';
 import { AppError } from '../errors.js';
+import { isSafeQuarantineRole } from './role-policy.js';
 import { embed, memberOrNull } from '../ui/ui.js';
 import { incidentCard } from '../ui/incident-card.js';
 /** How far back an incident alert looks for channels and roles the actor deleted. */
@@ -424,7 +425,7 @@ export class Security {
         const qId = this.store.settings(guild.id).quarantineRoleId;
         const q = qId ? guild.roles.cache.get(qId) : null;
         this.store.assertAuthorized(guild.id);
-        if (q && !q.managed && !dangerous(q.permissions.bitfield) && q.editable)
+        if (q && isSafeQuarantineRole(this.store, guild.id, q))
             await member.roles.add(q, 'Midtown Vanguard quarantine');
         const fresh = await guild.members.fetch({ user: userId, force: true });
         const remaining = dangerous(fresh.permissions.bitfield);

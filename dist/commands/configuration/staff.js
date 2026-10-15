@@ -6,6 +6,7 @@ import { embed } from '../../ui/ui.js';
 import { activityReport, REPORT_DEFAULTS } from '../../features/schedules.js';
 import { setFeature } from '../../features/settings.js';
 import { developers } from '../../bot/developers.js';
+import { assertStaffRoleChange, staffRoleState } from '../../database/staff-roles.js';
 import { RANKS, RANK_LABEL, SERVER_LEVELS, rankName, rankOf, supremeLeaders, isSupreme } from '../../bot/ranks.js';
 const label = (r) => r ? RANK_LABEL[rankName(r)] : 'No rank';
 export default defineCommand(new SlashCommandBuilder().setName('staff').setDescription('Vanguard staff ranks: who can use which commands')
@@ -67,20 +68,23 @@ export default defineCommand(new SlashCommandBuilder().setName('staff').setDescr
     const role = i.options.getRole('role', true), rank = i.options.getString('rank', true);
     if (role.id === guild || role.managed)
         throw new AppError('VALIDATION_ERROR', 'Choose a normal staff role (not @everyone or a bot role).');
-    const current = ctx.store.get('SELECT level FROM staff_roles WHERE guild_id=? AND role_id=?', guild, role.id)?.level;
+    const before = staffRoleState(ctx.store, guild, role.id);
+    const current = before.staff?.level;
+    assertStaffRoleChange(ctx.store, guild, i.user.id, ctx.actor, before);
     // You can only hand out (or take away) ranks below your own.
     for (const level of [rank, current].filter(l => l && l !== 'none'))
         if (myRank <= RANKS[level])
             throw new AppError('PERMISSION_ERROR', `Only someone above ${RANK_LABEL[level]} can change that rank.`);
     if (myRank < RANKS.headadmin)
         throw new AppError('PERMISSION_ERROR', 'Only Head Admins and above can change ranks.');
+    ctx.store.run('DELETE FROM permission_roles WHERE guild_id=? AND role_id=?', guild, role.id);
     if (rank === 'none')
         ctx.store.run('DELETE FROM staff_roles WHERE guild_id=? AND role_id=?', guild, role.id);
     else {
         ctx.store.run('INSERT OR IGNORE INTO guild_data(guild_id) VALUES(?)', guild);
         ctx.store.run('INSERT INTO staff_roles(guild_id,role_id,level,by_id,at) VALUES(?,?,?,?,?) ON CONFLICT(guild_id,role_id) DO UPDATE SET level=excluded.level,by_id=excluded.by_id,at=excluded.at', guild, role.id, rank, i.user.id, Date.now());
     }
-    ctx.store.history(guild, `staff/${role.id}`, current ? { level: current } : null, rank === 'none' ? null : { level: rank }, i.user.id);
+    ctx.store.history(guild, `staff-role:${role.id}`, before, staffRoleState(ctx.store, guild, role.id), i.user.id);
     ctx.logs.push(guild, embed('Staff rank changed', `By <@${i.user.id}> · <@&${role.id}> → ${rank === 'none' ? 'no rank' : RANK_LABEL[rank]}`, Colors.Orange));
     return rank === 'none' ? `<@&${role.id}> no longer has a Vanguard rank.` : `Everyone with <@&${role.id}> is now **${RANK_LABEL[rank]}** in this server.`;
 }, { subcommands: { list: { access: 'member', responseKind: 'info' }, check: { access: 'member', responseKind: 'info' }, report: { responseKind: 'info' },

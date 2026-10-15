@@ -3,6 +3,8 @@ import { defineCommand } from '../../bot/registry.js';
 import { AppError } from '../../errors.js';
 import { embed } from '../../ui/ui.js';
 import { RANKS, RANK_LABEL, rankOf } from '../../bot/ranks.js';
+import { assertStaffRoleChange, staffRoleState } from '../../database/staff-roles.js';
+import { isAntinukeCommand, requireAntinukeManager } from '../../bot/antinuke-access.js';
 export default defineCommand(new SlashCommandBuilder().setName('guild-config').setDescription('Server owner: command access, features, verification providers and backup schedule')
     .addSubcommand(s => s.setName('provider').setDescription('Enable or disable a configured verification provider').addStringOption(o => o.setName('provider').setDescription('Provider').setRequired(true).addChoices({ name: 'RoVer', value: 'rover' }, { name: 'Bloxlink', value: 'bloxlink' })).addBooleanOption(o => o.setName('enabled').setDescription('Enable this provider for this guild').setRequired(true)))
     .addSubcommand(s => s.setName('permission-role').setDescription('Give a Discord role a Vanguard staff rank (Head Admin, Admin, Moderator, Helper)').addRoleOption(o => o.setName('role').setDescription('Role').setRequired(true)).addStringOption(o => o.setName('access').setDescription('Rank for this role').setRequired(true).addChoices({ name: 'Head Admin (security and anti-nuke)', value: 'headadmin' }, { name: 'Admin (raid tools, lockdown, logs)', value: 'admin' }, { name: 'Moderator (moderation commands)', value: 'moderator' }, { name: 'Helper (warn, timeout, notes)', value: 'helper' }, { name: 'Remove access', value: 'remove' })))
@@ -20,13 +22,14 @@ export default defineCommand(new SlashCommandBuilder().setName('guild-config').s
     }
     else if (sub === 'permission-role') {
         const role = i.options.getRole('role', true), access = i.options.getString('access', true);
-        component = 'permission-role';
+        component = `staff-role:${role.id}`;
         if (role.id === guild || role.managed)
             throw new AppError('VALIDATION_ERROR', 'Choose a regular staff role, not @everyone or a managed role.');
         // Ranks live in staff_roles (same as /setup staff role). Any older "Security admin / Moderation only" setting for this role is replaced.
         const read = () => ctx.store.get('SELECT level FROM staff_roles WHERE guild_id=? AND role_id=?', guild, role.id) ?? ctx.store.get('SELECT access AS level FROM permission_roles WHERE guild_id=? AND role_id=?', guild, role.id) ?? null;
-        before = read();
-        const level = String(before?.level ?? '');
+        before = staffRoleState(ctx.store, guild, role.id);
+        assertStaffRoleChange(ctx.store, guild, user, ctx.actor, before);
+        const level = String(read()?.level ?? '');
         const actorRank = rankOf(ctx.store, guild, user, ctx.actor);
         for (const l of [access, level === 'admin' && !ctx.store.get('SELECT 1 FROM staff_roles WHERE guild_id=? AND role_id=?', guild, role.id) ? 'headadmin' : level].filter(l => l in RANKS))
             if (actorRank <= RANKS[l])
@@ -36,10 +39,12 @@ export default defineCommand(new SlashCommandBuilder().setName('guild-config').s
             ctx.store.run('DELETE FROM staff_roles WHERE guild_id=? AND role_id=?', guild, role.id);
         else
             ctx.store.run('INSERT INTO staff_roles(guild_id,role_id,level,by_id,at) VALUES(?,?,?,?,?) ON CONFLICT(guild_id,role_id) DO UPDATE SET level=excluded.level,by_id=excluded.by_id,at=excluded.at', guild, role.id, access, user, Date.now());
-        after = read();
+        after = staffRoleState(ctx.store, guild, role.id);
     }
     else if (sub === 'command') {
         const name = i.options.getString('command', true), def = ctx.registry.commands.get(`1:${name}`);
+        if (isAntinukeCommand(name))
+            requireAntinukeManager(user, i.guild.ownerId);
         component = `command:${name}`;
         if (!def?.metadata.requiresAuthorization || ['guild-config', 'config-history'].includes(name))
             throw new AppError('VALIDATION_ERROR', 'Choose a configurable protected command. Recovery access commands cannot be disabled.');

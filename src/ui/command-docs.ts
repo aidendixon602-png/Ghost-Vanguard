@@ -2,6 +2,7 @@ import type { Registry } from '../bot/registry.js';
 import { displayPath, RETIRED, treeJson } from '../bot/command-tree.js';
 import { requiredRank } from '../bot/ranks.js';
 import { accessLabel } from './help-ui.js';
+import { isAntinukeAction } from '../bot/antinuke-access.js';
 
 /**
  * docs/commands.md and docs/ranks.md, generated from the live command definitions so they can never
@@ -11,11 +12,11 @@ interface Leaf { path: string; top: string; description: string; who: string; le
 
 const LEVELS: [number, string, string][] = [
     [8, '🧰 Developer', 'The top rank: the bot owner (`BOT_OWNER_ID`) and anyone in `DEVELOPER_IDS`. Everything, including the tools that can take the bot down or reach every server at once: restarts, installing updates, restoring database settings, removing or banning servers, giving bot-wide ranks and lifting hardbans. Ignored by anti-nuke. Set only in `.env`.'],
-    [7, '👑 Supreme Leader', 'Bot-wide, every server: everything except the Developer-only tools. Diagnostics, update status, database health and backups, genrebans and hardbans, lifting genrebans. Ignored by anti-nuke. Given with `/setup staff global` or `SUPREME_LEADER_IDS`.'],
+    [7, '👑 Supreme Leader', 'Bot-wide, every server: everything except Developer-only tools and owner/developer anti-nuke controls. Diagnostics, update status, database health and backups, genrebans and hardbans, lifting genrebans. Given with `/setup staff global` or `SUPREME_LEADER_IDS`.'],
     [6, '🔭 Overseer', 'Bot-wide, every server: Bot Manager plus inspecting and authorizing servers, and letting a genrebanned person back into one server. Given with `/setup staff global`.'],
     [5, '🛠️ Bot Manager', 'Bot-wide, every server: Head Admin everywhere plus bot status, diagnostics and announcements. Given with `/setup staff global`.'],
     [4.5, '🏠 Server Owner', 'The owner of a server, in that server: everything a Head Admin can do, plus security admins and undoing setting changes. Cannot lift genrebans or hardbans. Ignored by anti-nuke.'],
-    [4, '🛡️ Head Admin', 'Server rank: anti-nuke, whitelist, control panel, backups and staff ranks. Given by linking a role with `/setup staff role`, or `/security admin` (owner). Discord\'s Administrator permission counts as Head Admin, except for actions that weaken protection.'],
+    [4, '🛡️ Head Admin', 'Server rank: control panel, backups and staff ranks. Anti-nuke controls and quarantine changes require the actual server owner or a configured Developer. Given by linking a role with `/setup staff role`, or `/security admin` (owner). Discord\'s Administrator permission counts as Head Admin, except for restricted actions.'],
     [3, '🔧 Admin', 'Server rank: lifting ordinary bans and accepting appeals, raid tools, automod, scam protection and logging. Given with `/setup staff role`; Discord\'s Administrator permission also works for unbans.'],
     [2, '🔨 Moderator', 'Server rank, or Discord\'s matching permission (Ban/Kick/Timeout Members, Manage Messages): bans, kicks, purges, denying appeals. Cannot lift bans.'],
     [1, '🤝 Helper', 'Server rank: warnings, short timeouts, cases and notes. Given with `/setup staff role`.'],
@@ -39,7 +40,7 @@ export function commandLeaves(registry: Registry): Leaf[] {
             const policy: any = { ...def.metadata, ...((def as any).subcommands?.[sub.path] ?? {}) };
             const key = sub.path ? `${json.name}/${sub.path}` : json.name;
             const need = requiredRank(key);
-            const level = need !== undefined ? need : policy.developerOnly ? 7 : policy.access === 'owner' ? 4.5 : policy.access === 'security' ? 4 : policy.requiredPermissions?.length ? 2 : 0;
+            const level = isAntinukeAction(policy, key) ? 4.5 : need !== undefined ? need : policy.developerOnly ? 7 : policy.access === 'owner' ? 4.5 : policy.access === 'security' ? 4 : policy.requiredPermissions?.length ? 2 : 0;
             const path = displayPath(json.name, sub.path.replaceAll('/', ' '));
             leaves.push({ path, top: path.split(' ')[0]!.slice(1), description: sub.description, who: accessLabel(policy, key), level });
         }
@@ -74,9 +75,10 @@ export function commandsDoc(registry: Registry): string {
 
 export function ranksDoc(registry: Registry): string {
     const leaves = commandLeaves(registry).sort((a, b) => a.path.localeCompare(b.path));
-    const out = ['# Ranks', '', 'Generated from the bot itself (`npm run docs`). Every rank can also use everything listed under the ranks below it.', '',
+    const out = ['# Ranks', '', 'Generated from the bot itself (`npm run docs`). Ranks normally inherit lower-rank commands; anti-nuke access is an identity-based exception.', '',
         '- **Bot-wide ranks** (Developer, Supreme Leader, Overseer, Bot Manager) work in every server.',
         '- **Server ranks** (Owner, Head Admin, Admin, Moderator, Helper) work only in the server they were given in.',
+        '- **Anti-nuke controls:** only the current server owner or a configured Developer. Administrator, whitelist grants, security-admin grants and every lower bot-wide rank cannot delegate this access.',
         '- **Developer is the top rank** (the bot owner and `DEVELOPER_IDS`). Restarts, installing updates, restoring data, removing servers, bot-wide ranks and lifting hardbans are Developer only, so giving someone Supreme Leader or lower cannot break the bot.',
         '- **Unbans:** ordinary bans are lifted by Admins and server owners; genrebans by a Supreme Leader or Developer (or a one-server exception from an Overseer+); hardbans only by a Developer.',
         '- **Anti-nuke** ignores only Developers, Supreme Leaders, the server owner and whitelisted people. Every other rank is still watched.',

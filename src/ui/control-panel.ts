@@ -4,6 +4,7 @@ import type { Store } from '../database/db.js';
 import type { LogQueue } from '../logging.js';
 import { AppError } from '../errors.js';
 import { developers } from '../bot/developers.js';
+import { requireAntinukeManager } from '../bot/antinuke-access.js';
 import { defaults, type CommandContext, type Registry } from '../bot/registry.js';
 import { getFeature, setFeature } from '../features/settings.js';
 import { confirmDanger } from './danger-ui.js';
@@ -56,7 +57,7 @@ export function panelMessage(store: Store, guildId: string, now = Date.now()) {
     const cases = Number(store.get('SELECT COUNT(*) AS n FROM cases WHERE guild_id=? AND at>?', guildId, now - 86400000)?.n ?? 0);
     const last = store.get('SELECT * FROM panel_actions WHERE guild_id=? ORDER BY at DESC LIMIT 1', guildId);
     const embed = new EmbedBuilder().setColor(Colors.Blurple).setTitle('🛡️ Midtown Vanguard · Control Panel')
-        .setDescription('Manage moderation and anti-nuke actions with the buttons below.\nOnly the server owner and authorized staff can use them. Anything that changes roles asks you to confirm first, and every action is logged.')
+        .setDescription('Manage moderation and anti-nuke actions with the buttons below.\nAnti-nuke strips and quarantine releases require the current server owner or a configured developer. Other actions use normal staff permissions. Role changes ask for confirmation and every action is logged.')
         .addFields(
             { name: 'Anti-nuke', value: !s.enabled ? '🔴 Off' : s.mode === 'enforce' ? '🟢 On' : '🟠 Watch-only', inline: true },
             { name: 'Last 24 hours', value: `${alerts} alert(s) · ${warnings} warning(s) · ${cases} case(s)`, inline: true },
@@ -187,6 +188,7 @@ export function registerControlPanel(registry: Registry) {
             const [, action, sub] = i.customId.split(':') as [string, string, string?];
             const guild = i.guild as Guild;
             const actorId = i.user.id as string;
+            if (action === 'strip' || action === 'pick' && sub === 'strip') requireAntinukeManager(actorId, guild.ownerId);
 
             if (action === 'refresh') {
                 await i.message?.edit(panelMessage(ctx.store, guild.id)).catch(() => null);
@@ -230,6 +232,7 @@ export function registerControlPanel(registry: Registry) {
                             const [a2, t2] = await Promise.all([guild.members.fetch({ user: actorId, force: true }), guild.members.fetch({ user: targetId, force: true }).catch(() => null)]);
                             const again = canStrip(guild, a2, t2, guild.client.user!.id);
                             if (again) throw new AppError('PERMISSION_ERROR', again);
+                            requireAntinukeManager(actorId, guild.ownerId);
                             const result = await c.security.contain(guild, targetId, false);
                             if (/^Protected/.test(result)) throw new AppError('VALIDATION_ERROR', `<@${targetId}> is on the anti-nuke whitelist (full bypass), so they cannot be stripped. Remove them with \`/antinuke whitelist remove\` first.`);
                             recordPanelAction(c.store, c.logs, guild.id, actorId, targetId, 'Strip Roles', result);
@@ -241,6 +244,7 @@ export function registerControlPanel(registry: Registry) {
                 }
                 // Restore: roles a strip saved (quarantine backup) come first; otherwise roles they had before leaving.
                 const backup = ctx.store.get('SELECT roles FROM backups WHERE guild_id=? AND user_id=?', guild.id, targetId);
+                if (backup) requireAntinukeManager(actorId, guild.ownerId);
                 const left = !backup ? savedRoles(ctx.store, guild.id, targetId) : null;
                 if (!backup && !left) return `No saved roles for <@${targetId}>: nothing was stripped from them, and they have not left and rejoined in the last 90 days.`;
                 const ids = backup ? JSON.parse(String(backup.roles)) as string[] : left!.roles;
@@ -256,6 +260,7 @@ export function registerControlPanel(registry: Registry) {
                         if (backup) {
                             const target = await guild.members.fetch({ user: targetId, force: true }).catch(() => null);
                             if (!target) throw new AppError('VALIDATION_ERROR', `<@${targetId}> is not in the server; their saved roles are kept for when they come back.`);
+                            requireAntinukeManager(actorId, guild.ownerId);
                             result = await c.security.release(guild, targetId, isBoss(guild, actorId));
                         } else {
                             const r = await restoreRoles(c.store, guild, actorId, targetId);

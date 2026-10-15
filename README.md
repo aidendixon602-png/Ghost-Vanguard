@@ -60,14 +60,16 @@ Midtown Vanguard protects a network of Discord servers from account takeovers, r
 
 Every command has a minimum rank, and each rank includes everything below it. Bot-wide ranks work in every server; server ranks work only where they were given.
 
+**Anti-nuke is an identity-based exception:** only the current server owner or a configured Developer (`BOT_OWNER_ID` / `DEVELOPER_IDS`) may use its commands, whitelist, approval and incident controls. This also protects security configuration, quarantine changes, shared log setup, anti-nuke command switches, and saved anti-nuke settings rollback. Discord Administrator, staff ranks, security-admin grants, whitelist access and lower bot-wide ranks cannot delegate this access.
+
 | Rank | Scope | Can do |
 |---|---|---|
 | **Developer** | All servers | The bot owner (`BOT_OWNER_ID`) and `DEVELOPER_IDS`. Everything, including the tools that can break the bot: restarts, installing updates, restoring database settings, removing or banning servers, giving bot-wide ranks, lifting hardbans |
-| **Supreme Leader** | All servers | Everything except the Developer-only tools: diagnostics, update status, database health and backups, genrebans and hardbans, lifting genrebans |
+| **Supreme Leader** | All servers | Everything except Developer-only tools and owner/developer anti-nuke controls: diagnostics, update status, database health and backups, genrebans and hardbans, lifting genrebans |
 | **Overseer** | All servers | Bot Manager, plus inspecting and authorizing servers and one-server genreban exceptions |
 | **Bot Manager** | All servers | Head Admin in every server, plus bot status, diagnostics and announcements |
 | **Server Owner** | Own server | Head Admin, plus security admins, undoing setting changes and undoing strips |
-| **Head Admin** | One server | Anti-nuke, whitelist, control panel, backups, staff ranks |
+| **Head Admin** | One server | Control panel, backups, staff ranks; anti-nuke controls require the actual server owner or a configured Developer |
 | **Admin** | One server | Lifting ordinary bans, accepting appeals, raid tools, automod, scam protection, logging |
 | **Moderator** | One server | Bans, kicks, tempbans, purges, ban records, denying appeals |
 | **Helper** | One server | Warnings, short timeouts, cases and notes |
@@ -121,9 +123,9 @@ Copy [`.env.example`](.env.example) to `.env` and set at least:
 | `DISCORD_CLIENT_ID` | Yes | Application ID |
 | `DEVELOPER_IDS` | Yes | Comma-separated user IDs with Developer access (the top rank, full control) |
 | `DATABASE_PATH` | No | SQLite database location (default `./data/vanguard.db`) |
-| `BOT_OWNER_ID` | Recommended | The bot owner: Developer (the top rank), and the default for `TRUSTED_DM_IDS` |
+| `BOT_OWNER_ID` | Recommended | Your Discord user ID: Developer (the top rank), and the default for `TRUSTED_DM_IDS`. No owner account is built in. |
 | `SUPREME_LEADER_IDS` | No | Supreme Leaders: everything except the Developer-only tools. Nobody is built in; every start prints who has bot-wide access |
-| `TRUSTED_DM_IDS` | No | The only people the bot DMs about itself, including the daily database backup (default: `BOT_OWNER_ID`) |
+| `TRUSTED_DM_IDS` | No | The only people the bot DMs about itself, including the daily database backup (default: `BOT_OWNER_ID`; no recipients if both are blank) |
 | `UPDATE_REPO`, `UPDATE_TOKEN` | No | Enable automatic updates (see below) |
 | `ROVER_API_KEY`, `BLOXLINK_API_KEY` | No | Roblox verification providers |
 | `AI_ENABLED`, `OPENAI_API_KEY` | No | AI moderation and `/ask` |

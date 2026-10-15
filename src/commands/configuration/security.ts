@@ -1,5 +1,6 @@
 import { ChannelType, Colors, PermissionFlagsBits, SlashCommandBuilder } from 'discord.js';
 import { clip, dangerous, RULES } from '../../core.js';
+import { isSafeAutomaticRole, isSafeQuarantineRole } from '../../security/role-policy.js';
 import { AppError } from '../../errors.js';
 import { defineCommand, type CommandContext } from '../../bot/registry.js';
 import { checkTarget, embed, REQUIRED_PERMISSIONS } from '../../ui/ui.js';
@@ -38,6 +39,8 @@ export default defineCommand(new SlashCommandBuilder().setName('security').setDe
                 const role = await i.guild.roles.fetch(chosen.id);
                 if (!role || role.id === i.guildId || role.managed || !role.editable || dangerous(role.permissions.bitfield))
                     throw new AppError('VALIDATION_ERROR', `${option} must be a safe, unmanaged role below the bot without moderation or administrative permissions.`);
+                if (!(option === 'verified_role' ? isSafeAutomaticRole(ctx.store, i.guildId, role) : isSafeQuarantineRole(ctx.store, i.guildId, role)))
+                    throw new AppError('VALIDATION_ERROR', `${option} must not grant Vanguard staff, command or anti-nuke whitelist access.`);
                 s[field] = role.id;
             }
         }

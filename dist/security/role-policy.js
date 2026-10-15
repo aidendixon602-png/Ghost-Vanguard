@@ -1,6 +1,7 @@
 import { PermissionFlagsBits } from 'discord.js';
 import { developers } from '../bot/developers.js';
 import { explicitRank, hasAdministrator, RANKS } from '../bot/ranks.js';
+import { dangerous } from '../core.js';
 /**
  * Who may give or take which role with /role.
  *
@@ -29,9 +30,20 @@ export function privilegedReason(store, guildId, role) {
         return 'it is a Vanguard staff role';
     if (store.get('SELECT 1 FROM permission_roles WHERE guild_id=? AND role_id=?', guildId, role.id))
         return 'it gives Vanguard command access';
+    if (store.get("SELECT 1 FROM grants WHERE guild_id=? AND user_id=? AND (kind='trust_role' OR kind LIKE 'trust_role:%') AND (expires IS NULL OR expires>?)", guildId, role.id, Date.now()))
+        return 'it gives anti-nuke whitelist access';
     if (store.settings(guildId).quarantineRoleId === role.id)
         return 'it is the quarantine role';
     return null;
+}
+/** Automatic verification/group roles must never grant Discord or Vanguard privileges. */
+export function isSafeAutomaticRole(store, guildId, role) {
+    return role.id !== guildId && role.editable && !role.managed && !dangerous(role.permissions.bitfield) && !privilegedReason(store, guildId, role);
+}
+export function isSafeQuarantineRole(store, guildId, role) {
+    const reason = privilegedReason(store, guildId, role);
+    return role.id !== guildId && role.editable && !role.managed && !dangerous(role.permissions.bitfield)
+        && (!reason || reason === 'it is the quarantine role');
 }
 export const isAllowlisted = (store, guildId, roleId) => !!store.get("SELECT 1 FROM role_rules WHERE guild_id=? AND role_id=? AND kind='allow'", guildId, roleId);
 /** An owner-approved rule lets this person (or one of their roles) manage this privileged role. */

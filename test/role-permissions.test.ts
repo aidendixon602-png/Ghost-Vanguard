@@ -101,6 +101,18 @@ test('a Vanguard staff role counts as protected even with no Discord permissions
     } finally { store.close(); }
 });
 
+for (const kind of ['trust_role', 'trust_role:mass_ban'])
+test(`a ${kind} role needs owner-approved delegation even without Discord permissions`, () => {
+    const { store, p, decide } = setup();
+    try {
+        store.grant(G, R.cosmetic.id, kind, OWNER);
+        assert.equal(decide(p.admin, R.cosmetic).ok, false);
+        assert.equal(decide(p.admin, R.cosmetic, 'remove').ok, false);
+        store.run('UPDATE grants SET expires=1 WHERE guild_id=? AND user_id=? AND kind=?', G, R.cosmetic.id, kind);
+        assert.equal(decide(p.admin, R.cosmetic).ok, true, 'expired whitelist entries no longer grant privileges');
+    } finally { store.close(); }
+});
+
 test('configured moderators: only allow-listed roles, and never privileged ones without a rule', () => {
     const { store, p, decide } = setup();
     try {

@@ -23,6 +23,24 @@ const member = (id: string, roles: any[], perms = 0n, extra: any = {}) => {
 };
 let added: string[] = [];
 
+test('a later full departure with no saved roles clears the old departure snapshot', () => {
+    const store = new Store(':memory:'); authorize(store, G);
+    try {
+        saveLeftRoles(store, member(USER, [R.member, R.staff]));
+        saveLeftRoles(store, member(USER, [R.everyone, R.integration]));
+        assert.equal(savedRoles(store, G, USER), null);
+    } finally { store.close(); }
+});
+
+test('a partial departure cannot replace a complete saved role snapshot', () => {
+    const store = new Store(':memory:'); authorize(store, G);
+    try {
+        saveLeftRoles(store, member(USER, [R.member, R.staff]));
+        saveLeftRoles(store, member(USER, [R.member], 0n, { partial: true }));
+        assert.deepEqual(savedRoles(store, G, USER)!.roles, [R.member.id, R.staff.id]);
+    } finally { store.close(); }
+});
+
 function world(store: Store) {
     const live = new Collection<string, any>([R.everyone, R.bot, R.manager, R.member, R.level, R.staff, R.integration].map(r => [r.id, r]));
     const people = new Map<string, any>([[OWNER, member(OWNER, [])], [MANAGER, member(MANAGER, [R.manager], PermissionFlagsBits.ManageRoles)], [BOT, member(BOT, [R.bot])], [USER, member(USER, [])]]);

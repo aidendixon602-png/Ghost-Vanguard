@@ -46,6 +46,8 @@ const WORKFLOW = 'CI';
 const CHECK_MS = Math.max(env.UPDATE_API_BASE ? 1000 : 60000, Number(env.UPDATE_INTERVAL_MINUTES ?? 5) * 60000);
 // Overridable only for testing the updater against a local copy.
 const API = (env.UPDATE_API_BASE || 'https://api.github.com').replace(/\/$/, '');
+// Local API fixtures use a shorter deadline; production requests get 15 seconds.
+const REQUEST_MS = env.UPDATE_API_BASE ? 1000 : 15000;
 const REMOTE = env.UPDATE_REMOTE_URL || `https://github.com/${REPO}.git`;
 const HEALTHY_MS = Number(env.UPDATE_HEALTHY_SECONDS ?? 120) * 1000;
 const updatesOn = /^[\w.-]+\/[\w.-]+$/.test(REPO) && TOKEN.length > 20;
@@ -65,7 +67,7 @@ const git = (...args) => { const r = quiet('git', [...auth(), ...args]); return 
 const head = () => quiet('git', ['rev-parse', 'HEAD']).stdout?.trim() || null;
 
 async function github(path) {
-    const res = await fetch(`${API}/repos/${REPO}${path}`, { headers: { Authorization: `Bearer ${TOKEN}`, Accept: 'application/vnd.github+json', 'User-Agent': 'midtown-vanguard-updater' } });
+    const res = await fetch(`${API}/repos/${REPO}${path}`, { signal: AbortSignal.timeout(REQUEST_MS), headers: { Authorization: `Bearer ${TOKEN}`, Accept: 'application/vnd.github+json', 'User-Agent': 'midtown-vanguard-updater' } });
     if (!res.ok) throw new Error(`GitHub ${res.status} on ${path}`);
     return res.json();
 }
@@ -260,7 +262,8 @@ async function checkForUpdate(beforeInstall) {
         say(`Update found: ${latest.sha.slice(0, 7)}${subject ? ` · ${subject.length > 70 ? `${subject.slice(0, 67)}...` : subject}` : ''}`, '↻');
         const previous = head();
         await stopBot();
-        if (install(latest.sha)) {
+        const installed = install(latest.sha);
+        if (installed) {
             lastGood = previous; say(`Installed ${latest.sha.slice(0, 7)} · starting the new version`, '✔');
             // The bot code is new now, but this launcher keeps running the code it started with.
             if (launcherHash() !== LAUNCHER_HASH) say('launch.js itself changed in this update. Press Restart in the Wispbyte panel when convenient to load it (the bot keeps working until then).', '⚠');
@@ -268,9 +271,11 @@ async function checkForUpdate(beforeInstall) {
         else { rejected.add(latest.sha); say('The update could not be installed; staying on the current version.', '✖'); }
         updating = false;
         startBot();
-        // Once the new version has run for 2 minutes, it becomes the version to fall back to.
-        setTimeout(() => { if (child && Date.now() - startedAt >= HEALTHY_MS - 1000) lastGood = head(); }, HEALTHY_MS + 1000).unref();
-        return { state: 'installed', sha: latest.sha };
+        // Once an installed version has run for 2 minutes, it becomes the fallback.
+        if (installed) setTimeout(() => { if (child && Date.now() - startedAt >= HEALTHY_MS - 1000) lastGood = head(); }, HEALTHY_MS + 1000).unref();
+        lastCheck = { at: Date.now(), result: installed ? 'installed' : 'install failed' };
+        return installed ? { state: 'installed', sha: latest.sha }
+            : { state: 'error', sha: latest.sha, why: 'The update could not be installed; staying on the current version.' };
     } catch (error) {
         updating = false;
         const why = hide(error instanceof Error ? error.message : error);

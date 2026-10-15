@@ -19,8 +19,40 @@ function queueWith(send: (p: any) => Promise<any>) {
     const client: any = { isReady: () => true, channels: { fetch: async () => ({ id: 'c', isSendable: () => true, send }) } };
     const logs = new LogQueue(store, client);
     logs.canDeliver = () => true;
-    return { store, logs };
+    return { store, logs, client };
 }
+
+test('paused guild logs cannot block delivery for another ready guild', async () => {
+    const sent: any[] = [];
+    const { store, logs } = queueWith(async p => { sent.push(p); return { id: 'm' }; });
+    try {
+        authorize(store, 'other');
+        for (let n = 0; n < 5; n++) logs.push(G, new EmbedBuilder().setTitle('Paused'), [], 'c');
+        logs.push('other', new EmbedBuilder().setTitle('Ready'), [], 'c');
+        logs.canDeliver = id => id === 'other';
+        await logs.flush();
+        assert.equal(sent.length, 1);
+        assert.equal(sent[0].embeds[0].title, 'Ready');
+        assert.equal(store.get('SELECT COUNT(*) AS n FROM outbox WHERE guild_id=?', G)!.n, 5);
+    } finally { store.close(); }
+});
+
+for (const edit of [false, true])
+test(`record log ${edit ? 'edits' : 'posts'} stop if authorization is revoked during channel lookup`, async () => {
+    let mutations = 0;
+    const { store, logs, client } = queueWith(async () => { mutations++; return { id: 'm' }; });
+    try {
+        logs.refs.set('test', { render: () => ({ embeds: [{ title: 'Private record' }] }), location: () => edit ? { channelId: 'c', messageId: 'm' } : null, posted: () => { mutations++; } });
+        const channel = { id: 'c', isSendable: () => true, isTextBased: () => true, send: async () => { mutations++; return { id: 'm' }; }, messages: { edit: async () => { mutations++; } } };
+        client.channels.fetch = async () => {
+            store.run("UPDATE guild_authorization SET state='DEAUTHORIZED',generation=generation+1 WHERE guild_id=?", G);
+            return channel;
+        };
+        if (edit) logs.refreshRef(G, 'test', 1); else logs.pushRef(G, 'c', 'test', 1);
+        await logs.flush();
+        assert.equal(mutations, 0);
+    } finally { store.close(); }
+});
 
 test('a log entry that cannot be delivered is kept and retried, then sent exactly once', async () => {
     let fail = true; const sent: any[] = [];

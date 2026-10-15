@@ -5,6 +5,7 @@ import { inviteUrl } from './invite.js';
 import { developers } from './developers.js';
 import { AppError } from '../errors.js';
 import { DEVELOPER_ONLY_MESSAGE, explicitRank, needsDeveloper, rankOf, requiredRank } from './ranks.js';
+import { canManageAntinuke, isAntinukeAction, requireAntinukeManager } from './antinuke-access.js';
 const permissionNames = (permissions) => permissions.map(p => new PermissionsBitField(p).toArray().join(' ')).map(p => p.replace(/([a-z])([A-Z])/g, '$1 $2'));
 export class Guard {
     store;
@@ -23,6 +24,8 @@ export class Guard {
             return false;
         if (policy.requiresAuthorization && this.ready && !this.ready(guildId))
             return false;
+        if (isAntinukeAction(policy, rankKey ?? command) && !canManageAntinuke(user, actor?.guild?.id === guildId ? actor.guild.ownerId : null))
+            return false;
         // Developer-only commands: the Developer rank is the only way in (no Discord permission, server role
         // or lower bot-wide rank).
         if (needsDeveloper(rankKey ?? command))
@@ -31,6 +34,8 @@ export class Guard {
         // or a server role. Discord's limits on the bot itself and confirmation prompts still apply.
         if (developers.has(user))
             return this.enabledHere(policy, guildId, command);
+        if (this.quarantined(policy, guildId, user, actor))
+            return false;
         // A Vanguard staff rank high enough for this command replaces the Discord-permission and access checks.
         const need = requiredRank(rankKey ?? command);
         const byRank = need !== undefined && rankOf(this.store, guildId, user, actor, rankKey ?? command) >= need;
@@ -44,6 +49,10 @@ export class Guard {
         if (!this.enabledHere(policy, guildId, command))
             return false;
         return !policy.requiredPermissions.length || !!actor?.permissions.has(policy.requiredPermissions);
+    }
+    quarantined(policy, guildId, user, actor) {
+        return !!guildId && policy.requiresAuthorization && !developers.has(user) && actor?.guild?.ownerId !== user
+            && !!this.store.get('SELECT 1 FROM backups WHERE guild_id=? AND user_id=? AND active=1', guildId, user);
     }
     /** Commands and features a server switched off stay off for every rank. */
     enabledHere(policy, guildId, command) {
@@ -73,6 +82,10 @@ export class Guard {
         }
         // Interaction member contains current permission data; fetch only role data if not cached.
         const actor = refreshMember ? await i.guild.members.fetch({ user: i.user.id, force: true }) : i.member;
+        if (isAntinukeAction(policy, key))
+            requireAntinukeManager(i.user.id, i.guild.ownerId);
+        if (this.quarantined(policy, i.guildId, i.user.id, actor))
+            throw new AppError('PERMISSION_ERROR', 'You are quarantined in this server. Authorized staff must release you before you can use protected Vanguard commands again.');
         if (needsDeveloper(key) && explicitRank(this.store, i.guildId, i.user.id, actor) < requiredRank(key))
             throw new AppError('PERMISSION_ERROR', DEVELOPER_ONLY_MESSAGE);
         if (policy.developerOnly && (requiredRank(key) ?? Infinity) > rankOf(this.store, i.guildId, i.user.id, actor, key))

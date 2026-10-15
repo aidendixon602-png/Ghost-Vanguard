@@ -36,9 +36,19 @@ async function runLockSchedule(d: ScheduleDeps, guild: Guild, now: number) {
     const inside = c.enabled && inWindow(c, now);
     const locked = !!lockdownState(d.store, guild.id);
     if (inside && !c.lockedBySchedule && !locked && !d.locks.busy(guild.id)) {
-        setFeature(d.store, guild.id, 'lockschedule', LOCK_SCHEDULE_DEFAULTS, { lockedBySchedule: true });
         const reopen = `${c.end} (UTC${c.utcOffset >= 0 ? '+' : ''}${c.utcOffset})`;
-        const r = await d.locks.run([guild.id], () => lockGuild(d, guild, d.client.user!.id, `Quiet hours: chat is paused until ${reopen}.`, SCHEDULE_REASON));
+        const r = await d.locks.run([guild.id], async () => {
+            // Claim ownership before the first Discord write, but release it if
+            // locking fails before a recoverable lockdown has been recorded.
+            setFeature(d.store, guild.id, 'lockschedule', LOCK_SCHEDULE_DEFAULTS, { lockedBySchedule: true });
+            try {
+                return await lockGuild(d, guild, d.client.user!.id, `Quiet hours: chat is paused until ${reopen}.`, SCHEDULE_REASON);
+            } catch (error) {
+                if (lockdownState(d.store, guild.id)?.reason !== SCHEDULE_REASON)
+                    setFeature(d.store, guild.id, 'lockschedule', LOCK_SCHEDULE_DEFAULTS, { lockedBySchedule: false });
+                throw error;
+            }
+        });
         d.logs.push(guild.id, embed('🔒 Scheduled lockdown started', `Quiet hours began. **${r.locked}** of ${r.total} channels locked. Chat reopens automatically at **${reopen}**.\nUse \`/security unlock\` to end it early.`, Colors.Orange));
     } else if (!inside && c.lockedBySchedule) {
         const state = lockdownState(d.store, guild.id);
@@ -48,6 +58,7 @@ async function runLockSchedule(d: ScheduleDeps, guild: Guild, now: number) {
         if (ours) {
             const r = await d.locks.run([guild.id], () => unlockGuild(d, guild, d.client.user!.id, 'Quiet hours are over. Chat is open again.', true));
             d.logs.push(guild.id, embed('🔓 Scheduled lockdown ended', `Quiet hours ended; **${r.restored}** of ${r.total} channels were restored exactly as they were.`, Colors.Green));
+            if (r.failed) return; // Keep ownership and retry the remaining channels next minute.
         }
         setFeature(d.store, guild.id, 'lockschedule', LOCK_SCHEDULE_DEFAULTS, { lockedBySchedule: false });
     }

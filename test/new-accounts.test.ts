@@ -6,6 +6,7 @@ import { authorize } from './helpers.js';
 import { DAY } from '../src/security/raidmode.js';
 import { handleNewAccountJoin, newAccountConfig, setNewAccountConfig, similarName, registerNewAccountControls } from '../src/security/new-accounts.js';
 import { Registry } from '../src/bot/registry.js';
+import { Guard } from '../src/bot/guard.js';
 
 const G = '123456789012345678';
 function setup() { const store = new Store(':memory:'); authorize(store, G); store.save(store.settings(G)); return store; }
@@ -82,12 +83,45 @@ test('alert buttons: Let in lifts the hold; Ban needs Ban Members and records a 
     const control = registry.components.find(c => c.prefix === 'newacct:')!;
     const target = member(1); target.bannable = true;
     const bans: string[] = []; let replied = '';
-    const i = (customId: string, perms: bigint) => ({ customId, guildId: G, guild: { members: { fetch: async () => target, ban: async (id: string) => void bans.push(id) } }, message: { embeds: [{ title: 'New account joined', description: 'x' }], edit: async () => {} }, editReply: async (p: any) => { replied = p.content; } }) as any;
-    const ctx = (perms: bigint): any => ({ store, actor: { id: 'mod', permissions: new PermissionsBitField(perms) } });
+    const highest = { comparePositionTo: () => 1 };
+    const guild = { id: G, ownerId: 'owner', members: { fetch: async () => target, fetchMe: async () => ({ id: 'bot', roles: { highest } }), ban: async (id: string) => void bans.push(id) } };
+    target.roles = { highest: {} };
+    const i = (customId: string, perms: bigint) => ({ customId, guildId: G, guild, message: { embeds: [{ title: 'New account joined', description: 'x' }], edit: async () => {} }, editReply: async (p: any) => { replied = p.content; } }) as any;
+    const ctx = (perms: bigint): any => ({ store, actor: { id: 'mod', guild, roles: { highest }, permissions: new PermissionsBitField(perms) } });
     await control.execute(ctx(PermissionsBitField.Flags.ModerateMembers), i(`newacct:release:${target.id}`, 0n));
     assert.deepEqual(target.actions[0], ['timeout', null]); assert.match(replied, /let in/);
     await assert.rejects(control.execute(ctx(PermissionsBitField.Flags.ModerateMembers), i(`newacct:ban:${target.id}`, 0n)), /Ban Members/);
     await control.execute(ctx(PermissionsBitField.Flags.ModerateMembers | PermissionsBitField.Flags.BanMembers), i(`newacct:ban:${target.id}`, 0n));
     assert.deepEqual(bans, [target.id]); assert.equal(store.get('SELECT action FROM cases WHERE guild_id=?', G).action, 'ban');
     store.close();
+});
+
+for (const action of ['release', 'kick', 'ban'])
+for (const failure of ['higher target', 'unavailable membership'])
+test(`new-account ${action} refuses ${failure} without Discord mutations`, async () => {
+    const store = setup();
+    const registry = new Registry(); registerNewAccountControls(registry);
+    const control = registry.components.find(c => c.prefix === 'newacct:')!;
+    const target = member(1); target.bannable = true; target.roles = { highest: { position: 20 } };
+    let bans = 0;
+    const guild: any = { id: G, ownerId: 'owner', members: {
+        fetch: async () => { if (failure === 'unavailable membership') throw { code: 50013 }; return target; },
+        fetchMe: async () => ({ id: 'bot', roles: { highest: { comparePositionTo: () => 1 } } }),
+        ban: async () => { bans++; },
+    } };
+    const actor = { id: 'mod', guild, roles: { highest: { comparePositionTo: () => -1 } }, permissions: new PermissionsBitField(PermissionsBitField.All) };
+    try {
+        await assert.rejects(control.execute({ store, actor } as any, { guild, guildId: G, customId: `newacct:${action}:${target.id}`, editReply: async () => {} }), /higher role|Could not confirm target membership/);
+        assert.equal(bans, 0);
+        assert.deepEqual(target.actions, []);
+    } finally { store.close(); }
+});
+
+test('new-account ban controls do not require the unrelated Timeout Members permission', () => {
+    const store = setup();
+    const registry = new Registry(); registerNewAccountControls(registry);
+    const control = registry.components.find(c => c.prefix === 'newacct:')!;
+    const actor: any = { id: 'mod', guild: { id: G, ownerId: 'owner' }, roles: { cache: new Map() }, permissions: new PermissionsBitField(PermissionsBitField.Flags.BanMembers) };
+    try { assert.equal(new Guard(store).allowed(control.metadata, G, actor.id, actor, 'newacct'), true); }
+    finally { store.close(); }
 });

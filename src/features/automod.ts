@@ -58,8 +58,10 @@ export function cleanDomain(input: string): string | null {
 export function blockedLink(text: string, c: Pick<AutomodConfig, 'links' | 'allowedDomains' | 'blockedDomains'>): string | null {
     if (c.links === 'off') return null;
     for (const m of text.matchAll(URL_PATTERN)) {
-        const host = hostOf(m[1]!);
-        if (INVITE_HOSTS.includes(host) || /^(discord|discordapp)\.com$/.test(host) && /^\/invite\//i.test(m[2] ?? '')) continue;
+        let url: URL;
+        try { url = new URL(m[0]); } catch { continue; }
+        const host = hostOf(url.hostname);
+        if (INVITE_HOSTS.includes(host) || /^(discord|discordapp)\.com$/.test(host) && /^\/invite\//i.test(url.pathname)) continue;
         if (c.blockedDomains.some(d => domainMatches(host, d))) return host;
         if (c.links === 'allowlist' && !c.allowedDomains.some(d => domainMatches(host, d))) return host;
     }
@@ -106,11 +108,13 @@ export async function isStaff(store: Store, message: Message<true>, trusted: (id
 
 async function punish(store: Store, logs: LogQueue, message: Message<true>, minutes: number, reason: string, deleted: number, title: string) {
     const member = message.member;
-    let result = 'Messages deleted.';
+    const removal = deleted ? 'Messages deleted.' : 'No messages were deleted.';
+    let result = removal;
     if (member?.moderatable) {
-        await member.timeout(minutes * 60000, `Midtown Vanguard automod: ${reason}`).then(() => { result = `Messages deleted and timed out for ${minutes} minutes.`; }, () => { result = 'Messages deleted; the timeout failed (check Vanguard\'s role position).'; });
-        store.recordCase(message.guild.id, message.author.id, message.client.user.id, 'automod timeout', `${title}: ${reason}`);
-    } else result = 'Messages deleted; Vanguard cannot time this member out (role position).';
+        const applied = await member.timeout(minutes * 60000, `Midtown Vanguard automod: ${reason}`).then(() => true, () => false);
+        result = applied ? `${removal} Timed out for ${minutes} minutes.` : `${removal} The timeout failed (check Vanguard's role position).`;
+        if (applied) store.recordCase(message.guild.id, message.author.id, message.client.user.id, 'automod timeout', `${title}: ${reason}`);
+    } else result = `${removal} Vanguard cannot time this member out (role position).`;
     logs.push(message.guild.id, embed(`Automod · ${title}`, `**Member:** <@${message.author.id}> (${message.author.tag})\n**Channel:** <#${message.channelId}>\n**What happened:** ${reason}\n**Result:** ${result}${deleted ? ` (${deleted} message${deleted === 1 ? '' : 's'})` : ''}`, Colors.Orange));
     logEvent('automod', { guildId: message.guild.id, userId: message.author.id, title, reason });
 }

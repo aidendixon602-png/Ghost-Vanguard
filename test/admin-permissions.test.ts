@@ -6,6 +6,8 @@ import { Store } from '../src/database/db.js';
 import { Registry, type Definition } from '../src/bot/registry.js';
 import { Guard } from '../src/bot/guard.js';
 import { config } from '../src/config.js';
+// Explicit test owner; production has no built-in privileged account.
+config.ownerId = '1277709272041394187';
 import { rankOf, RANKS } from '../src/bot/ranks.js';
 
 /**
@@ -42,9 +44,9 @@ const member = (id: string, perms: bigint, roles: string[] = []) => ({
 const ADMIN_CAN = [
     'moderation/ban', 'moderation/unban', 'moderation/kick', 'moderation/timeout', 'moderation/warn', 'moderation/history',
     'case/view', 'case/search', 'case/recent', 'case/reason', 'warnings/status',
-    'security/status', 'security/config', 'security/incidents', 'guild-config/feature', 'guild-config/command', 'guild-config/provider',
-    'logs/status', 'logs/enable', 'logs/category', 'antinuke/status', 'antinuke/enable', 'antinuke/rules', 'antinuke/check',
-    'backup/create', 'backup/list', 'snapshot/create', 'snapshot/list', 'trust/list', 'config-history/list',
+    'security/status', 'security/incidents', 'guild-config/feature', 'guild-config/command', 'guild-config/provider',
+    'logs/status', 'logs/enable', 'logs/category',
+    'backup/create', 'backup/list', 'snapshot/create', 'snapshot/list', 'config-history/list',
     'health', 'automod/spam', 'welcome/setup', 'raidmode/on', 'lockdown', 'perm/list', 'staff/report',
 ];
 const ADMIN_CANNOT = [
@@ -52,6 +54,8 @@ const ADMIN_CANNOT = [
     'dev/diagnostics', 'autoreact/add', 'autoreact/remove', 'autoreact/list', 'genreban', 'ungenreban', 'hardban', 'unhardban', 'banserver', 'authserver', 'copylayout', 'staff/global', 'roblox/partner', 'roblox/network',
     // destructive restoration and deleting recovery points or records
     'backup/restore', 'snapshot/restore', 'config-history/restore', 'backup/delete', 'snapshot/delete', 'snapshot/cleanup', 'case/delete',
+    // Anti-nuke access is owner/developer only, including read-only anti-nuke commands.
+    'antinuke/status', 'antinuke/enable', 'antinuke/rules', 'antinuke/check', 'trust/list', 'antinuke-plus/scan', 'security/config', 'security/quarantine', 'logs/setup',
     // switching protection off or exempting people
     'antinuke/disable', 'disable', 'antinuke-plus/settings', 'trust/add', 'trust/remove', 'trust/bots', 'security/release', 'emergency/start', 'emergency/stop',
     // granting permissions
@@ -87,7 +91,7 @@ test('an explicit security-admin grant still unlocks restricted server actions',
     const head = member('444444444444444444', 0n);
     store.grant(G, head.id, 'admin', OWNER);
     assert.equal(can(head, 'backup/restore'), true);
-    assert.equal(can(head, 'antinuke/disable'), true);
+    assert.equal(can(head, 'antinuke/disable'), false, 'security-admin grants cannot delegate anti-nuke');
     assert.equal(can(head, 'genreban'), false);
     store.close();
 });

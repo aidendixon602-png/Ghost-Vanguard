@@ -28,7 +28,7 @@ export default defineCommand(new SlashCommandBuilder().setName('case').setDescri
         const user = i.options.getUser('user'), mod = i.options.getUser('moderator'), action = i.options.getString('action'), words = i.options.getString('reason_contains'), days = i.options.getInteger('days');
         if (user) { where.push('user_id=?'); args.push(user.id); }
         if (mod) { where.push('moderator_id=?'); args.push(mod.id); }
-        if (action) { where.push('action=?'); args.push(action); }
+        if (action) { where.push('(action=? OR action LIKE ?)'); args.push(action, `${action} (%`); }
         if (words) { where.push("reason LIKE ? ESCAPE '\\'"); args.push(`%${words.replace(/[\\%_]/g, c => '\\' + c)}%`); }
         if (days) { where.push('at>=?'); args.push(Date.now() - days * 86400000); }
         if (where.length === 1) throw new AppError('VALIDATION_ERROR', 'Pick at least one filter (user, moderator, action, reason words or days).');

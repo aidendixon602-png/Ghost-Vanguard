@@ -6,6 +6,8 @@ import { config } from '../src/config.js';
 import { Store } from '../src/database/db.js';
 import { Roblox } from '../src/integrations/roblox.js';
 import type { LogQueue } from '../src/logging.js';
+import { syncGroupRoles, GROUP_DEFAULTS } from '../src/features/roblox-tools.js';
+import { setFeature } from '../src/features/settings.js';
 
 function fixture() {
     const store = new Store(':memory:');
@@ -22,6 +24,57 @@ function fixture() {
     const roblox = new Roblox(store, { push: () => { } } as unknown as LogQueue);
     return { store, member, changes, roblox };
 }
+
+for (const kind of ['staff', 'permission', 'trust_role', 'trust_role:mass_ban', 'quarantine'])
+test(`verification never assigns a ${kind} role with zero Discord permissions`, async () => {
+    const f = fixture();
+    try {
+        if (kind === 'staff') f.store.run("INSERT INTO staff_roles(guild_id,role_id,level) VALUES('g','verified','admin')");
+        else if (kind === 'permission') f.store.run("INSERT INTO permission_roles(guild_id,role_id,access,by_id) VALUES('g','verified','admin','owner')");
+        else if (kind === 'quarantine') { const s = f.store.settings('g'); s.quarantineRoleId = 'verified'; f.store.save(s); }
+        else f.store.grant('g', 'verified', kind, 'owner');
+        await withFetch(async url => String(url).includes('users.roblox.com')
+            ? Response.json({ name: 'Safe', created: '2020-01-01', isBanned: false }) : Response.json({ robloxId: '123' }), async () => {
+            await assert.rejects(f.roblox.sync(f.member), /role.*(?:safe|protect|staff|privileg)|(?:safe|protect|staff|privileg).*role/i);
+            assert.deepEqual(f.changes, []);
+        });
+    } finally { f.store.close(); }
+});
+
+test('verification rechecks Vanguard role privileges after provider calls', async () => {
+    const f = fixture();
+    try {
+        await withFetch(async url => {
+            if (String(url).includes('users.roblox.com')) {
+                f.store.run("INSERT INTO staff_roles(guild_id,role_id,level) VALUES('g','verified','admin')");
+                return Response.json({ name: 'Safe', created: '2020-01-01', isBanned: false });
+            }
+            return Response.json({ robloxId: '123' });
+        }, async () => {
+            await assert.rejects(f.roblox.sync(f.member), /role.*(?:safe|protect|staff|privileg)|(?:safe|protect|staff|privileg).*role/i);
+            assert.deepEqual(f.changes, []);
+        });
+    } finally { f.store.close(); }
+});
+
+test('group rank sync neither grants protected roles nor reports rejected mutations as successful', async () => {
+    const f = fixture();
+    try {
+        const staff = { id: 'staff', editable: true, managed: false, permissions: new PermissionsBitField(0n) };
+        const plain = { ...staff, id: 'plain' };
+        f.member.guild.roles.cache = new Map([['staff', staff], ['plain', plain]]);
+        f.store.run("INSERT INTO staff_roles(guild_id,role_id,level) VALUES('g','staff','headadmin')");
+        setFeature(f.store, 'g', 'robloxgroup', GROUP_DEFAULTS, { groupId: '1', binds: [{ rank: 1, roleId: 'staff', mode: 'min' }, { rank: 1, roleId: 'plain', mode: 'min' }] });
+        const attempts: string[][] = [];
+        f.member.roles.add = async (ids: string[]) => { attempts.push(ids); throw new Error('Missing Permissions'); };
+        await withFetch(async () => Response.json({ data: [{ group: { id: 1, name: 'Group' }, role: { rank: 2, name: 'Member' } }] }), async () => {
+            const summary = await syncGroupRoles(f.store, f.member, '123');
+            assert.deepEqual(attempts, [['plain']]);
+            assert.doesNotMatch(summary, /1 role\(s\) added/);
+            assert.match(summary, /failed|could not/i);
+        });
+    } finally { f.store.close(); }
+});
 
 async function withFetch(fn: typeof fetch, testFn: () => Promise<void>) {
     const original = globalThis.fetch, oldR = config.roverKey, oldB = config.bloxlinkKey;

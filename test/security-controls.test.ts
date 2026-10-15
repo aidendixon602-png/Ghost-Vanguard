@@ -12,6 +12,8 @@ import enable from '../src/commands/antinuke/enable.js';
 import trust from '../src/commands/security/trust.js';
 import { saveTrust, clearTrust, trustPanel, panelFor, kindsFor, registerTrustPanel } from '../src/ui/trust-panel.js';
 import { config } from '../src/config.js';
+// Explicit test owner; production has no built-in privileged account.
+config.ownerId = '1277709272041394187';
 
 function setup() {
  const store=new Store(':memory:');authorize(store);const s=store.settings('g');s.enabled=true;s.mode='enforce';s.logChannelId='log';store.save(s);
@@ -49,12 +51,12 @@ test('role whitelist uses current membership and expiry; expired role grants do 
  }finally{store.close();}
 });
 
-test('whitelist changes cannot grant the acting administrator their own bypass',()=>{
+test('administrators cannot change anyone’s anti-nuke bypass',()=>{
  const {store}=setup();try {
  const ctx:any={store,actor:{id:'actor',roles:{cache:new Collection([['staff',{}]])}},logs:{push:()=>{}}};
- assert.throws(()=>changeTrust(ctx,'g','actor',false,true),/Another/);assert.throws(()=>changeTrust(ctx,'g','staff',true,true),/Another/);
- changeTrust(ctx,'g','other',true,true,24);assert.equal(store.hasGrant('g','other','trust_role'),true);
- changeTrust(ctx,'g','other',true,false);assert.equal(store.hasGrant('g','other','trust_role'),false);
+ assert.throws(()=>changeTrust(ctx,'g','actor',false,true),/Only the current server owner/);assert.throws(()=>changeTrust(ctx,'g','staff',true,true),/Only the current server owner/);
+ assert.throws(()=>changeTrust(ctx,'g','other',true,true,24),/Only the current server owner/);
+ assert.equal(store.hasGrant('g','other','trust_role'),false);
  }finally{store.close();}
 });
 
@@ -176,22 +178,22 @@ test('configured bot owner and developers can manage their own role and user byp
    clearTrust(ctx,'g',id,false);assert.equal(store.hasGrant('g',id,'trust'),false);
   }
   const actor='ordinary';const ctx:any={store,actor:{id:actor,roles:{cache:new Collection([['staff',{}]])}},logs:{push:()=>{}}};
-  assert.throws(()=>saveTrust(ctx,'g',actor,false,['all'],0),/Another security administrator/);
-  assert.throws(()=>saveTrust(ctx,'g','staff',true,['preset:moderation'],0),/Another security administrator/);
-  assert.throws(()=>changeTrust(ctx,'g','staff',true,true),/Another security administrator/);
+  assert.throws(()=>saveTrust(ctx,'g',actor,false,['all'],0),/Only the current server owner/);
+  assert.throws(()=>saveTrust(ctx,'g','staff',true,['preset:moderation'],0),/Only the current server owner/);
+  assert.throws(()=>changeTrust(ctx,'g','staff',true,true),/Only the current server owner/);
  }finally{if(!wasDeveloper)config.developers.delete(dev);store.close();}
 });
 
-test('admins may remove their own bypass; the server owner may grant their own; bot roles can be listed or removed',async()=>{
+test('only owners or developers may remove bypasses, including an administrator’s own bypass',async()=>{
  const {store}=setup();try {
  const admin:any={store,actor:{id:'actor',guild:{ownerId:'owner'},roles:{cache:new Collection([['staff',{}]])}},logs:{push:()=>{}}};
  store.grant('g','staff','trust_role','someone-else');store.grant('g','actor','trust','someone-else');
- changeTrust(admin,'g','staff',true,false);assert.equal(store.hasGrant('g','staff','trust_role'),false,'removing a held role is allowed');
- changeTrust(admin,'g','actor',false,false);assert.equal(store.hasGrant('g','actor','trust'),false,'removing your own bypass is allowed');
+ assert.throws(()=>changeTrust(admin,'g','staff',true,false),/Only the current server owner/);assert.equal(store.hasGrant('g','staff','trust_role'),true);
+ assert.throws(()=>changeTrust(admin,'g','actor',false,false),/Only the current server owner/);assert.equal(store.hasGrant('g','actor','trust'),true);
  assert.throws(()=>changeTrust(admin,'g','staff',true,true),/server owner/,'granting yourself is still blocked');
  const owner:any={store,actor:{id:'owner',guild:{ownerId:'owner'},roles:{cache:new Collection([['staff',{}]])}},logs:{push:()=>{}}};
  changeTrust(owner,'g','staff',true,true);assert.equal(store.hasGrant('g','staff','trust_role'),true,'server owner may grant a role they hold');
- saveTrust(admin,'g','botrole',true,['all'],0);assert.equal(store.hasGrant('g','botrole','trust_role'),true,'managed bot roles can be whitelisted');
+ saveTrust(owner,'g','botrole',true,['all'],0);assert.equal(store.hasGrant('g','botrole','trust_role'),true,'managed bot roles can be whitelisted');
  }finally{store.close();}
 });
 
@@ -202,7 +204,7 @@ test('whitelist panel: pick a duration, re-selecting changes the duration, and r
  try {
   const registry=new Registry();registerAntinukePanel(registry);
   const panel=registry.components.find(c=>c.prefix==='anpanel:')!;
-  let last:any;const actor={id:USER,guild:{ownerId:'owner'},roles:{cache:new Collection()}};
+  let last:any;const actor={id:USER,guild:{ownerId:USER},roles:{cache:new Collection()}};
   const ctx:any={store,actor,logs:{push:()=>{}}};
   const click=(customId:string,values?:string[])=>panel.execute(ctx,{customId,values,guildId:GUILD,user:{id:USER},guild:{roles:{fetch:async(id:string)=>({id,managed:true})}},editReply:async(p:any)=>{last=p;}} as any);
   const p=`anpanel:${GUILD}:${USER}:`;

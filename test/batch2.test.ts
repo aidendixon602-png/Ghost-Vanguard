@@ -123,11 +123,8 @@ test('batch 2 review: who may approve a held bot', () => {
     const ADMIN = BigInt(PermissionFlagsBits.Administrator), BAN = BigInt(PermissionFlagsBits.BanMembers);
     const base = { ownerId: 'owner', adder: 'adder', supreme: false, rank: 4, userPerms: BAN, held: BAN };
     assert.equal(canApproveBot({ ...base, user: 'owner', rank: 0, userPerms: 0n }), null, 'the owner');
-    assert.equal(canApproveBot({ ...base, user: 'x', supreme: true, rank: 0, userPerms: 0n }), null, 'a Supreme Leader');
-    assert.match(canApproveBot({ ...base, user: 'adder' })!, /added a bot cannot approve/);
-    assert.match(canApproveBot({ ...base, user: 'mod', rank: 2 })!, /Head Admins/);
-    assert.match(canApproveBot({ ...base, user: 'ha', held: ADMIN })!, /only approve permissions you have/);
-    assert.equal(canApproveBot({ ...base, user: 'ha' }), null, 'a Head Admin with the same permissions');
+    for (const opts of [{ ...base, user: 'x', supreme: true }, { ...base, user: 'adder' }, { ...base, user: 'mod', rank: 2 }, { ...base, user: 'ha', held: ADMIN }, { ...base, user: 'ha' }])
+        assert.match(canApproveBot(opts)!, /Only the current server owner/, 'ranks and Discord permissions cannot approve a held bot');
 });
 
 test('batch 2 review: AI keeps flagged minors content at low sensitivity, and retries text-only when an image is refused', async () => {

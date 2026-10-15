@@ -3,7 +3,8 @@ import { defaults } from '../bot/registry.js';
 import { AppError } from '../errors.js';
 import { RULES } from '../core.js';
 import { embed } from './ui.js';
-import { canManageOwnTrust, RULE_LABELS, scopeName, TRUST_PRESETS, trustListPage } from './antinuke-panel.js';
+import { RULE_LABELS, scopeName, TRUST_PRESETS, trustListPage } from './antinuke-panel.js';
+import { requireAntinukeManager } from '../bot/antinuke-access.js';
 /**
  * The /antinuke whitelist add panel: pick a user or role, tick what anti-nuke should let them do, pick how
  * long, press Save. Saving replaces everything that user or role had before, so what you see is
@@ -99,9 +100,7 @@ export function panelFor(ctx, guild, target, role) {
 /** Replace a user's/role's bypasses with exactly these selections. */
 export function saveTrust(ctx, guild, target, role, values, hours) {
     const actor = ctx.actor;
-    // Giving yourself a bypass is what a hijacked admin account would do before a nuke, so someone else must do it.
-    if (!canManageOwnTrust(actor.id, actor.guild?.ownerId) && (target === actor.id || role && actor.roles.cache.has(target)))
-        throw new AppError('PERMISSION_ERROR', 'Another security administrator (or the server owner) must whitelist you or a role you hold. You can still remove it yourself.');
+    requireAntinukeManager(actor.id, actor.guild?.ownerId);
     if (role && target === guild)
         throw new AppError('VALIDATION_ERROR', 'You cannot whitelist @everyone.');
     const kinds = kindsFor(values, role);
@@ -120,6 +119,7 @@ export function saveTrust(ctx, guild, target, role, values, hours) {
     return `Saved: <@${role ? '&' : ''}${target}> may now do **${scope}** (${time.toLowerCase()}).`;
 }
 export function clearTrust(ctx, guild, target, role) {
+    requireAntinukeManager(ctx.actor.id, ctx.actor?.guild?.ownerId);
     const kinds = currentSelection(ctx, guild, target, role).kinds;
     if (!kinds.length)
         throw new AppError('VALIDATION_ERROR', 'They have no anti-nuke bypass to remove.');

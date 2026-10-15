@@ -73,7 +73,11 @@ export class LogQueue {
         try {
             const now = Date.now();
             this.store.run('DELETE FROM outbox WHERE created_at IS NOT NULL AND created_at<?', now - KEEP_MS);
-            for (const row of this.store.all('SELECT * FROM outbox WHERE next_at<=? ORDER BY id LIMIT 5', now)) {
+            // Apply readiness before the delivery limit so paused guilds cannot occupy every slot.
+            const eligible = this.store.all('SELECT DISTINCT guild_id FROM outbox WHERE next_at<=?', now)
+                .map(r => String(r.guild_id)).filter(id => !this.store.isAuthorized(id) || this.canDeliver(id));
+            if (!eligible.length) return;
+            for (const row of this.store.all(`SELECT * FROM outbox WHERE next_at<=? AND guild_id IN (${eligible.map(() => '?').join(',')}) ORDER BY id LIMIT 5`, now, ...eligible)) {
                 if (!this.store.isAuthorized(row.guild_id)) {
                     this.store.run('DELETE FROM outbox WHERE id=?', row.id);
                     continue;
@@ -117,6 +121,7 @@ export class LogQueue {
             if (!where) { this.store.run('DELETE FROM outbox WHERE id=?', row.id); return; }
             const channel = await this.client.channels.fetch(where.channelId);
             if (!channel?.isTextBased()) throw new Error('Log channel missing');
+            if (!this.store.isAuthorized(row.guild_id) || !this.canDeliver(row.guild_id)) return;
             try {
                 await (channel as any).messages.edit(where.messageId, message);
             } catch (error: any) {
@@ -130,6 +135,7 @@ export class LogQueue {
         }
         const channel = await this.client.channels.fetch(row.channel_id);
         if (!channel?.isSendable()) throw new Error('Log channel missing or not sendable');
+        if (!this.store.isAuthorized(row.guild_id) || !this.canDeliver(row.guild_id)) return;
         const sent = await channel.send({ ...message, nonce: `mv${row.id}`, enforceNonce: true });
         renderer.posted(row.guild_id, stored.id, channel.id, sent.id);
         this.store.run('DELETE FROM outbox WHERE id=?', row.id);

@@ -1,12 +1,13 @@
 import { Colors, GuildMember } from 'discord.js';
 import { config } from '../config.js';
-import { ageDays, dangerous, decideLinks, KeyedQueue } from '../core.js';
+import { ageDays, decideLinks, KeyedQueue } from '../core.js';
 import { addToBlacklist, blacklistEntry, syncGroupRoles } from '../features/roblox-tools.js';
 import type { Store } from '../database/db.js';
 import { AppError } from '../errors.js';
 import { HttpReads } from './http.js';
 import type { LogQueue } from '../logging.js';
 import { embed, memberOrNull } from '../ui/ui.js';
+import { isSafeAutomaticRole } from '../security/role-policy.js';
 
 type Lookup = {
     kind: 'found';
@@ -113,8 +114,8 @@ export class Roblox {
                 throw new AppError('INTEGRATION_ERROR', 'A security administrator must configure /security setup verified_role first.');
             const fresh = await member.guild.members.fetch({ user: member.id, force: true });
             const role = await member.guild.roles.fetch(s.verifiedRoleId);
-            if (!role || role.managed || !role.editable || dangerous(role.permissions.bitfield))
-                throw new AppError('INTEGRATION_ERROR', 'The verified role is missing, above the bot, managed, or grants moderation/administrative permissions.');
+            if (!role || !isSafeAutomaticRole(this.store, member.guild.id, role))
+                throw new AppError('INTEGRATION_ERROR', 'The verified role is unsafe or unavailable: it must be below the bot, unmanaged, and grant no Discord or Vanguard privileges.');
             const configured = (['rover', 'bloxlink'] as const).filter(p => (p === 'rover' ? config.roverKey : config.bloxlinkKey) && this.store.get('SELECT enabled FROM provider_config WHERE guild_id=? AND provider=?', member.guild.id, p)?.enabled !== 0);
             if (!configured.length)
                 throw new AppError('INTEGRATION_ERROR', 'Set a RoVer or Bloxlink API key in .env first.');
@@ -161,7 +162,7 @@ export class Roblox {
             if (!this.store.settings(member.guild.id).authorized || this.store.get('SELECT 1 FROM backups WHERE guild_id=? AND user_id=? AND active=1', member.guild.id, member.id))
                 throw new AppError('INTEGRATION_ERROR', 'Verification was canceled because server authorization or quarantine status changed.');
             const checkedRole = await member.guild.roles.fetch(role.id, { force: true });
-            if (!checkedRole || !checkedRole.editable || dangerous(checkedRole.permissions.bitfield))
+            if (!checkedRole || !isSafeAutomaticRole(this.store, member.guild.id, checkedRole))
                 throw new AppError('INTEGRATION_ERROR', 'The verified role became unsafe or unavailable during verification.');
             this.store.assertAuthorized(member.guild.id);
             await fresh.roles.add(checkedRole, 'Roblox account verified');
@@ -189,7 +190,9 @@ export class Roblox {
             return;
         this.refreshing = true;
         try {
-            for (const row of this.store.all('SELECT * FROM links WHERE synced<? ORDER BY synced LIMIT 10', Date.now() - 15 * 60000)) {
+            const eligible = [...client.guilds.cache.values()].filter(guild => permitted(guild.id) && this.store.isAuthorized(guild.id)).map(guild => guild.id);
+            if (!eligible.length) return;
+            for (const row of this.store.all(`SELECT * FROM links WHERE synced<? AND guild_id IN (${eligible.map(() => '?').join(',')}) ORDER BY synced LIMIT 10`, Date.now() - 15 * 60000, ...eligible)) {
                 const guild = client.guilds.cache.get(row.guild_id);
                 if (!guild || !permitted(guild.id) || !this.store.isAuthorized(guild.id))
                     continue;
