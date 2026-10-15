@@ -235,9 +235,12 @@ function stopBot() {
 const rejected = new Set();
 let lastNote = '';
 let lastCheck = { at: 0, result: 'not checked yet' };
+let checkingForUpdate = false;
 /** Returns what it found; `beforeInstall` runs (and is awaited) just before the bot is restarted. */
 async function checkForUpdate(beforeInstall) {
-    if (updating || stopping) return { state: 'busy' };
+    if (checkingForUpdate || updating || stopping) return { state: 'busy' };
+    checkingForUpdate = true;
+    let ownsInstall = false;
     try {
         const latest = await latestPassing();
         const result = !latest ? { state: 'none' }
@@ -253,8 +256,12 @@ async function checkForUpdate(beforeInstall) {
             lastNote = note;
         }
         if (result.state !== 'installing') return result;
-        if (beforeInstall) await beforeInstall(result);
+        // A restart may have begun while GitHub was answering. Claim the install
+        // before the reply delay so a restart cannot overlap that delay either.
+        if (updating || stopping) return { state: 'busy' };
         updating = true;
+        ownsInstall = true;
+        if (beforeInstall) await beforeInstall(result);
         const subject = quiet('git', ['log', '-1', '--format=%s', latest.sha]).stdout?.trim();
         console.log('');
         say(`Update found: ${latest.sha.slice(0, 7)}${subject ? ` · ${subject.length > 70 ? `${subject.slice(0, 67)}...` : subject}` : ''}`, '↻');
@@ -272,12 +279,14 @@ async function checkForUpdate(beforeInstall) {
         setTimeout(() => { if (child && Date.now() - startedAt >= HEALTHY_MS - 1000) lastGood = head(); }, HEALTHY_MS + 1000).unref();
         return { state: 'installed', sha: latest.sha };
     } catch (error) {
-        updating = false;
+        if (ownsInstall) updating = false;
         const why = hide(error instanceof Error ? error.message : error);
         lastCheck = { at: Date.now(), result: `check failed: ${why}` };
         say(`Update check failed: ${why} (trying again in ${CHECK_MS / 60000} minutes)`, '⚠');
-        if (!child && !stopping) startBot();
+        if (!child && !stopping && !updating) startBot();
         return { state: 'error', why };
+    } finally {
+        checkingForUpdate = false;
     }
 }
 
