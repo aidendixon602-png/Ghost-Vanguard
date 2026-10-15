@@ -14,10 +14,11 @@
  *    .env and data/ are never touched by an update.
  */
 import { spawn, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, copyFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, copyFileSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { recoverDatabase } from './scripts/recover-database.mjs';
 
 const root = dirname(fileURLToPath(import.meta.url));
 process.chdir(root);
@@ -150,16 +151,17 @@ if (!depsCurrent()) {
 }
 
 const data = join(root, 'data'), importDb = join(data, 'import', 'vanguard.db'), main = join(data, 'vanguard.db');
+const databasePath = resolve(root, env.DATABASE_PATH || './data/vanguard.db');
 // Safety net: the database file is gone but its automatic backups are still here (a deleted
 // file, a bad pull). Put the newest verified backup back instead of starting empty.
-const backupsDir = join(data, 'database-backups');
-if (!existsSync(main) && existsSync(backupsDir)) {
-    const newest = readdirSync(backupsDir).filter(f => /^\d+-[\w-]+\.db$/.test(f) && existsSync(join(backupsDir, f + '.json')))
-        .map(f => ({ f, at: statSync(join(backupsDir, f)).mtimeMs })).sort((a, b) => b.at - a.at)[0];
-    if (newest) {
-        copyFileSync(join(backupsDir, newest.f), main);
-        say(`data/vanguard.db was missing. Restored the newest backup (${newest.f}, ${new Date(newest.at).toISOString()}) so no settings are lost.`);
-    }
+const backupsDir = resolve(root, env.DATABASE_BACKUP_DIRECTORY || './data/database-backups');
+try {
+    const recovered = recoverDatabase(databasePath, backupsDir, message => say(message, '⚠'));
+    if (recovered)
+        say(`Database was missing. Restored the newest valid backup (${recovered.file}, ${new Date(recovered.at).toISOString()}). Changes after that backup are not included.`);
+} catch (error) {
+    say(`Database recovery failed: ${error.message}`, '✖');
+    process.exit(1);
 }
 if (existsSync(importDb)) {
     if (!existsSync(main)) {
