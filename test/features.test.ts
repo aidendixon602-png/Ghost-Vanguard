@@ -20,6 +20,45 @@ function setup() {
     return { store, logs, queue: { push: (_g: string, e: any, rows?: any[]) => logs.push({ e: e.toJSON(), rows }) } as any };
 }
 
+test('automod link rules inspect the actual URL host, including credentials and encoded hostnames', () => {
+    const config = { links: 'blocklist' as const, blockedDomains: ['bad.example'], allowedDomains: ['good.example'] };
+    for (const url of ['https://someone@bad.example/path', 'https://%62ad.example/path', 'https://BAD.example.:443/path'])
+        assert.equal(blockedLink(url, config), 'bad.example', url);
+    for (const url of ['https://bad.example@good.example/path', 'https://good.example/bad.example', 'https://good.example/?next=https://bad.example'])
+        assert.equal(blockedLink(url, config), null, url);
+});
+
+test('automod never records a timeout when Discord rejects it', async () => {
+    const { store, queue, logs } = setup();
+    const id = '823456789012345678';
+    const channel: any = { isTextBased: () => true, messages: { delete: async () => { throw new Error('cannot delete'); } } };
+    const guild: any = { id: G, ownerId: 'owner', channels: { cache: new Collection([['c', channel]]) } };
+    const member: any = { id, guild, roles: { cache: new Collection() }, permissions: { has: () => false }, moderatable: true, timeout: async () => { throw new Error('Missing Permissions'); } };
+    const message: any = { id: 'audit-spam', guild, inGuild: () => true, member, author: { id, tag: 'sender', bot: false }, client: { user: { id: BOT } }, channelId: 'c', channel,
+        content: 'spam', mentions: { users: new Collection(Array.from({ length: 5 }, (_, n) => [`u${n}`, {}])), roles: new Collection() } };
+    try {
+        await processAutomod(store, queue, message, () => false);
+        assert.equal(store.get('SELECT COUNT(*) AS n FROM cases WHERE guild_id=?', G)!.n, 0);
+        assert.match(JSON.stringify(logs), /timeout failed/i);
+        assert.doesNotMatch(JSON.stringify(logs), /Messages deleted/);
+    } finally { store.close(); }
+});
+
+test('case action search finds duration-labeled temporary bans without including ordinary bans', async () => {
+    const { store, queue } = setup();
+    try {
+        store.recordCase(G, U, M, 'tempban (1 day)', 'first');
+        store.recordCase(G, U, M, 'tempban (6 hours)', 'second');
+        store.recordCase(G, U, M, 'ban', 'ordinary ban');
+        const reply = await caseCommand.execute({ store, logs: queue } as any, { guildId: G, options: {
+            getSubcommand: () => 'search', getUser: () => null, getInteger: () => null, getString: (key: string) => key === 'action' ? 'tempban' : null,
+        } } as any);
+        assert.match(String(reply), /2 found/);
+        assert.match(String(reply), /first/); assert.match(String(reply), /second/);
+        assert.doesNotMatch(String(reply), /ordinary ban/);
+    } finally { store.close(); }
+});
+
 test('feature settings fall back to defaults and keep history', () => {
     const { store } = setup();
     try {

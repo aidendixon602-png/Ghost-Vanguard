@@ -11,12 +11,14 @@ import { staffReason } from '../security/raidmode.js';
  */
 export const KEEP_MS = 90 * 24 * 60 * 60 * 1000;
 export function saveLeftRoles(store, member, now = Date.now()) {
-    if (member.user?.bot)
+    if (member.user?.bot || member.partial)
         return;
     const roles = [...(member.roles?.cache?.values() ?? [])].filter(r => r.id !== member.guild.id && !r.managed).map(r => r.id);
     store.run('DELETE FROM left_roles WHERE guild_id=? AND left_at<?', member.guild.id, now - KEEP_MS);
-    if (!roles.length)
+    if (!roles.length) {
+        store.run('DELETE FROM left_roles WHERE guild_id=? AND user_id=?', member.guild.id, member.id);
         return;
+    }
     store.run('INSERT INTO left_roles(guild_id,user_id,roles,left_at) VALUES(?,?,?,?) ON CONFLICT(guild_id,user_id) DO UPDATE SET roles=excluded.roles,left_at=excluded.left_at', member.guild.id, member.id, JSON.stringify(roles), now);
 }
 export function savedRoles(store, guildId, userId, now = Date.now()) {

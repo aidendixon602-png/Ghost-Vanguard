@@ -1,7 +1,7 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, Colors, PermissionFlagsBits } from 'discord.js';
 import { defaults } from '../bot/registry.js';
 import { AppError, logEvent } from '../errors.js';
-import { embed } from '../ui/ui.js';
+import { checkTarget, embed, memberOrNull } from '../ui/ui.js';
 import { DAY, staffReason } from './raidmode.js';
 import { RANKS, rankOf } from '../bot/ranks.js';
 const MAX_TIMEOUT = 28 * DAY - 60000;
@@ -135,7 +135,7 @@ export async function handleNewAccountJoin(store, logs, member, trusted, now = D
 }
 /** Let in / Kick / Ban buttons on new-account alerts. Each needs the matching Discord permission. */
 export function registerNewAccountControls(registry) {
-    registry.component({ prefix: 'newacct:', kinds: ['button'], metadata: { ...defaults, category: 'moderation', access: 'member', requiredPermissions: [PermissionFlagsBits.ModerateMembers], cooldown: 0 }, execute: async (ctx, i) => {
+    registry.component({ prefix: 'newacct:', kinds: ['button'], metadata: { ...defaults, category: 'moderation', access: 'member', cooldown: 0 }, execute: async (ctx, i) => {
             const match = /^newacct:(release|kick|ban):(\d{17,20})$/.exec(i.customId);
             if (!match)
                 throw new AppError('VALIDATION_ERROR', 'Unknown control.');
@@ -144,7 +144,12 @@ export function registerNewAccountControls(registry) {
             const need = action === 'ban' ? PermissionFlagsBits.BanMembers : action === 'kick' ? PermissionFlagsBits.KickMembers : PermissionFlagsBits.ModerateMembers;
             if (rankOf(ctx.store, i.guildId, actor.id, actor) < (action === 'ban' ? RANKS.moderator : action === 'kick' ? RANKS.moderator : RANKS.helper) && !actor.permissions.has(need))
                 throw new AppError('PERMISSION_ERROR', `You need ${action === 'ban' ? 'Ban Members' : action === 'kick' ? 'Kick Members' : 'Timeout Members'} for this.`);
-            const member = await i.guild.members.fetch(userId).catch(() => null);
+            const member = await memberOrNull(i.guild, userId);
+            const me = await i.guild.members.fetchMe({ force: true });
+            if ([actor.id, me.id, i.guild.ownerId].includes(userId))
+                throw new AppError('VALIDATION_ERROR', 'You cannot target yourself, this bot, or the server owner.');
+            if (member)
+                checkTarget(actor, member, me);
             let done;
             if (action === 'release') {
                 if (!member)

@@ -2,6 +2,7 @@ import { backup, DatabaseSync } from 'node:sqlite';
 import { mkdir, readFile, rename, unlink, writeFile, chmod } from 'node:fs/promises';
 import { join } from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
+import { GUILD_SCOPED_TABLES } from './db.js';
 import { config, VERSION } from '../config.js';
 import { logEvent, redact } from '../errors.js';
 export class DatabaseBackups {
@@ -130,7 +131,7 @@ export class DatabaseBackups {
                 continue;
             // Preserve authorization bans and their audit; retire only retained operational data.
             this.store.transaction(() => {
-                for (const table of ['antiping_config', 'antiping_targets', 'guild_config', 'antinuke_rules', 'antinuke_defaults', 'provider_config', 'permission_roles', 'command_settings', 'feature_settings', 'backup_config', 'grants', 'observations', 'incidents', 'backups', 'cases', 'links', 'blocked_accounts', 'snapshots', 'snapshot_metadata', 'recovery_events', 'recovery_history', 'outbox', 'configuration_history', 'guild_features', 'appeals', 'duty_sessions'])
+                for (const table of [...GUILD_SCOPED_TABLES.filter(table => table !== 'recovery_mappings'), 'recovery_events'])
                     this.store.run(`DELETE FROM ${table} WHERE guild_id=?`, row.guild_id);
                 this.store.run('DELETE FROM recovery_mappings WHERE destination_guild=?', row.guild_id);
                 this.store.run('DELETE FROM roblox_network WHERE guild_id=?', row.guild_id);

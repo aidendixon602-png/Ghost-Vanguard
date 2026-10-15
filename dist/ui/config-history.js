@@ -2,7 +2,7 @@ import { ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import { AppError } from '../errors.js';
 import { addConfirmation } from './layout-ui.js';
 import { defaults } from '../bot/registry.js';
-import { dangerous } from '../core.js';
+import { isSafeAutomaticRole, isSafeQuarantineRole } from '../security/role-policy.js';
 import { embed } from './ui.js';
 export async function previewHistory(ctx, i, id) {
     const row = ctx.store.get('SELECT * FROM configuration_history WHERE guild_id=? AND id=?', i.guildId, id);
@@ -38,9 +38,12 @@ export function registerHistory(registry) {
             if (row.component === 'settings') {
                 if (!previous)
                     throw new AppError('VALIDATION_ERROR', 'No previous settings are available.');
-                for (const id of [previous.verifiedRoleId, previous.quarantineRoleId].filter(Boolean)) {
+                for (const field of ['verifiedRoleId', 'quarantineRoleId']) {
+                    const id = previous[field];
+                    if (!id)
+                        continue;
                     const role = await i.guild.roles.fetch(id);
-                    if (!role || role.managed || !role.editable || dangerous(role.permissions.bitfield))
+                    if (!role || !(field === 'verifiedRoleId' ? isSafeAutomaticRole(ctx.store, i.guildId, role) : isSafeQuarantineRole(ctx.store, i.guildId, role)))
                         throw new AppError('VALIDATION_ERROR', 'A saved verification/quarantine role is now missing or unsafe. Configure a safe role first.');
                 }
             }

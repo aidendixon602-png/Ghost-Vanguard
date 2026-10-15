@@ -1,6 +1,6 @@
 import { Colors, type GuildMember } from 'discord.js';
 import type { Store } from '../database/db.js';
-import { dangerous } from '../core.js';
+import { isSafeAutomaticRole } from '../security/role-policy.js';
 import { embed } from '../ui/ui.js';
 import { accountAgeDays, robloxAvatar, robloxGroups, robloxPastNames, robloxUser } from '../integrations/roblox-api.js';
 import { getFeature } from './settings.js';
@@ -74,12 +74,13 @@ export async function syncGroupRoles(store: Store, member: GuildMember, robloxId
     const rank = groups.find(g => g.groupId === c.groupId)?.rank ?? 0;
     const want = rolesForRank(c.binds, rank);
     // Never hand out powerful roles from a Roblox rank, and only touch roles Vanguard can manage.
-    const usable = (id: string) => { const r = member.guild.roles.cache.get(id); return !!r && r.editable && !r.managed && !dangerous(r.permissions.bitfield); };
+    const usable = (id: string) => { const r = member.guild.roles.cache.get(id); return !!r && isSafeAutomaticRole(store, member.guild.id, r); };
     const add = [...want].filter(id => !member.roles.cache.has(id) && usable(id));
     const remove = c.binds.map(b => b.roleId).filter(id => !want.has(id) && member.roles.cache.has(id) && usable(id));
-    if (add.length) await member.roles.add(add, `Roblox group rank ${rank}`).catch(() => { });
-    if (remove.length) await member.roles.remove(remove, `Roblox group rank ${rank}`).catch(() => { });
-    return add.length || remove.length ? ` Group rank ${rank}: ${add.length} role(s) added, ${remove.length} removed.` : '';
+    let added = 0, removed = 0, failed = 0;
+    if (add.length) await member.roles.add(add, `Roblox group rank ${rank}`).then(() => { added = add.length; }, () => { failed += add.length; });
+    if (remove.length) await member.roles.remove(remove, `Roblox group rank ${rank}`).then(() => { removed = remove.length; }, () => { failed += remove.length; });
+    return add.length || remove.length ? ` Group rank ${rank}: ${added} role(s) added, ${removed} removed.${failed ? ` ${failed} role change(s) failed; check Vanguard's permissions and role position.` : ''}` : '';
 }
 
 /** A profile card for /roblox lookup. */

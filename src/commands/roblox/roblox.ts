@@ -1,7 +1,7 @@
 import { Colors, SlashCommandBuilder } from 'discord.js';
 import { defineCommand } from '../../bot/registry.js';
 import { AppError } from '../../errors.js';
-import { dangerous } from '../../core.js';
+import { isSafeAutomaticRole } from '../../security/role-policy.js';
 import { embed } from '../../ui/ui.js';
 import { setFeature } from '../../features/settings.js';
 import { robloxGroupInfo, robloxGroupRanks, robloxUserByName } from '../../integrations/roblox-api.js';
@@ -116,7 +116,7 @@ export default defineCommand(new SlashCommandBuilder().setName('roblox').setDesc
     if (sub === 'bind') {
         const role = i.options.getRole('role', true), rank = i.options.getInteger('rank', true), mode = (i.options.getString('mode') ?? 'min') as 'min' | 'exact';
         if (role.managed || role.id === guild) throw new AppError('VALIDATION_ERROR', 'Pick a normal role.');
-        if (dangerous(BigInt(role.permissions.bitfield))) throw new AppError('VALIDATION_ERROR', 'That role has moderation or admin permissions. Roblox ranks can only give plain roles.');
+        if (!isSafeAutomaticRole(ctx.store, guild, role)) throw new AppError('VALIDATION_ERROR', 'That role is unavailable or grants Discord or Vanguard privileges. Roblox ranks can only give plain roles.');
         if (role.position >= (ctx.actor?.roles?.highest?.position ?? 0) && i.guild.ownerId !== i.user.id) throw new AppError('PERMISSION_ERROR', 'Pick a role below your own highest role.');
         if (c.binds.length >= 25 && !c.binds.some(b => b.roleId === role.id)) throw new AppError('VALIDATION_ERROR', 'Up to 25 binds.');
         setFeature(ctx.store, guild, 'robloxgroup', GROUP_DEFAULTS, { binds: [...c.binds.filter(b => b.roleId !== role.id), { rank, roleId: role.id, mode }].sort((a, b) => a.rank - b.rank) }, i.user.id);

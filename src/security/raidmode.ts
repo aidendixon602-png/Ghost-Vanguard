@@ -62,7 +62,9 @@ export async function handleRaidJoin(store: Store, logs: LogQueue, member: Guild
 
 /** Lift temporary bans whose time is up. Runs every minute. */
 export async function sweepTempbans(store: Store, logs: LogQueue, client: Client, ready: (id: string) => boolean, now = Date.now()) {
-    const due = store.db.prepare('SELECT * FROM tempbans WHERE until<=? ORDER BY until LIMIT 50').all(now) as any[];
+    const eligible = [...client.guilds.cache.values()].filter(guild => ready(guild.id) && store.isAuthorized(guild.id)).map(guild => guild.id);
+    if (!eligible.length) return;
+    const due = store.db.prepare(`SELECT * FROM tempbans WHERE until<=? AND guild_id IN (${eligible.map(() => '?').join(',')}) ORDER BY until LIMIT 50`).all(now, ...eligible) as any[];
     for (const row of due) {
         const guild = client.guilds.cache.get(row.guild_id);
         if (!guild || !ready(guild.id) || !store.isAuthorized(guild.id)) continue;

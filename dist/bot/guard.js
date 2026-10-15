@@ -31,6 +31,8 @@ export class Guard {
         // or a server role. Discord's limits on the bot itself and confirmation prompts still apply.
         if (developers.has(user))
             return this.enabledHere(policy, guildId, command);
+        if (this.quarantined(policy, guildId, user, actor))
+            return false;
         // A Vanguard staff rank high enough for this command replaces the Discord-permission and access checks.
         const need = requiredRank(rankKey ?? command);
         const byRank = need !== undefined && rankOf(this.store, guildId, user, actor, rankKey ?? command) >= need;
@@ -44,6 +46,10 @@ export class Guard {
         if (!this.enabledHere(policy, guildId, command))
             return false;
         return !policy.requiredPermissions.length || !!actor?.permissions.has(policy.requiredPermissions);
+    }
+    quarantined(policy, guildId, user, actor) {
+        return !!guildId && policy.requiresAuthorization && !developers.has(user) && actor?.guild?.ownerId !== user
+            && !!this.store.get('SELECT 1 FROM backups WHERE guild_id=? AND user_id=? AND active=1', guildId, user);
     }
     /** Commands and features a server switched off stay off for every rank. */
     enabledHere(policy, guildId, command) {
@@ -73,6 +79,8 @@ export class Guard {
         }
         // Interaction member contains current permission data; fetch only role data if not cached.
         const actor = refreshMember ? await i.guild.members.fetch({ user: i.user.id, force: true }) : i.member;
+        if (this.quarantined(policy, i.guildId, i.user.id, actor))
+            throw new AppError('PERMISSION_ERROR', 'You are quarantined in this server. Authorized staff must release you before you can use protected Vanguard commands again.');
         if (needsDeveloper(key) && explicitRank(this.store, i.guildId, i.user.id, actor) < requiredRank(key))
             throw new AppError('PERMISSION_ERROR', DEVELOPER_ONLY_MESSAGE);
         if (policy.developerOnly && (requiredRank(key) ?? Infinity) > rankOf(this.store, i.guildId, i.user.id, actor, key))

@@ -128,6 +128,23 @@ test('containment backs up roles first, preserves ordinary roles and reports rem
     store.close();
 });
 
+for (const staff of [false, true])
+test(`quarantine assignment ${staff ? 'rejects a role that gained Vanguard privileges' : 'accepts the configured plain quarantine role'}`, async () => {
+    const { store, security } = setup('enforce');
+    const q: any = { id: 'q', managed: false, editable: true, permissions: new PermissionsBitField(0n) };
+    const settings = store.settings('g'); settings.quarantineRoleId = q.id; store.save(settings);
+    if (staff) store.run("INSERT INTO staff_roles(guild_id,role_id,level) VALUES('g','q','admin')");
+    const added: string[] = [];
+    const member: any = { id: 'attacker', manageable: true, roles: { cache: new Collection(), add: async (role: any) => { added.push(role.id); } }, permissions: new PermissionsBitField(0n) };
+    const guild: any = { id: 'g', ownerId: 'owner', client: { user: { id: 'bot' } },
+        members: { fetch: async () => member, fetchMe: async () => ({ roles: { highest: { comparePositionTo: () => 1 } } }) },
+        roles: { fetch: async () => {}, cache: new Collection([['q', q]]) } };
+    try {
+        await security.contain(guild, member.id);
+        assert.deepEqual(added, staff ? [] : ['q']);
+    } finally { store.close(); }
+});
+
 const perms = (...bits: bigint[]) => new PermissionsBitField(bits.reduce((all, bit) => all | BigInt(bit), 0n));
 const auditEntry = (id: string, action: number, extra: Record<string, unknown> = {}, actor = 'attacker') => ({ id, executorId: actor, action, createdTimestamp: Date.now(), targetId: 'target', ...extra }) as unknown as GuildAuditLogsEntry;
 const incidentsFor = (store: Store, rule: string) => store.all('SELECT * FROM incidents WHERE guild_id=? AND rule=?', 'g', rule);
