@@ -24,10 +24,10 @@ npm ci && npm run build   # or use the prebuilt dist/ with: npm install --omit=d
 npm start                 # one worker only
 ```
 
-On a container host that extracts into `/home/container`, put the project in `/home/container/midtown-vanguard`, keep your existing `.env` and `data/`, run `npm install --omit=dev` once, and start with `cd /home/container/midtown-vanguard && node dist/index.js`. The compiled `dist/` is included, so no build step is needed on the host. A typical startup command is:
+On a container host that extracts into `/home/container`, use a persistent project directory and keep your existing `.env` and `data/` when upgrading. For a fresh checkout, the current repository name gives `/home/container/Ghost-Vanguard`; if an existing deployment still lives in `/home/container/midtown-vanguard`, you can keep that directory and substitute it in the commands below. Run `npm install --omit=dev` once. The compiled `dist/` is included, so no build step is needed on the host. A typical startup command for a fresh checkout is:
 
 ```sh
-cd /home/container/midtown-vanguard && /usr/local/bin/npm install --omit=dev && FORCE_COLOR=1 /usr/local/bin/node dist/index.js
+cd /home/container/Ghost-Vanguard && /usr/local/bin/npm install --omit=dev && FORCE_COLOR=1 /usr/local/bin/node dist/index.js
 ```
 
 When upgrading, replace the whole `dist/` folder rather than extracting over it, so files from removed features (such as the old `/csb` command) are not left behind and loaded; `node scripts/verify-install.mjs` refuses an install that still contains `/csb`. After stopping the bot, wait 30 seconds before starting it again so its database lease expires. Never put `DELETE FROM leases` in the startup command: the lease is what stops two copies of the bot running against one database.

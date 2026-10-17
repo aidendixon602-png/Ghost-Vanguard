@@ -1,6 +1,7 @@
 #!/bin/sh
 # Ghost Vanguard host start script (Wispbyte / Linux).
-# Startup command:  cd /home/container/midtown-vanguard && sh scripts/start.sh
+# Fresh checkout:   cd /home/container/Ghost-Vanguard && sh scripts/start.sh
+# Existing installs may keep their current directory; adjust the path as needed.
 #
 # 1. Installs production dependencies.
 # 2. If data/import/vanguard.db exists, merges ONE server (IMPORT_GUILD, default Midtown Tower
