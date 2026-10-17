@@ -1,7 +1,7 @@
 # Changelog
 
 ## 3.0.0: Ghost Vanguard — the two bots are one, and the balance is the point
-- **The product is called Ghost Vanguard.** Midtown Vanguard and the separate Midtown Desk ticket bot are now one bot with one name, one database and one set of ranks. The repository stays `midtown-vanguard`.
+- **The product is called Ghost Vanguard.** Midtown Vanguard and the separate Midtown Desk ticket bot are now one bot with one name, one database and one set of ranks. At the time of this release, the repository was still named `midtown-vanguard`; it has since been renamed `Ghost-Vanguard`.
 - **One language.** The ticket desk was ported from the Python Midtown Desk into this codebase, so there is a single Node.js/TypeScript bot to run; midtown-desk is retired. Its desk-owner tools (desk-wide authorization, maintenance, broadcast, backup) were deliberately not ported — Ghost Vanguard already has `/setup`, `/recovery` and `/dev` for those.
 - **The threat board: defence and counter-attack, balanced.**
   - Every confirmed incident now scores the member behind it: mass ban 40, bot additions and dangerous grants 35, mass kicks 30, deletions and AutoMod tampering 25, prunes and webhook changes 20, server and role changes and confirmed scams 15, anti-ping, join floods, channel or role creation, role grants and mass timeouts 10, small changes 5, anything unrecognised 5.

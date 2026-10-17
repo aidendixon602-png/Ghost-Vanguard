@@ -23,7 +23,7 @@ The CI workflow rejects commits that contain these files, or anything that looks
 
 ## Deployment integrity
 
-Anyone with push access to `main` can change the running bot, because the host installs every commit that passes CI. Keep the repository private, limit write access to trusted developers, and enable branch protection on `main` (require pull requests and passing checks).
+This repository is public, and the host installs commits to `main` after CI passes. Treat write access as production access: limit it to trusted maintainers and protect `main` with required pull requests and passing CI checks. Require independent human review for changes to access control, destructive moderation actions, backups/recovery, or automatic updates; CI passing is not a substitute for review.
 
 ## Access model
 

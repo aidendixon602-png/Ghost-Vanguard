@@ -8,7 +8,7 @@
 
 Anti-nuke and the threat board · Moderation and audit logging · Ticket desk · Live dashboard · Server recovery
 
-[![CI](https://github.com/aidendixon602-png/midtown-vanguard/actions/workflows/ci.yml/badge.svg)](https://github.com/aidendixon602-png/midtown-vanguard/actions/workflows/ci.yml)
+[![CI](https://github.com/aidendixon602-png/Ghost-Vanguard/actions/workflows/ci.yml/badge.svg)](https://github.com/aidendixon602-png/Ghost-Vanguard/actions/workflows/ci.yml)
 ![Version](https://img.shields.io/badge/version-3.0.0-6d5ae6)
 ![Tests](https://img.shields.io/badge/tests-523%20passing-2EA043)
 ![Node](https://img.shields.io/badge/node-24-339933?logo=node.js&logoColor=white)
@@ -281,4 +281,4 @@ Do not commit `.env`, tokens, API keys or anything under `data/`; CI rejects com
 
 ## License
 
-Private project. All rights reserved.
+This repository is publicly viewable, but no open-source license is granted. All rights reserved. Public visibility does not grant permission to reuse, redistribute, or modify the code without prior written permission.
