@@ -4,8 +4,8 @@ import {AuditLogEvent,Collection,PermissionFlagsBits} from 'discord.js';
 import {RULES,escalationAdded} from '../src/core.js';
 import {Security} from '../src/security/security.js';
 import {Store} from '../src/database/db.js';
+import {Guard} from '../src/bot/guard.js';
 import {authorize} from './helpers.js';
-import enable from '../src/commands/antinuke/enable.js';
 import antinuke from '../src/commands/antinuke/antinuke.js';
 import { antinukeStatus } from '../src/ui/antinuke-status.js';
 
@@ -17,7 +17,7 @@ test('status embed shows the fixed limits (saved custom limits are ignored) and 
   store.run('UPDATE grants SET expires=? WHERE guild_id=? AND user_id=?',Date.now()-1,'g','333');
   const status=antinukeStatus(store,'g').toJSON();
   assert.equal(status.title,'Antinuke Status');assert.equal(status.color,0x57F287);
-  assert.match(status.description!,/`Ban` – \*\*5 in 60s → strip\*\* `\[revert\]`/);assert.match(status.description!,/preset is fixed/);
+  assert.match(status.description!,/`Ban` – \*\*5 in 60s → strip\*\* `\[revert\]`/);assert.match(status.description!,/fixed preset applies to every server/);
   assert.match(status.description!,/<@111>/);assert.doesNotMatch(status.description!,/<@222>|<@333>/);
   assert.match(status.description!,/manage_webhooks/);assert.ok(status.description!.length<=3900);
   s.enabled=false;store.save(s);assert.equal(antinukeStatus(store,'g').toJSON().color,0xED4245);
@@ -32,6 +32,18 @@ test('status and rules commands send the status embed without pinging trusted us
    let reply:any;await antinuke.execute({store,actor:{id:'owner'}} as any,{guildId:'g',user:{id:'owner'},options:{getSubcommand:()=>sub},editReply:async(value:any)=>{reply=value;}} as any);
    assert.equal(reply.embeds[0].toJSON().title,'Antinuke Status');assert.deepEqual(reply.allowedMentions,{parse:[]});
   }
+ } finally {store.close();}
+});
+
+test('Discord Administrators can read anti-nuke status/check and enable enforcement, but cannot disable it on that permission alone',()=>{
+ const {store}=fixture();
+ try {
+  const member:any={id:'admin',guild:{id:'g',ownerId:'different-owner'},roles:{cache:new Collection()},permissions:{has:(permission:bigint)=>permission===PermissionFlagsBits.Administrator}};
+  const guard=new Guard(store);const policy=antinuke.metadata;
+  assert.equal(guard.allowed(policy,'g','admin',member,undefined,'antinuke/status'),true);
+  assert.equal(guard.allowed(policy,'g','admin',member,undefined,'antinuke/check'),true);
+  assert.equal(guard.allowed(policy,'g','admin',member,undefined,'antinuke/enable'),true);
+  assert.equal(guard.allowed(policy,'g','admin',member,undefined,'antinuke/disable'),false,'weakening protection remains restricted');
  } finally {store.close();}
 });
 
@@ -54,16 +66,89 @@ test('Permission Grant detects exactly the requested six permission bits',()=>{
  assert.equal(escalationAdded(0n,PermissionFlagsBits.ManageRoles),0n);
 });
 
-test('/enable reloads the preset, clears shared limits, captures a baseline and persists enforce mode',async()=>{
- const {store,guild}=fixture();
+function readinessGuild({ id = 'g', actorId = 'owner', missing = new Set<bigint>(), above = [] as any[] } = {}) {
+ const bot:any={permissions:{has:(permission:bigint)=>!missing.has(permission)},roles:{highest:{id:'botrole',position:50}}};
+ const roles=new Collection<string,any>();
+ roles.set(id,{id,position:0,managed:false});
+ roles.set('botrole',{id:'botrole',name:'Ghost Vanguard',position:50,managed:false});
+ for(const role of above)roles.set(role.id,role);
+ const log={id:'log',isTextBased:()=>true,permissionsFor:()=>({has:()=>true})};
+ const guild:any={id,name:'Test Guild',ownerId:actorId,members:{me:bot,fetchMe:async()=>bot},roles:{cache:roles},channels:{cache:new Collection([['log',log]]),fetch:async(channelId:string)=>channelId==='log'?log:null}};
+ const actor:any={id:actorId,guild,roles:{cache:new Collection()},permissions:{has:()=>true}};
+ guild.members.fetch=async()=>actor;
+ return {guild,actor,missing,roles};
+}
+
+function commandInteraction(guild:any, actor:any, subcommand='enable') {
+ const replies:any[]=[];
+ return {inCachedGuild:()=>true,guildId:guild.id,guild,member:actor,user:{id:actor.id},options:{getSubcommand:()=>subcommand},replies,customId:'',editReply:async(payload:any)=>{replies.push(payload);}} as any;
+}
+
+async function clickDangerConfirmation(ctx:any, source:any) {
+ const {Registry}=await import('../src/bot/registry.js');
+ const {registerDangerConfirm}=await import('../src/ui/danger-ui.js');
+ const registry=new Registry();registerDangerConfirm(registry);
+ const customId=String(source.replies[0].components[0].components[0].data.custom_id);
+ const click={...source,customId};
+ await registry.components.find(c=>c.prefix==='dangerconfirm:')!.execute(ctx,click);
+ return click;
+}
+
+test('/antinuke enable leaves observe mode unchanged until a ready owner confirms, and warns about roles above Vanguard',async()=>{
+ const store=new Store(':memory:');authorize(store);
  try {
-  const s=store.settings('g');s.enabled=false;s.mode='observe';s.logChannelId='log';s.ruleDefaults={count:99,seconds:5};s.rules.mass_ban={count:90,seconds:5};store.save(s);
-  let snapshots=0;const ctx:any={store,actor:{id:'actor'},snapshots:{numberOf:(_g:any,id:number)=>id,save:async()=>{snapshots++;return 1;}},logs:{push:()=>{}}};
-  guild.members={me:{permissions:{has:()=>true},roles:{highest:{id:'botrole',position:99}}}};guild.roles={cache:new Collection()};guild.channels={cache:new Collection([['log',{isTextBased:()=>true,permissionsFor:()=>({has:()=>true})}]]),fetch:async()=>null};
-  const i:any={guildId:'g',guild,user:{id:'actor'},options:{getSubcommand:()=>{throw new Error('Alias must choose enable.');}}};
-  await enable.execute(ctx,i);
-  const result=store.settings('g');assert.equal(result.enabled,true);assert.equal(result.mode,'enforce');assert.equal(result.ruleDefaults,undefined);assert.deepEqual(result.rules,{});assert.equal(snapshots,1);
-  assert.equal(store.antinukeStaffDisabled('g'),false);
+  const high={id:'high',name:'High Staff',position:60,managed:false};
+  const {guild,actor}=readinessGuild({above:[high]});
+  const s=store.settings('g');s.enabled=true;s.mode='observe';s.logChannelId='log';s.ruleDefaults={count:99,seconds:5};s.rules.mass_ban={count:90,seconds:5};store.save(s);
+  let snapshots=0;const events:any[]=[];
+  const ctx:any={store,actor,snapshots:{numberOf:(_g:any,id:number)=>id,save:async()=>{snapshots++;return 1;}},logs:{push:(_g:any,e:any)=>events.push(e)},policy:{...antinuke.metadata,...antinuke.subcommands?.enable},actionKey:'antinuke/enable'};
+  const i=commandInteraction(guild,actor);
+  await antinuke.execute(ctx,i);
+  assert.equal(store.settings('g').mode,'observe');assert.equal(snapshots,0,'nothing is saved or enabled before confirmation');
+  assert.match(JSON.stringify(i.replies[0]),/High Staff/,'the role-hierarchy limitation is part of the review prompt');
+  await clickDangerConfirmation(ctx,i);
+  const result=store.settings('g');assert.equal(result.enabled,true);assert.equal(result.mode,'enforce');assert.equal(result.ruleDefaults,undefined);assert.deepEqual(result.rules,{});
+  assert.equal(snapshots,1);assert.equal(store.antinukeStaffDisabled('g'),false);
+  assert.match(JSON.stringify(i.replies.at(-1)),/High Staff|cannot be contained/);
+  assert.equal(events.length,1);
+ } finally {store.close();}
+});
+
+test('/antinuke enable rechecks missing permissions on confirmation and refuses before the baseline',async()=>{
+ const store=new Store(':memory:');authorize(store);
+ try {
+  const missing=new Set<bigint>();const {guild,actor}=readinessGuild({missing});
+  const s=store.settings('g');s.enabled=true;s.mode='observe';s.logChannelId='log';store.save(s);
+  let snapshots=0;const ctx:any={store,actor,snapshots:{numberOf:(_g:any,id:number)=>id,save:async()=>{snapshots++;return 1;}},logs:{push:()=>{}},policy:{...antinuke.metadata,...antinuke.subcommands?.enable},actionKey:'antinuke/enable'};
+  const i=commandInteraction(guild,actor);await antinuke.execute(ctx,i);
+  missing.add(PermissionFlagsBits.BanMembers);
+  await assert.rejects(()=>clickDangerConfirmation(ctx,i),/readiness changed|not enabled/i);
+  assert.equal(snapshots,0);assert.equal(store.settings('g').mode,'observe');assert.equal(store.antinukeStaffDisabled('g'),false);
+ } finally {store.close();}
+});
+
+test('/antinuke enable repeats readiness after saving the baseline and still refuses if permissions changed',async()=>{
+ const store=new Store(':memory:');authorize(store);
+ try {
+  const missing=new Set<bigint>();const {guild,actor}=readinessGuild({missing});
+  const s=store.settings('g');s.enabled=true;s.mode='observe';s.logChannelId='log';store.save(s);
+  let snapshots=0;const ctx:any={store,actor,snapshots:{numberOf:(_g:any,id:number)=>id,save:async()=>{snapshots++;missing.add(PermissionFlagsBits.BanMembers);return 1;}},logs:{push:()=>{}},policy:{...antinuke.metadata,...antinuke.subcommands?.enable},actionKey:'antinuke/enable'};
+  const i=commandInteraction(guild,actor);await antinuke.execute(ctx,i);
+  await assert.rejects(()=>clickDangerConfirmation(ctx,i),/baseline was saved.*enforcement was not enabled/i);
+  assert.equal(snapshots,1);assert.equal(store.settings('g').mode,'observe');assert.equal(store.antinukeStaffDisabled('g'),false);
+ } finally {store.close();}
+});
+
+test('/antinuke enable invalidates a confirmation if role hierarchy changes before the click',async()=>{
+ const store=new Store(':memory:');authorize(store);
+ try {
+  const high={id:'high',name:'High Staff',position:60,managed:false};const {guild,actor}=readinessGuild({above:[high]});
+  const s=store.settings('g');s.enabled=true;s.mode='observe';s.logChannelId='log';store.save(s);
+  let snapshots=0;const ctx:any={store,actor,snapshots:{numberOf:(_g:any,id:number)=>id,save:async()=>{snapshots++;return 1;}},logs:{push:()=>{}},policy:{...antinuke.metadata,...antinuke.subcommands?.enable},actionKey:'antinuke/enable'};
+  const i=commandInteraction(guild,actor);await antinuke.execute(ctx,i);
+  high.name='Changed Staff Hierarchy';
+  await assert.rejects(()=>clickDangerConfirmation(ctx,i),/role hierarchy changed/i);
+  assert.equal(snapshots,0);assert.equal(store.settings('g').mode,'observe');
  } finally {store.close();}
 });
 
@@ -119,43 +204,66 @@ test('role creation reverts skip managed roles and hierarchy-protected roles',as
 });
 
 import { applyDefaultAntinuke, antinukeOptedOut } from '../src/security/locked-antinuke.js';
-test('every authorized server gets the fixed preset enabled in enforce mode automatically, with a baseline',async()=>{
+test('new authorized servers start in observe mode even when readiness passes; the choice persists without an automatic baseline',async()=>{
  const store=new Store(':memory:');authorize(store);
  try {
-  const s=store.settings('g');s.enabled=false;s.mode='observe';s.rules.mass_ban={count:90,seconds:5,enabled:false};store.save(s);store.setKickBots('g',true);
-  const alerts:any[]=[];let baselines=0;const logs:any={push:(_g:any,e:any)=>alerts.push(e.toJSON())};
-  assert.equal(await applyDefaultAntinuke(store,{id:'g'} as any,logs,async()=>++baselines),'enabled');
-  const r=store.settings('g');assert.equal(r.enabled,true);assert.equal(r.mode,'enforce');assert.deepEqual(r.rules,{});assert.equal(store.kickBots('g'),false);
-  assert.equal(baselines,1);assert.match(JSON.stringify(alerts[0]),/"name":"Rules","value":"17"/);
-  assert.equal(await applyDefaultAntinuke(store,{id:'g'} as any,logs,async()=>++baselines),'unchanged');assert.equal(baselines,1);assert.equal(alerts.length,1);
+  const {guild}=readinessGuild();
+  const s=store.settings('g');s.enabled=false;s.mode='observe';s.logChannelId='log';s.rules.mass_ban={count:90,seconds:5,enabled:false};store.save(s);store.setKickBots('g',true);
+  const alerts:any[]=[];const logs:any={push:(_g:any,e:any)=>alerts.push(e.toJSON())};
+  assert.equal(await applyDefaultAntinuke(store,guild,logs),'observing');
+  const first=store.settings('g');assert.equal(first.enabled,true);assert.equal(first.mode,'observe');assert.deepEqual(first.rules,{});assert.equal(first.ruleDefaults,undefined);assert.equal(store.kickBots('g'),false);
+  assert.equal(alerts[0].title,'🟠 Anti-nuke observe mode');assert.match(JSON.stringify(alerts[0]),/enforcement still needs a deliberate/);
+  assert.equal(await applyDefaultAntinuke(store,guild,logs),'unchanged');assert.equal(alerts.length,1);
   authorize(store,'other');store.run("UPDATE guild_authorization SET state='DEAUTHORIZED' WHERE guild_id='other'");
   assert.equal(await applyDefaultAntinuke(store,{id:'other'} as any,logs),'unchanged');assert.equal(store.settings('other').enabled,false);
  } finally {store.close();}
 });
-test('/disable is remembered across restarts and /enable switches it back on',async()=>{
+
+test('an already-enforced server with missing readiness fails safe into observe and stays there after repair',async()=>{
+ const store=new Store(':memory:');authorize(store);
+ try {
+  const s=store.settings('g');s.enabled=true;s.mode='enforce';s.rules={};store.save(s);
+  const alerts:any[]=[];const logs:any={push:(_g:any,e:any)=>alerts.push(e.toJSON())};
+  assert.equal(await applyDefaultAntinuke(store,{id:'g'} as any,logs),'observing');
+  assert.equal(store.settings('g').enabled,true);assert.equal(store.settings('g').mode,'observe');
+  assert.equal(alerts[0].title,'⚠️ Anti-nuke switched to observe mode');assert.match(JSON.stringify(alerts[0]),/Readiness blockers/);
+  const {guild}=readinessGuild();
+  assert.equal(await applyDefaultAntinuke(store,guild,logs),'unchanged','repairing readiness does not silently resume enforcement');
+  assert.equal(store.settings('g').mode,'observe');
+ } finally {store.close();}
+});
+
+test('an established enforce preset remains enforcing across startup when readiness still passes',async()=>{
+ const store=new Store(':memory:');authorize(store);
+ try {
+  const {guild}=readinessGuild();const s=store.settings('g');s.enabled=true;s.mode='enforce';s.logChannelId='log';store.save(s);
+  assert.equal(await applyDefaultAntinuke(store,guild,{push:()=>{}} as any),'unchanged');
+  assert.equal(store.settings('g').mode,'enforce');
+ } finally {store.close();}
+});
+
+test('/disable remains a confirmed, persistent staff opt-out; /antinuke enable re-enables only after a fresh confirmation',async()=>{
  const store=new Store(':memory:');authorize(store);
  const {config}=await import('../src/config.js');const DEV='1277709272041394187';config.developers.add(DEV);
- const {Registry}=await import('../src/bot/registry.js');const {registerDangerConfirm}=await import('../src/ui/danger-ui.js');
  try {
-  const logs:any={push:()=>{}};
-  await applyDefaultAntinuke(store,{id:'g'} as any,logs);assert.equal(store.settings('g').enabled,true);
-  const member:any={id:DEV,guild:{id:'g',ownerId:DEV},roles:{cache:new Map()},permissions:{has:()=>true}};
-  const mk=()=>{const replies:any[]=[];return {inCachedGuild:()=>true,member,guild:{name:'Test',members:{me:{permissions:{has:()=>true}},fetch:async()=>member}},user:{id:DEV},guildId:'g',customId:'',replies,options:{getSubcommand:()=> 'disable'},editReply:async(p:any)=>void replies.push(p)} as any;};
-  const ctx:any={store,actor:{id:DEV},logs};
-  const i=mk();await antinuke.execute(ctx,i);
-  assert.equal(store.settings('g').enabled,true,'nothing changes before the confirmation click');
-  const registry=new Registry();registerDangerConfirm(registry);
-  const click=mk();click.customId=String(i.replies[0].components[0].components[0].data.custom_id);
-  await registry.components.find(c=>c.prefix==='dangerconfirm:')!.execute(ctx,click);
-  assert.equal(store.settings('g').enabled,false);assert.equal(antinukeOptedOut(store,'g'),true);
-  // A restart must not switch it back on.
-  assert.equal(await applyDefaultAntinuke(store,{id:'g'} as any,logs),'opted-out');assert.equal(store.settings('g').enabled,false);
-  // /enable records the choice; the next restart keeps it on.
-  const g:any={id:'g',members:{me:{permissions:{has:()=>true},roles:{highest:{id:'botrole',position:99}}}},roles:{cache:new Collection()},channels:{cache:new Collection([['log',{isTextBased:()=>true,permissionsFor:()=>({has:()=>true})}]]),fetch:async()=>null}};
+  const {guild,actor}=readinessGuild({actorId:DEV});
   const s=store.settings('g');s.logChannelId='log';store.save(s);
-  await enable.execute({store,actor:{id:DEV},snapshots:{numberOf:(_g:any,id:number)=>id,save:async()=>1},logs} as any,{guildId:'g',guild:g,user:{id:DEV},options:{}} as any);
-  assert.equal(antinukeOptedOut(store,'g'),false);assert.equal(await applyDefaultAntinuke(store,{id:'g'} as any,logs),'unchanged');assert.equal(store.settings('g').enabled,true);
- } finally {store.close();}
+  const logs:any={push:()=>{}};
+  assert.equal(await applyDefaultAntinuke(store,guild,logs),'observing');assert.equal(store.settings('g').mode,'observe');
+  const ctx:any={store,actor,snapshots:{numberOf:(_g:any,id:number)=>id,save:async()=>1},logs,policy:antinuke.metadata,actionKey:'antinuke/disable'};
+  const off=commandInteraction(guild,actor,'disable');await antinuke.execute(ctx,off);
+  assert.equal(store.settings('g').enabled,true,'nothing changes before the disable confirmation');
+  await clickDangerConfirmation(ctx,off);
+  assert.equal(store.settings('g').enabled,false);assert.equal(antinukeOptedOut(store,'g'),true);
+  assert.equal(await applyDefaultAntinuke(store,guild,logs),'opted-out');assert.equal(store.settings('g').enabled,false);
+
+  ctx.policy={...antinuke.metadata,...antinuke.subcommands?.enable};ctx.actionKey='antinuke/enable';
+  const on=commandInteraction(guild,actor);await antinuke.execute(ctx,on);
+  assert.equal(store.settings('g').enabled,false,'the opt-out is preserved until the enable confirmation');
+  await clickDangerConfirmation(ctx,on);
+  assert.equal(antinukeOptedOut(store,'g'),false);assert.equal(store.settings('g').enabled,true);assert.equal(store.settings('g').mode,'enforce');
+  assert.equal(await applyDefaultAntinuke(store,guild,logs),'unchanged');assert.equal(store.settings('g').enabled,true);
+ } finally {config.developers.delete(DEV);store.close();}
 });
 
 test('a brand-new role created with Administrator counts as a Permission Grant straight away; an ordinary new role does not',async()=>{

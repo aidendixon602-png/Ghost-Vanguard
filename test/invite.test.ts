@@ -71,12 +71,14 @@ test('console: roles-above-bot warnings are grouped under one heading and backup
     try {
         logEvent('protection_warning', { server: 'Cafe', rolesAboveBot: ['Owner', 'admin'] });
         logEvent('protection_warning', { server: 'Bank', rolesAboveBot: ['Founder'], missingPermissions: ['ManageWebhooks'] });
+        logEvent('protection_warning', { server: 'Exempt', bypassedRolesAboveBot: ['Senior Staff'] });
         logEvent('database_backup_verified', { id: '762646f5-0a94-446b-9cb3-752ee410bb33', kind: 'startup', size: 1153433 });
     } finally { console.log = original; }
     const text = lines.join('\n');
     assert.equal((text.match(/Roles above the bot/g) ?? []).length, 1, 'one heading for all servers');
     assert.match(text, /• Cafe — Owner, admin/);
     assert.match(text, /• Bank — Founder · bot is missing ManageWebhooks/);
+    assert.match(text, /• Exempt — bypassed\/exempt: Senior Staff/);
     assert.match(text, /Database backup saved · startup · 1\.1 MB/);
     assert.doesNotMatch(text, /762646f5/, 'no backup UUID noise');
 });

@@ -75,11 +75,12 @@ export async function catchUp(guild, store, logs, trusted, offlineSince, now = D
     if (settings.enabled) {
         const ready = readiness(guild, settings.logChannelId, store);
         // Console: one line per server only when something needs fixing (the ready banner already says how many servers are protected).
-        if (ready.missing.length || ready.above.length)
-            logEvent('protection_warning', { server: guild.name ?? guild.id, ...(ready.missing.length ? { missingPermissions: ready.missing } : {}), ...(ready.above.length ? { rolesAboveBot: ready.above } : {}) });
+        if (ready.missing.length || ready.above.length || ready.bypassed.length)
+            logEvent('protection_warning', { server: guild.name ?? guild.id, ...(ready.missing.length ? { missingPermissions: ready.missing } : {}), ...(ready.above.length ? { rolesAboveBot: ready.above } : {}), ...(ready.bypassed.length ? { bypassedRolesAboveBot: ready.bypassed } : {}) });
         const disabled = Object.values(settings.rules).filter(r => r.enabled === false).length;
-        if (shouldPost(store, guild.id, 'protection', JSON.stringify([settings.mode, disabled, ready.missing, ready.above]), { quietIfNew: quick }))
-            logs.push(guild.id, noticeEmbed('Saved protection loaded', [`**Mode:** ${settings.mode}`, `**Rules off:** ${disabled}`, ...ready.text.split('\n')], ready.missing.length || ready.above.length ? Colors.Orange : Colors.Green));
+        const protectionState = JSON.stringify([settings.mode, disabled, ready.missing, ready.above, ready.bypassed]);
+        if (shouldPost(store, guild.id, 'protection', protectionState, { quietIfNew: quick }))
+            logs.push(guild.id, noticeEmbed('Saved protection loaded', [`**Mode:** ${settings.mode}`, `**Rules off:** ${disabled}`, ...ready.text.split('\n')], ready.missing.length || ready.above.length || ready.bypassed.length ? Colors.Orange : Colors.Green));
     }
     if (!offlineSince || guild.members.me?.permissions.has(PermissionFlagsBits.ViewAuditLog) === false)
         return;

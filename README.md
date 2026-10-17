@@ -10,7 +10,7 @@ Anti-nuke and the threat board · Moderation and audit logging · Ticket desk ·
 
 [![CI](https://github.com/aidendixon602-png/Ghost-Vanguard/actions/workflows/ci.yml/badge.svg)](https://github.com/aidendixon602-png/Ghost-Vanguard/actions/workflows/ci.yml)
 ![Version](https://img.shields.io/badge/version-3.0.0-6d5ae6)
-![Tests](https://img.shields.io/badge/tests-523%20passing-2EA043)
+![Tests](https://img.shields.io/badge/tests-529%20passing-2EA043)
 ![Node](https://img.shields.io/badge/node-24-339933?logo=node.js&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
 ![discord.js](https://img.shields.io/badge/discord.js-14-5865F2?logo=discord&logoColor=white)
@@ -42,7 +42,7 @@ It is deliberately **balanced — yin and yang**. Defence reacts: anti-nuke stri
 ### Protection
 | Feature | Description |
 |---|---|
-| **Anti-nuke** | 17 rules covering mass bans and kicks, channel/role deletion, dangerous permission grants, bot additions, webhooks and server edits. Everyday rules warn first, staff get a heads-up one step before any limit, and offenders are stripped with the damage reverted. False alarms are undone in one click. |
+| **Anti-nuke** | 17 rules covering mass bans and kicks, channel/role deletion, dangerous permission grants, bot additions, webhooks and server edits. New or unconfigured servers start in observe mode; enforcement requires a successful readiness check and an explicit confirmation. Everyday rules warn first, staff get a heads-up one step before any limit, and offenders are stripped with the damage reverted. False alarms are undone in one click. |
 | **Whitelist** | Per-user or per-role exemptions, either full or per rule, with optional expiry. Includes presets for common staff roles and built-in recognition of verification bots. |
 | **Raid response** | Raid mode, server-wide lockdown with exact restore, emergency mode, new-account holds, join-flood detection. |
 | **Content protection** | Automod (spam, links, invites, optional AI moderation), scam-link and scam-image detection, staff anti-ping. |
@@ -185,11 +185,12 @@ node launch.js
 ### Adding a server
 
 1. Invite the bot using the link printed at startup. Inviting with a developer account authorizes the server automatically.
-2. Run `/setup logs setup` to create the ban and server log channels.
-3. Run `/setup panel` to create the staff control panel.
-4. Link staff roles to ranks with `/setup staff role`.
-5. Make sure the Ghost Vanguard role sits above every staff role.
-6. Run `/ticket setup` to post the ticket panel, then `/setup panel` for the staff control panel if you have not already.
+2. Run `/setup logs setup` to create the ban and server log channels (including the security log used by anti-nuke).
+3. Move the Ghost Vanguard role above staff roles where possible. `/antinuke check` reports missing permissions and roles the bot cannot contain.
+4. When the readiness check passes, run `/antinuke enable` and review the confirmation to start enforce mode. New or unconfigured servers stay in observe mode until this is done.
+5. Run `/setup panel` to create the staff control panel.
+6. Link staff roles to ranks with `/setup staff role`.
+7. Run `/ticket setup` to post the ticket panel.
 
 ## Operations
 

@@ -107,8 +107,8 @@ const lifecycle = new GuildLifecycle(store, client, id => {
 }, async (guild) => {
     await scam.initialize(guild);
     store.save(store.settings(guild.id));
-    // Every authorized server runs the fixed anti-nuke preset unless staff switched it off.
-    await applyDefaultAntinuke(store, guild, logs, async (g) => snapshots.numberOf(g.id, await snapshots.save(g, client.user?.id ?? 'system', 'snapshot', 'baseline')));
+    // New or unconfigured servers start in observe mode; existing enforcement is readiness-gated.
+    await applyDefaultAntinuke(store, guild, logs);
     // Reconcile only after authorization. No unauthorized guild fetches or role actions.
     await reconcileStartupMembers(store, security, guild);
 });

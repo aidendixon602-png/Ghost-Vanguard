@@ -1,6 +1,6 @@
 # Anti-nuke controls
 
-Anti-nuke runs a fixed preset of 17 rules in every authorized server. It starts automatically and survives restarts. The limits are listed in [antinuke-locked.md](antinuke-locked.md), and `/antinuke status` shows the live values.
+The fixed 17-rule preset is loaded for authorized servers and survives restarts. New or unconfigured servers begin in **observe** mode: incidents are recorded, but no members are stripped and no changes are automatically reverted. Run `/setup logs setup`, then `/antinuke check`; when required bot permissions and an accessible security-log channel are ready, `/antinuke enable` shows a confirmation, saves a baseline, and rechecks readiness before switching to **enforce**. Roles at or above Vanguard are shown as hierarchy warnings because their members cannot be contained. Existing enforce-mode servers stay enforced only while readiness passes at startup; missing readiness switches them to observe, and fixing it does not silently resume enforcement. A staff opt-out remains off across restarts. The complete limits are listed in [antinuke-locked.md](antinuke-locked.md), and `/antinuke status` shows the live values.
 
 ## How a rule fires
 
@@ -29,7 +29,8 @@ Granting **Administrator** or **Manage Server** is always checked unless the per
 | Command | What it does |
 |---|---|
 | `/antinuke status` | Rules, limits, whitelist and state, with Refresh, Incidents and Whitelist buttons |
-| `/antinuke enable` / `disable` | Turn protection on (takes a baseline snapshot) or off (asks to confirm; stays off after restarts) |
+| `/antinuke enable` | After readiness passes, review a confirmation; it saves a baseline and enables enforce mode. Hierarchy warnings are shown and rechecked. |
+| `/antinuke disable` | Turn protection off with confirmation; the staff opt-out stays off after restarts |
 | `/antinuke check` | Vanguard's permissions, log-channel access and role position |
 | `/antinuke scan` | Powerful roles, roles above Vanguard, bots with Administrator |
 | `/antinuke settings` | Extra protection layers (all on by default) |
