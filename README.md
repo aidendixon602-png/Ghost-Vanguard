@@ -205,7 +205,7 @@ push to main → CI (typecheck, build, tests, secret scan) → launcher installs
 - Only commits that passed CI are installed.
 - A version that stops within two minutes of installing is rolled back automatically and skipped.
 - `.env` and `data/` are never modified.
-- Developers can check the update status with `/dev update`. Installing immediately (`action: now`) and `/dev restart` are Developer only.
+- Developers can check the update status with `/dev update`. Installing immediately (`action: now`), `/dev restart`, and the in-server `,restart` shortcut are Developer only. `,restart` requires Message Content Intent enabled in the Discord Developer Portal, and `MESSAGE_CONTENT_ENABLED` must not be set to `false`.
 
 ### Backups
 
