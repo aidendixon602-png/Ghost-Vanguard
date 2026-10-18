@@ -1,4 +1,5 @@
 import { CommandInteractionOptionResolver } from 'discord.js';
+import { isDeveloperPrefixOnly } from './registry.js';
 export const UMBRELLAS = [
     { name: 'antinuke', description: 'Anti-nuke readiness, observe/enforce controls, rules and exceptions', entries: [
             { child: 'antinuke', mode: 'flat' }, { child: 'antinuke-plus', mode: 'flat' }, { child: 'trust', mode: 'group', as: 'whitelist' }
@@ -49,44 +50,71 @@ const GROUP_DESCRIPTIONS = { server: 'Authorize, inspect, list, ban or unban ser
 const json = (def) => def.data.toJSON ? def.data.toJSON() : def.data;
 const isSub = (o) => o.type === 1 || o.type === 2;
 const leafName = (e) => e.as ?? e.child;
-/** The command list sent to Discord. */
+function slashOptions(def, options, prefix = '') {
+    const out = [];
+    for (const option of options) {
+        if (option.type === 1) {
+            const path = prefix ? `${prefix}/${option.name}` : option.name;
+            const key = `${def.data.name}/${path}`;
+            if (isDeveloperPrefixOnly({ ...def.metadata, ...def.subcommands?.[path] }, key))
+                continue;
+            out.push({ ...option, options: option.options ?? [] });
+            continue;
+        }
+        if (option.type === 2) {
+            const path = prefix ? `${prefix}/${option.name}` : option.name;
+            const children = slashOptions(def, option.options ?? [], path);
+            if (children.length)
+                out.push({ ...option, options: children });
+            continue;
+        }
+        out.push(option);
+    }
+    return out;
+}
+/** The command list sent to Discord; developer-only actions remain available through comma commands only. */
 export function treeJson(registry) {
     const out = [];
     for (const u of UMBRELLAS) {
         const options = [];
         for (const e of u.entries) {
             const def = registry.commands.get(`1:${e.child}`);
-            if (!def)
+            if (!def || isDeveloperPrefixOnly(def.metadata, e.child))
                 continue;
             const j = json(def);
+            const filtered = slashOptions(def, j.options ?? []);
             if (e.mode === 'single' && e.in) {
-                // Singles that share a subcommand group, e.g. /dev server authorize.
                 let group = options.find(o => o.type === 2 && o.name === e.in);
                 if (!group) {
                     group = { type: 2, name: e.in, description: GROUP_DESCRIPTIONS[e.in] ?? e.in, options: [] };
                     options.push(group);
                 }
-                group.options.push({ type: 1, name: leafName(e), description: j.description, options: j.options ?? [] });
+                group.options.push({ type: 1, name: leafName(e), description: j.description, options: filtered });
             }
             else if (e.mode === 'flat')
-                options.push(...(j.options ?? []).filter(isSub));
-            else if (e.mode === 'group')
-                options.push({ type: 2, name: leafName(e), description: j.description, options: (j.options ?? []).filter(isSub) });
+                options.push(...filtered.filter(isSub));
+            else if (e.mode === 'group') {
+                if (filtered.length)
+                    options.push({ type: 2, name: leafName(e), description: j.description, options: filtered.filter(isSub) });
+            }
             else
-                options.push({ type: 1, name: leafName(e), description: j.description, options: j.options ?? [] });
+                options.push({ type: 1, name: leafName(e), description: j.description, options: filtered });
         }
-        out.push({ type: 1, name: u.name, description: u.description, contexts: [0], integration_types: [0], options });
+        if (options.length)
+            out.push({ type: 1, name: u.name, description: u.description, contexts: [0], integration_types: [0], options });
     }
     for (const name of STANDALONE) {
         const def = registry.commands.get(`1:${name}`);
-        if (def)
-            out.push(json(def));
+        if (def && !isDeveloperPrefixOnly(def.metadata, name))
+            out.push({ ...json(def), options: slashOptions(def, json(def).options ?? []) });
     }
-    // Anything not placed in the tree (a newly added command) still shows up on its own.
+    // Anything not placed in the tree (a newly added command) still shows up on its own, unless it's developer-only.
     const placed = new Set([...UMBRELLAS.flatMap(u => u.entries.map(e => e.child)), ...STANDALONE, ...RETIRED]);
-    for (const def of registry.commands.values())
-        if (!placed.has(json(def).name))
-            out.push(json(def));
+    for (const def of registry.commands.values()) {
+        const data = json(def);
+        if (!placed.has(data.name) && !isDeveloperPrefixOnly(def.metadata, data.name))
+            out.push({ ...data, options: slashOptions(def, data.options ?? []) });
+    }
     return out;
 }
 /** Where a module and subcommand live in the grouped tree, e.g. ("automod","links") → "/security automod links". */

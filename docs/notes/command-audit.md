@@ -1,5 +1,7 @@
 # Command audit
 
+> Historical review of the earlier slash-command layout. For current command names and access rules, use [commands.md](../commands.md) and [ranks.md](../ranks.md). Developer-only actions now use comma-prefix commands and require an exact `DEVELOPER_IDS` entry.
+
 Scope: all nine original top-level slash commands, all 29 original subcommands, and the original restore-confirmation button. No original context commands, select menus, modals or autocomplete handlers existed. Those interaction types are now supported by the common fail-closed registry/guard contract and tested with registered mock handlers.
 
 Every module uses centrally enforced developer/server/user/bot permissions, immediate acknowledgement, schema validation, cooldowns, categorized redacted errors, per-guild execution and structured activity logs. Common checks were removed from the old monolithic router. Domain-specific target hierarchy, safe role checks and provider policy remain in their respective services.

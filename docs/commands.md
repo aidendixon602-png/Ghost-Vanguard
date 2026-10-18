@@ -1,6 +1,6 @@
 # Commands
 
-Generated from the bot itself (`npm run docs`). Type `/` in Discord and pick **Ghost Vanguard**; `/help` shows only what you can use. For the same list grouped by rank, see [ranks.md](ranks.md).
+Generated from the bot itself (`npm run docs`). Type `/` in Discord and pick **Ghost Vanguard**; `/help` shows only slash commands you can use. Sensitive and admin slash replies are private; ordinary public utility replies stay public. Developer-only actions are hidden from the slash menu and use the comma commands below. For the same list grouped by rank, see [ranks.md](ranks.md).
 
 ## /antinuke
 
@@ -38,7 +38,7 @@ Moderation: ban, kick, timeout, bans, cases, notes, appeals
 | `/mod case search` | Find cases by member, staff member, action, words in the reason or date | Helper+ or Moderate Members |
 | `/mod case recent` | The latest cases in this server | Helper+ or Moderate Members |
 | `/mod ban` | Ban a user (asks to confirm) | Moderator+ or Ban Members |
-| `/mod unban` | Admins and owners: lift a ban by user ID (genrebans and hardbans need bot-wide staff) | Admin+ or Administrator (ordinary bans only; a genreban needs an Overseer+ for a one-server exception, or a Supreme Leader+ to lift it everywhere; a hardban needs a Developer) |
+| `/mod unban` | Admins and owners: lift a ban by user ID (genrebans and hardbans need bot-wide staff) | Admin+ or Administrator (ordinary bans only; an Overseer+ can grant a one-server genreban exception; Supreme Leaders can lift genrebans from the ban-log controls; `,ungenreban`/`,unhardban` require an exact `DEVELOPER_IDS` entry) |
 | `/mod kick` | Kick a member | Moderator+ or Kick Members |
 | `/mod timeout` | Time out a member for a number of minutes | Helper+ or Moderate Members (Helpers up to 60 minutes; Moderators longer) |
 | `/mod untimeout` | Remove a timeout | Moderator+ or Moderate Members |
@@ -143,7 +143,6 @@ Server setup: logs, staff ranks, welcome, config, permissions
 | `/setup permissions list` | Browse the roles that hold Vanguard command access | Head Admin+ |
 | `/setup permissions discord` | Roles holding Administrator or Manage Roles, which can reorder the hierarchy | Head Admin+ |
 | `/setup staff role` | Link a Discord role to a server rank (Head Admin, Admin, Moderator, Helper) | Owner |
-| `/setup staff global` | Developer: make someone Supreme Leader, Overseer or Bot Manager in every server | Developer |
 | `/setup staff report` | Staff activity: actions per staff member | Owner |
 | `/setup staff list` | Show every rank in this server and bot-wide | Helper+ |
 | `/setup staff check` | Show someone's Vanguard rank here | Helper+ |
@@ -208,46 +207,6 @@ Look things up: users, roles, the server and the bot
 | `/info server` | Browse complete server details and Vanguard protection status | Everyone |
 | `/info user` | Member details; staff also see cases, notes, bypasses and Roblox link | Everyone |
 
-## /network
-
-Developers: genrebans and hardbans across every Midtown server
-
-| Command | What it does | Who |
-|---|---|---|
-| `/network genreban` | Developer: ban a user from every authorized server until /network ungenreban | Supreme Leader+ |
-| `/network hardban` | Developer: permanently ban a user from every authorized server until /network unhardban | Supreme Leader+ |
-| `/network exceptions list` | Active genreban exceptions, newest first | Supreme Leader+ |
-| `/network exceptions revoke` | Cancel an exception: the genreban applies in that server again | Supreme Leader+ (exceptions are granted by Overseers and higher through `/mod unban`) |
-| `/network ungenreban` | Supreme Leader+: revoke a genreban and lift it in every authorized server | Supreme Leader+ |
-| `/network unhardban` | Developer: revoke a hardban and lift it in every authorized server | Developer |
-
-## /dev
-
-Bot developers: diagnostics, updates, servers and the database
-
-| Command | What it does | Who |
-|---|---|---|
-| `/dev server list` | Developer: list every server Vanguard is authorized in | Bot Manager+ |
-| `/dev server authorize` | Developer: authorize this server so Vanguard protects it | Overseer+ |
-| `/dev autoreact add` | React to every message from a member (🐐 by default) | Supreme Leader+ |
-| `/dev autoreact remove` | Stop auto-reacting to a member | Supreme Leader+ |
-| `/dev autoreact list` | Members the bot auto-reacts to in this server | Supreme Leader+ |
-| `/dev server ban` | Developer: ban a server from Vanguard | Developer |
-| `/dev database status` | Show database health, storage, backup and migration status | Supreme Leader+ |
-| `/dev database backup` | Create a verified database backup now | Supreme Leader+ |
-| `/dev database backups` | List recent database backups | Supreme Leader+ |
-| `/dev database restore-settings` | Developer: put back lost settings from an old backup file; anything newer is kept | Developer |
-| `/dev database verify` | Recheck backup checksum and database integrity | Supreme Leader+ |
-| `/dev server deauthorize` | Developer: remove this server's authorization and leave | Developer |
-| `/dev diagnostics` | Inspect runtime health without secrets | Bot Manager+ |
-| `/dev inspect` | Read-only overview of any server Vanguard knows | Overseer+ |
-| `/dev broadcast` | Post an announcement to every authorized server's log channel | Bot Manager+ |
-| `/dev status` | Show a custom bot status instead of the rotation | Bot Manager+ |
-| `/dev status-reset` | Return to the normal rotating status | Bot Manager+ |
-| `/dev update` | Automatic GitHub updates: see the status, or install now (Developer) | Supreme Leader+ (anyone with /dev sees the status; installing now needs a Developer) |
-| `/dev server info` | Developer: show this server's authorization details | Bot Manager+ |
-| `/dev server unban` | Developer: remove a server ban | Developer |
-
 ## /help
 
 Browse every command you can use, by section
@@ -301,3 +260,37 @@ Give or take a role from a member, with role rules and hierarchy enforced
 | `/role remove` | Take a role from a member | Everyone (checked role by role, like `/role add`) |
 | `/role restore` | Give a member back the roles they had before they left the server | Everyone (gives back only roles the person could give with `/role add`) |
 | `/role who-can-give` | Choose who can give a role, or see the list (leave everything empty) | Owner or Head Admin (staff roles: owner only) |
+
+## Developer comma commands
+
+**Developer comma commands** · only IDs listed in `DEVELOPER_IDS` (the bot owner is not an implicit exception)
+`,restart` — gracefully restart, then update this message with the actual downtime and readiness status.
+`,authserver` — Developer: authorize this server so Vanguard protects it
+`,autoreact add <user> [--emoji <emoji>]` — React to every message from a member (🐐 by default)
+`,autoreact list` — Members the bot auto-reacts to in this server
+`,autoreact remove <user>` — Stop auto-reacting to a member
+`,banserver [--guild_id <guild_id>] [--reason <reason>]` — Developer: ban a server from Vanguard
+`,database backup` — Create a verified database backup now
+`,database backups` — List recent database backups
+`,database restore-settings <attach file>` — Developer: put back lost settings from an old backup file; anything newer is kept
+`,database status` — Show database health, storage, backup and migration status
+`,database verify <backup>` — Recheck backup checksum and database integrity
+`,deauthserver DEAUTHORIZE` — Developer: remove this server's authorization and leave
+`,dev broadcast <message> [--title <title>] [--confirm <confirm>]` — Post an announcement to every authorized server's log channel
+`,dev diagnostics` — Inspect runtime health without secrets
+`,dev inspect <guild_id>` — Read-only overview of any server Vanguard knows
+`,dev status <text> [--minutes <number>] [--presence online|idle|dnd]` — Show a custom bot status instead of the rotation
+`,dev status-reset` — Return to the normal rotating status
+`,genreban <user> [--reason <reason>] [--evidence <evidence>] [attach file] [--delete_messages 0|3600|86400|604800]` — Developer: ban a user from every authorized server until ,ungenreban
+`,hardban <user> [--reason <reason>] [--evidence <evidence>] [attach file] [--delete_messages 0|3600|86400|604800]` — Developer: permanently ban a user from every authorized server until ,unhardban
+`,netexception list [--user_id <user_id>]` — Active genreban exceptions, newest first
+`,netexception revoke <number>` — Cancel an exception: the genreban applies in that server again
+`,serverauth` — Developer: show this server's authorization details
+`,servers [--page <number>]` — Developer: list every server Vanguard is authorized in
+`,staff global <user> supreme|overseer|botmanager|none` — Developer: make someone Supreme Leader, Overseer or Bot Manager in every server
+`,unbanserver <guild_id>` — Developer: remove a server ban
+`,ungenreban <user> [--reason <reason>]` — Developer: revoke a genreban and lift it in every authorized server
+`,unhardban <user> [--reason <reason>] [--unban]` — Developer: revoke a hardban and lift it in every authorized server
+`,update [status|now]` — Automatic GitHub updates: see the status, or install now (Developer)
+Use quotes for multiword values, `--option value` for optional arguments, and attach the backup file for `,database restore-settings`.
+Slash commands stay permission-checked; use `/help` for the non-developer command menu.

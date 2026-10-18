@@ -2,8 +2,25 @@ import { readdir } from 'node:fs/promises';
 import { dirname, extname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { AppError } from '../errors.js';
+import { isAdminRestricted, needsDeveloper, requiredRank } from './ranks.js';
 export const defaults = { responseKind: 'success', category: 'utility', developerOnly: false, requiresAuthorization: true,
     requiredPermissions: [], botPermissions: [], cooldown: 1500, ephemeralDefault: true, dmAllowed: false, guildOnly: true, access: 'member', deferral: 'defer' };
+const PRIVATE_CATEGORIES = new Set(['moderation', 'security', 'configuration', 'recovery', 'ticket', 'tickets']);
+/** Developer-only slash actions are dispatched only through the comma command handler. */
+export function isDeveloperPrefixOnly(policy, key) {
+    return policy.developerOnly || !!key && needsDeveloper(key);
+}
+/** Slash replies for staff/admin/sensitive actions are private; ordinary utility replies stay public. */
+export function isSensitiveSlashPolicy(policy, key) {
+    return policy.developerOnly
+        || policy.access !== 'member'
+        || PRIVATE_CATEGORIES.has(policy.category)
+        || policy.requiredPermissions.length > 0
+        || !!policy.channelPermissions?.length
+        || !!policy.userChannelPermissions?.length
+        || isAdminRestricted(key)
+        || (requiredRank(key) ?? 0) > 0;
+}
 export function defineCommand(builder, metadata, execute, extra = {}) {
     const data = builder.toJSON();
     // Guild installation/context only. Guild ID is never used for registration.
@@ -59,7 +76,9 @@ export class Registry {
     }
     policy(def, i) {
         const path = i.isChatInputCommand?.() || i.isAutocomplete?.() ? [i.options.getSubcommandGroup(false), i.options.getSubcommand(false)].filter(Boolean).join('/') : '';
-        return { ...def.metadata, ...def.subcommands?.[path], ...def.contextualPolicy?.(i) };
+        const policy = { ...def.metadata, ...def.subcommands?.[path], ...def.contextualPolicy?.(i) };
+        const key = path ? `${def.data.name}/${path}` : def.data.name;
+        return { ...policy, ephemeralDefault: isSensitiveSlashPolicy(policy, key) };
     }
     async load(directory = join(dirname(fileURLToPath(import.meta.url)), '..', 'commands')) {
         const extension = extname(fileURLToPath(import.meta.url));

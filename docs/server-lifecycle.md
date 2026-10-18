@@ -17,7 +17,7 @@ It is posted in the system channel or the first channel where the bot can send e
 
 Keep approved Discord user IDs in `DEVELOPER_IDS` and invite the bot with one of those accounts, with **View Audit Log** granted. The bot checks the latest `BOT_ADD` audit entry. If it names this bot and the current installation time, and its executor is a developer, the server is authorized automatically, server systems start, and the 120-second leave timer is cancelled. A developer merely being a member does not count.
 
-If Discord does not expose the inviter, or the bot lacks View Audit Log, run `/dev server authorize` within 120 seconds. Other inviters keep the same window. Server bans and explicit deauthorization always take precedence. Servers the bot already left need a fresh invite.
+If Discord does not expose the inviter, or the bot lacks View Audit Log, a developer whose exact ID is listed in `DEVELOPER_IDS` can run `,authserver` within 120 seconds. Other inviters keep the same window. Server bans and explicit deauthorization always take precedence. Servers the bot already left need a fresh invite.
 
 The lookup is bounded: up to three reads for a recent pending join (750 ms apart), one read for an older pending install at startup, and a 2.5-second timeout per request. Already-authorized servers need no lookup, and nothing polls continuously.
 

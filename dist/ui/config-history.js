@@ -9,7 +9,7 @@ export async function previewHistory(ctx, i, id) {
     if (!row)
         throw new AppError('VALIDATION_ERROR', 'Configuration history entry not found in this guild.');
     if (row.component === 'authorization')
-        throw new AppError('VALIDATION_ERROR', 'Authorization history is retained for audit. Authorization must be changed by a developer through /dev server authorize, /dev server deauthorize or /dev server info.');
+        throw new AppError('VALIDATION_ERROR', 'Authorization history is retained for audit. Authorization must be changed by a developer through ,authserver, ,deauthserver or ,serverauth.');
     if (row.component === 'antiping')
         throw new AppError('VALIDATION_ERROR', 'Anti-ping changes are retained for audit. Use /security antiping to change Discord protection and keep its rule synchronized.');
     const key = addConfirmation(ctx, { guild: i.guildId, user: i.user.id, snapshot: id, prune: false, fingerprint: row.before_json ?? 'null', action: 'history' });

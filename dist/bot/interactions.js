@@ -3,7 +3,7 @@ import { KeyedQueue } from '../core.js';
 import { BUSY_MESSAGE } from '../recovery/recovery.js';
 import { AppError, logEvent } from '../errors.js';
 import { Guard } from './guard.js';
-import { validateArguments } from './registry.js';
+import { isDeveloperPrefixOnly, validateArguments } from './registry.js';
 import { acknowledge, commandFailure, respond } from './responses.js';
 import { ReplyPanels } from './reply-panels.js';
 import { routeInteraction } from './command-tree.js';
@@ -30,7 +30,7 @@ export class Interactions {
             if (at < Date.now() - 900000)
                 this.seen.delete(id);
         const start = Date.now();
-        let name = 'unknown', path = '', policy, execute;
+        let name = 'unknown', path = '', policy, execute, privateReply = true;
         try {
             const registry = this.services.registry;
             if (i.isCommand() || i.isAutocomplete()) {
@@ -40,11 +40,17 @@ export class Interactions {
                 if (!def)
                     throw new AppError('VALIDATION_ERROR', 'This command was replaced. Refresh Discord and use /help.');
                 policy = registry.policy(def, i);
+                privateReply = i.isAutocomplete() ? true : policy.ephemeralDefault;
                 if (i.isChatInputCommand() || i.isAutocomplete()) {
                     path = [i.options.getSubcommandGroup(false), i.options.getSubcommand(false)].filter(Boolean).join('/');
+                    const key = path ? `${name}/${path}` : name;
+                    if (isDeveloperPrefixOnly(policy, key))
+                        throw new AppError('VALIDATION_ERROR', 'Developer-only actions are comma-prefix only. Run ,help for the current developer command list.');
                     if (!i.isAutocomplete())
                         validateArguments(def.data, i.options.data);
                 }
+                else if (isDeveloperPrefixOnly(policy, name))
+                    throw new AppError('VALIDATION_ERROR', 'Developer-only commands are comma-prefix only.');
                 if (i.isAutocomplete()) {
                     if (!def.autocomplete)
                         throw new AppError('VALIDATION_ERROR', 'Autocomplete is unavailable for this command.');
@@ -65,7 +71,7 @@ export class Interactions {
             // No DB/network/queue awaits before ACK. Validation above is synchronous.
             // A 'modal' policy stays unacknowledged: Discord rejects a modal on a deferred interaction.
             if (policy.deferral !== 'modal')
-                await acknowledge(i, policy.ephemeralDefault);
+                await acknowledge(i, privateReply);
             const actor = await this.guard.check(i, policy, `${name}/${path}`, !i.isAutocomplete());
             const context = { ...this.services, actor, policy, actionKey: `${name}/${path}`, serialize: work => this.queue.run(i.guildId, work), assertActive: () => {
                     if (policy.requiresAuthorization)
@@ -110,7 +116,7 @@ export class Interactions {
             logEvent('command_activity', { command: name, subcommand: path, user: i.user.tag, userId: i.user.id, guildId, guild: i.inCachedGuild() ? i.guild.name : null, durationMs: Date.now() - start, result: 'success' });
         }
         catch (error) {
-            await commandFailure(i, error, name, { subcommand: path, user: i.user.tag, guild: i.inCachedGuild() ? i.guild.name : null, durationMs: Date.now() - start, result: 'failure' });
+            await commandFailure(i, error, name, { subcommand: path, user: i.user.tag, guild: i.inCachedGuild() ? i.guild.name : null, durationMs: Date.now() - start, result: 'failure' }, privateReply);
         }
     }
     clearGuild(id) {

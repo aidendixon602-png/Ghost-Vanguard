@@ -7,6 +7,9 @@ import { createRecord, setStatus } from '../src/audit/ban-log.js';
 import { askLauncher, describeUpdate } from '../src/bot/updater-link.js';
 import bans from '../src/commands/moderation/bans.js';
 import dev from '../src/commands/developer/dev.js';
+import { Registry } from '../src/bot/registry.js';
+import { treeJson } from '../src/bot/command-tree.js';
+import { prefixHelp } from '../src/bot/prefix-commands.js';
 
 const G = '500000000000000001', MOD = '223456789012345678', U1 = '400000000000000001', U2 = '400000000000000002';
 
@@ -71,10 +74,16 @@ test('/dev update talks to launch.js, and explains when it is not available', as
     assert.match(disabled, /Restart in the hosting panel/, 'explains how to apply the fix');
 });
 
-test('/dev update stays available, but restarting is now the ,restart message command', () => {
+test('/dev update is comma-only and restarts stay on ,restart', async () => {
     const subcommands = (dev.data.options ?? []).map(option => option.name);
-    assert.ok(subcommands.includes('update'));
+    assert.ok(subcommands.includes('update'), 'the handler and GitHub updater remain intact');
     assert.equal(subcommands.includes('restart'), false);
+    const registry = new Registry();
+    await registry.load();
+    const tree = treeJson(registry);
+    assert.equal(tree.some(command => command.name === 'dev'), false, '/dev is hidden from the slash-command list');
+    assert.match(prefixHelp(registry), /`,update \[status\|now\]`/);
+    assert.match(prefixHelp(registry), /`,restart`/);
 });
 
 test('launcher restart requests ask launch.js and report when unavailable', async () => {

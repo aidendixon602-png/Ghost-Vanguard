@@ -14,7 +14,7 @@ export default defineCommand(new SlashCommandBuilder().setName('autoreact').setD
     if (sub === 'list') {
         const rows = ctx.store.all('SELECT user_id, emoji FROM autoreact_users WHERE guild_id=? ORDER BY at', guild);
         if (!rows.length)
-            return 'No auto-reactions in this server. Add one with `/dev autoreact add`.';
+            return 'No auto-reactions in this server. Add one with `,autoreact add`.';
         return [`**Auto-reactions in this server (${rows.length}):**`, ...rows.map(r => `${r.emoji}  <@${r.user_id}>`)].join('\n');
     }
     const user = i.options.getUser('user', true);

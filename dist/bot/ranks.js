@@ -124,9 +124,9 @@ export const COMMAND_RANK = {
     authorizedservers: 5, serverauth: 5, 'dev/diagnostics': 5, 'dev/status': 5, 'dev/status-reset': 5, 'dev/broadcast': 5, 'staff/list': 1, 'staff/check': 1,
     // Overseer
     'dev/inspect': 6, authserver: 6,
-    // Supreme Leader (and Developers): everyday bot tools. Installing updates (`/dev update action:now`) is checked in the command.
+    // Formerly rank-gated bot tools now use the comma-only Developer surface.
     dev: 7, 'dev/update': 7, database: 7, autoreact: 7,
-    // Network bans: Supreme Leaders issue them and lift genrebans. Hardbans are lifted only by a Developer.
+    // Network-ban issuance/revocation uses comma commands; Supreme Leaders may still lift genrebans from ban-log controls.
     genreban: 7, ungenreban: 7, hardban: 7, netexception: 7,
     // Developer only (the bot owner and DEVELOPER_IDS): anything that can take the bot down, rewrite its data or
     // reach every server at once. No Discord permission, server role or lower rank unlocks these.
@@ -134,7 +134,7 @@ export const COMMAND_RANK = {
 };
 /** Commands above Supreme Leader: only Developers. */
 export const needsDeveloper = (key) => (requiredRank(key) ?? 0) > RANKS.supreme;
-export const DEVELOPER_ONLY_MESSAGE = 'Only a **Developer** (the bot owner, or someone in `DEVELOPER_IDS`) can do this. It affects the bot in every server (restarts, updates, the database, removing servers, bot-wide ranks or lifting hardbans).';
+export const DEVELOPER_ONLY_MESSAGE = 'Developer-only actions are available as comma commands to IDs listed in `DEVELOPER_IDS`. `BOT_OWNER_ID` alone is not an exception; add the owner ID to `DEVELOPER_IDS` to use them. Run `,help` for the current list.';
 /** Who may lift a network ban everywhere: genreban = Supreme Leader or Developer, hardban = Developer only. */
 export function canLiftNetworkBan(store, userId, kind) {
     return explicitRank(store, null, userId) >= (kind === 'hardban' ? RANKS.developer : RANKS.supreme);

@@ -12,7 +12,7 @@ import {
 } from './network-ban.js';
 
 /**
- * /network genreban, /network hardban and their revoke commands share one implementation; only the
+ * ,genreban, ,hardban and their revoke commands share one implementation; only the
  * wording and what enforcement does afterwards differ. All four are developer-only.
  */
 
@@ -21,8 +21,8 @@ const POLICY = { category: 'developer', developerOnly: true, requiresAuthorizati
 const OTHER: Record<NetworkKind, NetworkKind> = { genreban: 'hardban', hardban: 'genreban' };
 
 const AFTER: Record<NetworkKind, string> = {
-    genreban: 'While the genreban is active, the bot bans them again if they join any authorized server, including servers authorized later. Only a developer can lift it, with `/network ungenreban`.',
-    hardban: 'While the hardban is active, the bot bans them again whenever they are unbanned or join, and re-checks every server every 10 minutes and after restarts. Only a developer can lift it, with `/network unhardban`.',
+    genreban: 'While the genreban is active, the bot bans them again if they join any authorized server, including servers authorized later. Only a developer can lift it, with `,ungenreban`.',
+    hardban: 'While the hardban is active, the bot bans them again whenever they are unbanned or join, and re-checks every server every 10 minutes and after restarts. Only a developer can lift it, with `,unhardban`.',
 };
 
 function header(ban: Pick<NetworkBan, 'id' | 'kind' | 'reason' | 'evidence' | 'evidence_file' | 'moderator_id' | 'created_at'> | null, user: Parameters<typeof describeUser>[0], fields: { reason: string; evidence?: string | null; evidenceFile?: string | null; moderator: string }) {
@@ -44,8 +44,8 @@ async function refuse(i: any, error: unknown, context: string) {
 export function issueCommand(kind: NetworkKind) {
     const name = KIND_NAME[kind];
     const description = kind === 'hardban'
-        ? 'Developer: permanently ban a user from every authorized server until /network unhardban'
-        : 'Developer: ban a user from every authorized server until /network ungenreban';
+        ? 'Developer: permanently ban a user from every authorized server until ,unhardban'
+        : 'Developer: ban a user from every authorized server until ,ungenreban';
     return defineCommand(new SlashCommandBuilder().setName(kind).setDescription(description)
         .addStringOption(o => o.setName('user').setDescription('User ID, @mention or username. IDs work even if they are in no server.').setRequired(true).setMaxLength(40))
         .addStringOption(o => o.setName('reason').setDescription('Reason, shown in every server\'s log and audit log (optional)').setMaxLength(400))
@@ -90,7 +90,7 @@ export function issueCommand(kind: NetworkKind) {
                 replaces ? `Their active genreban **${recordId(replaces)}** is closed and replaced by this hardban.` : 'A record is saved, every server\'s log channel is told, and a moderation case is recorded in each server.',
             ],
             label: kind === 'hardban' ? `Hardban in ${count} server${count === 1 ? '' : 's'}` : `Genreban in ${count} server${count === 1 ? '' : 's'}`,
-            reversal: `\`/network un${kind}\` lifts it in every server where the bot placed it.`,
+            reversal: `\`,un${kind}\` lifts it in every server where the bot placed it.`,
             run: async (c, b) => {
                 let ban: NetworkBan;
                 try {
@@ -120,7 +120,7 @@ export function issueCommand(kind: NetworkKind) {
 
 export function revokeCommand(kind: NetworkKind) {
     const name = KIND_NAME[kind];
-    const builder = new SlashCommandBuilder().setName(`un${kind}`).setDescription(`${kind === 'hardban' ? 'Developer' : 'Supreme Leader+'}: revoke a ${kind} and lift it in every authorized server`)
+    const builder = new SlashCommandBuilder().setName(`un${kind}`).setDescription(`Developer: revoke a ${kind} and lift it in every authorized server`)
         .addStringOption(o => o.setName('user').setDescription('User ID, @mention, or the username recorded with the ban').setRequired(true).setMaxLength(40))
         .addStringOption(o => o.setName('reason').setDescription('Reason for lifting it (optional)').setMaxLength(400));
     if (kind === 'hardban')
@@ -168,5 +168,5 @@ function findActive(ctx: CommandContext, kind: NetworkKind, input: string): Netw
     if (ban)
         return ban;
     const other = userId ? activeBan(ctx.store, OTHER[kind], userId) : undefined;
-    throw new AppError('VALIDATION_ERROR', `Could not find an active ${kind} for \`${clip(input, 40)}\`.${other ? ` They have an active ${OTHER[kind]} (${recordId(other)}) instead; use \`/network un${OTHER[kind]}\`.` : ''}`);
+    throw new AppError('VALIDATION_ERROR', `Could not find an active ${kind} for \`${clip(input, 40)}\`.${other ? ` They have an active ${OTHER[kind]} (${recordId(other)}) instead; use \`,un${OTHER[kind]}\`.` : ''}`);
 }

@@ -4,57 +4,35 @@ Generated from the bot itself (`npm run docs`). Every rank can also use everythi
 
 - **Bot-wide ranks** (Developer, Supreme Leader, Overseer, Bot Manager) work in every server.
 - **Server ranks** (Owner, Head Admin, Admin, Moderator, Helper) work only in the server they were given in.
-- **Developer is the top rank** (the bot owner and `DEVELOPER_IDS`). Restarts, installing updates, restoring data, removing servers, bot-wide ranks and lifting hardbans are Developer only, so giving someone Supreme Leader or lower cannot break the bot.
-- **Unbans:** ordinary bans are lifted by Admins and server owners; genrebans by a Supreme Leader or Developer (or a one-server exception from an Overseer+); hardbans only by a Developer.
+- **Developer is the top bot-wide rank** (the bot owner and `DEVELOPER_IDS`). Developer operations use comma-prefix commands; Developer-only slash entries are hidden and stale slash calls are rejected.
+- **Every comma command requires an exact `DEVELOPER_IDS` entry.** `BOT_OWNER_ID` alone is not enough; add the owner ID to `DEVELOPER_IDS` if the owner should use comma commands. This also applies to commands that were previously available to other bot-wide ranks.
+- **Unbans:** ordinary bans are lifted by Admins and server owners; Supreme Leaders can lift genrebans through ban-log controls (or an Overseer+ can grant a one-server exception); `,ungenreban` and `,unhardban` require an exact `DEVELOPER_IDS` entry.
 - **Anti-nuke** ignores only Developers, Supreme Leaders, the server owner and whitelisted people. Every other rank is still watched.
 - Check anyone with `/setup staff check user:@them`; see all ranks with `/setup staff list`.
 
 ## 🧰 Developer
 
-The top rank: the bot owner (`BOT_OWNER_ID`) and anyone in `DEVELOPER_IDS`. Everything, including the tools that can take the bot down or reach every server at once: restarts, installing updates, restoring database settings, removing or banning servers, giving bot-wide ranks and lifting hardbans. Ignored by anti-nuke. Set only in `.env`.
+The top bot-wide rank: the bot owner (`BOT_OWNER_ID`) and anyone in `DEVELOPER_IDS`. Developer operations use comma-prefix commands, including diagnostics, updates, database and server controls, global rank changes and network bans. Every comma command requires the exact user ID in `DEVELOPER_IDS`; `BOT_OWNER_ID` alone is not an exception.
 
-- `/dev database restore-settings`: Developer: put back lost settings from an old backup file; anything newer is kept
-- `/dev server ban`: Developer: ban a server from Vanguard
-- `/dev server deauthorize`: Developer: remove this server's authorization and leave
-- `/dev server unban`: Developer: remove a server ban
-- `/network unhardban`: Developer: revoke a hardban and lift it in every authorized server
-- `/setup staff global`: Developer: make someone Supreme Leader, Overseer or Bot Manager in every server
+_Everything below._
 
 ## 👑 Supreme Leader
 
-Bot-wide, every server: everything except the Developer-only tools. Diagnostics, update status, database health and backups, genrebans and hardbans, lifting genrebans. Ignored by anti-nuke. Given with `/setup staff global` or `SUPREME_LEADER_IDS`.
+Bot-wide, every server: everything below. A Supreme Leader can lift genrebans from ban-log controls, but Developer comma commands require an exact `DEVELOPER_IDS` entry. Given with `/setup staff global` or `SUPREME_LEADER_IDS`.
 
-- `/dev autoreact add`: React to every message from a member (🐐 by default)
-- `/dev autoreact list`: Members the bot auto-reacts to in this server
-- `/dev autoreact remove`: Stop auto-reacting to a member
-- `/dev database backup`: Create a verified database backup now
-- `/dev database backups`: List recent database backups
-- `/dev database status`: Show database health, storage, backup and migration status
-- `/dev database verify`: Recheck backup checksum and database integrity
-- `/dev update`: Automatic GitHub updates: see the status, or install now (Developer) _(anyone with /dev sees the status; installing now needs a Developer)_
-- `/network exceptions list`: Active genreban exceptions, newest first
-- `/network exceptions revoke`: Cancel an exception: the genreban applies in that server again _(exceptions are granted by Overseers and higher through `/mod unban`)_
-- `/network genreban`: Developer: ban a user from every authorized server until /network ungenreban
-- `/network hardban`: Developer: permanently ban a user from every authorized server until /network unhardban
-- `/network ungenreban`: Supreme Leader+: revoke a genreban and lift it in every authorized server
+_No extra commands; see the ranks below._
 
 ## 🔭 Overseer
 
-Bot-wide, every server: Bot Manager plus inspecting and authorizing servers, and letting a genrebanned person back into one server. Given with `/setup staff global`.
+Bot-wide, every server: everything below, and can grant a one-server genreban exception through `/mod unban`. Developer comma commands require an exact `DEVELOPER_IDS` entry. Given with `/setup staff global`.
 
-- `/dev inspect`: Read-only overview of any server Vanguard knows
-- `/dev server authorize`: Developer: authorize this server so Vanguard protects it
+_No extra commands; see the ranks below._
 
 ## 🛠️ Bot Manager
 
-Bot-wide, every server: Head Admin everywhere plus bot status, diagnostics and announcements. Given with `/setup staff global`.
+Bot-wide, every server: Head Admin-level access across servers. This rank does not unlock comma commands; those require an exact `DEVELOPER_IDS` entry. Given with `/setup staff global`.
 
-- `/dev broadcast`: Post an announcement to every authorized server's log channel
-- `/dev diagnostics`: Inspect runtime health without secrets
-- `/dev server info`: Developer: show this server's authorization details
-- `/dev server list`: Developer: list every server Vanguard is authorized in
-- `/dev status`: Show a custom bot status instead of the rotation
-- `/dev status-reset`: Return to the normal rotating status
+_No extra commands; see the ranks below._
 
 ## 🏠 Server Owner
 
@@ -122,7 +100,7 @@ Server rank: lifting ordinary bans and accepting appeals, raid tools, automod, s
 
 - `/antinuke scan`: Safety scan: powerful roles, roles above Vanguard, bots with Administrator
 - `/mod massban`: Raid cleanup: ban up to 200 user IDs at once (whitelisted staff only) _(must also be on the anti-nuke whitelist)_
-- `/mod unban`: Admins and owners: lift a ban by user ID (genrebans and hardbans need bot-wide staff) _(ordinary bans only; a genreban needs an Overseer+ for a one-server exception, or a Supreme Leader+ to lift it everywhere; a hardban needs a Developer)_
+- `/mod unban`: Admins and owners: lift a ban by user ID (genrebans and hardbans need bot-wide staff) _(ordinary bans only; an Overseer+ can grant a one-server genreban exception; Supreme Leaders can lift genrebans from the ban-log controls; `,ungenreban`/`,unhardban` require an exact `DEVELOPER_IDS` entry)_
 - `/roblox bloxlink-sync`: Ask Bloxlink to re-sync this member's linked roles and nickname
 - `/security antiping bypass`: Allow or disallow a role to mention protected staff
 - `/security antiping disable`: Disable staff mention blocking

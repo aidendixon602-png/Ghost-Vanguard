@@ -32,6 +32,7 @@ test('no Supreme Leader is built into the code, and every start lists who has bo
         store.run("INSERT INTO bot_staff(user_id,level,by_id,at) VALUES('555555555555555555','supreme','x',1)");
         const text = accessSummary(store).join('\n');
         assert.match(text, /Supreme.*555555555555555555/);
+        assert.match(text, /Comma IDs/);
         assert.match(text, /Bot-wide.*444444444444444444 \(botmanager\)/);
         assert.match(text, /Bot DMs to/);
     } finally { store.close(); }

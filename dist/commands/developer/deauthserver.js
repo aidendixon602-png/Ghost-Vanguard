@@ -12,7 +12,7 @@ export default defineCommand(new SlashCommandBuilder().setName('deauthserver').s
             'Stored configuration, snapshots and audit history are kept.',
         ],
         label: 'Revoke and leave',
-        reversal: 'Re-invite the bot and run `/dev server authorize` within 120 seconds.',
+        reversal: 'Re-invite the bot and run `,authserver` within 120 seconds.',
         run: (c, b) => Promise.resolve(c.lifecycle.deauthorize(b.guild, b.user.id)),
     });
 });
