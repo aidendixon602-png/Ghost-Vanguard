@@ -83,11 +83,14 @@ export async function syncGroupRoles(store: Store, member: GuildMember, robloxId
 }
 
 /** A profile card for /roblox lookup. */
-export async function lookupCard(store: Store, guild: string, robloxId: string) {
+export async function lookupCard(store: Store, guild: string, robloxId: string, bloxlinkDiscordIds: string[] | null = null) {
     const [user, past, groups, avatar] = await Promise.all([robloxUser(robloxId), robloxPastNames(robloxId), robloxGroups(robloxId), robloxAvatar(robloxId)]);
     if (!user) return null;
     const age = accountAgeDays(user.created);
-    const linked = store.all('SELECT user_id FROM links WHERE guild_id=? AND roblox_id=?', guild, robloxId).map(r => `<@${r.user_id}>`);
+    const linked = [...new Set([
+        ...store.all('SELECT user_id FROM links WHERE guild_id=? AND roblox_id=?', guild, robloxId).map(r => String(r.user_id)),
+        ...(bloxlinkDiscordIds ?? []),
+    ])].map(id => `<@${id}>`);
     const block = blacklistEntry(store, guild, robloxId);
     const c = groupConfig(store, guild), inGroup = c.groupId ? groups?.find(g => g.groupId === c.groupId) : null;
     const lines = [

@@ -19,6 +19,12 @@ type Lookup = {
     rejected?: boolean;
 };
 
+export interface BloxlinkUpdateResult {
+    addedRoles: string[];
+    removedRoles: string[];
+    nickname: string | null;
+}
+
 const PROVIDER_NAMES = { rover: 'RoVer', bloxlink: 'Bloxlink' } as const;
 const KEY_SETTINGS = { rover: 'ROVER_API_KEY', bloxlink: 'BLOXLINK_API_KEY' } as const;
 /** How long to stop calling a provider for one server after it rejects our key. */
@@ -92,6 +98,99 @@ export class Roblox {
             this.observed(provider, guild, false, 'Network/request failure; try again later.');
             return { kind: 'error' };
         }
+    }
+
+    /** Resolve a Roblox account to Discord members through Bloxlink; null means the lookup is unavailable. */
+    async discordIdsForRoblox(guild: string, robloxId: string): Promise<string[] | null> {
+        const key = config.bloxlinkKey;
+        if (!key || this.store.get('SELECT enabled FROM provider_config WHERE guild_id=? AND provider=?', guild, 'bloxlink')?.enabled === 0)
+            return null;
+        if (!/^\d{1,20}$/.test(robloxId) || (this.providerCooldown.get('bloxlink') ?? 0) > Date.now() || (this.providerCooldown.get(`bloxlink:${guild}`) ?? 0) > Date.now())
+            return null;
+        try {
+            this.store.assertAuthorized(guild);
+            const response = await this.http.get(`${guild}:bloxlink:reverse:${robloxId}`,
+                `https://api.blox.link/v4/public/guilds/${guild}/roblox-to-discord/${robloxId}`, { Authorization: key });
+            if (response.status === 404) {
+                this.observed('bloxlink', guild, true, 'Provider responded; no linked Discord accounts were found.');
+                return [];
+            }
+            if (response.status === 401 || response.status === 403) {
+                this.observed('bloxlink', guild, false, `HTTP ${response.status}; check BLOXLINK_API_KEY and server access.`);
+                this.providerCooldown.set(`bloxlink:${guild}`, Date.now() + REJECTED_KEY_PAUSE_MS);
+                console.warn(`[verification] Bloxlink rejected the API key for guild ${guild} (HTTP ${response.status}); check BLOXLINK_API_KEY and server access. Pausing lookups for 5 minutes.`);
+                return null;
+            }
+            if (!response.ok) {
+                this.observed('bloxlink', guild, false, `HTTP ${response.status}; retry after the provider pause.`);
+                if (response.status === 429 || response.status >= 500) this.providerCooldown.set('bloxlink', Date.now() + 60000);
+                console.warn(`[verification] Bloxlink reverse lookup HTTP ${response.status}; credentials and response bodies omitted.`);
+                return null;
+            }
+            const data = await response.json() as { discordIDs?: unknown };
+            if (!Array.isArray(data.discordIDs)) {
+                this.observed('bloxlink', guild, false, 'Provider returned an incomplete reverse-lookup response.');
+                return null;
+            }
+            const ids = [...new Set(data.discordIDs.map(String).filter(id => /^\d{17,20}$/.test(id)))];
+            this.observed('bloxlink', guild, true, ids.length ? 'Provider returned linked Discord accounts.' : 'Provider returned no linked Discord accounts.');
+            return ids;
+        } catch {
+            this.observed('bloxlink', guild, false, 'Network/request failure; try again later.');
+            return null;
+        }
+    }
+
+    /** Explicitly request Bloxlink to re-run its configured verification for a member. This is a non-retried POST. */
+    async updateBloxlinkUser(member: GuildMember): Promise<BloxlinkUpdateResult> {
+        const guild = member.guild.id;
+        return this.queue.run(`${guild}:${member.id}`, async () => {
+            this.store.assertAuthorized(guild);
+            const key = config.bloxlinkKey;
+            if (!key) throw new AppError('INTEGRATION_ERROR', 'Bloxlink is not configured. Set BLOXLINK_API_KEY in .env.');
+            if (this.store.get('SELECT enabled FROM provider_config WHERE guild_id=? AND provider=?', guild, 'bloxlink')?.enabled === 0)
+                throw new AppError('INTEGRATION_ERROR', 'Bloxlink verification is disabled in this server.');
+            if (this.store.get('SELECT enabled FROM feature_settings WHERE guild_id=? AND feature=?', guild, 'verification')?.enabled === 0)
+                throw new AppError('INTEGRATION_ERROR', 'Verification is disabled in this server.');
+            if (this.store.get('SELECT 1 FROM backups WHERE guild_id=? AND user_id=? AND active=1', guild, member.id))
+                throw new AppError('INTEGRATION_ERROR', 'Bloxlink updates are unavailable while this member is quarantined.');
+            const paused = Math.max(this.providerCooldown.get('bloxlink') ?? 0, this.providerCooldown.get(`bloxlink:${guild}`) ?? 0);
+            if (paused > Date.now()) throw new AppError('INTEGRATION_ERROR', 'Bloxlink requests are temporarily paused after a provider error. Try again later.');
+            const fresh = await member.guild.members.fetch({ user: member.id, force: true }).catch(() => null);
+            if (!fresh) throw new AppError('VALIDATION_ERROR', 'That member is no longer in this server.');
+            this.store.assertAuthorized(guild);
+            let response: Response;
+            try {
+                response = await fetch(`https://api.blox.link/v4/public/guilds/${guild}/update-user/${member.id}`, {
+                    method: 'POST', headers: { Authorization: key }, signal: AbortSignal.timeout(10000),
+                });
+            } catch {
+                this.observed('bloxlink', guild, false, 'Update request failed or timed out; check Bloxlink before retrying.');
+                throw new AppError('INTEGRATION_ERROR', 'The Bloxlink update request failed or timed out. Check the member in Bloxlink before retrying.');
+            }
+            if (response.status === 401 || response.status === 403) {
+                this.observed('bloxlink', guild, false, `HTTP ${response.status}; check BLOXLINK_API_KEY and server access.`);
+                this.providerCooldown.set(`bloxlink:${guild}`, Date.now() + REJECTED_KEY_PAUSE_MS);
+                console.warn(`[verification] Bloxlink rejected the API key for guild ${guild} (HTTP ${response.status}); check BLOXLINK_API_KEY and server access. Pausing requests for 5 minutes.`);
+                throw new AppError('INTEGRATION_ERROR', 'Bloxlink rejected the API key for this server. Check BLOXLINK_API_KEY and its server access.');
+            }
+            if (response.status === 404) {
+                this.observed('bloxlink', guild, true, 'Provider could not find a linked account or current server member.');
+                throw new AppError('VALIDATION_ERROR', 'Bloxlink could not find a linked account for that member in this server.');
+            }
+            if (!response.ok) {
+                this.observed('bloxlink', guild, false, `HTTP ${response.status}; retry after the provider pause.`);
+                if (response.status === 429 || response.status >= 500) this.providerCooldown.set('bloxlink', Date.now() + 60000);
+                console.warn(`[verification] Bloxlink update HTTP ${response.status}; credentials and response bodies omitted.`);
+                throw new AppError('INTEGRATION_ERROR', `Bloxlink update failed (HTTP ${response.status}). Check Bloxlink before retrying.`);
+            }
+            const data = await response.json().catch(() => null) as Partial<BloxlinkUpdateResult> | null;
+            if (!data || typeof data !== 'object') throw new AppError('INTEGRATION_ERROR', 'Bloxlink returned an unreadable update response. Check the member in Bloxlink.');
+            this.store.assertAuthorized(guild);
+            const roleNames = (value: unknown) => Array.isArray(value) ? [...new Set(value.filter((name): name is string => typeof name === 'string').map(name => name.trim()).filter(Boolean))].slice(0, 20) : [];
+            this.observed('bloxlink', guild, true, 'Member update completed.');
+            return { addedRoles: roleNames(data.addedRoles), removedRoles: roleNames(data.removedRoles), nickname: typeof data.nickname === 'string' ? data.nickname : null };
+        });
     }
 
     clearGuild(id: string) {

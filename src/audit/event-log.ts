@@ -42,6 +42,8 @@ export interface LogEvent {
     actorUnverified?: boolean;
     /** Label for the actor field (default "By"). */
     actorLabel?: string;
+    /** Use mentions as the only actor/target identifiers instead of repeating raw IDs in the footer. */
+    compact?: boolean;
     /** Label for the target field (default "Target"). */
     targetLabel?: string;
     color?: number;
@@ -79,15 +81,15 @@ export function logsCategory(store: Store, guildId: string, category: LogCategor
 
 const FIELD = /^\*\*(.+?):\*\*\s?([\s\S]*)$/;
 
-/** Compact embed: coloured sidebar, the person's avatar, one field per detail, IDs and a timestamp. */
+/** Render a log embed with actor, target, details, and timestamp; compact cards avoid repeated IDs. */
 export function renderEvent(event: LogEvent): EmbedBuilder {
     const at = event.at ?? Date.now();
     const e = new EmbedBuilder().setColor(event.color ?? CATEGORY_COLOR[event.category]).setTitle(event.action.slice(0, 256)).setTimestamp(at);
-    if (event.author) e.setAuthor({ name: event.author.name.slice(0, 256), iconURL: event.author.iconURL ?? undefined });
+    if (event.author && !event.compact) e.setAuthor({ name: event.author.name.slice(0, 256), iconURL: event.author.iconURL ?? undefined });
     const fields: { name: string; value: string; inline?: boolean }[] = [];
     const loose: string[] = [];
     if (event.target) fields.push({ name: event.targetLabel ?? 'Target', value: event.target, inline: true });
-    if (event.actorId) fields.push({ name: event.actorLabel ?? 'By', value: `<@${event.actorId}> (\`${event.actorId}\`)`, inline: true });
+    if (event.actorId) fields.push({ name: event.actorLabel ?? 'By', value: event.compact ? `<@${event.actorId}>` : `<@${event.actorId}> (\`${event.actorId}\`)`, inline: true });
     else if (event.actorUnverified) fields.push({ name: event.actorLabel ?? 'By', value: 'Unavailable (could not be verified)', inline: true });
     for (const line of event.details ?? []) {
         const m = FIELD.exec(line);
@@ -97,13 +99,18 @@ export function renderEvent(event: LogEvent): EmbedBuilder {
     if (loose.length) e.setDescription(loose.join('\n').slice(0, 3900));
     if (fields.length) e.addFields(fields);
     if (event.image) e.setImage(event.image);
-    const ids = [event.targetId && `${event.targetLabel ? `${event.targetLabel} ` : ''}ID: ${event.targetId}`, event.actorId && `By: ${event.actorId}`].filter(Boolean).join(' · ');
+    const ids = event.compact ? '' : [event.targetId && `${event.targetLabel ? `${event.targetLabel} ` : ''}ID: ${event.targetId}`, event.actorId && `By: ${event.actorId}`].filter(Boolean).join(' · ');
     e.setFooter({ text: ids || 'Ghost Vanguard' });
     return e;
 }
 
+function compactTarget(target: string | null | undefined) {
+    const mention = /^(<@\d+>)(?:\s+\([\s\S]*\))?$/.exec(target ?? '');
+    return mention ? mention[1]! : target;
+}
+
 /** Store an event and post it to the event log channel, if logging is on for its category. */
-export function recordEvent(store: Store, logs: LogQueue, guildId: string, event: LogEvent): boolean {
+export function recordEvent(store: Store, logs: LogQueue, guildId: string, event: LogEvent, options: { post?: boolean; compact?: boolean } = {}): boolean {
     const config = eventLogConfig(store, guildId);
     if (!config.enabled || !config.categories.has(event.category))
         return false;
@@ -117,7 +124,10 @@ export function recordEvent(store: Store, logs: LogQueue, guildId: string, event
         ...(clean.details ?? []),
     ];
     store.run('INSERT INTO event_log(guild_id,at,category,action,actor_id,target_id,target,summary) VALUES(?,?,?,?,?,?,?,?)', guildId, at, event.category, event.action, event.actorId ?? null, event.targetId ?? null, clean.target ?? null, lines.join('\n') || event.action);
-    logs.push(guildId, renderEvent(clean), [], config.channelId);
+    if (options.post !== false) {
+        const display = options.compact ? { ...clean, compact: true, author: null, target: compactTarget(clean.target) } : clean;
+        logs.push(guildId, renderEvent(display), [], config.channelId);
+    }
     return true;
 }
 
@@ -368,10 +378,94 @@ export function describeAudit(entry: GuildAuditLogsEntry, guild: Guild, options:
         author: user ? { name: user.tag ?? user.username, iconURL: user.displayAvatarURL() } : null, channelId };
 }
 
+const ROLE_CHANGE_GROUP_WINDOW_MS = 4000;
+
+interface PendingRoleChangeLog {
+    store: Store;
+    logs: LogQueue;
+    guildId: string;
+    event: LogEvent;
+    added: Set<string>;
+    removed: Set<string>;
+    otherDetails: Set<string>;
+    count: number;
+    timer: ReturnType<typeof setTimeout>;
+}
+
+const pendingRoleChangeLogs = new Map<string, PendingRoleChangeLog>();
+
+function addRoleEventDetails(batch: PendingRoleChangeLog, event: LogEvent) {
+    for (const line of event.details ?? []) {
+        const match = FIELD.exec(line);
+        if (!match) {
+            if (line.trim()) batch.otherDetails.add(line);
+            continue;
+        }
+        const label = match[1]!.toLowerCase();
+        const roles = label === 'roles added' ? batch.added : label === 'roles removed' ? batch.removed : null;
+        if (!roles) {
+            batch.otherDetails.add(line);
+            continue;
+        }
+        for (const role of match[2]!.split(/,\s*/).map(value => value.trim()).filter(Boolean))
+            roles.add(role);
+    }
+}
+
+function flushRoleChangeLog(key: string) {
+    const batch = pendingRoleChangeLogs.get(key);
+    if (!batch) return;
+    clearTimeout(batch.timer);
+    pendingRoleChangeLogs.delete(key);
+
+    const config = eventLogConfig(batch.store, batch.guildId);
+    if (!config.enabled || !config.categories.has(batch.event.category) || isExcluded(batch.store, batch.guildId, batch.event.channelId)) return;
+
+    const details: string[] = [];
+    if (batch.added.size) details.push(`**Added:** ${[...batch.added].join(', ')}`);
+    if (batch.removed.size) details.push(`**Removed:** ${[...batch.removed].join(', ')}`);
+    details.push(...batch.otherDetails);
+    const summary: LogEvent = {
+        ...batch.event,
+        action: batch.count > 1 ? `Role changes · ${batch.count} updates` : 'Role changes',
+        details,
+        target: batch.event.targetId ? `<@${batch.event.targetId}>` : compactTarget(batch.event.target),
+        author: null,
+        compact: true,
+        color: Colors.Purple,
+    };
+    const clean: LogEvent = { ...summary, details: (summary.details ?? []).map(detail => redact(detail)), target: redact(summary.target) };
+    batch.logs.push(batch.guildId, renderEvent(clean), [], config.channelId);
+}
+
+function queueRoleChangeLog(store: Store, logs: LogQueue, guildId: string, event: LogEvent) {
+    const key = `${guildId}:${event.actorId}:${event.targetId}`;
+    let batch = pendingRoleChangeLogs.get(key);
+    if (!batch) {
+        batch = { store, logs, guildId, event, added: new Set(), removed: new Set(), otherDetails: new Set(), count: 0,
+            timer: setTimeout(() => flushRoleChangeLog(key), ROLE_CHANGE_GROUP_WINDOW_MS) };
+        pendingRoleChangeLogs.set(key, batch);
+    }
+    batch.event = { ...event, author: event.author ?? batch.event.author, target: event.target ?? batch.event.target };
+    batch.count++;
+    addRoleEventDetails(batch, event);
+}
+
+/** Flush pending role summaries immediately, for shutdown and deterministic tests. */
+export function flushPendingRoleChangeLogs() {
+    for (const key of [...pendingRoleChangeLogs.keys()]) flushRoleChangeLog(key);
+}
+
 export function recordAuditEvent(store: Store, logs: LogQueue, entry: GuildAuditLogsEntry, guild: Guild) {
     const event = describeAudit(entry, guild, { ignoreBotRoutine: logChannels(store, guild.id).ignoreBotRoutine });
-    if (event)
-        recordEvent(store, logs, guild.id, event);
+    if (!event) return;
+    if (event.action === 'Roles Updated' && event.actorId && event.targetId) {
+        // Preserve every audit event in history, but post rapid same-actor/same-target edits as one card.
+        if (recordEvent(store, logs, guild.id, event, { post: false }))
+            queueRoleChangeLog(store, logs, guild.id, event);
+        return;
+    }
+    recordEvent(store, logs, guild.id, event, { compact: true });
 }
 
 export function recordMemberEvent(store: Store, logs: LogQueue, member: GuildMember | PartialGuildMember, joined: boolean) {
@@ -381,5 +475,5 @@ export function recordMemberEvent(store: Store, logs: LogQueue, member: GuildMem
         category: 'members', action: joined ? 'Member joined' : 'Member left',
         targetId: member.id, target: `<@${member.id}>${user?.tag ? ` (${user.tag})` : ''}`,
         details: joined && created ? [`**Account:**${created.replace(' · account', '')}`] : [],
-    });
+    }, { compact: true });
 }

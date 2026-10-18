@@ -90,6 +90,9 @@ test('deleted and edited messages are logged with their text when message loggin
         store.withAuthorized(G, async () => configureEventLog(store, G, { enabled: true, channelId: '444444444444444444' }));
         logDeletedMessage(store, queue, msg('hello there'));
         assert.match(JSON.stringify(logs[0].e), /Message Deleted/); assert.match(JSON.stringify(logs[0].e), /hello there/);
+        assert.equal(logs[0].e.author, undefined, 'message author is shown once in the field');
+        assert.equal(logs[0].e.fields.find((field: any) => field.name === 'Author')?.value, `<@${U}>`);
+        assert.equal(logs[0].e.footer.text, 'Ghost Vanguard');
         logDeletedMessage(store, queue, msg(null));
         assert.match(JSON.stringify(logs[1].e), /Unavailable \(message sent before Vanguard started\)/);
         logDeletedMessage(store, queue, msg('bot text', true));

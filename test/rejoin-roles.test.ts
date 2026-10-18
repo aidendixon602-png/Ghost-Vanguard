@@ -54,6 +54,8 @@ test('rejoin posts a card with a Restore roles button', () => {
         assert.equal(posts.length, 1);
         assert.equal(posts[0].e.title, 'Member Rejoined');
         assert.match(posts[0].e.description, /had \*\*2\*\* role/);
+        assert.equal(posts[0].e.author, undefined, 'the member is not repeated in the embed author');
+        assert.doesNotMatch(posts[0].e.footer.text, /User ID/);
         assert.equal(posts[0].rows[0].toJSON().components[0].custom_id, `rejoin:restore:${USER}`);
     } finally { store.close(); }
 });

@@ -42,7 +42,9 @@ export default defineCommand(new SlashCommandBuilder().setName('roblox').setDesc
     .addSubcommand(s => s.setName('unbind').setDescription('Stop giving a role from group ranks').addRoleOption(o => o.setName('role').setDescription('Discord role').setRequired(true)))
     .addSubcommand(s => s.setName('binds').setDescription('Show the group and its rank → role binds'))
     .addSubcommand(s => s.setName('sync').setDescription('Re-check someone\'s Roblox verification and group roles now')
-        .addUserOption(o => o.setName('member').setDescription('Member (default: you)'))),
+        .addUserOption(o => o.setName('member').setDescription('Member (default: you)')))
+    .addSubcommand(s => s.setName('bloxlink-sync').setDescription('Ask Bloxlink to re-sync this member\'s linked roles and nickname')
+        .addUserOption(o => o.setName('member').setDescription('Member to update').setRequired(true))),
 { category: 'verification', access: 'security', cooldown: 2000 }, async (ctx, i) => {
     const sub = i.options.getSubcommand(), guild = i.guildId;
     if (sub === 'lookup') {
@@ -50,13 +52,29 @@ export default defineCommand(new SlashCommandBuilder().setName('roblox').setDesc
         let id: string | null = null;
         if (member) {
             id = ctx.store.get('SELECT roblox_id FROM links WHERE guild_id=? AND user_id=?', guild, member.id)?.roblox_id ?? null;
-            if (!id) throw new AppError('VALIDATION_ERROR', `<@${member.id}> has not verified a Roblox account here.`);
+            if (!id) {
+                const inGuild = await i.guild!.members.fetch(member.id).catch(() => null);
+                if (!inGuild) throw new AppError('VALIDATION_ERROR', `<@${member.id}> is not in this server.`);
+                id = await ctx.roblox.identify(inGuild);
+            }
+            if (!id) throw new AppError('VALIDATION_ERROR', `<@${member.id}> has no Roblox account linked through Vanguard or a configured provider.`);
         } else if (account) id = await resolveRoblox(account);
         else throw new AppError('VALIDATION_ERROR', 'Give a Roblox account or pick a member.');
-        const card = await lookupCard(ctx.store, guild, String(id));
+        const bloxlinkIds = await ctx.roblox.discordIdsForRoblox(guild, String(id));
+        const card = await lookupCard(ctx.store, guild, String(id), bloxlinkIds);
         if (!card) throw new AppError('INTEGRATION_ERROR', 'Roblox did not return that account. Try again in a moment.');
         await i.editReply({ embeds: [card], allowedMentions: { parse: [] } });
         return;
+    }
+    if (sub === 'bloxlink-sync') {
+        const target = i.options.getUser('member', true);
+        const member = await i.guild!.members.fetch(target.id).catch(() => null);
+        if (!member) throw new AppError('VALIDATION_ERROR', 'That member is not in this server.');
+        const result = await ctx.roblox.updateBloxlinkUser(member);
+        const safe = (name: string) => name.replace(/[\r\n]/g, ' ').replaceAll('`', 'ˋ').replaceAll('@', '＠').slice(0, 60);
+        const names = (items: string[]) => items.length ? items.map(name => `\`${safe(name)}\``).join(', ') : 'None';
+        const nickname = result.nickname ? `\n**Nickname:** \`${safe(result.nickname)}\`` : '';
+        return `Bloxlink sync completed for <@${member.id}>.\n**Added:** ${names(result.addedRoles)}\n**Removed:** ${names(result.removedRoles)}${nickname}`;
     }
     if (sub === 'blacklist' || sub === 'unblacklist') {
         const id = await resolveRoblox(i.options.getString('account', true));

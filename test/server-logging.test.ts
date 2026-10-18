@@ -99,6 +99,26 @@ test('events render as compact embeds: fields, avatar, IDs and an "unavailable" 
     } finally { store.close(); }
 });
 
+test('compact log cards show mentions once while stored history keeps full target details', () => {
+    const store = new Store(':memory:'); authorize(store, G);
+    const posted: any[] = [];
+    const logs: any = { push: (_g: string, e: any) => posted.push(e.toJSON()) };
+    try {
+        configureEventLog(store, G, { enabled: true, channelId: 'log' });
+        recordEvent(store, logs, G, { category: 'members', action: 'Roles Updated', actorId: 'mod1', targetId: '12345678901234567',
+            target: '<@12345678901234567> (andrey)', author: { name: 'andrey' }, details: ['**Roles added:** <@&r1>'] }, { compact: true });
+        const card = posted[0]!;
+        assert.equal(card.author, undefined);
+        assert.deepEqual(card.fields.map((f: any) => f.name), ['Target', 'By', 'Roles added']);
+        assert.equal(card.fields[0].value, '<@12345678901234567>');
+        assert.equal(card.fields[1].value, '<@mod1>');
+        assert.equal(card.footer.text, 'Ghost Vanguard');
+        const stored = store.get('SELECT target,summary FROM event_log WHERE guild_id=?', G)!;
+        assert.equal(stored.target, '<@12345678901234567> (andrey)');
+        assert.match(stored.summary, /andrey/);
+    } finally { store.close(); }
+});
+
 test('excluded channels are not logged; routine bot channel renames are skipped unless turned back on', async () => {
     const store = new Store(':memory:'); authorize(store, G);
     const posted: any[] = [];

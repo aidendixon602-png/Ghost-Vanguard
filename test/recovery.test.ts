@@ -366,6 +366,21 @@ test('layout copy remaps source objects and repeated copies reuse destination ma
     f.store.close();
 });
 
+test('layout-copy review reads destination snapshot numbers inside the destination scope', async () => {
+    const f = fixture(), id = f.insert(), replies: any[] = [];
+    authorize(f.store, 'source');
+    f.guild.ownerId = 'owner';
+    f.guild.members.fetch = async ({ user }: any) => ({ id: user });
+    const ctx: any = { snapshots: f.service, store: f.store, lifecycle: { isReady: () => true },
+        client: { guilds: { cache: new Collection([['g', f.guild]]) } } };
+    const interaction: any = { guild: { id: 'source', name: 'Source' }, user: { id: 'owner' }, editReply: async (r: any) => replies.push(r) };
+    const pending = { guild: 'source', user: 'owner', destination: 'g', snapshot: id, prune: false, fingerprint: '', components: selectComponents(), expires: Date.now() + 10000 };
+    await f.store.withAuthorized('source', () => showLayoutReview(ctx, interaction, 'key', pending));
+    assert.equal(replies.length, 1);
+    assert.match(replies[0].embeds[0].toJSON().description, /Snapshot:\*\* #1/);
+    f.store.close();
+});
+
 test('confirmation menus put All first, expand components, and remain valid after partial selection', async () => {
     const f = fixture(), id = f.insert(), replies: any[] = [];
     const pending = { guild: 'g', user: 'owner', snapshot: id, prune: false, fingerprint: '', components: selectComponents(), expires: Date.now() + 10000 };
