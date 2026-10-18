@@ -283,7 +283,7 @@ async function checkForUpdate(beforeInstall) {
 
 /** /dev update asks the launcher (over the bot's IPC channel) for status, or to check now. */
 async function answerBot(c, message) {
-    // /dev restart: confirm, then stop the bot cleanly and start it again (the launcher stays up).
+    // Discord restart request: stop the bot cleanly and start it again (the launcher stays up).
     if (message?.type === 'vg-restart' && c?.connected) {
         try { c.send({ type: 'vg-restart-result', id: message.id, ok: !updating && !stopping }); } catch { }
         if (updating || stopping) return;

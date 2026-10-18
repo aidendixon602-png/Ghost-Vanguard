@@ -120,8 +120,8 @@ export const selfRestart: { run: ((code: number) => void) | null } = { run: null
 export const RESTART_EXIT_CODE = 75;
 
 /**
- * Fallback for a launch.js started before /dev restart existed: it does not answer the restart request,
- * but it restarts the bot whenever it stops with a non-zero code. Only after 2.5 minutes of uptime, so the
+ * Fallback for a launch.js that does not understand the Discord restart request. It restarts the bot
+ * when it stops with a non-zero code, but only after 2.5 minutes of uptime, so the
  * launcher never mistakes it for a freshly installed version crashing (which would roll the update back).
  */
 export function fallbackRestart(proc: NodeJS.Process = process, uptimeSeconds = proc.uptime()): 'scheduled' | 'too-soon' | 'no-launcher' {

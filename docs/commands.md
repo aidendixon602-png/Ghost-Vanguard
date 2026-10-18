@@ -244,7 +244,6 @@ Bot developers: diagnostics, updates, servers and the database
 | `/dev broadcast` | Post an announcement to every authorized server's log channel | Bot Manager+ |
 | `/dev status` | Show a custom bot status instead of the rotation | Bot Manager+ |
 | `/dev status-reset` | Return to the normal rotating status | Bot Manager+ |
-| `/dev restart` | Developer: restart the bot (about 10 seconds offline); settings are kept | Developer |
 | `/dev update` | Automatic GitHub updates: see the status, or install now (Developer) | Supreme Leader+ (anyone with /dev sees the status; installing now needs a Developer) |
 | `/dev server info` | Developer: show this server's authorization details | Bot Manager+ |
 | `/dev server unban` | Developer: remove a server ban | Developer |
