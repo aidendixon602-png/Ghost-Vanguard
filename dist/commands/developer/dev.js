@@ -6,7 +6,7 @@ import { AppError } from '../../errors.js';
 import { broadcast, broadcastTargets, clearPresenceOverride, inspectGuild, setPresenceOverride } from '../../bot/dev-tools.js';
 import { presenceLines } from '../../security/protection-stats.js';
 import { spawnSync } from 'node:child_process';
-import { askLauncher, askRestart, describeUpdate, fallbackRestart } from '../../bot/updater-link.js';
+import { askLauncher, describeUpdate } from '../../bot/updater-link.js';
 import { DEVELOPER_ONLY_MESSAGE, explicitRank, RANKS } from '../../bot/ranks.js';
 /** Which GitHub commit is running, and whether automatic updates are on (no secrets shown). */
 function codeVersion() {
@@ -28,38 +28,9 @@ export default defineCommand(new SlashCommandBuilder().setName('dev').setDescrip
     .addIntegerOption(o => o.setName('minutes').setDescription('Return to the rotation after this many minutes (default: until reset)').setMinValue(1).setMaxValue(10080))
     .addStringOption(o => o.setName('presence').setDescription('Online indicator').addChoices({ name: 'Online', value: 'online' }, { name: 'Idle', value: 'idle' }, { name: 'Do not disturb', value: 'dnd' })))
     .addSubcommand(s => s.setName('status-reset').setDescription('Return to the normal rotating status'))
-    .addSubcommand(s => s.setName('restart').setDescription('Developer: restart the bot (about 10 seconds offline); settings are kept'))
     .addSubcommand(s => s.setName('update').setDescription('Automatic GitHub updates: see the status, or install now (Developer)')
     .addStringOption(o => o.setName('action').setDescription('What to do (default: status)').addChoices({ name: 'Show status', value: 'status' }, { name: 'Check and install now', value: 'now' }))), { responseKind: 'info', category: 'developer', developerOnly: true, requiresAuthorization: false }, async (ctx, i) => {
     const sub = i.options.getSubcommand();
-    if (sub === 'restart') {
-        await confirmDanger(ctx, i, {
-            title: 'Restart Ghost Vanguard',
-            summary: `Version **${VERSION}** · ${ctx.client.guilds.cache.size} server(s)`,
-            consequences: [
-                'The bot goes offline for about 10 seconds in every server, then comes back on its own.',
-                'All settings, whitelists, logs and records are kept (they are in the database).',
-                'Anything happening during those seconds is caught up from the audit log when it is back.',
-            ],
-            label: 'Restart now',
-            reversal: 'Nothing to undo: it starts again by itself.',
-            run: async (_c, b) => {
-                const ok = await askRestart(b.user.id);
-                if (ok === null) {
-                    const fallback = fallbackRestart();
-                    if (fallback === 'scheduled')
-                        return '🔄 **Restarting.** Ghost Vanguard will be back in about 10 seconds; run `/info ping` to check.\n-# The launcher on the host is an older version, so this used the backup method. Press Restart in the Wispbyte panel once to load the newest launcher.';
-                    if (fallback === 'too-soon')
-                        throw new AppError('VALIDATION_ERROR', 'The bot started less than 3 minutes ago. Wait a minute and try again (restarting this early could make the launcher undo the latest update).');
-                    throw new AppError('VALIDATION_ERROR', 'Restarting from Discord needs the bot to be started with `node launch.js`. Use Restart in the Wispbyte panel instead.');
-                }
-                if (!ok)
-                    throw new AppError('VALIDATION_ERROR', 'An update or restart is already in progress. Try again in a minute.');
-                return '🔄 **Restarting.** Ghost Vanguard will be back in about 10 seconds; run `/info ping` to check.';
-            },
-        });
-        return;
-    }
     if (sub === 'update') {
         const op = (i.options.getString('action') ?? 'status');
         // Anyone with /dev may look; installing a new version is for Developers.

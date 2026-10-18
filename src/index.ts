@@ -2,6 +2,7 @@ import { accessSummary } from './bot/access-summary.js';
 import { dmTrusted } from './bot/trusted-dm.js';
 import { onRejoin, saveLeftRoles } from './features/rejoin-roles.js';
 import { selfRestart } from './bot/updater-link.js';
+import { isPrefixRestartMessage, requestPrefixRestart } from './bot/prefix-restart.js';
 import { autoReact } from './features/autoreact.js';
 import { reconcileStartupMembers } from './security/startup-members.js';
 import { ScamProtection } from './security/scam.js';
@@ -266,6 +267,21 @@ client.on(Events.GuildAuditLogEntryCreate, (entry, guild) => {
 });
 
 client.on(Events.MessageCreate, m => {
+    if (isPrefixRestartMessage(m)) {
+        task('prefix restart', (async () => {
+            const result = await requestPrefixRestart(m.author.id);
+            const response: Record<typeof result, string> = {
+                'not-authorized': '⛔ Only the bot owner and approved developers can use `,restart`.',
+                restarting: '🔄 Restarting Ghost Vanguard. It should be back in about 10 seconds; use `/info ping` to check.',
+                busy: 'A restart or update is already in progress. Try again in a minute.',
+                scheduled: '🔄 Restart scheduled using the backup method. Once the bot is back, press **Restart** in the Wispbyte panel once to load the current launcher.',
+                'too-soon': 'The bot started less than 3 minutes ago. Wait a minute, then try `,restart` again.',
+                'no-launcher': 'I can’t restart from Discord because the launcher is not available. Use **Restart** in Wispbyte. The startup command should remain `cd /home/container && node launch.js`.',
+            };
+            await m.reply(response[result]);
+        })());
+        return;
+    }
     if (m.guild) protectedTask('scam scanning', m.guild.id, () => scam.process(m));
     if (m.guild) protectedTask('automod', m.guild.id, () => processAutomod(store, logs, m, id => security.trusted(m.guild!, id)));
     if (m.guild) protectedTask('ai moderation', m.guild.id, () => aiModerate(store, logs, m, id => security.trusted(m.guild!, id)));
@@ -371,7 +387,7 @@ client.on(Events.ShardResume, () => console.log('[discord] Gateway resumed.'));
 const server = createServer((req, res) => {
     // /healthz is the liveness probe uptime monitors use; everything else is the dashboard.
     if ((req.url ?? '').split('?')[0] !== '/healthz') {
-        const result = dashboardAnswer(store, req, { token: config.dashboardToken });
+        const result = dashboardAnswer(store, req, { token: config.dashboardToken, enabled: config.dashboardEnabled });
         res.writeHead(result.status, { 'Content-Type': result.type, 'Cache-Control': result.cache, 'X-Robots-Tag': 'noindex' });
         res.end(req.method === 'HEAD' ? undefined : result.encoding === 'base64' ? Buffer.from(result.body, 'base64') : result.body);
         return;
@@ -388,9 +404,17 @@ server.on('error', () => {
 });
 
 server.listen(config.port, config.host, () => {
-    logEvent('health_listening', { url: healthUrl, dashboard: `http://${config.host}:${config.port}/`, token: config.dashboardToken ? 'required' : 'none' });
-    if (config.logFormat !== 'json')
-        console.log(`  ${style.dim('Dashboard:')} ${config.host}:${config.port}/  ${config.dashboardToken ? style.dim('(DASHBOARD_TOKEN required)') : style.dim('(set DASHBOARD_TOKEN before exposing it)')}`);
+    logEvent('health_listening', {
+        url: healthUrl,
+        dashboard: config.dashboardEnabled ? `http://${config.host}:${config.port}/` : 'disabled',
+        ...(config.dashboardEnabled ? { token: config.dashboardToken ? 'required' : 'none' } : {}),
+    });
+    if (config.logFormat !== 'json') {
+        if (config.dashboardEnabled)
+            console.log(`  ${style.dim('Dashboard:')} ${config.host}:${config.port}/  ${config.dashboardToken ? style.dim('(DASHBOARD_TOKEN required)') : style.dim('(set DASHBOARD_TOKEN before exposing it)')}`);
+        else
+            console.log(`  ${style.dim('Health check:')} ${config.host}:${config.port}/healthz  ${style.dim('(dashboard disabled)')}`);
+    }
 });
 timers.push(setInterval(() => task('logs', logs.flush()), 2000));
 timers.push(setInterval(() => task('temporary bans', sweepTempbans(store, logs, client, id => lifecycle.isReady(id))), 60000));

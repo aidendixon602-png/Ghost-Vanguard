@@ -166,7 +166,8 @@ Copy [`.env.example`](.env.example) to `.env` and set at least:
 | `DISCORD_CLIENT_ID` | Yes | Application ID |
 | `DEVELOPER_IDS` | Yes | Comma-separated user IDs with Developer access (the top rank, full control) |
 | `DATABASE_PATH` | No | SQLite database location (default `./data/vanguard.db`) |
-| `DASHBOARD_TOKEN` | Recommended | Require a token for the dashboard and its API. Without it the dashboard is open to anyone who can reach the port, so keep it on localhost |
+| `DASHBOARD_ENABLED` | No | Set to `false` to disable the built-in dashboard while keeping `/healthz` available (default: enabled) |
+| `DASHBOARD_TOKEN` | Recommended | Require a token for the dashboard and its API when enabled. Without it the dashboard is open to anyone who can reach the port, so keep it on localhost |
 | `BOT_OWNER_ID` | Recommended | The bot owner: Developer (the top rank), and the default for `TRUSTED_DM_IDS` |
 | `SUPREME_LEADER_IDS` | No | Supreme Leaders: everything except the Developer-only tools. Nobody is built in; every start prints who has bot-wide access |
 | `TRUSTED_DM_IDS` | No | The only people the bot DMs about itself, including the daily database backup (default: `BOT_OWNER_ID`) |
@@ -205,7 +206,7 @@ push to main → CI (typecheck, build, tests, secret scan) → launcher installs
 - Only commits that passed CI are installed.
 - A version that stops within two minutes of installing is rolled back automatically and skipped.
 - `.env` and `data/` are never modified.
-- Developers can check the update status with `/dev update`. Installing immediately (`action: now`) and `/dev restart` are Developer only.
+- Developers can check the update status with `/dev update`. Installing immediately (`action: now`) and restarting from a server with `,restart` are Developer only. `,restart` requires Message Content Intent enabled in the Discord Developer Portal, and `MESSAGE_CONTENT_ENABLED` must not be set to `false`.
 
 ### Backups
 

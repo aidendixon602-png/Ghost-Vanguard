@@ -14,7 +14,6 @@ Generated from the bot itself (`npm run docs`). Every rank can also use everythi
 The top rank: the bot owner (`BOT_OWNER_ID`) and anyone in `DEVELOPER_IDS`. Everything, including the tools that can take the bot down or reach every server at once: restarts, installing updates, restoring database settings, removing or banning servers, giving bot-wide ranks and lifting hardbans. Ignored by anti-nuke. Set only in `.env`.
 
 - `/dev database restore-settings`: Developer: put back lost settings from an old backup file; anything newer is kept
-- `/dev restart`: Developer: restart the bot (about 10 seconds offline); settings are kept
 - `/dev server ban`: Developer: ban a server from Vanguard
 - `/dev server deauthorize`: Developer: remove this server's authorization and leave
 - `/dev server unban`: Developer: remove a server ban

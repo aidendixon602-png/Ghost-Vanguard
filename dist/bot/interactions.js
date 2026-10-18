@@ -98,8 +98,11 @@ export class Interactions {
                     return execute(context, i);
                 };
                 const result = policy.requiresAuthorization && !recovery ? await this.queue.run(guildId, run) : await run();
-                if (typeof result === 'string' && !i.isAutocomplete())
-                    await respond(i, result, policy.responseKind === 'info' ? 'Ghost Vanguard · Information' : '✓ Action completed', policy.responseKind === 'info' ? Colors.Blurple : Colors.Green);
+                if (typeof result === 'string' && !i.isAutocomplete()) {
+                    const title = name === 'dev' && path === 'update' ? '🚀 Ghost Vanguard · Update Center'
+                        : policy.responseKind === 'info' ? 'Ghost Vanguard · Information' : '✓ Action completed';
+                    await respond(i, result, title, policy.responseKind === 'info' ? Colors.Blurple : Colors.Green);
+                }
             }
             finally {
                 this.depths.set(guildId, Math.max(0, (this.depths.get(guildId) ?? 1) - 1));

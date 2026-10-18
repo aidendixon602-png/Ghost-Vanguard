@@ -27,7 +27,9 @@ export function answer(store, request, options = {}) {
     const path = url.pathname.replace(/\/+$/, '') || '/';
     // /healthz stays open: it is a liveness probe, and it exposes nothing about members.
     if (path === '/healthz')
-        return json({ service: 'Ghost Vanguard', version: VERSION, ready: true, dashboard: true });
+        return json({ service: 'Ghost Vanguard', version: VERSION, ready: true, dashboard: options.enabled !== false });
+    if (options.enabled === false)
+        return json({ error: 'Dashboard is disabled.' }, 404);
     // The tab icon and the header badge are the same bytes, inlined into the page and served here
     // for anything that asks for the file directly. Open, like the page: it is art, not data.
     if (path === '/favicon.ico' || path === '/logo.png')
