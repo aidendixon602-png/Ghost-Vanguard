@@ -9,7 +9,6 @@ import { logsCategory, recordEvent } from '../audit/event-log.js';
  * from the audit log, so "Deleted by" is never filled in by guesswork.
  */
 const text = (m) => m.partial || m.content == null ? null : m.content;
-const author = (m) => m.author ? { name: m.author.tag ?? m.author.username, iconURL: typeof m.author.displayAvatarURL === 'function' ? m.author.displayAvatarURL() : null } : null;
 const IMAGE = /\.(png|jpe?g|gif|webp)$/i;
 function attachments(m) {
     const list = [...(m.attachments?.values() ?? [])];
@@ -26,15 +25,15 @@ export function logDeletedMessage(store, logs, m) {
         return;
     const body = text(m);
     const files = attachments(m);
-    recordEvent(store, logs, m.guildId, { category: 'messages', action: '🗑️ Message Deleted', color: Colors.Red, targetId: m.author?.id ?? null,
-        author: author(m), channelId: m.channelId, image: files.image,
+    recordEvent(store, logs, m.guildId, { category: 'messages', action: '🗑️ Message Deleted', color: Colors.Red,
+        targetId: m.author?.id ?? null, target: m.author ? `<@${m.author.id}>` : 'Unavailable (message sent before Vanguard started)', targetLabel: 'Author',
+        channelId: m.channelId, image: files.image,
         details: [
-            `**Author:** ${m.author ? `<@${m.author.id}> (\`${m.author.id}\`)` : 'Unavailable (message sent before Vanguard started)'}`,
             `**Channel:** <#${m.channelId}>`,
             `**Message ID:** \`${m.id}\``,
-            `**Content:** ${body === null ? 'Unavailable (message sent before Vanguard started)' : body ? clip(body, 1000) : '*No text*'}`,
+            `**Content:** ${body === null ? 'Unavailable (message sent before Vanguard started)' : body ? clip(body, 600) : '*No text*'}`,
             files.line ?? '',
-        ].filter(Boolean) });
+        ].filter(Boolean) }, { compact: true });
 }
 export function logEditedMessage(store, logs, before, after) {
     if (!after.guildId || after.author?.bot || after.webhookId || !logsCategory(store, after.guildId, 'messages'))
@@ -42,20 +41,22 @@ export function logEditedMessage(store, logs, before, after) {
     const old = text(before), now = text(after);
     if (old === null || old === now || now === null)
         return; // unknown "before", embeds loading or pins also fire "edits"
-    recordEvent(store, logs, after.guildId, { category: 'messages', action: '✏️ Message Edited', color: Colors.Yellow, targetId: after.author?.id ?? null,
-        author: author(after), channelId: after.channelId,
+    recordEvent(store, logs, after.guildId, { category: 'messages', action: '✏️ Message Edited', color: Colors.Yellow,
+        targetId: after.author?.id ?? null, target: after.author ? `<@${after.author.id}>` : 'Unavailable', targetLabel: 'Author',
+        channelId: after.channelId,
         details: [
-            `**Author:** <@${after.author?.id}> (\`${after.author?.id}\`)`,
             `**Channel:** <#${after.channelId}> · [jump to message](${after.url})`,
-            `**Before:** ${clip(old || '*empty*', 1000)}`,
-            `**After:** ${clip(now || '*empty*', 1000)}`,
-        ] });
+            `**Before:** ${clip(old || '*empty*', 600)}`,
+            `**After:** ${clip(now || '*empty*', 600)}`,
+        ] }, { compact: true });
 }
 export function logBulkDelete(store, logs, messages) {
     const first = messages.first();
     if (!first?.guildId || !logsCategory(store, first.guildId, 'messages'))
         return;
-    const known = [...messages.values()].filter(m => text(m) && !m.author?.bot).slice(0, 15).reverse();
+    const known = [...messages.values()].filter(m => text(m) && !m.author?.bot);
+    const shown = known.slice(0, 8).reverse();
     recordEvent(store, logs, first.guildId, { category: 'messages', action: `🧹 ${messages.size} Messages Bulk-Deleted`, color: Colors.Red, channelId: first.channelId,
-        details: [`**Channel:** <#${first.channelId}>`, ...known.map(m => `${m.author?.username ?? 'unknown'}: ${clip(text(m), 120)}`)] });
+        details: [`**Channel:** <#${first.channelId}>`, ...shown.map(m => `${m.author?.username ?? 'unknown'}: ${clip(text(m), 100)}`),
+            ...(known.length > shown.length ? [`**More:** ${known.length - shown.length} additional message(s) omitted`] : [])] }, { compact: true });
 }

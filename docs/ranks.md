@@ -123,6 +123,7 @@ Server rank: lifting ordinary bans and accepting appeals, raid tools, automod, s
 - `/antinuke scan`: Safety scan: powerful roles, roles above Vanguard, bots with Administrator
 - `/mod massban`: Raid cleanup: ban up to 200 user IDs at once (whitelisted staff only) _(must also be on the anti-nuke whitelist)_
 - `/mod unban`: Admins and owners: lift a ban by user ID (genrebans and hardbans need bot-wide staff) _(ordinary bans only; a genreban needs an Overseer+ for a one-server exception, or a Supreme Leader+ to lift it everywhere; a hardban needs a Developer)_
+- `/roblox bloxlink-sync`: Ask Bloxlink to re-sync this member's linked roles and nickname
 - `/security antiping bypass`: Allow or disallow a role to mention protected staff
 - `/security antiping disable`: Disable staff mention blocking
 - `/security antiping enable`: Enable blocking mentions of configured staff

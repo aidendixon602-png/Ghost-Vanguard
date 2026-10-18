@@ -5,6 +5,7 @@ import { PermissionsBitField } from 'discord.js';
 import { config } from '../src/config.js';
 import { Store } from '../src/database/db.js';
 import { Roblox } from '../src/integrations/roblox.js';
+import { lookupCard } from '../src/features/roblox-tools.js';
 import type { LogQueue } from '../src/logging.js';
 
 function fixture() {
@@ -36,6 +37,92 @@ async function withFetch(fn: typeof fetch, testFn: () => Promise<void>) {
         config.bloxlinkKey = oldB;
     }
 }
+
+async function withBloxlinkFetch(fn: typeof fetch, testFn: () => Promise<void>) {
+    const original = globalThis.fetch, oldR = config.roverKey, oldB = config.bloxlinkKey;
+    globalThis.fetch = fn;
+    config.roverKey = '';
+    config.bloxlinkKey = 'mock-bloxlink-key';
+    try {
+        await testFn();
+    } finally {
+        globalThis.fetch = original;
+        config.roverKey = oldR;
+        config.bloxlinkKey = oldB;
+    }
+}
+
+test('Roblox profile cards merge local and Bloxlink linked Discord accounts without duplicates', async () => {
+    const f = fixture();
+    f.store.run('INSERT INTO links VALUES(?,?,?,?,?)', 'g', 'local-user', '123', 'RobloxName', 0);
+    const original = globalThis.fetch;
+    globalThis.fetch = async (input: any) => {
+        const url = String(input);
+        if (url.endsWith('/v1/users/123')) return Response.json({ id: 123, name: 'RobloxName', displayName: 'RobloxName', created: '2020-01-01T00:00:00Z', isBanned: false, description: '' });
+        if (url.includes('username-history')) return Response.json({ data: [] });
+        if (url.includes('/groups/roles')) return Response.json({ data: [] });
+        if (url.includes('thumbnails')) return Response.json({ data: [] });
+        throw new Error(`Unexpected Roblox URL: ${url}`);
+    };
+    try {
+        const card = await lookupCard(f.store, 'g', '123', ['local-user', '214858075650260992']);
+        assert.match(card!.toJSON().description!, /<@local-user>/);
+        assert.match(card!.toJSON().description!, /<@214858075650260992>/);
+        assert.equal((card!.toJSON().description!.match(/<@local-user>/g) ?? []).length, 1);
+    } finally {
+        globalThis.fetch = original;
+        f.store.close();
+    }
+});
+
+test('Bloxlink reverse lookup requests the current guild and accepts only Discord IDs', async () => {
+    const f = fixture();
+    const requests: { url: string; authorization: string }[] = [];
+    await withBloxlinkFetch(async (input: any, init: any) => {
+        requests.push({ url: String(input), authorization: init.headers.Authorization });
+        return Response.json({ discordIDs: ['214858075650260992', '314858075650260993', '214858075650260992', 'not-an-id'] });
+    }, async () => {
+        assert.deepEqual(await f.roblox.discordIdsForRoblox('g', '146941966'), ['214858075650260992', '314858075650260993']);
+        assert.match(requests[0]!.url, /guilds\/g\/roblox-to-discord\/146941966$/);
+        assert.equal(requests[0]!.authorization, 'mock-bloxlink-key');
+    });
+    f.store.close();
+});
+
+test('Bloxlink update-user is one explicit POST and returns the changed roles and nickname', async () => {
+    const f = fixture();
+    let calls = 0;
+    await withBloxlinkFetch(async (input: any, init: any) => {
+        calls++;
+        assert.match(String(input), /guilds\/g\/update-user\/u$/);
+        assert.equal(init.method, 'POST');
+        assert.equal(init.headers.Authorization, 'mock-bloxlink-key');
+        return Response.json({ addedRoles: ['Verified', 'Staff'], removedRoles: ['Unverified'], nickname: 'RobloxName' });
+    }, async () => {
+        assert.deepEqual(await f.roblox.updateBloxlinkUser(f.member), { addedRoles: ['Verified', 'Staff'], removedRoles: ['Unverified'], nickname: 'RobloxName' });
+        assert.equal(calls, 1);
+    });
+    f.store.close();
+});
+
+test('Bloxlink update-user refuses quarantined members before making the request', async () => {
+    const f = fixture();
+    f.store.run('INSERT INTO backups VALUES(?,?,?,?,?)', 'g', 'u', '[]', 0, 1);
+    await withBloxlinkFetch(async () => { throw new Error('Quarantined member must not be sent to Bloxlink'); }, async () => {
+        await assert.rejects(f.roblox.updateBloxlinkUser(f.member), /while this member is quarantined/);
+    });
+    f.store.close();
+});
+
+test('Bloxlink update-user is not retried automatically after a server error', async () => {
+    const f = fixture();
+    let calls = 0;
+    await withBloxlinkFetch(async () => { calls++; return new Response('{}', { status: 502 }); }, async () => {
+        await assert.rejects(f.roblox.updateBloxlinkUser(f.member), /Check Bloxlink before retrying/);
+        assert.equal(calls, 1);
+    });
+    f.store.close();
+});
 
 test('provider outage preserves the verified role', async () => {
     const f = fixture();

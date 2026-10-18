@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { AuditLogEvent } from 'discord.js';
 import { Store } from '../src/database/db.js';
-import { configureEventLog, describeAudit, eventLogConfig, logsCategory, recentEvents, recordEvent } from '../src/audit/event-log.js';
+import { configureEventLog, describeAudit, eventLogConfig, flushPendingRoleChangeLogs, logsCategory, recentEvents, recordAuditEvent, recordEvent } from '../src/audit/event-log.js';
 import { restartNotice, summarizeMissed, formatDuration } from '../src/audit/downtime.js';
 
 const guild: any = { id: 'g', client: { user: { id: 'bot' } } };
@@ -41,6 +41,21 @@ test('audit entries become readable log events with the right category and actor
     assert.match(prune.details![0]!, /12 member\(s\) inactive for 30 day/);
 });
 
+test('audit cards use compact mentions while full actor and target details remain in history', () => {
+    const { store } = setup();
+    configureEventLog(store, 'g', { enabled: true, channelId: 'events' });
+    const sent: any[] = [];
+    const logs: any = { push: (_guildId: string, message: any) => sent.push(message.toJSON()) };
+    recordAuditEvent(store, logs, entry(AuditLogEvent.MemberKick, { targetId: '12345678901234567', target: { tag: 'andrey' } }, 'mod1'), guild);
+    assert.equal(sent.length, 1);
+    assert.equal(sent[0]!.author, undefined);
+    assert.equal(sent[0]!.fields.find((field: any) => field.name === 'Target')?.value, '<@12345678901234567>');
+    assert.equal(sent[0]!.fields.find((field: any) => field.name === 'Moderator')?.value, '<@mod1>');
+    assert.equal(sent[0]!.footer.text, 'Ghost Vanguard');
+    assert.match(String(store.get('SELECT summary FROM event_log WHERE guild_id=?', 'g')?.summary), /andrey/);
+    store.close();
+});
+
 test("the bot's own actions are skipped (its commands and the ban log report them), others are credited", () => {
     assert.equal(describeAudit(entry(AuditLogEvent.ChannelCreate, {}, 'bot'), guild), null);
     assert.equal(describeAudit(entry(AuditLogEvent.MemberBanAdd, { reason: '223456789012345678: raiding' }, 'bot'), guild), null, '/mod ban is already logged as a case and in #bans');
@@ -63,6 +78,56 @@ test('nothing is stored or posted until logging is enabled, and disabled categor
     assert.equal(logsCategory(store, 'g', 'moderation'), true);
     assert.equal(recentEvents(store, 'g').total, 1);
     assert.deepEqual(pushed.map(p => p.channel), [null], 'without its own channel, events go to the security log channel');
+    store.close();
+});
+
+test('rapid role edits are grouped into one compact message while every audit entry stays in history', () => {
+    const { store } = setup();
+    configureEventLog(store, 'g', { enabled: true, channelId: 'events' });
+    const sent: { embed: any; channel: string | null }[] = [];
+    const logs: any = { push: (_guildId: string, message: any, _files: unknown, channel: string | null) => sent.push({ embed: message.toJSON(), channel }) };
+    const roleEntry = (actor: string, target: string, changes: any[]) => entry(AuditLogEvent.MemberRoleUpdate,
+        { targetId: target, target: { tag: 'andrey' }, changes }, actor);
+
+    recordAuditEvent(store, logs, roleEntry('mod', 'u1', [{ key: '$add', new: [{ id: 'r1' }] }]), guild);
+    recordAuditEvent(store, logs, roleEntry('mod', 'u1', [
+        { key: '$add', new: [{ id: 'r2' }] }, { key: '$remove', new: [{ id: 'r3' }] },
+    ]), guild);
+    assert.equal(sent.length, 0, 'waits briefly to collect rapid edits');
+    flushPendingRoleChangeLogs();
+
+    assert.equal(sent.length, 1);
+    assert.equal(sent[0]!.channel, 'events');
+    assert.equal(sent[0]!.embed.title, 'Role changes · 2 updates');
+    const fields = sent[0]!.embed.fields;
+    assert.equal(fields.find((field: any) => field.name === 'Target')?.value, '<@u1>');
+    assert.equal(fields.find((field: any) => field.name === 'Added')?.value, '<@&r1>, <@&r2>');
+    assert.equal(fields.find((field: any) => field.name === 'Removed')?.value, '<@&r3>');
+    assert.equal(fields.find((field: any) => field.name === 'Changed by')?.value, '<@mod>');
+    assert.equal(sent[0]!.embed.author, undefined, 'the target is not repeated as the embed author');
+    assert.equal(sent[0]!.embed.footer.text, 'Ghost Vanguard', 'raw actor and target IDs are not repeated in the footer');
+    assert.equal(recentEvents(store, 'g').total, 2, 'both original audit entries remain searchable');
+    store.close();
+});
+
+test('role edits by different actors, targets, or guilds are never combined', () => {
+    const { store } = setup();
+    configureEventLog(store, 'g', { enabled: true });
+    configureEventLog(store, 'g2', { enabled: true });
+    const guild2: any = { id: 'g2', client: { user: { id: 'bot' } } };
+    const sent: any[] = [];
+    const logs: any = { push: (_guildId: string, message: any) => sent.push(message.toJSON()) };
+    const roleEntry = (actor: string, target: string, role: string) => entry(AuditLogEvent.MemberRoleUpdate,
+        { targetId: target, target: { tag: target }, changes: [{ key: '$add', new: [{ id: role }] }] }, actor);
+
+    recordAuditEvent(store, logs, roleEntry('mod1', 'u1', 'r1'), guild);
+    recordAuditEvent(store, logs, roleEntry('mod2', 'u1', 'r2'), guild);
+    recordAuditEvent(store, logs, roleEntry('mod1', 'u2', 'r3'), guild);
+    recordAuditEvent(store, logs, roleEntry('mod1', 'u1', 'r4'), guild2);
+    flushPendingRoleChangeLogs();
+    assert.equal(sent.length, 4);
+    assert.equal(recentEvents(store, 'g').total, 3);
+    assert.equal(recentEvents(store, 'g2').total, 1);
     store.close();
 });
 

@@ -5,7 +5,7 @@ import { Colors, PermissionFlagsBits } from 'discord.js';
 import { overrideRule, ruleFor, RULES } from '../core.js';
 import { responsibleActor } from '../security/security.js';
 import { embed } from '../ui/ui.js';
-import { describeAudit, eventLogConfig, recordEvent } from './event-log.js';
+import { eventLogConfig, recordAuditEvent } from './event-log.js';
 import { QUIET_RESTART_MS, shouldPost } from './notices.js';
 // When the bot was last known to be running, updated every minute and on shutdown.
 const LAST_SEEN = 'last_seen';
@@ -86,11 +86,8 @@ export async function catchUp(guild, store, logs, trusted, offlineSince, now = D
         return;
     const fetched = await guild.fetchAuditLogs({ limit: 100 }).catch(() => null);
     const missed = fetched ? [...fetched.entries.values()].filter(e => e.createdTimestamp > offlineSince && e.createdTimestamp <= now).reverse() : [];
-    for (const entry of missed) {
-        const event = describeAudit(entry, guild);
-        if (event)
-            recordEvent(store, logs, guild.id, event);
-    }
+    for (const entry of missed)
+        recordAuditEvent(store, logs, entry, guild);
     const summary = summarizeMissed(missed, guild, settings, trusted);
     if (!summary.lines.length)
         return;

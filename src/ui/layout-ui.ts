@@ -37,14 +37,21 @@ export async function showLayoutReview(ctx: CommandContext, i: any, key: string,
     const components = pending.components ?? selectComponents();
     if (pending.destination)
         await checkDestination(ctx, destination, i.user.id, components);
-    const plan = await ctx.store.withAuthorized(destination.id, () => ctx.snapshots.plan(destination, ctx.snapshots.load(destination.id, pending.snapshot).data, pending.prune, components));
+    // Keep every destination-scoped read (plan, snapshot body and per-server number) in the
+    // destination context. A cross-server copy is invoked while the source context is active.
+    const review = await ctx.store.withAuthorized(destination.id, async () => {
+        const { data } = ctx.snapshots.load(destination.id, pending.snapshot);
+        const plan = await ctx.snapshots.plan(destination, data, pending.prune, components);
+        const number = ctx.snapshots.numberOf(destination.id, pending.snapshot);
+        return { data, plan, number };
+    });
+    const { data, plan, number } = review;
     pending.fingerprint = plan.fingerprint;
     const names = components.map(c => c[0]!.toUpperCase() + c.slice(1));
-    const data = ctx.store.readGuild(destination.id, () => ctx.snapshots.load(destination.id, pending.snapshot).data);
     const settings = data.settings ? Object.keys(data.settings).join(', ') : 'No guild settings stored in this older snapshot';
-    const summary = `**${pending.destination ? 'Copy layout to' : 'Restore server'}:** ${destination.name} (${destination.id})\n**Snapshot:** #${ctx.snapshots.numberOf(destination.id, pending.snapshot)}\n**Components:** ${names.join(', ')}\n${components.includes('settings') ? `**Supported settings:** ${settings}\n` : ''}**Create:** ${plan.roleCreate} roles · ${plan.channelCreate} categories/channels\n**Update/reorder candidates:** ${plan.roleUpdate} roles · ${plan.channelUpdate} categories/channels\n**Delete extras:** ${plan.roleDelete.length} roles · ${plan.channelDelete.length} channels\n**Settings changes:** ${plan.settingsUpdate}\n**Skipped:** ${plan.skipped.length}\n\nA fresh destination backup is required before any changes. Existing objects are matched before creation. ${components.includes('permissions') ? 'Saved permissions, including privileged permissions, will be applied.' : 'Existing permissions are preserved; new channels begin private.'}\n${pending.prune ? 'Explicit pruning will permanently delete the reviewed extras only if there are no skipped objects or failures.\n' : ''}Confirmation expires in two minutes and checks for server changes.`;
+    const summary = `**${pending.destination ? 'Copy layout to' : 'Restore server'}:** ${destination.name} (${destination.id})\n**Snapshot:** #${number}\n**Components:** ${names.join(', ')}\n${components.includes('settings') ? `**Supported settings:** ${settings}\n` : ''}**Create:** ${plan.roleCreate} roles · ${plan.channelCreate} categories/channels\n**Update/reorder candidates:** ${plan.roleUpdate} roles · ${plan.channelUpdate} categories/channels\n**Delete extras:** ${plan.roleDelete.length} roles · ${plan.channelDelete.length} channels\n**Settings changes:** ${plan.settingsUpdate}\n**Skipped:** ${plan.skipped.length}\n\nA fresh destination backup is required before any changes. Existing objects are matched before creation. ${components.includes('permissions') ? 'Saved permissions, including privileged permissions, will be applied.' : 'Existing permissions are preserved; new channels begin private.'}\n${pending.prune ? 'Explicit pruning will permanently delete the reviewed extras only if there are no skipped objects or failures.\n' : ''}Confirmation expires in two minutes and checks for server changes.`;
     const manifest = [
-        `Snapshot #${ctx.snapshots.numberOf(destination.id, pending.snapshot)} -> ${destination.name} (${destination.id})`,
+        `Snapshot #${number} -> ${destination.name} (${destination.id})`,
         `Selected: ${names.join(', ')}`,
             ...data.roles.filter(r => components.includes('roles') || components.includes('permissions')).map(r => `Role: ${r.name} (${r.id}) -> ${plan.roleMap[r.id] ?? 'create if Roles selected'}; snapshot position ${r.position}${plan.blockedRoles.includes(r.id) ? '; skipped' : ''}`),
             ...data.channels.filter(c => components.includes('permissions') || components.includes(c.type === 4 ? 'categories' : 'channels')).map(c => `${c.type === 4 ? 'Category' : 'Channel'}: ${c.name} (${c.id}) -> ${plan.channelMap[c.id] ?? 'create if layout component selected'}; parent ${c.parent ?? 'none'}; position ${c.position}; ${c.overwrites.length} saved overwrites${plan.blockedChannels.includes(c.id) ? '; skipped' : ''}`),

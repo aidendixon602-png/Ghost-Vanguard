@@ -34,11 +34,12 @@ export function onRejoin(store, logs, member) {
     const still = saved.roles.filter(id => member.guild.roles.cache.has(id));
     if (!still.length)
         return;
-    const list = still.map(id => `<@&${id}>`).join(' ');
+    const shown = still.slice(0, 8);
+    const list = shown.map(id => `<@&${id}>`).join(' ');
+    const more = still.length > shown.length ? `\n…and ${still.length - shown.length} more role(s)` : '';
     logs.push(member.guild.id, new EmbedBuilder().setColor(Colors.Blurple).setTitle('Member Rejoined')
-        .setAuthor({ name: member.user?.tag ?? member.id, iconURL: member.user?.displayAvatarURL?.() || undefined })
-        .setDescription(`<@${member.id}> left <t:${Math.floor(saved.leftAt / 1000)}:R> and came back. They had **${still.length}** role(s):\n${list}`.slice(0, 3900))
-        .setFooter({ text: `User ID: ${member.id} · Restore roles gives back what you are allowed to give` }).setTimestamp(), [restoreButton(member.id)]);
+        .setDescription(`<@${member.id}> came back <t:${Math.floor(saved.leftAt / 1000)}:R>. They had **${still.length}** role(s):\n${list}${more}`.slice(0, 3900))
+        .setFooter({ text: 'Use Restore roles to give back roles the staff member is allowed to grant.' }).setTimestamp(), [restoreButton(member.id)]);
 }
 /** Give back saved roles that this staff member is allowed to give. Throws if nothing could be given. */
 export async function restoreRoles(store, guild, actorId, userId) {

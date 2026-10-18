@@ -31,7 +31,7 @@ import { indexTree, treeJson } from './bot/command-tree.js';
 import { Roblox } from './integrations/roblox.js';
 import { Security } from './security/security.js';
 import { Snapshots } from './recovery/snapshots.js';
-import { recordAuditEvent, recordMemberEvent } from './audit/event-log.js';
+import { flushPendingRoleChangeLogs, recordAuditEvent, recordMemberEvent } from './audit/event-log.js';
 import { catchUp, lastSeen, markSeen } from './audit/downtime.js';
 import { presenceOverride } from './bot/dev-tools.js';
 import { clearAutomod, processAutomod } from './features/automod.js';
@@ -461,6 +461,11 @@ async function shutdown(code = 0) {
     shuttingDown = true;
     timers.forEach(clearInterval);
     lifecycle.close();
+    // Persist buffered role summaries to the outbox before closing the store.
+    try {
+        flushPendingRoleChangeLogs();
+    }
+    catch { }
     client.destroy();
     server.close();
     try {

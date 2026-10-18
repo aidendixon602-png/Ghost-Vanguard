@@ -281,6 +281,7 @@ Roblox: look up accounts, blacklist, shared ban network and group rank sync
 | `/roblox unbind` | Stop giving a role from group ranks | Head Admin+ |
 | `/roblox binds` | Show the group and its rank → role binds | Helper+ |
 | `/roblox sync` | Re-check someone's Roblox verification and group roles now | Helper+ |
+| `/roblox bloxlink-sync` | Ask Bloxlink to re-sync this member's linked roles and nickname | Admin+ |
 
 ## /ask
 
