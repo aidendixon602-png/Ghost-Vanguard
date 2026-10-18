@@ -53,7 +53,7 @@ function nowResult(s, interval) {
     if (!r)
         return '';
     if (r.state === 'installing')
-        return `🔄 **Installing ${commitLink(s.repo, r.sha)}**\nGhost Vanguard is restarting to load it. Check \`/dev update\` again in a moment.`;
+        return `🔄 **Installing ${commitLink(s.repo, r.sha)}**\nGhost Vanguard is restarting to load it. Check \`,update\` again in a moment.`;
     if (r.state === 'installed')
         return `✅ **Update installed:** ${commitLink(s.repo, r.sha)}\nThe bot is starting on the new version now.`;
     if (r.state === 'current')

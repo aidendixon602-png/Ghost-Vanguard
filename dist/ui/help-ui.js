@@ -3,7 +3,7 @@ import { displayPath, RETIRED } from '../bot/command-tree.js';
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, PermissionsBitField, StringSelectMenuBuilder } from 'discord.js';
 import { isAdminRestricted, RANK_LABEL, rankName, requiredRank } from '../bot/ranks.js';
 import { Guard } from '../bot/guard.js';
-import { defaults } from '../bot/registry.js';
+import { defaults, isDeveloperPrefixOnly } from '../bot/registry.js';
 import { AppError } from '../errors.js';
 import { embed } from './ui.js';
 /** Sections in the order staff need them, and the order of commands inside each section. */
@@ -51,7 +51,10 @@ export function helpCategories(ctx, guild, user) {
             continue;
         const category = sectionOf(name, def.metadata.category);
         const add = (description, path = '', policy = def.metadata) => {
-            if (!guard.allowed(policy, guild, user, ctx.actor, name, `${name}/${path.replaceAll(' ', '/')}`))
+            const key = path ? `${name}/${path.replaceAll(' ', '/')}` : name;
+            if (isDeveloperPrefixOnly(policy, key))
+                return;
+            if (!guard.allowed(policy, guild, user, ctx.actor, name, key))
                 return;
             const lines = groups.get(category) ?? [];
             const command = (def.data.type ?? 1) === 1 ? displayPath(name, path) : `${name} · context menu`;

@@ -11,7 +11,7 @@ npm run doctor
 
 ## Last recorded run
 
-Version 2.22.1 (2026-10-11): TypeScript check and build passed, and all 376 tests passed. The command registry loads 58 commands with no `/csb`, and `dist/` was regenerated from the included source. The new ban behaviour is covered by `test/network-ban.test.ts` and `test/ban-commands.test.ts`, using mock Discord servers and temporary SQLite databases.
+Command-system and restart-flow work (2026-10-18): using Node 24, the build/typecheck and command/rank documentation generation passed; the full suite passed **545 tests, 0 failures**. `dist/` was regenerated from `src/`. The outer system npm is Node 20 and prints engine warnings, but build, docs and tests ran under Node 24.
 
 ## Not covered
 
@@ -21,7 +21,7 @@ Automated tests use mock Discord guilds and temporary SQLite databases. No live 
 - Live API behavior and Discord's final role-hierarchy normalization
 - `Setup.ps1` and `Start.cmd`, which need Windows
 - The PowerShell updater, which was payload-verified and simulated against both supplied releases but requires Windows for execution
-- Discord credentials and the Wispbyte host. Try `/network genreban` and `/network ungenreban` on a test account after deploying.
+- Discord credentials and the Wispbyte host. After deploying, try `,genreban` and `,ungenreban` on a disposable test account from a user whose exact ID is listed in `DEVELOPER_IDS`.
 
 ## References
 

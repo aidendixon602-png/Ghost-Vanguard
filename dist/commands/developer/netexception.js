@@ -2,7 +2,7 @@ import { SlashCommandBuilder } from 'discord.js';
 import { defineCommand } from '../../bot/registry.js';
 import { AppError } from '../../errors.js';
 import { banById, enforceOnJoin, listExceptions, networkDeps, recordId, revokeException } from '../../security/network-ban.js';
-/** /network exceptions: see and cancel servers' "let this genrebanned person back in here" exceptions. */
+/** ,netexception: see and cancel servers' "let this genrebanned person back in here" exceptions. */
 export default defineCommand(new SlashCommandBuilder().setName('netexception').setDescription('Developer: servers that let a genrebanned user back in (their server only)')
     .addSubcommand(s => s.setName('list').setDescription('Active genreban exceptions, newest first')
     .addStringOption(o => o.setName('user_id').setDescription('Only this user').setMinLength(17).setMaxLength(20)))

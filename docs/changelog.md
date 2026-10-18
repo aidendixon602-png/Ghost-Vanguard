@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased: comma-prefix Developer actions and private admin replies
+- Developer-only and bot-wide risky actions use comma-prefix commands; their slash entries are hidden and stale slash calls are rejected. Ordinary slash utilities remain available under their normal policies.
+- Every comma command requires the exact user ID in `DEVELOPER_IDS`, including the bot owner. `BOT_OWNER_ID` alone is not a prefix-command exception.
+- Sensitive, staff and admin slash replies are ephemeral; ordinary public utility replies stay public. Use `/help` for slash commands and `,help` for the Developer comma-command list.
+
 ## 3.0.0: Ghost Vanguard — the two bots are one, and the balance is the point
 - **The product is called Ghost Vanguard.** Midtown Vanguard and the separate Midtown Desk ticket bot are now one bot with one name, one database and one set of ranks. At the time of this release, the repository was still named `midtown-vanguard`; it has since been renamed `Ghost-Vanguard`.
 - **One language.** The ticket desk was ported from the Python Midtown Desk into this codebase, so there is a single Node.js/TypeScript bot to run; midtown-desk is retired. Its desk-owner tools (desk-wide authorization, maintenance, broadcast, backup) were deliberately not ported — Ghost Vanguard already has `/setup`, `/recovery` and `/dev` for those.

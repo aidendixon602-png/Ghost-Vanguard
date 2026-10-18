@@ -43,12 +43,11 @@ test('the bot reacts only to listed members, only in the server they were added 
     } finally { store.close(); for (const s of ['', '-wal', '-shm']) try { (await import('node:fs')).rmSync(file + s); } catch {} }
 });
 
-test('/dev autoreact shows up under /dev with add, remove and list', async () => {
+test('developer auto-reactions are absent from slash commands', async () => {
     const registry = new Registry();
     await registry.load(new URL('../src/commands', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'));
     indexTree(registry);
-    const dev = treeJson(registry).find(c => c.name === 'dev');
-    const group = dev.options.find((o: any) => o.name === 'autoreact');
-    assert.equal(group?.type, 2);
-    assert.deepEqual(group.options.map((o: any) => o.name).sort(), ['add', 'list', 'remove']);
+    const tree = treeJson(registry);
+    assert.equal(tree.some(command => command.name === 'dev'), false);
+    assert.equal(tree.some(command => command.options?.some((option: any) => option.name === 'autoreact')), false);
 });

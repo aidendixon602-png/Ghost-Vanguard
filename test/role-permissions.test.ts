@@ -365,18 +365,18 @@ test('the reorganized command list: the expected top-level commands and groups',
     try {
         indexTree(registry);
         const tree = treeJson(registry);
-        assert.deepEqual(tree.map(c => c.name), ['antinuke', 'mod', 'security', 'setup', 'ticket', 'recovery', 'info', 'network', 'dev', 'help', 'verify', 'roblox', 'ask', 'role']);
+        assert.deepEqual(tree.map(c => c.name), ['antinuke', 'mod', 'security', 'setup', 'ticket', 'recovery', 'info', 'help', 'verify', 'roblox', 'ask', 'role']);
+        assert.equal(tree.some(c => c.name === 'dev' || c.name === 'network'), false, 'developer-only command groups are not registered as slash commands');
         const ticket = tree.find(c => c.name === 'ticket')!;
         assert.deepEqual(ticket.options.map((o: any) => o.name),
             ['setup', 'panel', 'types', 'settings', 'stats', 'claim', 'unclaim', 'transfer', 'priority', 'close', 'closerequest', 'add', 'remove', 'rename', 'history', 'block', 'unblock', 'blocked']);
         assert.deepEqual(ticket.options.find((o: any) => o.name === 'types').options.map((o: any) => o.name), ['add', 'edit', 'remove', 'list', 'reset']);
         const subs = (name: string) => tree.find(c => c.name === name)!.options.map((o: any) => o.name);
         assert.deepEqual(subs('antinuke'), ['status', 'enable', 'disable', 'check', 'scan', 'settings', 'whitelist']);
-        assert.deepEqual(subs('network'), ['genreban', 'ungenreban', 'hardban', 'unhardban', 'exceptions']);
+        assert.ok(!tree.some(c => c.name === 'network'), 'network-wide developer tools are comma-only');
         assert.ok(!subs('security').includes('mention') && !subs('security').includes('roblox-block'), 'duplicates removed');
         assert.ok(subs('setup').includes('permissions') && subs('mod').includes('notes'));
-        const server = tree.find(c => c.name === 'dev')!.options.find((o: any) => o.name === 'server');
-        assert.deepEqual(server.options.map((o: any) => o.name), ['authorize', 'deauthorize', 'info', 'list', 'ban', 'unban']);
+        assert.equal(tree.some(c => c.name === 'dev'), false, 'server authorization tools are comma-only');
         for (const c of tree) assert.ok((c.options ?? []).length <= 25, `${c.name} fits Discord's 25-option limit`);
     } finally { store.close(); }
 });

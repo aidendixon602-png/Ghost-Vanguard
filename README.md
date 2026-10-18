@@ -10,7 +10,7 @@ Anti-nuke and the threat board · Moderation and audit logging · Ticket desk ·
 
 [![CI](https://github.com/aidendixon602-png/Ghost-Vanguard/actions/workflows/ci.yml/badge.svg)](https://github.com/aidendixon602-png/Ghost-Vanguard/actions/workflows/ci.yml)
 ![Version](https://img.shields.io/badge/version-3.0.0-6d5ae6)
-![Tests](https://img.shields.io/badge/tests-529%20passing-2EA043)
+![Tests](https://img.shields.io/badge/tests-545%20passing-2EA043)
 ![Node](https://img.shields.io/badge/node-24-339933?logo=node.js&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
 ![discord.js](https://img.shields.io/badge/discord.js-14-5865F2?logo=discord&logoColor=white)
@@ -78,25 +78,25 @@ Every command has a minimum rank, and each rank includes everything below it. Bo
 
 | Rank | Scope | Can do |
 |---|---|---|
-| **Developer** | All servers | The bot owner (`BOT_OWNER_ID`) and `DEVELOPER_IDS`. Everything, including the tools that can break the bot: restarts, installing updates, restoring database settings, removing or banning servers, giving bot-wide ranks, lifting hardbans |
-| **Supreme Leader** | All servers | Everything except the Developer-only tools: diagnostics, update status, database health and backups, genrebans and hardbans, lifting genrebans |
-| **Overseer** | All servers | Bot Manager, plus inspecting and authorizing servers and one-server genreban exceptions |
-| **Bot Manager** | All servers | Head Admin in every server, plus bot status, diagnostics and announcements |
+| **Developer** | All servers | The bot owner (`BOT_OWNER_ID`) and `DEVELOPER_IDS`. Developer operations include diagnostics, updates, database and server controls, global ranks and network bans; comma commands require an exact `DEVELOPER_IDS` entry, even for the bot owner |
+| **Supreme Leader** | All servers | Everything below; can lift genrebans from ban-log controls. Developer comma commands remain restricted to exact `DEVELOPER_IDS` entries |
+| **Overseer** | All servers | Bot Manager, plus one-server genreban exceptions through `/mod unban` |
+| **Bot Manager** | All servers | Head Admin-level access in every server; this rank does not unlock comma commands |
 | **Server Owner** | Own server | Head Admin, plus security admins, undoing setting changes and undoing strips |
 | **Head Admin** | One server | Anti-nuke, whitelist, control panel, backups, staff ranks |
 | **Admin** | One server | Lifting ordinary bans, accepting appeals, raid tools, automod, scam protection, logging |
 | **Moderator** | One server | Bans, kicks, tempbans, purges, ban records, denying appeals |
 | **Helper** | One server | Warnings, short timeouts, cases and notes |
 
-**Developer is the top rank and is set only in `.env`.** Anything that can take the bot offline, change its data or affect every server at once is Developer only, so Supreme Leader (or any lower rank) is safe to give to someone who is still learning.
+**Developer is the top bot-wide rank:** the bot owner (`BOT_OWNER_ID`) and IDs in `DEVELOPER_IDS`. Developer-only actions are hidden from the slash menu and handled as comma-prefix commands. Every comma command requires the exact user ID in `DEVELOPER_IDS`—`BOT_OWNER_ID` alone is not enough, so add the owner's ID there too. Use `/help` for available slash commands and `,help` for the Developer command list. Sensitive and admin slash replies are private (ephemeral); ordinary public utility replies stay public.
 
 **Who can lift a ban**
 
 | Ban | Lifted by |
 |---|---|
-| Ordinary server ban | Admin rank, Discord Administrator or the server owner (`/mod unban`, ban log buttons, accepting an appeal) |
-| Genreban | A Supreme Leader or Developer, everywhere (`/network ungenreban`); an Overseer or higher can let the person back into one server (`/mod unban`) |
-| Hardban | A Developer only (`/network unhardban`) |
+| Ordinary server ban | Admin rank, Discord Administrator or the server owner (`/mod unban`, ban-log buttons, accepting an appeal) |
+| Genreban | A Supreme Leader or Developer can lift it everywhere from ban-log controls; an Overseer or higher can let the person back into one server (`/mod unban`). The comma command `,ungenreban` requires an exact `DEVELOPER_IDS` entry |
+| Hardban | Developer only; `,unhardban` requires an exact `DEVELOPER_IDS` entry |
 
 Anti-nuke watches every rank except Developers, Supreme Leaders, server owners and whitelisted entries. The complete list of commands for each rank is in **[docs/ranks.md](docs/ranks.md)**.
 
@@ -143,10 +143,9 @@ Commands are grouped under a small number of top-level entries:
 | `/recovery` | Snapshots, backups, layout copy |
 | `/info` | Users, roles, server, bot, latency |
 | `/roblox` | Verification, lookups, blacklist, group binds |
-| `/network` | Genrebans, hardbans and their exceptions (developers) |
-| `/dev` | Diagnostics, updates, restarts, servers, database (bot-wide ranks; the risky tools are Developer only) |
+| `,` commands | Developer operations: restart, updates, diagnostics, database, server authorization, global ranks and network bans. Every comma command requires an exact `DEVELOPER_IDS` entry, including for the bot owner |
 
-`/help` in Discord lists only the commands available to you. The full reference is in **[docs/commands.md](docs/commands.md)**.
+`/help` in Discord lists only the slash commands available to you; `,help` lists Developer comma commands for authorized IDs. Sensitive/admin slash replies are ephemeral; ordinary public utility replies stay public. The full reference is in **[docs/commands.md](docs/commands.md)**.
 
 ## Getting started
 
@@ -164,12 +163,12 @@ Copy [`.env.example`](.env.example) to `.env` and set at least:
 |---|---|---|
 | `DISCORD_TOKEN` | Yes | Bot token from the Discord Developer Portal |
 | `DISCORD_CLIENT_ID` | Yes | Application ID |
-| `DEVELOPER_IDS` | Yes | Comma-separated user IDs with Developer access (the top rank, full control) |
+| `DEVELOPER_IDS` | Yes | Comma-separated Discord user IDs with Developer access. Required for every comma command, including when the user is `BOT_OWNER_ID` |
 | `DATABASE_PATH` | No | SQLite database location (default `./data/vanguard.db`) |
 | `DASHBOARD_ENABLED` | No | Set to `false` to disable the built-in dashboard while keeping `/healthz` available (default: enabled) |
 | `DASHBOARD_TOKEN` | Recommended | Require a token for the dashboard and its API when enabled. Without it the dashboard is open to anyone who can reach the port, so keep it on localhost |
-| `BOT_OWNER_ID` | Recommended | The bot owner: Developer (the top rank), and the default for `TRUSTED_DM_IDS` |
-| `SUPREME_LEADER_IDS` | No | Supreme Leaders: everything except the Developer-only tools. Nobody is built in; every start prints who has bot-wide access |
+| `BOT_OWNER_ID` | Recommended | The bot owner: Developer rank for ordinary permission checks, and the default for `TRUSTED_DM_IDS`. Add this ID to `DEVELOPER_IDS` separately to use comma commands |
+| `SUPREME_LEADER_IDS` | No | Supreme Leaders: bot-wide rank below Developer; may lift genrebans from ban-log controls, but do not get comma commands. Nobody is built in; every start prints who has bot-wide access |
 | `TRUSTED_DM_IDS` | No | The only people the bot DMs about itself, including the daily database backup (default: `BOT_OWNER_ID`) |
 | `UPDATE_REPO`, `UPDATE_TOKEN` | No | Enable automatic updates (see below) |
 | `ROVER_API_KEY`, `BLOXLINK_API_KEY` | No | Roblox verification providers |
@@ -206,11 +205,11 @@ push to main → CI (typecheck, build, tests, secret scan) → launcher installs
 - Only commits that passed CI are installed.
 - A version that stops within two minutes of installing is rolled back automatically and skipped.
 - `.env` and `data/` are never modified.
-- Developers can check the update status with `/dev update`. Installing immediately (`action: now`) and restarting from a server with `,restart` are Developer only. `,restart` requires Message Content Intent enabled in the Discord Developer Portal, and `MESSAGE_CONTENT_ENABLED` must not be set to `false`.
+- Developers check update status or install now with `,update status` or `,update now`; restart from a server with `,restart`. These comma commands require an exact `DEVELOPER_IDS` entry (including for the bot owner). Prefix commands require Message Content Intent enabled in the Discord Developer Portal, and `MESSAGE_CONTENT_ENABLED` must not be set to `false`.
 
 ### Backups
 
-- **Database:** verified backups every hour, kept on a rolling schedule in `data/database-backups`, plus a daily compressed copy sent by DM only to `TRUSTED_DM_IDS` (default: the bot owner). Lost settings can be merged back from any backup with `/dev database restore-settings`.
+- **Database:** verified backups every hour, kept on a rolling schedule in `data/database-backups`, plus a daily compressed copy sent by DM only to `TRUSTED_DM_IDS` (default: the bot owner). Lost settings can be merged back from any backup with `,database restore-settings` (exact `DEVELOPER_IDS` membership required).
 - **Server layout:** snapshots and scheduled backups with `/recovery`.
 
 ### Running more than one copy

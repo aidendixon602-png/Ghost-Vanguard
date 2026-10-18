@@ -27,8 +27,8 @@ export class Guard {
         // or lower bot-wide rank).
         if (needsDeveloper(rankKey ?? command))
             return explicitRank(this.store, guildId, user, actor) >= requiredRank(rankKey ?? command) && this.enabledHere(policy, guildId, command);
-        // Developers (the bot owner and DEVELOPER_IDS) may use every other command here without Administrator, Manage Roles
-        // or a server role. Discord's limits on the bot itself and confirmation prompts still apply.
+        // For ordinary slash policies, Developers (the bot owner and DEVELOPER_IDS) may use commands without
+        // Administrator, Manage Roles or a server role. The comma handler separately requires DEVELOPER_IDS exactly.
         if (developers.has(user))
             return this.enabledHere(policy, guildId, command);
         // A Vanguard staff rank high enough for this command replaces the Discord-permission and access checks.
@@ -69,7 +69,7 @@ export class Guard {
         if (policy.requiresAuthorization) {
             this.store.assertAuthorized(i.guildId);
             if (this.ready && !this.ready(i.guildId))
-                throw new AppError('AUTHORIZATION_ERROR', 'Server systems are initializing. A developer can run /dev server authorize to retry initialization.');
+                throw new AppError('AUTHORIZATION_ERROR', 'Server systems are initializing. A developer listed in `DEVELOPER_IDS` can run `,authserver` to retry initialization.');
         }
         // Interaction member contains current permission data; fetch only role data if not cached.
         const actor = refreshMember ? await i.guild.members.fetch({ user: i.user.id, force: true }) : i.member;

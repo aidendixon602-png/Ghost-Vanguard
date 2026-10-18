@@ -3,7 +3,7 @@ import type { Store } from '../database/db.js';
 
 /**
  * Automatic reactions: developers pick members (per server) whose messages the bot reacts to,
- * 🐐 by default. Managed with /dev autoreact add | remove | list.
+ * 🐐 by default. Managed with ,autoreact add | remove | list.
  */
 
 export const DEFAULT_EMOJI = '🐐';

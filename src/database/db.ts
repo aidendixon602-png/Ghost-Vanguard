@@ -113,12 +113,16 @@ export class Store {
         snapshot_id INTEGER NOT NULL, actor_id TEXT NOT NULL, backup_id INTEGER, at INTEGER NOT NULL, report TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS outbox (id INTEGER PRIMARY KEY AUTOINCREMENT, guild_id TEXT, channel_id TEXT, json TEXT, attempts INTEGER DEFAULT 0, next_at INTEGER DEFAULT 0);
       CREATE TABLE IF NOT EXISTS leases (name TEXT PRIMARY KEY, owner TEXT, until INTEGER);
+      CREATE TABLE IF NOT EXISTS restart_notices (
+        id INTEGER PRIMARY KEY CHECK(id=1), channel_id TEXT NOT NULL, message_id TEXT NOT NULL, requested_at INTEGER NOT NULL);
+      CREATE TABLE IF NOT EXISTS prefix_message_cleanup (
+        id TEXT PRIMARY KEY, channel_id TEXT NOT NULL, message_id TEXT NOT NULL, delete_at INTEGER NOT NULL);
       CREATE TABLE IF NOT EXISTS guild_authorization (
         guild_id TEXT PRIMARY KEY, name TEXT NOT NULL, state TEXT NOT NULL CHECK(state IN ('PENDING_AUTHORIZATION','AUTHORIZED','DEAUTHORIZED','EXPIRED','BANNED')),
         joined_at INTEGER NOT NULL, deadline INTEGER, authorized_by TEXT, authorized_at INTEGER,
         removed_by TEXT, removed_at INTEGER, version TEXT, config_version INTEGER, generation INTEGER NOT NULL DEFAULT 0);
       CREATE TABLE IF NOT EXISTS server_bans (guild_id TEXT PRIMARY KEY, name TEXT NOT NULL, reason TEXT NOT NULL, banned_by TEXT NOT NULL, at INTEGER NOT NULL);
-      -- Developer bans across every authorized server (/network genreban, /network hardban). Rows are never deleted:
+      -- Developer bans across every authorized server (,genreban and ,hardban). Rows are never deleted:
       -- a revoked ban keeps who revoked it and why. At most one active ban per user and type.
       CREATE TABLE IF NOT EXISTS network_bans (
         id INTEGER PRIMARY KEY AUTOINCREMENT, kind TEXT NOT NULL CHECK(kind IN ('genreban','hardban')),
@@ -414,7 +418,7 @@ export class Store {
     assertAuthorized(guildId: string) {
         const active = this.active.getStore();
         if (!this.isAuthorized(guildId) || active && (active.guild !== guildId || active.generation !== this.authorization(guildId)?.generation))
-            throw new AppError('AUTHORIZATION_ERROR', 'This server requires developer authorization with /dev server authorize.');
+            throw new AppError('AUTHORIZATION_ERROR', 'This server requires developer authorization with ,authserver.');
     }
 
     withAuthorized<T>(guildId: string, fn: () => Promise<T>): Promise<T> {
@@ -422,7 +426,7 @@ export class Store {
         if (current)
             this.assertAuthorized(current.guild);
         if (!this.isAuthorized(guildId))
-            throw new AppError('AUTHORIZATION_ERROR', 'This server requires developer authorization with /dev server authorize.');
+            throw new AppError('AUTHORIZATION_ERROR', 'This server requires developer authorization with ,authserver.');
         return this.active.run({ guild: guildId, generation: this.authorization(guildId)!.generation }, fn);
     }
 

@@ -12,6 +12,12 @@ export const style = {
     cyan: paint('36'),
 };
 const RULE = '━'.repeat(60);
+const PANEL_WIDTH = 72;
+const stripAnsi = (value) => value.replace(/\x1b\[[0-9;]*m/g, '');
+const visibleLength = (value) => Array.from(stripAnsi(value)).length;
+const frame = (top, fill, end) => style.cyan(`  ${top}${fill.repeat(PANEL_WIDTH + 2)}${end}`);
+const panelRow = (content) => `  │ ${content}${' '.repeat(Math.max(0, PANEL_WIDTH - visibleLength(content)))} │`;
+const detail = (label, value) => panelRow(`${style.cyan(label.padEnd(10))} ${value}`);
 /** 393216 -> "384 KB". */
 export function readableSize(bytes) {
     if (bytes < 1024)
@@ -24,21 +30,23 @@ export function readableSize(bytes) {
     }
     return `${value >= 10 ? Math.round(value) : value.toFixed(1)} ${units[unit]}`;
 }
-const row = (ok, label, value) => `  ${ok ? style.green('✔') : style.yellow('!')} ${label.padEnd(13)} ${value}`;
-/** The block printed once the bot is connected and ready. */
+/** A compact, framed status panel printed once the bot is connected and ready. */
 export function startupSummary(info) {
     const integrations = Object.entries(info.integrations)
-        .map(([name, on]) => on ? `${name} ${style.green('✔')}` : style.dim(`${name} off`)).join('   ');
+        .map(([name, on]) => on ? `${name} ${style.green('ON')}` : `${name} ${style.dim('off')}`).join('  ·  ');
+    const network = info.servers > 0 ? `${info.servers} connected` : style.yellow('not in any servers yet');
+    const commandState = info.commandsUpdated ? style.yellow('updated on Discord') : style.green('up to date');
     return [
         '',
-        style.cyan(RULE),
-        `  ${style.bold('MIDTOWN VANGUARD')}  ${style.dim(`v${info.version}`)}`,
-        style.cyan(RULE),
-        row(true, 'Online', `as ${style.bold(info.tag)}`),
-        row(info.servers > 0, 'Servers', info.servers > 0 ? `${info.servers} connected` : 'not in any servers yet'),
-        row(true, 'Commands', `${info.commands} registered · ${info.commandsUpdated ? 'updated on Discord' : 'up to date'}`),
-        row(true, 'Integrations', integrations),
-        row(true, 'Health', info.health),
+        frame('╭', '─', '╮'),
+        panelRow(`${style.bold('MIDTOWN VANGUARD')}  ${style.dim(`v${info.version}`)}  ${style.cyan('SECURITY OPERATIONS')}`),
+        panelRow(`${style.green('● SYSTEM ONLINE')}  ${style.dim('as')} ${style.bold(info.tag)}`),
+        frame('├', '─', '┤'),
+        detail('NETWORK', network),
+        detail('COMMANDS', `${info.commands} registered  ·  ${commandState}`),
+        detail('MODULES', integrations),
+        detail('HEALTH', info.health),
+        frame('╰', '─', '╯'),
         '',
     ];
 }

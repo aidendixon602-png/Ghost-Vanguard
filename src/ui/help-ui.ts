@@ -4,7 +4,7 @@ import { ActionRowBuilder, ButtonBuilder, ButtonStyle, PermissionsBitField, Stri
 import { isAdminRestricted, RANK_LABEL, rankName, requiredRank } from '../bot/ranks.js';
 import type { Policy } from '../bot/registry.js';
 import { Guard } from '../bot/guard.js';
-import { defaults, type CommandContext, type Registry } from '../bot/registry.js';
+import { defaults, isDeveloperPrefixOnly, type CommandContext, type Registry } from '../bot/registry.js';
 import { AppError } from '../errors.js';
 import { embed } from './ui.js';
 
@@ -44,7 +44,9 @@ export function helpCategories(ctx:CommandContext,guild:string,user:string) {
         if(RETIRED.includes(name))continue;
         const category=sectionOf(name,def.metadata.category);
         const add=(description:string,path='',policy=def.metadata)=>{
-            if(!guard.allowed(policy,guild,user,ctx.actor,name,`${name}/${path.replaceAll(' ','/')}`))return;
+            const key=path?`${name}/${path.replaceAll(' ','/')}`:name;
+            if(isDeveloperPrefixOnly(policy,key))return;
+            if(!guard.allowed(policy,guild,user,ctx.actor,name,key))return;
             const lines=groups.get(category)??[];
             const command=(def.data.type??1)===1?displayPath(name,path):`${name} · context menu`;
             lines.push({order:rank(name)*100+lines.filter(l=>l.order>=rank(name)*100&&l.order<rank(name)*100+100).length,text:`\`${command}\` · ${description} · *${accessLabel(policy,`${name}/${path.replaceAll(' ','/')}`)}*`});groups.set(category,lines);

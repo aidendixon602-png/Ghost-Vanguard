@@ -20,7 +20,7 @@
 | Database backups | At startup and on a schedule, using the online SQLite backup. Each is checked for integrity, foreign keys and schema, hashed with SHA-256, and recorded with size, version and status. Recent, daily and weekly retention. Failures raise health counters, are logged, and trigger developer and owner DMs with backoff. |
 | Configuration history | `/config-history list/restore` records settings, grants, providers, permission roles, commands, features, backup, logging and verification settings. Owner or developer rollback needs confirmation and a verified whole-database backup first. Authorization changes stay with the developer authorization commands. |
 | Guild departure | A departed guild becomes inactive and its data is kept for 90 days by default. Rejoining restores it. Expired cleanup takes a verified backup first and preserves authorization, bans and their audit. |
-| Database monitoring | `/dev database status`, `/healthz`, persistent counters, storage size, last health check and last verified backup. `/dev database backups/backup/verify` for guarded backup work. |
+| Database monitoring | `,database status`, `/healthz`, persistent counters, storage size, last health check and last verified backup. `,database backups/backup/verify` for guarded backup work (comma commands require an exact `DEVELOPER_IDS` entry). |
 | Threat board | Every confirmed incident scores the member behind it in `threat_scores`; Watch (25+) is a staff heads-up, High (55+) strips access and restores the damage, Critical (85+) counter-attacks and bans. Whitelisted people, the bot, the server owner, observe mode and unauthorized servers are never auto-actioned, actions are cooldown-bound, logged and reversible, and scores halve daily and expire after a week. See [threat-board.md](threat-board.md). |
 | Dashboard | A self-contained read-only page and JSON API over the same database: servers, protection, the threat board, the ticket desk and recent incidents. Served by the bot on its health port, or standalone with `npm run dashboard`. No build step and no external assets, so it works offline. See [dashboard.md](dashboard.md). |
 | Ticket desk | Panel-driven tickets with types, claim/transfer/priority, cooldown and open limits, transcripts on close with a five-second delay, DM ratings, idle auto-close and a weekly report. The numbers also appear on the dashboard. |
@@ -63,11 +63,11 @@ All settings live in the database, so a restart or crash never resets anything. 
 
 `/setup config` lets the server owner or a developer configure provider toggles, Vanguard permission roles, command enablement and cooldowns, feature switches (moderation, verification, AI, snapshots) and scheduled layout backups. Provider credentials stay in environment variables. Security administrators cannot grant themselves owner or developer powers, and ordinary staff have no raw SQL or database-editing command.
 
-`/recovery backup` saves a Discord server's **layout**. `/dev database backup` saves Vanguard's **entire SQLite database**, including every guild's settings and recovery records. They are separate recovery points with separate retention. Manual layout snapshots and restore rollback points are kept until you delete them, and scheduled layout backups follow each guild's configured retention count.
+`/recovery backup` saves a Discord server's **layout**. `,database backup` saves Vanguard's **entire SQLite database**, including every guild's settings and recovery records. They are separate recovery points with separate retention. Manual layout snapshots and restore rollback points are kept until you delete them, and scheduled layout backups follow each guild's configured retention count.
 
 ## Restoring the whole database
 
-With the bot stopped, find the backup UUID from `/dev database backups` or the metadata files in the backup directory, then run:
+With the bot stopped, find the backup UUID from `,database backups` or the metadata files in the backup directory, then run:
 
 ```powershell
 npm run database:restore -- --id BACKUP_UUID --confirm RESTORE-BACKUP_UUID

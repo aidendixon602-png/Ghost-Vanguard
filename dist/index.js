@@ -2,7 +2,9 @@ import { accessSummary } from './bot/access-summary.js';
 import { dmTrusted } from './bot/trusted-dm.js';
 import { onRejoin, saveLeftRoles } from './features/rejoin-roles.js';
 import { selfRestart } from './bot/updater-link.js';
-import { isPrefixRestartMessage, requestPrefixRestart } from './bot/prefix-restart.js';
+import { PrefixCommands } from './bot/prefix-commands.js';
+import { restorePrefixMessageDeletions } from './bot/prefix-cleanup.js';
+import { completeRestartNotice } from './bot/restart-notice.js';
 import { autoReact } from './features/autoreact.js';
 import { reconcileStartupMembers } from './security/startup-members.js';
 import { ScamProtection } from './security/scam.js';
@@ -115,7 +117,12 @@ const lifecycle = new GuildLifecycle(store, client, id => {
 });
 const databaseBackups = new DatabaseBackups(store);
 const stats = new ProtectionStats(client, store, id => startupReady && lifecycle.isReady(id));
-const router = new Interactions({ stats, databaseBackups, client, store, security, snapshots, roblox, logs, lifecycle, registry, confirmations, ai: { inFlight: 0 } });
+const services = { stats, databaseBackups, client, store, security, snapshots, roblox, logs, lifecycle, registry, confirmations, ai: { inFlight: 0 } };
+const router = new Interactions(services);
+const prefixCommands = new PrefixCommands(services, router.queue);
+const restoredPrefixDeletions = restorePrefixMessageDeletions(client, store);
+if (restoredPrefixDeletions)
+    logEvent('prefix_message_deletions_restored', { count: restoredPrefixDeletions });
 let readyAt = 0, startupReady = false, shuttingDown = false;
 const timers = [];
 logs.canDeliver = id => startupReady && lifecycle.isReady(id);
@@ -142,7 +149,7 @@ function presence(soon = false) {
     stats.invalidate();
     if (!client.isReady() || Date.now() - lastPresence < (soon ? 15000 : 50000))
         return;
-    // A developer-set status (/dev status) replaces the rotation until it expires or is reset.
+    // A developer-set status (,dev status) replaces the rotation until it expires or is reset.
     const override = presenceOverride(store);
     const lines = override ? [override.text] : presenceLines(stats.get());
     client.user.setPresence({ activities: [{ name: 'Custom Status', type: ActivityType.Custom, state: lines[presenceIndex++ % lines.length] }], status: override?.mode ?? 'online' });
@@ -203,6 +210,8 @@ client.once(Events.ClientReady, async (c) => {
             console.log(closingRule());
         }
         endStartupSummary();
+        // A missing notice or slow Discord fetch should not hold up the rest of startup.
+        task('restart notice completion', completeRestartNotice(client, store, Date.now(), client.guilds.cache.size, registry.commands.size));
         markSeen(store);
         for (const guild of client.guilds.cache.values())
             protectedTask('restart notice', guild.id, () => catchUp(guild, store, logs, id => security.trusted(guild, id), offlineSince));
@@ -247,19 +256,9 @@ client.on(Events.GuildAuditLogEntryCreate, (entry, guild) => {
     protectedTask('settings lock', guild.id, () => lockServerSettings(store, logs, entry, guild, id => security.trusted(guild, id), (id, rule) => security.trustedFor(guild, id, rule)));
 });
 client.on(Events.MessageCreate, m => {
-    if (isPrefixRestartMessage(m)) {
-        task('prefix restart', (async () => {
-            const result = await requestPrefixRestart(m.author.id);
-            const response = {
-                'not-authorized': '⛔ Only the bot owner and approved developers can use `,restart`.',
-                restarting: '🔄 Restarting Ghost Vanguard. It should be back in about 10 seconds; use `/info ping` to check.',
-                busy: 'A restart or update is already in progress. Try again in a minute.',
-                scheduled: '🔄 Restart scheduled using the backup method. Once the bot is back, press **Restart** in the Wispbyte panel once to load the current launcher.',
-                'too-soon': 'The bot started less than 3 minutes ago. Wait a minute, then try `,restart` again.',
-                'no-launcher': 'I can’t restart from Discord because the launcher is not available. Use **Restart** in Wispbyte. The startup command should remain `cd /home/container && node launch.js`.',
-            };
-            await m.reply(response[result]);
-        })());
+    // Known comma commands are routed before moderation/anti-spam handlers. Unauthorized users are ignored silently.
+    if (prefixCommands.recognizes(m)) {
+        task('prefix command', prefixCommands.handle(m));
         return;
     }
     if (m.guild)

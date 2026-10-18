@@ -6,7 +6,7 @@ channels/roles and test members. Test actions can ban or kick the executor and s
 roles; use a helper account below Vanguard rather than the server owner, a developer or
 an exempt account. Do not automate a normal user account.
 
-1. Invite Vanguard and authorize the test server with `/dev server authorize` as a developer.
+1. Invite Vanguard and authorize the test server with `,authserver` as a developer whose exact ID is listed in `DEVELOPER_IDS`.
 2. Place Vanguard above regular staff/test roles, grant the permissions reported by
    `/antinuke check`, and set a security log channel with `/security config`.
 3. Run `/recovery backup`, `/antinuke check`, then `/antinuke enable`. Confirm green status and the defaults.
