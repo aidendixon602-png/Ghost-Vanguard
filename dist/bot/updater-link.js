@@ -12,29 +12,94 @@ export function askLauncher(op, timeoutMs = 20000, proc = process) {
         proc.send({ type: 'vg-update', op, id });
     });
 }
-const short = (sha) => sha ? `\`${sha.slice(0, 7)}\`` : 'unknown';
+const short = (sha) => sha ? `\`${sha.slice(0, 7)}\`` : '`unknown`';
+const validRepo = (repo) => !!repo && /^[\w.-]+\/[\w.-]+$/.test(repo);
+function repoLink(repo) {
+    return validRepo(repo) ? `[${repo}](https://github.com/${repo})` : repo ? `\`${repo.replace(/`/g, '')}\`` : '`not configured`';
+}
+function commitLink(repo, sha) {
+    if (!sha)
+        return '`unknown`';
+    const label = short(sha);
+    return validRepo(repo) && /^[a-f0-9]{7,40}$/i.test(sha)
+        ? `[${label}](https://github.com/${repo}/commit/${sha})`
+        : label;
+}
+function lastCheckLabel(result) {
+    if (result === 'current')
+        return '✅ Up to date';
+    if (result === 'not checked yet')
+        return '⏳ No check has completed yet';
+    if (result === 'installing')
+        return '🔄 Update installing';
+    if (result === 'installed')
+        return '✅ Update installed';
+    if (result === 'skipped')
+        return '⏭️ Update skipped';
+    if (result === 'none')
+        return 'ℹ️ No eligible update found';
+    if (result === 'busy')
+        return '🔄 Update already in progress';
+    if (/^waiting/i.test(result))
+        return `⏳ ${result}`;
+    if (/^check failed:/i.test(result))
+        return `⚠️ ${result}`;
+    if (result === 'error')
+        return '⚠️ Check failed';
+    return `ℹ️ ${result || 'Status unavailable'}`;
+}
+function nowResult(s, interval) {
+    const r = s.result;
+    if (!r)
+        return '';
+    if (r.state === 'installing')
+        return `🔄 **Installing ${commitLink(s.repo, r.sha)}**\nGhost Vanguard is restarting to load it. Check \`/dev update\` again in a moment.`;
+    if (r.state === 'installed')
+        return `✅ **Update installed:** ${commitLink(s.repo, r.sha)}\nThe bot is starting on the new version now.`;
+    if (r.state === 'current')
+        return '✅ **You’re up to date.** No newer passing version is available.';
+    if (r.state === 'waiting')
+        return `⏳ **Update found, but it isn’t ready yet:** ${commitLink(s.repo, r.sha)}\n${r.why || 'GitHub checks are still running.'} It will install automatically once checks pass.`;
+    if (r.state === 'skipped')
+        return `⏭️ **Version skipped:** ${commitLink(s.repo, r.sha)}\n${r.why || 'It previously failed to install.'} Push a fix to install a newer version.`;
+    if (r.state === 'busy')
+        return '🔄 **An update is already in progress.** Try again in a minute.';
+    if (r.state === 'error')
+        return `⚠️ **GitHub check failed:** ${r.why || 'No details were returned.'}\nAutomatic checks will retry every ${interval}.`;
+    if (r.state === 'none')
+        return 'ℹ️ **No eligible update found.** Check the configured branch and GitHub Actions status.';
+    return `ℹ️ **Update check complete:** ${r.state}.`;
+}
+/** A readable, linked status card. Keeps the first-launch state honest: no fake "just checked" timestamp. */
 export function describeUpdate(s, op) {
     if (!s)
-        return 'Automatic updates are not available: the bot was not started with `node launch.js`, or the launcher did not answer.';
-    if (!s.enabled)
-        return `**Automatic updates are off.** ${s.why ? `Reason: ${s.why}.` : 'Add `UPDATE_REPO` and `UPDATE_TOKEN` to `.env`.'}\nFix it in \`.env\`, then press Restart in the hosting panel (the launcher reads \`.env\` only when it starts).`;
-    const lines = [
-        `**Repository:** \`${s.repo}\` · branch \`${s.branch}\``,
-        `**Running:** ${short(s.running)}${s.fallback && s.fallback !== s.running ? ` · falls back to ${short(s.fallback)} if it crashes` : ''}`,
-        `**Checks:** every ${s.intervalMinutes} minutes · last <t:${Math.floor((s.lastCheck.at || Date.now()) / 1000)}:R>: ${s.lastCheck.result}`,
-    ];
-    if (s.rejected.length)
-        lines.push(`**Skipped versions:** ${s.rejected.map(short).join(', ')}`);
-    if (op === 'now' && s.result) {
-        const r = s.result;
-        lines.unshift(r.state === 'installing' ? `🔄 **Installing ${short(r.sha)} now.** The bot restarts in a few seconds; run \`/dev diagnostics\` in a minute to confirm.`
-            : r.state === 'current' ? '✅ **Already on the newest version.**'
-                : r.state === 'waiting' ? `⏳ **${short(r.sha)} is waiting:** ${r.why}. It installs by itself once GitHub's tests pass.`
-                    : r.state === 'skipped' ? `⏭️ **${short(r.sha)} is skipped:** ${r.why}. Push a fix to install a newer version.`
-                        : r.state === 'busy' ? '🔄 **An update is already in progress.**'
-                            : r.state === 'error' ? `⚠️ **Could not check GitHub:** ${r.why}`
-                                : 'Nothing to update.', '');
+        return '⚠️ **Launcher connection unavailable**\nThe bot was not started with `node launch.js`, or the launcher did not answer. On Wispbyte, keep the startup command `cd /home/container && node launch.js`, then try again.';
+    if (!s.enabled) {
+        const reason = s.why || 'Add `UPDATE_REPO` and `UPDATE_TOKEN` to `.env`.';
+        const reasonText = /[.!?]$/.test(reason) ? reason : `${reason}.`;
+        return `🟠 **Automatic updates are off**\n**Reason:** ${reasonText}\n\nFix the \`.env\` settings, then press Restart in the hosting panel. Your token is never displayed here.`;
     }
+    const interval = `${s.intervalMinutes} ${s.intervalMinutes === 1 ? 'minute' : 'minutes'}`;
+    const check = s.lastCheck ?? { at: 0, result: 'not checked yet' };
+    const checkedAt = Number.isFinite(check.at) && check.at > 0 ? ` · <t:${Math.floor(check.at / 1000)}:R>` : '';
+    const lines = [
+        '✅ **Automatic updates enabled**',
+        '',
+        `📦 **Repository**  ${repoLink(s.repo)}`,
+        `🌿 **Branch**  \`${s.branch}\``,
+        `🟢 **Running**  ${commitLink(s.repo, s.running)}`,
+        `🕒 **Last check**  ${lastCheckLabel(check.result)}${checkedAt}`,
+        `⏱️ **Auto-check**  Every ${interval}`,
+    ];
+    if (s.fallback && s.fallback !== s.running)
+        lines.push(`🛟 **Rollback version**  ${commitLink(s.repo, s.fallback)}`);
+    if (s.rejected.length) {
+        const shown = s.rejected.slice(0, 3).map(sha => commitLink(s.repo, sha)).join(', ');
+        const more = s.rejected.length > 3 ? `, and ${s.rejected.length - 3} more` : '';
+        lines.push(`⏭️ **Skipped versions**  ${shown}${more}`);
+    }
+    if (op === 'now' && s.result)
+        lines.unshift(nowResult(s, interval), '');
     return lines.join('\n');
 }
 /** Ask launch.js to restart the bot. Resolves true when it accepted (the bot stops a few seconds later). */

@@ -21,6 +21,8 @@ export interface DashboardResponse {
 }
 
 export interface DashboardOptions {
+    /** Set false to disable the page and API while leaving the liveness probe available. */
+    enabled?: boolean;
     /** When set, every route (page and API) needs this token, as ?token= or a bearer header. */
     token?: string;
     now?: () => number;
@@ -56,7 +58,9 @@ export function answer(store: Store, request: { method?: string; url?: string; h
     const path = url.pathname.replace(/\/+$/, '') || '/';
     // /healthz stays open: it is a liveness probe, and it exposes nothing about members.
     if (path === '/healthz')
-        return json({ service: 'Ghost Vanguard', version: VERSION, ready: true, dashboard: true });
+        return json({ service: 'Ghost Vanguard', version: VERSION, ready: true, dashboard: options.enabled !== false });
+    if (options.enabled === false)
+        return json({ error: 'Dashboard is disabled.' }, 404);
     // The tab icon and the header badge are the same bytes, inlined into the page and served here
     // for anything that asks for the file directly. Open, like the page: it is art, not data.
     if (path === '/favicon.ico' || path === '/logo.png')

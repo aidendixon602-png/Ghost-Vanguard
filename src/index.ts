@@ -387,7 +387,7 @@ client.on(Events.ShardResume, () => console.log('[discord] Gateway resumed.'));
 const server = createServer((req, res) => {
     // /healthz is the liveness probe uptime monitors use; everything else is the dashboard.
     if ((req.url ?? '').split('?')[0] !== '/healthz') {
-        const result = dashboardAnswer(store, req, { token: config.dashboardToken });
+        const result = dashboardAnswer(store, req, { token: config.dashboardToken, enabled: config.dashboardEnabled });
         res.writeHead(result.status, { 'Content-Type': result.type, 'Cache-Control': result.cache, 'X-Robots-Tag': 'noindex' });
         res.end(req.method === 'HEAD' ? undefined : result.encoding === 'base64' ? Buffer.from(result.body, 'base64') : result.body);
         return;
@@ -404,9 +404,17 @@ server.on('error', () => {
 });
 
 server.listen(config.port, config.host, () => {
-    logEvent('health_listening', { url: healthUrl, dashboard: `http://${config.host}:${config.port}/`, token: config.dashboardToken ? 'required' : 'none' });
-    if (config.logFormat !== 'json')
-        console.log(`  ${style.dim('Dashboard:')} ${config.host}:${config.port}/  ${config.dashboardToken ? style.dim('(DASHBOARD_TOKEN required)') : style.dim('(set DASHBOARD_TOKEN before exposing it)')}`);
+    logEvent('health_listening', {
+        url: healthUrl,
+        dashboard: config.dashboardEnabled ? `http://${config.host}:${config.port}/` : 'disabled',
+        ...(config.dashboardEnabled ? { token: config.dashboardToken ? 'required' : 'none' } : {}),
+    });
+    if (config.logFormat !== 'json') {
+        if (config.dashboardEnabled)
+            console.log(`  ${style.dim('Dashboard:')} ${config.host}:${config.port}/  ${config.dashboardToken ? style.dim('(DASHBOARD_TOKEN required)') : style.dim('(set DASHBOARD_TOKEN before exposing it)')}`);
+        else
+            console.log(`  ${style.dim('Health check:')} ${config.host}:${config.port}/healthz  ${style.dim('(dashboard disabled)')}`);
+    }
 });
 timers.push(setInterval(() => task('logs', logs.flush()), 2000));
 timers.push(setInterval(() => task('temporary bans', sweepTempbans(store, logs, client, id => lifecycle.isReady(id))), 60000));

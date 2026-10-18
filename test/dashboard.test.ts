@@ -28,6 +28,20 @@ test('the dashboard page is served without any build step or external asset', ()
     } finally { s.close(); }
 });
 
+test('disabling the built-in dashboard hides its routes but keeps /healthz available', () => {
+    const s = store();
+    try {
+        for (const path of ['/', '/api/guilds', '/favicon.ico']) {
+            const response = answer(s, { method: 'GET', url: path }, { enabled: false });
+            assert.equal(response.status, 404, path);
+            assert.match(JSON.parse(response.body).error, /disabled/i);
+        }
+        const health = answer(s, { method: 'GET', url: '/healthz' }, { enabled: false });
+        assert.equal(health.status, 200);
+        assert.equal(JSON.parse(health.body).dashboard, false);
+    } finally { s.close(); }
+});
+
 test('/healthz stays a plain liveness probe and unknown paths answer with the route list', () => {
     const s = store();
     try {

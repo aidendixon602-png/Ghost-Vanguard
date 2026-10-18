@@ -52,12 +52,22 @@ test('/dev update talks to launch.js, and explains when it is not available', as
     proc.send = (m: any) => setImmediate(() => proc.emit('message', { type: 'vg-update-result', id: m.id, enabled: true, repo: 'o/r', branch: 'main', running: 'abcdef1234', fallback: 'abcdef1234', intervalMinutes: 5,
         lastCheck: { at: Date.now(), result: 'current' }, rejected: [], result: m.op === 'now' ? { state: 'installing', sha: '1234567890' } : undefined }));
     const status = await askLauncher('status', 1000, proc);
-    assert.match(describeUpdate(status, 'status'), /Running:\*\* `abcdef1`/);
-    assert.match(describeUpdate(await askLauncher('now', 1000, proc), 'now'), /Installing `1234567` now/);
+    const statusText = describeUpdate(status, 'status');
+    assert.match(statusText, /Running.*abcdef1/);
+    assert.match(statusText, /\[o\/r\]\(https:\/\/github\.com\/o\/r\)/, 'repository is clickable');
+    assert.match(statusText, /https:\/\/github\.com\/o\/r\/commit\/abcdef1234/, 'running commit is clickable');
+    assert.match(statusText, /Last check.*Up to date.*<t:\d+:R>/);
+    const firstRun = describeUpdate({ ...status!, lastCheck: { at: 0, result: 'not checked yet' } }, 'status');
+    assert.match(firstRun, /No check has completed yet/);
+    assert.doesNotMatch(firstRun, /<t:\d+:R>/, 'never labels an unchecked state as just checked');
+    const installing = describeUpdate(await askLauncher('now', 1000, proc), 'now');
+    assert.match(installing, /Installing .*1234567/);
     const silent: any = new EventEmitter(); silent.connected = true; silent.send = () => {};
     assert.equal(await askLauncher('status', 50, silent), null, 'no answer → null, never hangs');
     assert.match(describeUpdate({ enabled: false } as any, 'status'), /Automatic updates are off/);
-    assert.match(describeUpdate({ enabled: false, why: 'UPDATE_TOKEN is empty in .env' } as any, 'status'), /Reason: UPDATE_TOKEN is empty in \.env\.[\s\S]*Restart in the hosting panel/, 'says exactly why');
+    const disabled = describeUpdate({ enabled: false, why: 'UPDATE_TOKEN is empty in .env' } as any, 'status');
+    assert.match(disabled, /UPDATE_TOKEN is empty in \.env/, 'says exactly why');
+    assert.match(disabled, /Restart in the hosting panel/, 'explains how to apply the fix');
 });
 
 test('/dev restart asks launch.js and reports when it cannot', async () => {
