@@ -1,6 +1,6 @@
 # Fixed anti-nuke preset (2.11.0)
 
-Every authorized server runs the same 17-rule anti-nuke preset in **enforce** mode.
+Every authorized server uses the same fixed 17-rule preset. New or unconfigured servers start in **observe** mode; enforce mode is an explicit, readiness-gated choice.
 
 | Rule | Limit | Action |
 |---|---|---|
@@ -24,12 +24,12 @@ Every authorized server runs the same 17-rule anti-nuke preset in **enforce** mo
 
 ## What staff can change
 
-- **On/off only:** `/antinuke enable` (or `/antinuke enable`) and `/antinuke disable` (or `/antinuke disable`, with confirmation). A disable is remembered across restarts.
+- **Enforcement:** `/antinuke enable` requires a passing readiness check and a user confirmation; the bot saves a baseline and rechecks permissions and hierarchy immediately before enabling. `/antinuke disable` also requires confirmation. A staff opt-out is remembered across restarts.
 - **Whitelist:** `/antinuke whitelist` and the status panel's *Manage Whitelist* button.
 - Nothing else. `/antinuke rule`, `toggle`, `preset`, `mode`, `bots` and `/antinuke-rule` were removed. Limits saved by older versions are ignored and cleared on the next startup.
 
-## Automatic enable
+## Observe-first rollout and readiness
 
-At startup and whenever a server is authorized, Vanguard enables the preset in enforce mode unless staff used `/antinuke disable`. The first automatic enable captures a baseline snapshot and posts "Anti-nuke protection active" in the security log.
+At startup and after authorization, a new or unconfigured server loads the preset in **observe** mode. It records incidents but does not strip people or automatically revert changes. Run `/setup logs setup`, then `/antinuke check`; readiness requires the bot permissions and an accessible security-log channel. When ready, `/antinuke enable` opens a confirmation that describes enforcement consequences, the baseline snapshot, and any roles at or above Vanguard. Confirming rechecks the security log, permissions, and hierarchy before enabling enforcement. A hierarchy warning does not block the choice, but Vanguard cannot contain members whose roles are above it.
 
-The server owner, configured developers and Vanguard itself are never punished. Role hierarchy still applies: Vanguard cannot act on members above its top role, so keep its role at the top (`/antinuke check`).
+A server already in enforce mode remains there across restarts only if readiness passes. If permissions or the security-log destination are missing, startup switches it to observe mode and reports the blockers; fixing readiness alone never silently resumes enforcement. A staff `/antinuke disable` opt-out stays off across restarts. The server owner, configured developers and Vanguard itself are never punished.

@@ -3,6 +3,7 @@ import type { Store } from '../database/db.js';
 import { RULES } from '../core.js';
 import { VERSION } from '../config.js';
 import { antinukeOptedOut } from '../security/locked-antinuke.js';
+import { readiness } from '../security/readiness.js';
 import { logChannels } from '../audit/log-setup.js';
 import { eventLogConfig } from '../audit/event-log.js';
 
@@ -26,19 +27,41 @@ export function setupStatus(guild: Guild) {
     return { admin, top: rank === 1, rank, total: roles.length };
 }
 
-export interface Checklist { items: { ok: boolean; label: string; fix: string }[]; ready: number; logsReady: boolean }
+export interface Checklist {
+    items: { ok: boolean; label: string; fix: string }[];
+    ready: number;
+    logsReady: boolean;
+    enforcementOn: boolean;
+    enforcementReady: boolean;
+    active: boolean;
+    optedOut: boolean;
+    readinessBlockers: string[];
+}
 
 export function checklist(store: Store | null, guild: Guild): Checklist {
     const s = setupStatus(guild);
     const audit = s.admin || !!guild.members?.me?.permissions?.has(PermissionFlagsBits.ViewAuditLog);
     const logsReady = !!store && !!logChannels(store, guild.id).bansChannelId && !!eventLogConfig(store, guild.id).channelId;
+    const settings = store ? store.settings(guild.id) : null;
+    const optedOut = !!store && antinukeOptedOut(store, guild.id);
+    const check = store && settings ? readiness(guild, settings.logChannelId, store) : null;
+    const readinessBlockers = check?.missing ?? ['Authorize the server first'];
+    const enforcementReady = !!check && check.missing.length === 0;
+    const active = !!settings?.enabled;
+    const enforcementOn = active && settings?.mode === 'enforce' && !optedOut;
+    const enforcingFix = !store
+        ? 'Authorize the server first'
+        : readinessBlockers.length
+            ? `Fix readiness: ${readinessBlockers.join(', ')}; see /antinuke check`
+            : 'Run /antinuke enable and confirm to switch from observe to enforce';
     const items = [
         { ok: s.admin, label: 'Administrator permission', fix: 'Server Settings → Roles → Ghost Vanguard → turn on Administrator' },
         { ok: s.top, label: `Role position ${s.rank ? `#${s.rank} of ${s.total}` : 'unknown'}`, fix: 'Drag the Ghost Vanguard role to the very top' },
         { ok: audit, label: 'View Audit Log', fix: 'Needed to see who did what (anti-nuke and logs)' },
         { ok: logsReady, label: 'Log channels', fix: 'Press **Set up logs** below' },
+        { ok: enforcementOn, label: 'Anti-nuke enforcement', fix: enforcingFix },
     ];
-    return { items, ready: items.filter(i => i.ok).length, logsReady };
+    return { items, ready: items.filter(i => i.ok).length, logsReady, enforcementOn, enforcementReady, active, optedOut, readinessBlockers };
 }
 
 const bar = (done: number, total: number) => '🟩'.repeat(done) + '⬛'.repeat(total - done);
@@ -46,16 +69,33 @@ const bar = (done: number, total: number) => '🟩'.repeat(done) + '⬛'.repeat(
 /** The panel for a server Vanguard protects. `inviter` is the developer who added it, if known. */
 export function welcomePanel(store: Store | null, guild: Guild, inviter: string | null = null) {
     const c = checklist(store, guild);
-    const on = !store || !antinukeOptedOut(store, guild.id);
     const all = c.ready === c.items.length;
     const intro = inviter
-        ? `Authorized by approved developer <@${inviter}>, so **${guild.name}** is protected straight away.`
-        : `**${guild.name}** is authorized and protected.`;
+        ? `Authorized by approved developer <@${inviter}>.`
+        : `**${guild.name}** is authorized.`;
+    const protection = c.enforcementOn
+        ? `Anti-nuke enforcement is active with ${RULES.length} rules.`
+        : c.optedOut
+            ? 'Staff have opted out of anti-nuke protection; it stays off until they enable it again.'
+            : !store
+                ? 'This server is not authorized yet; protection is not active.'
+                : c.active
+                    ? 'Anti-nuke starts in observe mode. Enforcement requires a successful readiness check and an explicit confirmation.'
+                    : 'Anti-nuke setup has not initialized yet. Once initialized, it starts in observe mode.';
+    const protectionField = c.enforcementOn
+        ? `🟢 **Enforce mode** · ${RULES.length} rules · automated containment is active`
+        : c.optedOut
+            ? '🔴 **Off by staff choice** · use /antinuke enable after readiness is fixed'
+            : !store
+                ? '⚪ **Not authorized** · protection is not active'
+                : c.active
+                    ? `🟠 **Observe mode** · incidents are recorded, but actions are not automatically reverted. ${c.enforcementReady ? 'Run /antinuke enable and confirm when ready.' : `Fix readiness: ${c.readinessBlockers.join(', ')}.`}`
+                    : '🟠 **Not initialized** · setup will start anti-nuke in observe mode.';
     const e = new EmbedBuilder().setColor(all ? Colors.Green : Colors.Gold)
         .setTitle('🛡️ Ghost Vanguard is online')
-        .setDescription(`${intro}\nProtection starts automatically. There's nothing to switch on.`)
+        .setDescription([intro, protection].join('\n'))
         .addFields(
-            { name: 'Protection', value: on ? `🟢 **Anti-nuke on** · ${RULES.length} rules · enforce mode` : '🔴 **Anti-nuke off** (switched off by staff) · `/antinuke enable`', inline: false },
+            { name: 'Protection', value: protectionField, inline: false },
             { name: `Setup ${bar(c.ready, c.items.length)} ${c.ready}/${c.items.length}`, value: c.items.map(i => `${i.ok ? '✅' : '⚠️'} **${i.label}**${i.ok ? '' : `\n-# ${i.fix}`}`).join('\n') },
             { name: 'Good to know', value: '`/help` lists every command you can use · `/antinuke status` shows the rules · `/role` gives roles safely' },
         )

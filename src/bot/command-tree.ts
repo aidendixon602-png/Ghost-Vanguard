@@ -21,7 +21,7 @@ type Entry = { child: string; mode: 'flat' | 'group' | 'single'; as?: string; /*
 export interface Umbrella { name: string; description: string; entries: Entry[] }
 
 export const UMBRELLAS: Umbrella[] = [
-    { name: 'antinuke', description: 'Anti-nuke protection: status, on/off, safety scan and the whitelist', entries: [
+    { name: 'antinuke', description: 'Anti-nuke readiness, observe/enforce controls, rules and exceptions', entries: [
         { child: 'antinuke', mode: 'flat' }, { child: 'antinuke-plus', mode: 'flat' }, { child: 'trust', mode: 'group', as: 'whitelist' }] },
     { name: 'mod', description: 'Moderation: ban, kick, timeout, bans, cases, notes, appeals', entries: [
         { child: 'moderation', mode: 'flat' }, { child: 'tempban', mode: 'single' }, { child: 'softban', mode: 'single' }, { child: 'massban', mode: 'single' },

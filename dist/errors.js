@@ -51,11 +51,12 @@ const SPECIAL_LINES = {
         const lines = [];
         if (!attentionHeader) {
             attentionHeader = true;
-            lines.push('', `  ${style.yellow('⚠ Roles above the bot')}  ${style.dim('anti-nuke cannot act on people with these · drag Ghost Vanguard above them in Server Settings → Roles')}`);
+            lines.push('', `  ${style.yellow('⚠ Roles above the bot')}  ${style.dim('unprotected roles are out of reach; bypassed roles are exempt · check /antinuke check')}`);
         }
         const above = Array.isArray(e.rolesAboveBot) && e.rolesAboveBot.length ? e.rolesAboveBot.join(', ') : '';
+        const bypassed = Array.isArray(e.bypassedRolesAboveBot) && e.bypassedRolesAboveBot.length ? style.dim(`bypassed/exempt: ${e.bypassedRolesAboveBot.join(', ')}`) : '';
         const missing = Array.isArray(e.missingPermissions) && e.missingPermissions.length ? style.yellow(`bot is missing ${e.missingPermissions.join(', ')}`) : '';
-        lines.push(`    ${style.yellow('•')} ${style.bold(String(e.server ?? '?'))} ${style.dim('—')} ${[above, missing].filter(Boolean).join(' · ')}`);
+        lines.push(`    ${style.yellow('•')} ${style.bold(String(e.server ?? '?'))} ${style.dim('—')} ${[above, bypassed, missing].filter(Boolean).join(' · ')}`);
         return lines;
     },
     database_backup_verified: e => [`  ${style.green('✔')} Database backup saved ${style.dim(`· ${e.kind ?? 'backup'} · ${typeof e.size === 'number' ? readableSize(e.size) : '?'}`)}`],

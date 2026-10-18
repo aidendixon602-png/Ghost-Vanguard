@@ -70,9 +70,9 @@ Server rank: anti-nuke, whitelist, control panel, backups and staff ranks. Given
 
 - `/antinuke check`: Check Vanguard's permissions and role position
 - `/antinuke disable`: Turn anti-nuke off (stays off after restarts)
-- `/antinuke enable`: Turn anti-nuke on (saves a backup of the server first)
+- `/antinuke enable`: Enable enforcement after readiness check and confirmation
 - `/antinuke settings`: Turn the extra protection layers on or off (all on by default)
-- `/antinuke status`: Is anti-nuke on? Its 17 rules, their limits and the whitelist
+- `/antinuke status`: Is anti-nuke observing or enforcing? Review rules and whitelist
 - `/antinuke whitelist add`: Whitelist a user or role: pick what anti-nuke lets them do and for how long
 - `/antinuke whitelist bots`: Let a verification bot (Bloxlink, RoVer) give verified roles without tripping anti-nuke
 - `/antinuke whitelist check`: See exactly what anti-nuke lets someone do, and what would get them stripped

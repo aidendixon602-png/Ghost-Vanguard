@@ -6,6 +6,7 @@ import { Security } from '../src/security/security.js';
 import { authorize } from './helpers.js';
 import { readiness } from '../src/security/readiness.js';
 import { Registry } from '../src/bot/registry.js';
+import { registerDangerConfirm } from '../src/ui/danger-ui.js';
 import { registerAntinukePanel, changeTrust, TRUST_PRESETS, scopeName } from '../src/ui/antinuke-panel.js';
 import { catchUp } from '../src/audit/downtime.js';
 import enable from '../src/commands/antinuke/enable.js';
@@ -16,8 +17,23 @@ import { config } from '../src/config.js';
 function setup() {
  const store=new Store(':memory:');authorize(store);const s=store.settings('g');s.enabled=true;s.mode='enforce';s.logChannelId='log';store.save(s);
  const logs:any[]=[];const security=new Security(store,{push:(_g:any,e:any)=>logs.push(e)} as any);
- const guild:any={id:'g',ownerId:'owner',client:{user:{id:'bot'}},members:{me:{permissions:{has:()=>true},roles:{highest:{id:'botrole',position:10}}},cache:new Collection()},roles:{cache:new Collection()},channels:{cache:new Collection([['log',{isTextBased:()=>true,permissionsFor:()=>({has:()=>true})}]])}};
- return {store,security,guild,logs};
+ const guild:any={id:'g',name:'Test Guild',ownerId:'owner',client:{user:{id:'bot'}},members:{me:{permissions:{has:()=>true},roles:{highest:{id:'botrole',position:10}}},cache:new Collection()},roles:{cache:new Collection()},channels:{cache:new Collection([['log',{isTextBased:()=>true,permissionsFor:()=>({has:()=>true})}]]),fetch:async()=>null}};
+ const actor:any={id:'owner',guild,roles:{cache:new Collection()},permissions:{has:()=>true}};
+ guild.members.fetchMe=async()=>guild.members.me;guild.members.fetch=async()=>actor;
+ return {store,security,guild,logs,actor};
+}
+
+function enableInteraction(guild:any, actor:any) {
+ const replies:any[]=[];
+ return {inCachedGuild:()=>true,guildId:guild.id,guild,member:actor,user:{id:actor.id},options:{},replies,editReply:async(payload:any)=>{replies.push(payload);}} as any;
+}
+
+async function confirmEnable(ctx:any, source:any) {
+ const registry=new Registry();registerDangerConfirm(registry);
+ const customId=String(source.replies[0].components[0].components[0].data.custom_id);
+ const click={...source,customId};
+ await registry.components.find(c=>c.prefix==='dangerconfirm:')!.execute(ctx,click);
+ return click;
 }
 
 test('readiness checks missing permissions, log overwrites and unmanaged role hierarchy',()=>{
@@ -71,18 +87,20 @@ test('startup reports saved protection and permission readiness without changing
  }finally{store.close();}
 });
 
-test('enable rejects missing permissions before saving a snapshot, but only warns about roles above Vanguard',async()=>{
- const {store,guild}=setup();try {
- let snapshots=0;guild.channels.fetch=async()=>null;
- const ctx:any={store,actor:{id:'owner'},snapshots:{numberOf:(_g:any,id:number)=>id,save:async()=>{snapshots++;return 1;}},logs:{push:()=>{}}};
- const i:any={guildId:'g',guild,user:{id:'owner'},options:{}};
+test('enable rejects missing permissions before saving a snapshot, then requires confirmation and warns about hierarchy',async()=>{
+ const {store,guild,actor}=setup();try {
+ let snapshots=0;const ctx:any={store,actor,snapshots:{numberOf:(_g:any,id:number)=>id,save:async()=>{snapshots++;return 1;}},logs:{push:()=>{}},policy:enable.metadata,actionKey:'enable'};
+ const i=enableInteraction(guild,actor);
  guild.members.me.permissions.has=()=>false;
- await assert.rejects(enable.execute(ctx,i),/Protection was not enabled/);assert.equal(snapshots,0);
+ await assert.rejects(enable.execute(ctx,i),/Enforcement remains off/);assert.equal(snapshots,0);
  guild.members.me.permissions.has=()=>true;guild.roles.cache.set('higher',{id:'higher',position:12,name:'Staff',managed:false});
- const reply=String(await enable.execute(ctx,i));assert.match(reply,/Hierarchy warning/);assert.match(reply,/drag the Ghost Vanguard role/);assert.equal(snapshots,1);
+ await enable.execute(ctx,i);
+ assert.equal(snapshots,0,'the command only arms a confirmation');
+ assert.match(JSON.stringify(i.replies[0]),/Unprotected roles at or above Vanguard/);
+ await confirmEnable(ctx,i);
+ assert.equal(snapshots,1);assert.equal(store.settings('g').mode,'enforce');
  }finally{store.close();}
 });
-
 test('incident report counts completed, failed and skipped reverts separately',async()=>{
  const {store,security,guild,logs}=setup();try {
  security.punish=async()=> 'Executor banned.';
@@ -149,19 +167,21 @@ test('readiness excludes only active guild-specific role bypasses and reports th
  }finally{store.close();}
 });
 
-test('enable lists bypassed high roles separately and warns about ordinary high roles',async()=>{
- const {store,guild}=setup();try {
+test('enable lists bypassed high roles separately from ordinary high roles and confirms both',async()=>{
+ const {store,guild,actor}=setup();try {
  let snapshots=0;guild.channels.fetch=async()=>null;
- const ctx:any={store,actor:{id:'owner'},snapshots:{numberOf:(_g:any,id:number)=>id,save:async()=>{snapshots++;return 1;}},logs:{push:()=>{}}};
- const i:any={guildId:'g',guild,user:{id:'owner'},options:{}};
+ const ctx:any={store,actor,snapshots:{numberOf:(_g:any,id:number)=>id,save:async()=>{snapshots++;return 1;}},logs:{push:()=>{}},policy:enable.metadata,actionKey:'enable'};
  guild.roles.cache.set('higher',{id:'higher',position:12,name:'Ownership',managed:false});
  store.grant('g','higher','trust_role','owner');
- await enable.execute(ctx,i);assert.equal(snapshots,1);assert.equal(store.settings('g').enabled,true);
+ const first=enableInteraction(guild,actor);await enable.execute(ctx,first);
+ assert.equal(snapshots,0);assert.match(JSON.stringify(first.replies[0]),/Explicitly bypassed roles at or above Vanguard: Ownership/);
+ await confirmEnable(ctx,first);assert.equal(snapshots,1);assert.equal(store.settings('g').enabled,true);
  guild.roles.cache.set('ordinary',{id:'ordinary',position:12,name:'Staff',managed:false});
- const reply=String(await enable.execute(ctx,i));assert.match(reply,/Hierarchy warning:\*\* 1 role/);assert.match(reply,/Bypassed roles above Vanguard:\*\* Ownership/);
+ const second=enableInteraction(guild,actor);await enable.execute(ctx,second);
+ const prompt=JSON.stringify(second.replies[0]);assert.match(prompt,/Unprotected roles at or above Vanguard cannot be contained: Staff/);assert.match(prompt,/Explicitly bypassed roles at or above Vanguard: Ownership/);
+ await confirmEnable(ctx,second);assert.equal(snapshots,2);
  }finally{store.close();}
 });
-
 
 test('configured bot owner and developers can manage their own role and user bypasses',async()=>{
  const {store}=setup();const dev='123456789012345678';const wasDeveloper=config.developers.has(dev);config.developers.add(dev);

@@ -4,14 +4,14 @@ Generated from the bot itself (`npm run docs`). Type `/` in Discord and pick **G
 
 ## /antinuke
 
-Anti-nuke protection: status, on/off, safety scan and the whitelist
+Anti-nuke readiness, observe/enforce controls, rules and exceptions
 
 | Command | What it does | Who |
 |---|---|---|
 | `/antinuke scan` | Safety scan: powerful roles, roles above Vanguard, bots with Administrator | Admin+ |
 | `/antinuke settings` | Turn the extra protection layers on or off (all on by default) | Owner or Head Admin |
-| `/antinuke status` | Is anti-nuke on? Its 17 rules, their limits and the whitelist | Head Admin+ |
-| `/antinuke enable` | Turn anti-nuke on (saves a backup of the server first) | Head Admin+ |
+| `/antinuke status` | Is anti-nuke observing or enforcing? Review rules and whitelist | Head Admin+ |
+| `/antinuke enable` | Enable enforcement after readiness check and confirmation | Head Admin+ |
 | `/antinuke disable` | Turn anti-nuke off (stays off after restarts) | Owner or Head Admin |
 | `/antinuke check` | Check Vanguard's permissions and role position | Head Admin+ |
 | `/antinuke whitelist add` | Whitelist a user or role: pick what anti-nuke lets them do and for how long | Owner or Head Admin |

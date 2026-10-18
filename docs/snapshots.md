@@ -14,7 +14,7 @@ Snapshots and backups are saved copies of a server's roles, categories, channels
 | Label | Created by |
 |---|---|
 | Snapshot | `/recovery snapshot create` |
-| Anti-nuke baseline | anti-nuke turning on (automatically or `/antinuke enable`) |
+| Anti-nuke baseline | saved when `/antinuke enable` is confirmed, immediately before enforcement starts |
 | Backup | `/recovery backup create` |
 | Scheduled backup | `/setup config backups` schedule |
 | Pre-restore backup | taken automatically before every restore |

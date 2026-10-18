@@ -158,7 +158,7 @@ export class GuildLifecycle {
                     return false;
                 sent = await plain.send({ content: kind === 'pending'
                         ? 'Ghost Vanguard is waiting for an approved developer to run /dev server authorize within 120 seconds of joining; otherwise it leaves.'
-                        : 'Ghost Vanguard is online and anti-nuke protection is running. Give it Embed Links to see the setup panel, then run /setup logs setup.', allowedMentions: { parse: [] } });
+                        : 'Ghost Vanguard is online. Anti-nuke starts in observe mode; run /setup logs setup, then /antinuke check and /antinuke enable after readiness passes.', allowedMentions: { parse: [] } });
             }
             else {
                 // No staff-only channel: tell the owner privately rather than posting in public.
@@ -311,7 +311,7 @@ export class GuildLifecycle {
         this.cancel(guild.id);
         await this.start(guild);
         logEvent('server_authorized', { guildId: guild.id, actor });
-        return `**${guild.name}** is authorized. Anti-nuke protection is already on; run /setup logs setup to add the log channels.`;
+        return `**${guild.name}** is authorized. New or unconfigured servers start in anti-nuke observe mode. Run /setup logs setup and /antinuke check; then use /antinuke enable and confirm to start enforcement. Existing staff opt-outs stay off.`;
     }
     async expire(guild) {
         return this.queue.run(guild.id, async () => {

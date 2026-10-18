@@ -79,6 +79,10 @@ test('a change is announced even on a quick restart', async () => {
         assert.deepEqual(await restart(1), [], 'and not again while it stays the same');
         store.grant('g', '900000000000000001', 'trust', 'owner');
         assert.deepEqual(await restart(1), [BACK], 'a trust-list change shows in the back-online summary');
+        above.push({ id: 'r2', name: 'Trusted Upper', position: 21, managed: false, permissions: { has: () => false } });
+        store.grant('g', 'r2', 'trust_role', 'owner');
+        assert.deepEqual(await restart(1), [BACK, SAVED], 'a role exemption above Vanguard is included in the warning and change fingerprint');
+        assert.deepEqual(await restart(1), [], 'the same hierarchy warning is not repeated on every restart');
     } finally { store.close(); }
 });
 

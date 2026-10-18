@@ -1,6 +1,6 @@
 import { CommandInteractionOptionResolver } from 'discord.js';
 export const UMBRELLAS = [
-    { name: 'antinuke', description: 'Anti-nuke protection: status, on/off, safety scan and the whitelist', entries: [
+    { name: 'antinuke', description: 'Anti-nuke readiness, observe/enforce controls, rules and exceptions', entries: [
             { child: 'antinuke', mode: 'flat' }, { child: 'antinuke-plus', mode: 'flat' }, { child: 'trust', mode: 'group', as: 'whitelist' }
         ] },
     { name: 'mod', description: 'Moderation: ban, kick, timeout, bans, cases, notes, appeals', entries: [

@@ -42,18 +42,20 @@ test('the welcome panel shows protection, a live checklist and buttons that do t
     const store = new Store(':memory:'); authorize(store, 'g');
     try {
         const weak = fakeGuild('g', { admin: false, rank: 3 }).guild;
+        const settings = store.settings('g'); settings.enabled = true; settings.mode = 'observe'; store.save(settings);
         assert.deepEqual(setupStatus(weak), { admin: false, top: false, rank: 3, total: 5 });
         const panel = welcomePanel(store, weak, '1277709272041394187');
         const e = panel.embeds[0]!.toJSON();
         assert.equal(e.title, '🛡️ Ghost Vanguard is online');
         assert.match(e.description!, /Authorized by approved developer <@1277709272041394187>/);
-        assert.doesNotMatch(JSON.stringify(e), /antinuke enable/, 'no outdated "run /antinuke enable" advice: it is already on');
+        assert.match(JSON.stringify(e), /observe mode|antinuke enable/i, 'the panel should explain that enforcement is not automatic');
         const f = fields(panel);
-        assert.match(f.Protection, /Anti-nuke on/);
+        assert.match(f.Protection, /observe mode|not initialized|not active/i);
         assert.match(f.Setup, /⚠️ \*\*Administrator permission/);
         assert.match(f.Setup, /⚠️ \*\*Role position #3 of 5/);
         assert.match(f.Setup, /⚠️ \*\*Log channels/);
-        assert.match(e.fields!.find(x => x.name.startsWith('Setup'))!.name, /0\/4/);
+        assert.match(f.Setup, /⚠️ \*\*Anti-nuke enforcement/);
+        assert.match(e.fields!.find(x => x.name.startsWith('Setup'))!.name, /0\/5/);
         const buttons = panel.components[0]!.toJSON().components.map((b: any) => [b.custom_id, b.label]);
         assert.deepEqual(buttons, [['vgwelcome:logs:1277709272041394187', 'Set up logs'], ['vgwelcome:check:1277709272041394187', 'Re-check'], ['vgcommands:open', 'Commands']]);
         const strong = fakeGuild('g', { admin: true, rank: 1 }).guild;
