@@ -176,7 +176,7 @@ if (existsSync(importDb)) {
         const step = join(work, String(i));
         mkdirSync(step, { recursive: true });
         say(`Importing server ${guild} ...`);
-        if (!run(process.execPath, ['scripts/merge-guild.mjs', '--bot', '.', '--from', join(data, 'import'), '--into', current, '--guild', guild, '--out', join(step, 'vanguard.db')])) { ok = false; break; }
+        if (!run(process.execPath, ['scripts/ops/merge-guild.mjs', '--bot', '.', '--from', join(data, 'import'), '--into', current, '--guild', guild, '--out', join(step, 'vanguard.db')])) { ok = false; break; }
         current = step;
     }
     if (ok) {

@@ -15,7 +15,7 @@ Anti-nuke and the threat board · Moderation and audit logging · Ticket desk ·
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
 ![discord.js](https://img.shields.io/badge/discord.js-14-5865F2?logo=discord&logoColor=white)
 
-[Overview](#overview) · [Capabilities](#capabilities) · [The threat board](#the-threat-board-defence-and-counter-attack) · [Dashboard](#dashboard) · [Tickets](#ticket-desk) · [Getting started](#getting-started) · [Development](#development)
+[Overview](#overview) · [Capabilities](#capabilities) · [The threat board](#the-threat-board-defence-and-counter-attack) · [Dashboard](#dashboard) · [Tickets](#ticket-desk) · [Workspace](#workspace) · [Getting started](#getting-started) · [Development](#development)
 
 </div>
 
@@ -46,7 +46,7 @@ It is deliberately **balanced — yin and yang**. Defence reacts: anti-nuke stri
 | **Whitelist** | Per-user or per-role exemptions, either full or per rule, with optional expiry. Includes presets for common staff roles and built-in recognition of verification bots. |
 | **Raid response** | Raid mode, server-wide lockdown with exact restore, emergency mode, new-account holds, join-flood detection. |
 | **Content protection** | Automod (spam, links, invites, optional AI moderation), scam-link and scam-image detection, staff anti-ping. |
-| **Threat board** | Every confirmed incident scores the member behind it. Watch (25+) is staff's chance to step in first, High (55+) strips their access and puts the damage back, Critical (85+) counter-attacks and bans. Whitelisted people, the bot, the server owner and observe mode are never auto-actioned, everything is logged and reversible, and a quiet attacker cools off (scores halve daily, entries expire after a week). See [docs/threat-board.md](docs/threat-board.md). |
+| **Threat board** | Every confirmed incident scores the member behind it. Watch (25+) is staff's chance to step in first, High (55+) strips their access and puts the damage back, Critical (85+) counter-attacks and bans. Whitelisted people, the bot, the server owner and observe mode are never auto-actioned, everything is logged and reversible, and a quiet attacker cools off (scores halve daily, entries expire after a week). See [docs/user/threat-board.md](docs/user/threat-board.md). |
 
 ### Moderation
 | Feature | Description |
@@ -67,9 +67,9 @@ It is deliberately **balanced — yin and yang**. Defence reacts: anti-nuke stri
 | Feature | Description |
 |---|---|
 | **Control panel** | A private `#vanguard-control` channel with buttons to restore or strip roles, revert the bot's actions and review recent activity. Restricted to authorized staff, confirmed and logged. |
-| **Audit logging** | `#midtown-vanguard-logging`: message edits and deletions, role, channel, member and permission changes, each with the verified actor. |
+| **Audit logging** | `#ghost-vanguard-logging`: message edits and deletions, role, channel, member and permission changes, each with the verified actor. |
 | **Recovery** | Snapshots and scheduled backups of roles, channels and permissions, with previewed, rate-limit-aware restores. |
-| **Dashboard** | A self-contained read-only page (no build step, no external assets) showing servers, protection, the threat board, the ticket desk and recent incidents. Served by the bot next to `/healthz`, or standalone against the same database. See [docs/dashboard.md](docs/dashboard.md). |
+| **Dashboard** | A self-contained read-only page (no build step, no external assets) showing servers, protection, the threat board, the ticket desk and recent incidents. Served by the bot next to `/healthz`, or standalone against the same database. See [docs/user/dashboard.md](docs/user/dashboard.md). |
 | **Self-hosting tools** | Supervised launcher, automatic CI-gated updates with rollback, hourly verified database backups, health endpoint. |
 
 ## Access model
@@ -113,7 +113,7 @@ Anti-nuke answers an incident immediately; the threat board is the memory that d
 
 Never automatic: whitelisted people, the bot itself, the server owner, servers with protection off or unauthorized, observe mode, and anything inside a ten-minute cooldown. A quiet attacker cools off — scores halve once a day and entries expire a week after the last incident.
 
-`/security threats list` shows the board, `view` shows one member's full history, and `clear`, `release` and `strike` (Head Admin and above) are how staff undo or force an action. Every automatic action is in the server's log channel too, and **all of them are reversible**. Full detail: [docs/threat-board.md](docs/threat-board.md).
+`/security threats list` shows the board, `view` shows one member's full history, and `clear`, `release` and `strike` (Head Admin and above) are how staff undo or force an action. Every automatic action is in the server's log channel too, and **all of them are reversible**. Full detail: [docs/user/threat-board.md](docs/user/threat-board.md).
 
 ## Dashboard
 
@@ -146,6 +146,12 @@ Commands are grouped under a small number of top-level entries:
 | `,` commands | Developer operations: restart, updates, diagnostics, database, server authorization, global ranks and network bans. Every comma command requires an exact `DEVELOPER_IDS` entry, including for the bot owner |
 
 `/help` in Discord lists only the slash commands available to you; `,help` lists Developer comma commands for authorized IDs. Sensitive/admin slash replies are ephemeral; ordinary public utility replies stay public. The full reference is in **[docs/commands.md](docs/commands.md)**.
+
+## Workspace
+
+Ghost Vanguard now includes a reusable, guild-scoped **Workspace** system for submissions, reviews, records, tasks, staff synchronization and reports. It is button-first: members and staff use persistent panels, while `/setup config workspace-*` is reserved for setup, publishing, status, enable/disable and synchronization. The system does not replace the existing ticket desk.
+
+Start with [docs/user/workspace.md](docs/user/workspace.md). Configure Google Sheets authentication, run `/setup config workspace-setup` with real channel and role selectors, validate the workbook, then run `/setup config workspace-publish`. The Midtown Archives preset is limited to guild `1556485316838293587` and is not active until the existing authorization process and live workbook validation succeed. No channel IDs or staff IDs are guessed.
 
 ## Getting started
 
@@ -241,21 +247,35 @@ Every pull request and push runs the CI workflow: type-check, build, a check tha
 
 ```
 src/
-  index.ts         entry point: client, health endpoint, startup
-  bot/             command registry, routing, permissions, ranks, lifecycle
-  commands/        one module per slash command, by category
-  security/        anti-nuke engine, threat board, moderation, network bans, role policy
-  dashboard/       the read-only page, its JSON API and the standalone server
-  audit/           ban records, event log, log channel setup, redaction
-  database/        SQLite store, migrations, backups, settings restore
-  recovery/        snapshots and the restore engine
-  features/        automod, appeals, welcome, rejoin roles and more
-  integrations/    Roblox providers
-  ui/              embeds, panels, buttons and generated docs
-launch.js          supervisor: install, restore, restart, automatic updates
-test/              node:test suites
-docs/              reference documentation
-dist/              compiled output (committed)
+  index.ts         entry, health endpoint & wiring (see src/bot/lifecycle.ts)
+  config.ts        env parsing & validation — single source for all settings
+  branding.ts      product name & default channel names (Ghost Vanguard)
+  console-ui.ts    startup panel rendering
+  errors.ts        AppError, redact(), logEvent()
+  core.ts          helpers: clip, dangerous(), RULES, KeyedQueue
+  logging.ts       LogQueue — per-guild outbox with backoff
+  bot/             registry, command-tree, interactions, guard, ranks, prefix-commands
+  commands/        68 slash commands in 8 groups → grouped tree in bot/command-tree.ts
+  security/        anti-nuke engine, threat-board, scam, lockdown, readiness
+  audit/           ban-log, event-log, log-setup, downtime, redaction
+  database/        Store (node:sqlite), migrations, backups
+  recovery/        snapshots, recovery engine, limits & cleanup
+  features/        tickets, automod, joins, rejoin-roles, schedules
+  integrations/    roblox.ts + http.ts (4-worker cache, circuit breaker)
+  dashboard/       no-build HTML + JSON API (served beside /healthz)
+  workspace/       submissions, reviews, records, tasks, staff, Sheets sync
+  ui/              embeds, panels, command-docs generator
+launch.js          supervisor: install/deps, DB restore, run + auto-update (CI-gated)
+scripts/
+  build/           clean.mjs, verify-install.mjs, update-preflight.mjs
+  ops/             restore-database.mjs, scam-setup.mjs, dashboard-demo.mjs
+  docs/            generate.ts → docs/commands.md + docs/ranks.md
+test/              node:test suites (Node 24, node:sqlite)
+docs/
+  commands.md, ranks.md, changelog.md           generated / release history
+  user/            architecture.md, threat-board.md, dashboard.md, … (operator guides)
+  internal/notes/  command-audit.md, owner-trust-fix.md … (historical)
+dist/              compiled output — committed for Wispbyte hosts
 ```
 
 </details>
@@ -266,14 +286,15 @@ dist/              compiled output (committed)
 |---|---|
 | [commands.md](docs/commands.md) | Every command and its required rank |
 | [ranks.md](docs/ranks.md) | Every rank and the commands it unlocks |
-| [security-controls.md](docs/security-controls.md) | How anti-nuke decides, warns, strips and reverts |
-| [threat-board.md](docs/threat-board.md) | Scoring, levels, the counter-attack and how to reverse it |
-| [dashboard.md](docs/dashboard.md) | Running, securing and reading the dashboard |
-| [antinuke-locked.md](docs/antinuke-locked.md) | The 17 rules and their limits |
-| [recovery.md](docs/recovery.md) | Snapshots, backups and restores |
-| [server-lifecycle.md](docs/server-lifecycle.md) | Invites, authorization and removal |
-| [hosting.md](docs/hosting.md) | Hosting, persistence and the health endpoint |
-| [architecture.md](docs/architecture.md) | How the code is organized |
+| [security-controls.md](docs/user/security-controls.md) | How anti-nuke decides, warns, strips and reverts |
+| [threat-board.md](docs/user/threat-board.md) | Scoring, levels, the counter-attack and how to reverse it |
+| [dashboard.md](docs/user/dashboard.md) | Running, securing and reading the dashboard |
+| [antinuke-locked.md](docs/user/antinuke-locked.md) | The 17 rules and their limits |
+| [recovery.md](docs/user/recovery.md) | Snapshots, backups and restores |
+| [server-lifecycle.md](docs/user/server-lifecycle.md) | Invites, authorization and removal |
+| [hosting.md](docs/user/hosting.md) | Hosting, persistence and the health endpoint |
+| [architecture.md](docs/user/architecture.md) | How the code is organized |
+| [workspace.md](docs/user/workspace.md) | Sheets-backed submissions, reviews & staff sync |
 | [changelog.md](docs/changelog.md) | Release history |
 
 ## Security

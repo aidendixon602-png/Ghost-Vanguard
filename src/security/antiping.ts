@@ -1,4 +1,5 @@
 import { AutoModerationRuleTriggerType, Colors, EmbedBuilder, type Guild, type Message, type PartialMessage } from 'discord.js';
+import { PRODUCT_NAME } from '../branding.js';
 import type { CommandContext, Services } from '../bot/registry.js';
 import { AppError } from '../errors.js';
 import { noteThreat } from './threat-board.js';
@@ -78,7 +79,7 @@ export async function processStaffMention(ctx: Pick<Services, 'store' | 'securit
         if (!hit || !ctx.store.observe(`staff-ping:${message.id}`, guild.id, message.author.id, 'staff_ping', message.id))
             return;
         const results: string[] = [];
-        const notice = new EmbedBuilder().setColor(Colors.Blurple).setTitle('🔕 Mentions Disabled').setDescription('This user has **@mentions disabled**.\n\nNeed assistance? Please open a ticket in **#support** and provide the reason you’re trying to reach them.').setFooter({ text: 'Midtown • Mention Protection' });
+        const notice = new EmbedBuilder().setColor(Colors.Blurple).setTitle('🔕 Mentions Disabled').setDescription('This user has **@mentions disabled**.\n\nNeed assistance? Please open a ticket in **#support** and provide the reason you’re trying to reach them.').setFooter({ text: `${PRODUCT_NAME} • Mention Protection` });
         active();
         try {
             await message.reply({ embeds: [notice], allowedMentions: { parse: [], repliedUser: false } });

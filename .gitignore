@@ -11,3 +11,5 @@ data/
 update-backups/
 
 # dist/ IS committed on purpose: the server runs it directly, and CI checks it matches src/.
+# Reorg shims — ignore old untracked docs redirect stubs that are generated?
+# (kept in repo intentionally, so not ignored)

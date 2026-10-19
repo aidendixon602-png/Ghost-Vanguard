@@ -88,6 +88,12 @@ Server rank: anti-nuke, whitelist, control panel, backups and staff ranks. Given
 - `/setup config feature`: Turn moderation, verification, AI or backups on/off
 - `/setup config permission-role`: Give a Discord role a Vanguard staff rank (Head Admin, Admin, Moderator, Helper)
 - `/setup config provider`: Enable or disable a configured verification provider
+- `/setup config workspace-disable`: Disable Workspace and stop its reminders without deleting records
+- `/setup config workspace-enable`: Enable the validated Workspace integration
+- `/setup config workspace-publish`: Post or update the configured persistent panels
+- `/setup config workspace-setup`: Save and validate this guild’s Workspace profile
+- `/setup config workspace-status`: Show Workspace setup status
+- `/setup config workspace-sync`: Preview and synchronize recognized staff members
 - `/setup history list`: Show recent setting changes and who made them
 - `/setup panel`: Create or update the private control panel channel (buttons for staff)
 - `/setup permissions discord`: Roles holding Administrator or Manage Roles, which can reorder the hierarchy
@@ -151,7 +157,7 @@ Server rank: lifting ordinary bans and accepting appeals, raid tools, automod, s
 - `/setup logs disable`: Turn off event logging (stored history is kept)
 - `/setup logs enable`: Turn on event logging
 - `/setup logs exclude`: Stop (or start again) logging events from a channel
-- `/setup logs setup`: Create or reuse #bans and #midtown-vanguard-logging, check access and send a test
+- `/setup logs setup`: Create or reuse #bans and #ghost-vanguard-logging, check access and send a test
 - `/setup logs status`: Show event logging settings
 - `/setup logs view`: Browse logged events from the last 30 days
 - `/setup staff report`: Staff activity: actions per staff member

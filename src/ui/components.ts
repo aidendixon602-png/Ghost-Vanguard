@@ -15,6 +15,7 @@ import { registerAiModControls } from '../features/ai-moderation.js';
 import { registerBotQuarantineControls } from '../features/antinuke-plus.js';
 import { registerNewAccountControls } from '../security/new-accounts.js';
 import { registerTicketControls } from './ticket-ui.js';
+import { registerWorkspaceControls } from '../workspace/handlers.js';
 import { registerIncidentControls } from './incident-ui.js';
 import { registerControlPanel } from './control-panel.js';
 import { registerHistory } from './config-history.js';
@@ -45,6 +46,7 @@ export function registerComponents(registry: Registry) {
     registerBotQuarantineControls(registry);
     registerNewAccountControls(registry);
     registerTicketControls(registry);
+    registerWorkspaceControls(registry);
     registerIncidentControls(registry);
     registerControlPanel(registry);
     registerHistory(registry);

@@ -130,7 +130,13 @@ Server setup: logs, staff ranks, welcome, config, permissions
 | `/setup config command` | Turn one Vanguard command on/off or change its cooldown | Owner |
 | `/setup config feature` | Turn moderation, verification, AI or backups on/off | Owner |
 | `/setup config backups` | Configure scheduled server layout backups | Owner |
-| `/setup logs setup` | Create or reuse #bans and #midtown-vanguard-logging, check access and send a test | Admin+ |
+| `/setup config workspace-setup` | Save and validate this guild’s Workspace profile | Owner |
+| `/setup config workspace-publish` | Post or update the configured persistent panels | Owner |
+| `/setup config workspace-status` | Show Workspace setup status | Owner |
+| `/setup config workspace-enable` | Enable the validated Workspace integration | Owner |
+| `/setup config workspace-disable` | Disable Workspace and stop its reminders without deleting records | Owner |
+| `/setup config workspace-sync` | Preview and synchronize recognized staff members | Owner |
+| `/setup logs setup` | Create or reuse #bans and #ghost-vanguard-logging, check access and send a test | Admin+ |
 | `/setup logs check` | Check both log channels and the bot permissions, then send a test embed | Admin+ |
 | `/setup logs exclude` | Stop (or start again) logging events from a channel | Admin+ |
 | `/setup logs bot-changes` | Skip routine bot changes, like member-count channel renames | Admin+ |

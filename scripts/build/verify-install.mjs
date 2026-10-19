@@ -1,8 +1,8 @@
 import { readdir, access } from 'node:fs/promises';
 import { join } from 'node:path';
-import { Registry } from '../dist/bot/registry.js';
-import { registerComponents } from '../dist/ui/components.js';
-import { VERSION } from '../dist/config.js';
+import { Registry } from '../../dist/bot/registry.js';
+import { registerComponents } from '../../dist/ui/components.js';
+import { VERSION } from '../../dist/config.js';
 let count=0;
 async function walk(path='src',relative='') {
     for(const item of await readdir(path,{withFileTypes:true})) {

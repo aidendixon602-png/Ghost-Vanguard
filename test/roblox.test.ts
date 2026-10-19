@@ -156,6 +156,42 @@ test('an outage keeps the generic message instead of blaming the key', async () 
     f.store.close();
 });
 
+test('a refused request (HTTP 400) is reported as a configuration problem, not an outage, and pauses that server', async () => {
+    const f = fixture();
+    let calls = 0;
+    await withBloxlinkFetch(async () => { calls++; return new Response('{}', { status: 400 }); }, async () => {
+        await assert.rejects(f.roblox.sync(f.member), (error: Error) => /refused the lookup/.test(error.message)
+            && !/rejected the bot's API key/.test(error.message) && /BLOXLINK_API_KEY/.test(error.message) && /preserved/.test(error.message));
+        await assert.rejects(f.roblox.sync(f.member), /refused the lookup/, 'the pause keeps saying what to fix');
+        assert.equal(calls, 1, 'the same request is not sent again while the server is paused');
+        assert.deepEqual(f.changes, [], 'roles are never touched on a failed lookup');
+    });
+    f.store.close();
+});
+
+test('a refused Bloxlink update (HTTP 400) says what to check and is not retried straight away', async () => {
+    const f = fixture();
+    let calls = 0;
+    await withBloxlinkFetch(async () => { calls++; return new Response('{}', { status: 400 }); }, async () => {
+        await assert.rejects(f.roblox.updateBloxlinkUser(f.member), (error: Error) => /Check Bloxlink before retrying/.test(error.message)
+            && /BLOXLINK_API_KEY/.test(error.message) && !/rejected the API key/.test(error.message));
+        await assert.rejects(f.roblox.updateBloxlinkUser(f.member), /paused after a failed request/);
+        assert.equal(calls, 1);
+    });
+    f.store.close();
+});
+
+test('a refused key (HTTP 401) still gets the rejected-key message and leaves roles alone', async () => {
+    const f = fixture();
+    let calls = 0;
+    await withBloxlinkFetch(async () => { calls++; return new Response('{}', { status: 401 }); }, async () => {
+        await assert.rejects(f.roblox.updateBloxlinkUser(f.member), /rejected the API key for this server/);
+        await assert.rejects(f.roblox.updateBloxlinkUser(f.member), /paused because this server's API key was rejected/);
+        assert.equal(calls, 1);
+    });
+    f.store.close();
+});
+
 test('a rejected key pauses only the server it was rejected for', async () => {
     const f = fixture();
     authorize(f.store, 'g2');

@@ -16,6 +16,8 @@ export class Roblox {
     http = new HttpReads();
     refreshing = false;
     providerCooldown = new Map();
+    /** Why one server's provider is paused, so a paused lookup keeps saying the right thing. */
+    providerPause = new Map();
     observations = new Map();
     providerStatus(guild, provider) {
         const enabled = !!(provider === 'rover' ? config.roverKey : config.bloxlinkKey) && this.store.get('SELECT enabled FROM provider_config WHERE guild_id=? AND provider=?', guild, provider)?.enabled !== 0;
@@ -29,6 +31,41 @@ export class Roblox {
         if (!ok && previous?.ok !== false || ok && previous?.ok === false)
             this.logs.push(guild, embed(ok ? 'Verification provider recovered' : 'Verification provider unavailable', `${PROVIDER_NAMES[provider]}: ${detail} Existing verification roles are preserved on provider errors.`, ok ? Colors.Green : Colors.Orange));
     }
+    /**
+     * Deal with a provider response Vanguard cannot use.
+     * 401/403: this server's key was refused, so pause only this server and say what to check.
+     * 429/5xx: temporary, so pause briefly and let normal retries resume.
+     * Any other client error (usually HTTP 400): retrying the same request fails the same way, so it is
+     * paused like a rejected key and reported as a configuration/request problem instead of an outage.
+     * Console warnings never include the key or the provider's response body.
+     */
+    providerFailure(provider, guild, status, action) {
+        const name = PROVIDER_NAMES[provider], setting = KEY_SETTINGS[provider];
+        const pause = (flags) => {
+            this.providerCooldown.set(`${provider}:${guild}`, Date.now() + REJECTED_KEY_PAUSE_MS);
+            this.providerPause.set(`${provider}:${guild}`, flags);
+            return flags;
+        };
+        if (status === 401 || status === 403) {
+            console.warn(`[verification] ${name} rejected the API key for guild ${guild} (HTTP ${status}). `
+                + `Check ${setting} in .env and that the key has access to this server. `
+                + `Pausing ${name} ${action} for this server for ${REJECTED_KEY_PAUSE_MS / 60000} minutes.`);
+            return pause({ detail: `HTTP ${status}; check ${setting} and this server's ${name} access.`, rejected: true, misconfigured: false });
+        }
+        if (status === 429 || status >= 500) {
+            this.providerCooldown.set(provider, Date.now() + 60000);
+            console.warn(`[verification] ${name} ${action} HTTP ${status} for guild ${guild}; pausing for a minute. Credentials and response bodies omitted.`);
+            return { detail: `HTTP ${status}; ${name} is busy or unavailable, so requests pause for a minute and then resume.`, rejected: false, misconfigured: false };
+        }
+        // Keys and requests are per server, so pause this server rather than every server using the provider.
+        console.warn(`[verification] ${name} ${action} HTTP ${status} for guild ${guild}; check ${setting}, the server's ${name} setup `
+            + `and the member's link. Credentials and response bodies omitted.`);
+        return pause({
+            detail: `HTTP ${status}; the request was refused, so check ${setting}, ${name} server access and the member's link. `
+                + `Requests are paused for ${REJECTED_KEY_PAUSE_MS / 60000} minutes.`,
+            rejected: false, misconfigured: true,
+        });
+    }
     constructor(store, logs) {
         this.store = store;
         this.logs = logs;
@@ -41,7 +78,7 @@ export class Roblox {
         if ((this.providerCooldown.get(provider) ?? 0) > Date.now())
             return { kind: 'error' };
         if ((this.providerCooldown.get(`${provider}:${guild}`) ?? 0) > Date.now())
-            return { kind: 'error', rejected: true };
+            return { kind: 'error', ...(this.providerPause.get(`${provider}:${guild}`) ?? { rejected: true }) };
         const url = provider === 'rover'
             ? `https://registry.rover.link/api/guilds/${guild}/discord-to-roblox/${user}`
             : `https://api.blox.link/v4/public/guilds/${guild}/discord-to-roblox/${user}`;
@@ -52,21 +89,10 @@ export class Roblox {
                 this.observed(provider, guild, true, 'Provider responded; this member has no linked account.');
                 return { kind: 'absent' };
             }
-            if (response.status === 401 || response.status === 403) {
-                this.observed(provider, guild, false, `HTTP ${response.status}; check ${KEY_SETTINGS[provider]} and server access.`);
-                // Keys are tied to specific servers, so pause only this server and say what to check.
-                this.providerCooldown.set(`${provider}:${guild}`, Date.now() + REJECTED_KEY_PAUSE_MS);
-                console.warn(`[verification] ${PROVIDER_NAMES[provider]} rejected the API key for guild ${guild} (HTTP ${response.status}). `
-                    + `Check ${KEY_SETTINGS[provider]} in .env and that the key has access to this server. `
-                    + `Pausing ${PROVIDER_NAMES[provider]} lookups for this server for 5 minutes.`);
-                return { kind: 'error', rejected: true };
-            }
             if (!response.ok) {
-                this.observed(provider, guild, false, `HTTP ${response.status}; retry after the provider pause.`);
-                if (response.status === 429 || response.status >= 500)
-                    this.providerCooldown.set(provider, Date.now() + 60000);
-                console.warn(`[verification] ${provider} HTTP ${response.status}; credentials and response bodies omitted.`);
-                return { kind: 'error' };
+                const { detail, ...flags } = this.providerFailure(provider, guild, response.status, 'lookups');
+                this.observed(provider, guild, false, detail);
+                return { kind: 'error', detail, ...flags };
             }
             const data = await response.json();
             const id = String(data.robloxId ?? data.robloxID ?? '');
@@ -93,17 +119,9 @@ export class Roblox {
                 this.observed('bloxlink', guild, true, 'Provider responded; no linked Discord accounts were found.');
                 return [];
             }
-            if (response.status === 401 || response.status === 403) {
-                this.observed('bloxlink', guild, false, `HTTP ${response.status}; check BLOXLINK_API_KEY and server access.`);
-                this.providerCooldown.set(`bloxlink:${guild}`, Date.now() + REJECTED_KEY_PAUSE_MS);
-                console.warn(`[verification] Bloxlink rejected the API key for guild ${guild} (HTTP ${response.status}); check BLOXLINK_API_KEY and server access. Pausing lookups for 5 minutes.`);
-                return null;
-            }
             if (!response.ok) {
-                this.observed('bloxlink', guild, false, `HTTP ${response.status}; retry after the provider pause.`);
-                if (response.status === 429 || response.status >= 500)
-                    this.providerCooldown.set('bloxlink', Date.now() + 60000);
-                console.warn(`[verification] Bloxlink reverse lookup HTTP ${response.status}; credentials and response bodies omitted.`);
+                const { detail } = this.providerFailure('bloxlink', guild, response.status, 'reverse lookups');
+                this.observed('bloxlink', guild, false, detail);
                 return null;
             }
             const data = await response.json();
@@ -135,8 +153,12 @@ export class Roblox {
             if (this.store.get('SELECT 1 FROM backups WHERE guild_id=? AND user_id=? AND active=1', guild, member.id))
                 throw new AppError('INTEGRATION_ERROR', 'Bloxlink updates are unavailable while this member is quarantined.');
             const paused = Math.max(this.providerCooldown.get('bloxlink') ?? 0, this.providerCooldown.get(`bloxlink:${guild}`) ?? 0);
-            if (paused > Date.now())
-                throw new AppError('INTEGRATION_ERROR', 'Bloxlink requests are temporarily paused after a provider error. Try again later.');
+            if (paused > Date.now()) {
+                const reason = this.providerPause.get(`bloxlink:${guild}`);
+                throw new AppError('INTEGRATION_ERROR', reason?.rejected
+                    ? 'Bloxlink requests are paused because this server\'s API key was rejected. Check BLOXLINK_API_KEY and its server access.'
+                    : `Bloxlink requests are paused after a failed request. ${reason?.detail ?? ''} Try again later.`.trim());
+            }
             const fresh = await member.guild.members.fetch({ user: member.id, force: true }).catch(() => null);
             if (!fresh)
                 throw new AppError('VALIDATION_ERROR', 'That member is no longer in this server.');
@@ -151,22 +173,16 @@ export class Roblox {
                 this.observed('bloxlink', guild, false, 'Update request failed or timed out; check Bloxlink before retrying.');
                 throw new AppError('INTEGRATION_ERROR', 'The Bloxlink update request failed or timed out. Check the member in Bloxlink before retrying.');
             }
-            if (response.status === 401 || response.status === 403) {
-                this.observed('bloxlink', guild, false, `HTTP ${response.status}; check BLOXLINK_API_KEY and server access.`);
-                this.providerCooldown.set(`bloxlink:${guild}`, Date.now() + REJECTED_KEY_PAUSE_MS);
-                console.warn(`[verification] Bloxlink rejected the API key for guild ${guild} (HTTP ${response.status}); check BLOXLINK_API_KEY and server access. Pausing requests for 5 minutes.`);
-                throw new AppError('INTEGRATION_ERROR', 'Bloxlink rejected the API key for this server. Check BLOXLINK_API_KEY and its server access.');
-            }
             if (response.status === 404) {
                 this.observed('bloxlink', guild, true, 'Provider could not find a linked account or current server member.');
                 throw new AppError('VALIDATION_ERROR', 'Bloxlink could not find a linked account for that member in this server.');
             }
             if (!response.ok) {
-                this.observed('bloxlink', guild, false, `HTTP ${response.status}; retry after the provider pause.`);
-                if (response.status === 429 || response.status >= 500)
-                    this.providerCooldown.set('bloxlink', Date.now() + 60000);
-                console.warn(`[verification] Bloxlink update HTTP ${response.status}; credentials and response bodies omitted.`);
-                throw new AppError('INTEGRATION_ERROR', `Bloxlink update failed (HTTP ${response.status}). Check Bloxlink before retrying.`);
+                const { detail, rejected } = this.providerFailure('bloxlink', guild, response.status, 'updates');
+                this.observed('bloxlink', guild, false, detail);
+                throw new AppError('INTEGRATION_ERROR', rejected
+                    ? `Bloxlink rejected the API key for this server. ${detail} No roles or nicknames were changed.`
+                    : `Bloxlink update failed. ${detail} Check Bloxlink before retrying; no roles or nicknames were changed.`);
             }
             const data = await response.json().catch(() => null);
             if (!data || typeof data !== 'object')
@@ -182,6 +198,7 @@ export class Roblox {
         for (const provider of ['rover', 'bloxlink']) {
             this.observations.delete(`${provider}:${id}`);
             this.providerCooldown.delete(`${provider}:${id}`);
+            this.providerPause.delete(`${provider}:${id}`);
         }
     }
     async sync(member) {
@@ -206,10 +223,18 @@ export class Roblox {
             const lookups = await Promise.all(configured.map(p => this.lookup(p, member.guild.id, member.id)));
             const result = decideLinks(lookups);
             if (result.kind === 'unavailable') {
-                const rejected = configured.filter((_, i) => lookups[i].kind === 'error' && lookups[i].rejected);
+                const failed = (i) => lookups[i].kind === 'error' ? lookups[i] : null;
+                const rejected = configured.filter((_, i) => failed(i)?.rejected);
+                const refused = configured.filter((_, i) => failed(i)?.misconfigured);
                 if (rejected.length)
                     throw new AppError('INTEGRATION_ERROR', `${rejected.map(p => PROVIDER_NAMES[p]).join(' and ')} rejected the bot's API key for this server. `
                         + 'Existing roles were preserved. A server admin should check the key in .env and its access in the provider dashboard.');
+                if (refused.length) {
+                    const detail = configured.map((_, i) => failed(i)?.detail).filter((detail) => !!detail).join(' ');
+                    throw new AppError('INTEGRATION_ERROR', `${refused.map(p => PROVIDER_NAMES[p]).join(' and ')} refused the lookup, which is a request or `
+                        + `configuration problem rather than an outage: ${detail} Existing roles were preserved; no further requests are sent until it is fixed `
+                        + 'or the pause ends.');
+                }
                 throw new AppError('INTEGRATION_ERROR', 'Verification providers are unavailable or misconfigured. Existing roles were preserved; try again later.');
             }
             if (result.kind === 'conflict')

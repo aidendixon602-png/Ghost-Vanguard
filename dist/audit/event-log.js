@@ -1,4 +1,5 @@
 import { AuditLogEvent, Colors, EmbedBuilder, PermissionsBitField } from 'discord.js';
+import { PRODUCT_NAME } from '../branding.js';
 import { redact } from './redact.js';
 import { isExcluded, logChannels } from './log-setup.js';
 import { responsibleActor } from '../security/security.js';
@@ -60,7 +61,7 @@ export function renderEvent(event) {
     if (event.image)
         e.setImage(event.image);
     const ids = event.compact ? '' : [event.targetId && `${event.targetLabel ? `${event.targetLabel} ` : ''}ID: ${event.targetId}`, event.actorId && `By: ${event.actorId}`].filter(Boolean).join(' · ');
-    e.setFooter({ text: ids || 'Ghost Vanguard' });
+    e.setFooter({ text: ids || PRODUCT_NAME });
     return e;
 }
 function compactTarget(target) {

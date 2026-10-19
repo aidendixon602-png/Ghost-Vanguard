@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased: no more hard-coded legacy names, and honest provider errors
+- **One name, one place.** The product name now comes from a single constant, so the startup panel, embed footers, the mention-protection notice and the default log channel all say Ghost Vanguard. New servers get **#ghost-vanguard-logging**.
+- **Existing servers keep the channel they have.** A server still using the older **#midtown-vanguard-logging** reuses it instead of getting a second log channel, and setup says so ("existing channel reused (still named #…)"). Vanguard never renames a channel by itself: rename it yourself, or run `/setup logs setup logging_channel:` and pick any channel.
+- **Provider errors now say which kind they are.**
+  - HTTP 401/403: the key was rejected for this server — check `ROVER_API_KEY` / `BLOXLINK_API_KEY` and its access there.
+  - HTTP 429/5xx: temporary — requests pause for a minute and then resume.
+  - HTTP 400 and other client errors: a request or configuration problem, not an outage. The message says to check the key, the provider's access to the server and the member's link, and the server is paused for 5 minutes instead of being told to wait for a pause that was never set.
+  - Verification roles are still never removed on a provider error, and console warnings still omit keys and response bodies.
+
+## Unreleased: reusable Workspace management system
+- Added a guild-scoped, button-first Workspace for submissions, reviews, linked records, directives/tasks, staff synchronization and live reports.
+- Added durable sessions and panels, exact Discord-ID checks, idempotent counters, retry-safe linked Record IDs, audit history, setup validation, module visibility, authorization isolation and scheduled reminder state.
+- Added generic profiles plus the opt-in Midtown Archives preset (guild `1556485316838293587`, configured spreadsheet ID, `America/Los_Angeles`, row 7 headers and rows 8–207). Channel and role IDs remain setup selectors; none are invented.
+- Added Google Sheets v4 access-token/service-account authentication through environment variables, RAW literal writes, live header checks and controlled prepared-row expansion.
+- Added `/setup config workspace-setup`, `publish`, `status`, `enable`, `disable` and `sync`, plus member/staff/task/review controls. See [docs/workspace.md](workspace.md).
+
 ## Unreleased: comma-prefix Developer actions and private admin replies
 - Developer-only and bot-wide risky actions use comma-prefix commands; their slash entries are hidden and stale slash calls are rejected. Ordinary slash utilities remain available under their normal policies.
 - Every comma command requires the exact user ID in `DEVELOPER_IDS`, including the bot owner. `BOT_OWNER_ID` alone is not a prefix-command exception.
