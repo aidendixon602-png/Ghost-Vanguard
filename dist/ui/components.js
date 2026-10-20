@@ -21,6 +21,7 @@ import { registerControlPanel } from './control-panel.js';
 import { registerHistory } from './config-history.js';
 import { registerPermControls } from './perm-ui.js';
 import { registerDangerConfirm } from './danger-ui.js';
+import { registerVerifyControls } from '../features/verify-components.js';
 import { serverInfo } from './info-ui.js';
 import { snapshotPage } from './snapshot-ui.js';
 import { embed } from './ui.js';
@@ -50,6 +51,7 @@ export function registerComponents(registry) {
     registerHistory(registry);
     registerPermControls(registry);
     registerDangerConfirm(registry);
+    registerVerifyControls(registry);
     registry.component({ prefix: 'serverinfo:', kinds: ['button'], metadata: { ...defaults, requiresAuthorization: false, responseKind: 'info' }, execute: async (ctx, i) => {
             const match = /^serverinfo:(\d{17,20}):(-?\d{1,2})$/.exec(i.customId);
             if (!match || match[1] !== i.user.id)

@@ -31,16 +31,30 @@ export function normalizeCommands(commands: any[]): string {
     })).sort((a, b) => a.type - b.type || a.name.localeCompare(b.name))));
 }
 
-export async function syncCommands(rest: Pick<REST, 'get' | 'put'>, application: string, desired: any[]) {
+export async function syncCommands(rest: Pick<REST, 'get' | 'put'>, application: string, desired: any[], opts: { force?: boolean } = {}) {
     const route = Routes.applicationCommands(application);
     const current = await rest.get(route) as any[];
-    if (normalizeCommands(current) === normalizeCommands(desired)) {
-        logEvent('command_sync', { result: 'unchanged', count: desired.length });
+    const currentNorm = normalizeCommands(current);
+    const desiredNorm = normalizeCommands(desired);
+    if (!opts.force && currentNorm === desiredNorm) {
+        logEvent('command_sync', { result: 'unchanged', count: desired.length, names: desired.map((c: any) => c.name).sort() });
         return false;
+    }
+    if (currentNorm !== desiredNorm) {
+        const curNames = (current as any[]).map(c => c.name).sort();
+        const desNames = desired.map((c: any) => c.name).sort();
+        logEvent('command_sync', { result: 'updating', count: desired.length, from: curNames, to: desNames, force: !!opts.force });
     }
     // Bulk replacement also removes obsolete global commands, including context commands.
     await rest.put(route, { body: desired });
-    logEvent('command_sync', { result: 'updated', count: desired.length });
+    logEvent('command_sync', { result: 'updated', count: desired.length, names: desired.map((c: any) => c.name).sort() });
+    return true;
+}
+
+export async function syncGuildCommands(rest: Pick<REST, 'get' | 'put'>, application: string, guildId: string, desired: any[]) {
+    const route = Routes.applicationGuildCommands(application, guildId);
+    await rest.put(route, { body: desired });
+    logEvent('command_sync', { result: 'guild_updated', guildId, count: desired.length });
     return true;
 }
 

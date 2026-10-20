@@ -29,11 +29,13 @@ export default defineCommand(new SlashCommandBuilder().setName('dev').setDescrip
     .addStringOption(o => o.setName('presence').setDescription('Online indicator').addChoices({ name: 'Online', value: 'online' }, { name: 'Idle', value: 'idle' }, { name: 'Do not disturb', value: 'dnd' })))
     .addSubcommand(s => s.setName('status-reset').setDescription('Return to the normal rotating status'))
     .addSubcommand(s => s.setName('update').setDescription('Automatic GitHub updates: see the status, or install now (Developer)')
-    .addStringOption(o => o.setName('action').setDescription('What to do (default: status)').addChoices({ name: 'Show status', value: 'status' }, { name: 'Check and install now', value: 'now' }))), { responseKind: 'info', category: 'developer', developerOnly: true, requiresAuthorization: false }, async (ctx, i) => {
+    .addStringOption(o => o.setName('action').setDescription('What to do (default: status)').addChoices({ name: 'Show status', value: 'status' }, { name: 'Check and install now', value: 'now' })))
+    .addSubcommand(s => s.setName('sync').setDescription('Force re-register slash commands globally (and instantly in this server)')
+    .addStringOption(o => o.setName('guild_id').setDescription('Optional: also push instantly to this server ID (bypasses 1h global cache)').setMinLength(17).setMaxLength(20))), { responseKind: 'info', category: 'developer', developerOnly: true, requiresAuthorization: false }, async (ctx, i) => {
     const sub = i.options.getSubcommand();
     if (sub === 'update') {
         const op = (i.options.getString('action') ?? 'status');
-        // The updater remains available through the comma-only ,update alias.
+        // Updater: available as /dev update (`,update` alias remains).
         if (op === 'now' && explicitRank(ctx.store, i.guildId, i.user.id, ctx.actor ?? null) < RANKS.developer)
             throw new AppError('PERMISSION_ERROR', `${DEVELOPER_ONLY_MESSAGE}\nYou can still see the update status with \`,update\`.`);
         return describeUpdate(await askLauncher(op), op);
@@ -82,5 +84,29 @@ export default defineCommand(new SlashCommandBuilder().setName('dev').setDescrip
         ctx.client.user?.setPresence({ activities: [{ name: 'Custom Status', type: ActivityType.Custom, state: ctx.stats ? presenceLines(ctx.stats.get())[0] : 'Ghost Vanguard' }], status: 'online' });
         return 'Back to the normal rotating status.';
     }
-    return `**Database:** ${ctx.store.get('PRAGMA quick_check')?.quick_check}\n**Connected servers:** ${ctx.client.guilds.cache.size}\n**Loaded commands:** ${ctx.registry.commands.size}\n**Version:** ${VERSION}${codeVersion()}\n**RoVer configured:** ${!!config.roverKey}\n**Bloxlink configured:** ${!!config.bloxlinkKey}\n**AI configured:** ${config.aiEnabled && !!config.openaiKey}\n**Uptime:** ${Math.floor(process.uptime())} seconds`;
+    if (sub === 'sync') {
+        const { syncCommands, syncGuildCommands } = await import('../../bot/command-sync.js');
+        const { treeJson } = await import('../../bot/command-tree.js');
+        const desired = treeJson(ctx.registry);
+        const guildOverride = i.options.getString('guild_id')?.trim();
+        await syncCommands(ctx.client.rest, config.clientId, desired, { force: true });
+        let extra = '';
+        const targetGuild = guildOverride || i.guildId;
+        if (targetGuild && /^\d{17,20}$/.test(targetGuild)) {
+            try {
+                await syncGuildCommands(ctx.client.rest, config.clientId, targetGuild, desired);
+                extra = `\nGuild instant sync: **${targetGuild}** — commands appear in ~5s (global can take up to 1h).`;
+            }
+            catch (e) {
+                extra = `\nGuild sync failed for ${targetGuild}: ${String(e?.message ?? e).slice(0, 300)}`;
+            }
+        }
+        try {
+            const { cleanLegacyGuildCommands } = await import('../../bot/command-sync.js');
+            await cleanLegacyGuildCommands(ctx.client.rest, config.clientId, i.guildId, ctx.store);
+        }
+        catch { }
+        return `**Slash commands re-registered**\nGlobal: **${desired.length}** commands — Discord will show them within 1 hour.\nThis server (\`${i.guildId}\`) was also pushed instantly, so try \`/verify\` / \`/dev\` now.${extra}\n\n-# Tip: refresh picker (Ctrl+K → type /dev) or re-invite with https://discord.com/api/oauth2/authorize?client_id=${config.clientId}&scope=applications.commands+bot&permissions=8`;
+    }
+    return `**Database:** ${ctx.store.get('PRAGMA quick_check')?.quick_check}\n**Connected servers:** ${ctx.client.guilds.cache.size}\n**Loaded commands:** ${ctx.registry.commands.size}\n**Version:** ${VERSION}${codeVersion()}\n**Verification:** Custom (VG- code in Roblox bio) — no Bloxlink/RoVer needed\n**RoVer configured:** ${!!config.roverKey}\n**Bloxlink configured:** ${!!config.bloxlinkKey}\n**AI configured:** ${config.aiEnabled && !!config.openaiKey}\n**Uptime:** ${Math.floor(process.uptime())} seconds`;
 });
