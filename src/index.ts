@@ -1,4 +1,4 @@
-import { accessSummary } from './bot/access-summary.js';
+﻿import { accessSummary } from './bot/access-summary.js';
 import { dmTrusted } from './bot/trusted-dm.js';
 import { onRejoin, saveLeftRoles } from './features/rejoin-roles.js';
 import { selfRestart } from './bot/updater-link.js';
@@ -61,7 +61,7 @@ import { warnEmptyDatabase } from './features/bot-health.js';
 const errors = validateConfig();
 
 if (errors.length) {
-    console.error(`\n${style.red('✖ Ghost Vanguard cannot start.')} Fix these settings in .env:\n${errors.map(e => `  • ${e}`).join('\n')}\n`);
+    console.error(`\n${style.red('âœ– Ghost Vanguard cannot start.')} Fix these settings in .env:\n${errors.map(e => `  â€¢ ${e}`).join('\n')}\n`);
     process.exit(1);
 }
 
@@ -344,7 +344,7 @@ client.on(Events.GuildMemberAdd, member => {
     if (member.user.bot) protectedTask('bot quarantine', member.guild.id, () => quarantineNewBot(store, logs, member));
     const s = store.settings(member.guild.id);
     if (s.authorized && s.syncOnJoin && !member.user.bot && s.verifiedRoleId)
-        protectedTask('join verification', member.guild.id, () => roblox.sync(member));
+        protectedTask('join verification', member.guild.id, () => roblox.sync(member, { isInitial: true }));
 });
 
 client.on(Events.GuildMemberUpdate, (old, member) => {
@@ -512,9 +512,9 @@ try {
     await client.login(config.token);
 } catch (error: any) {
     const code = String(error?.code ?? ''), why = code === 'TokenInvalid' ? 'Discord rejected DISCORD_TOKEN. Reset the token in the Developer Portal (Bot page) and paste the new one into .env.'
-        : /disallowed intents/i.test(String(error?.message)) ? 'An intent is switched off. Developer Portal → Bot: turn on Server Members Intent and Message Content Intent.'
+        : /disallowed intents/i.test(String(error?.message)) ? 'An intent is switched off. Developer Portal â†’ Bot: turn on Server Members Intent and Message Content Intent.'
         : 'Check your internet connection, VPN or firewall, then try again.';
-    console.error(`Discord login failed: ${code || 'error'} — ${String(error?.message ?? error).slice(0, 200)}
+    console.error(`Discord login failed: ${code || 'error'} â€” ${String(error?.message ?? error).slice(0, 200)}
 ${why}`);
     await shutdown(1);
 }

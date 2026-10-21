@@ -1,0 +1,1361 @@
+diff --git a/dist/audit/downtime.js b/dist/audit/downtime.js
+index 6b454aa..38fb116 100644
+--- a/dist/audit/downtime.js
++++ b/dist/audit/downtime.js
+@@ -5,7 +5,7 @@ import { Colors, PermissionFlagsBits } from 'discord.js';
+ import { overrideRule, ruleFor, RULES } from '../core.js';
+ import { responsibleActor } from '../security/security.js';
+ import { embed } from '../ui/ui.js';
+-import { describeAudit, eventLogConfig, recordEvent } from './event-log.js';
++import { eventLogConfig, recordAuditEvent } from './event-log.js';
+ import { QUIET_RESTART_MS, shouldPost } from './notices.js';
+ // When the bot was last known to be running, updated every minute and on shutdown.
+ const LAST_SEEN = 'last_seen';
+@@ -86,11 +86,8 @@ export async function catchUp(guild, store, logs, trusted, offlineSince, now = D
+         return;
+     const fetched = await guild.fetchAuditLogs({ limit: 100 }).catch(() => null);
+     const missed = fetched ? [...fetched.entries.values()].filter(e => e.createdTimestamp > offlineSince && e.createdTimestamp <= now).reverse() : [];
+-    for (const entry of missed) {
+-        const event = describeAudit(entry, guild);
+-        if (event)
+-            recordEvent(store, logs, guild.id, event);
+-    }
++    for (const entry of missed)
++        recordAuditEvent(store, logs, entry, guild);
+     const summary = summarizeMissed(missed, guild, settings, trusted);
+     if (!summary.lines.length)
+         return;
+diff --git a/dist/audit/event-log.js b/dist/audit/event-log.js
+index fa5fc7e..921b9b1 100644
+--- a/dist/audit/event-log.js
++++ b/dist/audit/event-log.js
+@@ -32,18 +32,18 @@ export function logsCategory(store, guildId, category) {
+     return config.enabled && config.categories.has(category);
+ }
+ const FIELD = /^\*\*(.+?):\*\*\s?([\s\S]*)$/;
+-/** Compact embed: coloured sidebar, the person's avatar, one field per detail, IDs and a timestamp. */
++/** Render a log embed with actor, target, details, and timestamp; compact cards avoid repeated IDs. */
+ export function renderEvent(event) {
+     const at = event.at ?? Date.now();
+     const e = new EmbedBuilder().setColor(event.color ?? CATEGORY_COLOR[event.category]).setTitle(event.action.slice(0, 256)).setTimestamp(at);
+-    if (event.author)
++    if (event.author && !event.compact)
+         e.setAuthor({ name: event.author.name.slice(0, 256), iconURL: event.author.iconURL ?? undefined });
+     const fields = [];
+     const loose = [];
+     if (event.target)
+         fields.push({ name: event.targetLabel ?? 'Target', value: event.target, inline: true });
+     if (event.actorId)
+-        fields.push({ name: event.actorLabel ?? 'By', value: `<@${event.actorId}> (\`${event.actorId}\`)`, inline: true });
++        fields.push({ name: event.actorLabel ?? 'By', value: event.compact ? `<@${event.actorId}>` : `<@${event.actorId}> (\`${event.actorId}\`)`, inline: true });
+     else if (event.actorUnverified)
+         fields.push({ name: event.actorLabel ?? 'By', value: 'Unavailable (could not be verified)', inline: true });
+     for (const line of event.details ?? []) {
+@@ -59,12 +59,16 @@ export function renderEvent(event) {
+         e.addFields(fields);
+     if (event.image)
+         e.setImage(event.image);
+-    const ids = [event.targetId && `${event.targetLabel ? `${event.targetLabel} ` : ''}ID: ${event.targetId}`, event.actorId && `By: ${event.actorId}`].filter(Boolean).join(' · ');
++    const ids = event.compact ? '' : [event.targetId && `${event.targetLabel ? `${event.targetLabel} ` : ''}ID: ${event.targetId}`, event.actorId && `By: ${event.actorId}`].filter(Boolean).join(' · ');
+     e.setFooter({ text: ids || 'Ghost Vanguard' });
+     return e;
+ }
++function compactTarget(target) {
++    const mention = /^(<@\d+>)(?:\s+\([\s\S]*\))?$/.exec(target ?? '');
++    return mention ? mention[1] : target;
++}
+ /** Store an event and post it to the event log channel, if logging is on for its category. */
+-export function recordEvent(store, logs, guildId, event) {
++export function recordEvent(store, logs, guildId, event, options = {}) {
+     const config = eventLogConfig(store, guildId);
+     if (!config.enabled || !config.categories.has(event.category))
+         return false;
+@@ -78,7 +82,10 @@ export function recordEvent(store, logs, guildId, event) {
+         ...(clean.details ?? []),
+     ];
+     store.run('INSERT INTO event_log(guild_id,at,category,action,actor_id,target_id,target,summary) VALUES(?,?,?,?,?,?,?,?)', guildId, at, event.category, event.action, event.actorId ?? null, event.targetId ?? null, clean.target ?? null, lines.join('\n') || event.action);
+-    logs.push(guildId, renderEvent(clean), [], config.channelId);
++    if (options.post !== false) {
++        const display = options.compact ? { ...clean, compact: true, author: null, target: compactTarget(clean.target) } : clean;
++        logs.push(guildId, renderEvent(display), [], config.channelId);
++    }
+     return true;
+ }
+ export function recentEvents(store, guildId, filter = {}) {
+@@ -325,10 +332,81 @@ export function describeAudit(entry, guild, options = {}) {
+         targetLabel: kind === 'role' ? 'Role' : undefined,
+         author: user ? { name: user.tag ?? user.username, iconURL: user.displayAvatarURL() } : null, channelId };
+ }
++const ROLE_CHANGE_GROUP_WINDOW_MS = 4000;
++const pendingRoleChangeLogs = new Map();
++function addRoleEventDetails(batch, event) {
++    for (const line of event.details ?? []) {
++        const match = FIELD.exec(line);
++        if (!match) {
++            if (line.trim())
++                batch.otherDetails.add(line);
++            continue;
++        }
++        const label = match[1].toLowerCase();
++        const roles = label === 'roles added' ? batch.added : label === 'roles removed' ? batch.removed : null;
++        if (!roles) {
++            batch.otherDetails.add(line);
++            continue;
++        }
++        for (const role of match[2].split(/,\s*/).map(value => value.trim()).filter(Boolean))
++            roles.add(role);
++    }
++}
++function flushRoleChangeLog(key) {
++    const batch = pendingRoleChangeLogs.get(key);
++    if (!batch)
++        return;
++    clearTimeout(batch.timer);
++    pendingRoleChangeLogs.delete(key);
++    const config = eventLogConfig(batch.store, batch.guildId);
++    if (!config.enabled || !config.categories.has(batch.event.category) || isExcluded(batch.store, batch.guildId, batch.event.channelId))
++        return;
++    const details = [];
++    if (batch.added.size)
++        details.push(`**Added:** ${[...batch.added].join(', ')}`);
++    if (batch.removed.size)
++        details.push(`**Removed:** ${[...batch.removed].join(', ')}`);
++    details.push(...batch.otherDetails);
++    const summary = {
++        ...batch.event,
++        action: batch.count > 1 ? `Role changes · ${batch.count} updates` : 'Role changes',
++        details,
++        target: batch.event.targetId ? `<@${batch.event.targetId}>` : compactTarget(batch.event.target),
++        author: null,
++        compact: true,
++        color: Colors.Purple,
++    };
++    const clean = { ...summary, details: (summary.details ?? []).map(detail => redact(detail)), target: redact(summary.target) };
++    batch.logs.push(batch.guildId, renderEvent(clean), [], config.channelId);
++}
++function queueRoleChangeLog(store, logs, guildId, event) {
++    const key = `${guildId}:${event.actorId}:${event.targetId}`;
++    let batch = pendingRoleChangeLogs.get(key);
++    if (!batch) {
++        batch = { store, logs, guildId, event, added: new Set(), removed: new Set(), otherDetails: new Set(), count: 0,
++            timer: setTimeout(() => flushRoleChangeLog(key), ROLE_CHANGE_GROUP_WINDOW_MS) };
++        pendingRoleChangeLogs.set(key, batch);
++    }
++    batch.event = { ...event, author: event.author ?? batch.event.author, target: event.target ?? batch.event.target };
++    batch.count++;
++    addRoleEventDetails(batch, event);
++}
++/** Flush pending role summaries immediately, for shutdown and deterministic tests. */
++export function flushPendingRoleChangeLogs() {
++    for (const key of [...pendingRoleChangeLogs.keys()])
++        flushRoleChangeLog(key);
++}
+ export function recordAuditEvent(store, logs, entry, guild) {
+     const event = describeAudit(entry, guild, { ignoreBotRoutine: logChannels(store, guild.id).ignoreBotRoutine });
+-    if (event)
+-        recordEvent(store, logs, guild.id, event);
++    if (!event)
++        return;
++    if (event.action === 'Roles Updated' && event.actorId && event.targetId) {
++        // Preserve every audit event in history, but post rapid same-actor/same-target edits as one card.
++        if (recordEvent(store, logs, guild.id, event, { post: false }))
++            queueRoleChangeLog(store, logs, guild.id, event);
++        return;
++    }
++    recordEvent(store, logs, guild.id, event, { compact: true });
+ }
+ export function recordMemberEvent(store, logs, member, joined) {
+     const user = member.user;
+@@ -337,5 +415,5 @@ export function recordMemberEvent(store, logs, member, joined) {
+         category: 'members', action: joined ? 'Member joined' : 'Member left',
+         targetId: member.id, target: `<@${member.id}>${user?.tag ? ` (${user.tag})` : ''}`,
+         details: joined && created ? [`**Account:**${created.replace(' · account', '')}`] : [],
+-    });
++    }, { compact: true });
+ }
+diff --git a/dist/bot/ranks.js b/dist/bot/ranks.js
+index c3051ae..33d468d 100644
+--- a/dist/bot/ranks.js
++++ b/dist/bot/ranks.js
+@@ -103,7 +103,7 @@ export function explicitRank(store, guildId, userId, member) {
+ /** Minimum rank per command, subcommand ("command/sub") or button prefix. Missing = ranks don't apply. */
+ export const COMMAND_RANK = {
+     // Helper
+-    'moderation/warn': 1, 'antinuke-plus': 4, 'antinuke-plus/scan': 3, botq: 4, 'warnings/status': 1, warnings: 4, emergency: 3, webhooks: 3, webhook: 3, aimod: 1, roblox: 4, 'roblox/lookup': 1, 'roblox/sync': 1, 'roblox/blacklist': 2, 'roblox/unblacklist': 2, 'roblox/blacklisted': 1, 'roblox/binds': 1, 'case/search': 1, 'appeals/pending': 2, appeal: 2, 'staff/report': 3, automod: 3, welcome: 3, appeals: 4, 'moderation/timeout': 1, 'moderation/history': 1, 'note/add': 1, 'note/list': 1, 'case/view': 1, 'case/recent': 1,
++    'moderation/warn': 1, 'antinuke-plus': 4, 'antinuke-plus/scan': 3, botq: 4, 'warnings/status': 1, warnings: 4, emergency: 3, webhooks: 3, webhook: 3, aimod: 1, roblox: 4, 'roblox/lookup': 1, 'roblox/sync': 1, 'roblox/bloxlink-sync': 3, 'roblox/blacklist': 2, 'roblox/unblacklist': 2, 'roblox/blacklisted': 1, 'roblox/binds': 1, 'case/search': 1, 'appeals/pending': 2, appeal: 2, 'staff/report': 3, automod: 3, welcome: 3, appeals: 4, 'moderation/timeout': 1, 'moderation/history': 1, 'note/add': 1, 'note/list': 1, 'case/view': 1, 'case/recent': 1,
+     // Moderator. Lifting a ban is Admin: Moderators can ban, but only Admins and owners undo bans.
+     'moderation/unban': 3,
+     moderation: 2, bans: 2, tempban: 2, softban: 2, 'role/who-can-give': 4, nick: 2, slowmode: 2, 'case/reason': 2, 'note/remove': 2, newacct: 2,
+diff --git a/dist/commands/roblox/roblox.js b/dist/commands/roblox/roblox.js
+index e4561bf..da794c2 100644
+--- a/dist/commands/roblox/roblox.js
++++ b/dist/commands/roblox/roblox.js
+@@ -44,26 +44,46 @@ export default defineCommand(new SlashCommandBuilder().setName('roblox').setDesc
+     .addSubcommand(s => s.setName('unbind').setDescription('Stop giving a role from group ranks').addRoleOption(o => o.setName('role').setDescription('Discord role').setRequired(true)))
+     .addSubcommand(s => s.setName('binds').setDescription('Show the group and its rank → role binds'))
+     .addSubcommand(s => s.setName('sync').setDescription('Re-check someone\'s Roblox verification and group roles now')
+-    .addUserOption(o => o.setName('member').setDescription('Member (default: you)'))), { category: 'verification', access: 'security', cooldown: 2000 }, async (ctx, i) => {
++    .addUserOption(o => o.setName('member').setDescription('Member (default: you)')))
++    .addSubcommand(s => s.setName('bloxlink-sync').setDescription('Ask Bloxlink to re-sync this member\'s linked roles and nickname')
++    .addUserOption(o => o.setName('member').setDescription('Member to update').setRequired(true))), { category: 'verification', access: 'security', cooldown: 2000 }, async (ctx, i) => {
+     const sub = i.options.getSubcommand(), guild = i.guildId;
+     if (sub === 'lookup') {
+         const member = i.options.getUser('member'), account = i.options.getString('account');
+         let id = null;
+         if (member) {
+             id = ctx.store.get('SELECT roblox_id FROM links WHERE guild_id=? AND user_id=?', guild, member.id)?.roblox_id ?? null;
++            if (!id) {
++                const inGuild = await i.guild.members.fetch(member.id).catch(() => null);
++                if (!inGuild)
++                    throw new AppError('VALIDATION_ERROR', `<@${member.id}> is not in this server.`);
++                id = await ctx.roblox.identify(inGuild);
++            }
+             if (!id)
+-                throw new AppError('VALIDATION_ERROR', `<@${member.id}> has not verified a Roblox account here.`);
++                throw new AppError('VALIDATION_ERROR', `<@${member.id}> has no Roblox account linked through Vanguard or a configured provider.`);
+         }
+         else if (account)
+             id = await resolveRoblox(account);
+         else
+             throw new AppError('VALIDATION_ERROR', 'Give a Roblox account or pick a member.');
+-        const card = await lookupCard(ctx.store, guild, String(id));
++        const bloxlinkIds = await ctx.roblox.discordIdsForRoblox(guild, String(id));
++        const card = await lookupCard(ctx.store, guild, String(id), bloxlinkIds);
+         if (!card)
+             throw new AppError('INTEGRATION_ERROR', 'Roblox did not return that account. Try again in a moment.');
+         await i.editReply({ embeds: [card], allowedMentions: { parse: [] } });
+         return;
+     }
++    if (sub === 'bloxlink-sync') {
++        const target = i.options.getUser('member', true);
++        const member = await i.guild.members.fetch(target.id).catch(() => null);
++        if (!member)
++            throw new AppError('VALIDATION_ERROR', 'That member is not in this server.');
++        const result = await ctx.roblox.updateBloxlinkUser(member);
++        const safe = (name) => name.replace(/[\r\n]/g, ' ').replaceAll('`', 'ˋ').replaceAll('@', '＠').slice(0, 60);
++        const names = (items) => items.length ? items.map(name => `\`${safe(name)}\``).join(', ') : 'None';
++        const nickname = result.nickname ? `\n**Nickname:** \`${safe(result.nickname)}\`` : '';
++        return `Bloxlink sync completed for <@${member.id}>.\n**Added:** ${names(result.addedRoles)}\n**Removed:** ${names(result.removedRoles)}${nickname}`;
++    }
+     if (sub === 'blacklist' || sub === 'unblacklist') {
+         const id = await resolveRoblox(i.options.getString('account', true));
+         if (sub === 'blacklist') {
+diff --git a/dist/features/message-logs.js b/dist/features/message-logs.js
+index 7f0d337..0c3ab51 100644
+--- a/dist/features/message-logs.js
++++ b/dist/features/message-logs.js
+@@ -9,7 +9,6 @@ import { logsCategory, recordEvent } from '../audit/event-log.js';
+  * from the audit log, so "Deleted by" is never filled in by guesswork.
+  */
+ const text = (m) => m.partial || m.content == null ? null : m.content;
+-const author = (m) => m.author ? { name: m.author.tag ?? m.author.username, iconURL: typeof m.author.displayAvatarURL === 'function' ? m.author.displayAvatarURL() : null } : null;
+ const IMAGE = /\.(png|jpe?g|gif|webp)$/i;
+ function attachments(m) {
+     const list = [...(m.attachments?.values() ?? [])];
+@@ -26,15 +25,15 @@ export function logDeletedMessage(store, logs, m) {
+         return;
+     const body = text(m);
+     const files = attachments(m);
+-    recordEvent(store, logs, m.guildId, { category: 'messages', action: '🗑️ Message Deleted', color: Colors.Red, targetId: m.author?.id ?? null,
+-        author: author(m), channelId: m.channelId, image: files.image,
++    recordEvent(store, logs, m.guildId, { category: 'messages', action: '🗑️ Message Deleted', color: Colors.Red,
++        targetId: m.author?.id ?? null, target: m.author ? `<@${m.author.id}>` : 'Unavailable (message sent before Vanguard started)', targetLabel: 'Author',
++        channelId: m.channelId, image: files.image,
+         details: [
+-            `**Author:** ${m.author ? `<@${m.author.id}> (\`${m.author.id}\`)` : 'Unavailable (message sent before Vanguard started)'}`,
+             `**Channel:** <#${m.channelId}>`,
+             `**Message ID:** \`${m.id}\``,
+-            `**Content:** ${body === null ? 'Unavailable (message sent before Vanguard started)' : body ? clip(body, 1000) : '*No text*'}`,
++            `**Content:** ${body === null ? 'Unavailable (message sent before Vanguard started)' : body ? clip(body, 600) : '*No text*'}`,
+             files.line ?? '',
+-        ].filter(Boolean) });
++        ].filter(Boolean) }, { compact: true });
+ }
+ export function logEditedMessage(store, logs, before, after) {
+     if (!after.guildId || after.author?.bot || after.webhookId || !logsCategory(store, after.guildId, 'messages'))
+@@ -42,20 +41,22 @@ export function logEditedMessage(store, logs, before, after) {
+     const old = text(before), now = text(after);
+     if (old === null || old === now || now === null)
+         return; // unknown "before", embeds loading or pins also fire "edits"
+-    recordEvent(store, logs, after.guildId, { category: 'messages', action: '✏️ Message Edited', color: Colors.Yellow, targetId: after.author?.id ?? null,
+-        author: author(after), channelId: after.channelId,
++    recordEvent(store, logs, after.guildId, { category: 'messages', action: '✏️ Message Edited', color: Colors.Yellow,
++        targetId: after.author?.id ?? null, target: after.author ? `<@${after.author.id}>` : 'Unavailable', targetLabel: 'Author',
++        channelId: after.channelId,
+         details: [
+-            `**Author:** <@${after.author?.id}> (\`${after.author?.id}\`)`,
+             `**Channel:** <#${after.channelId}> · [jump to message](${after.url})`,
+-            `**Before:** ${clip(old || '*empty*', 1000)}`,
+-            `**After:** ${clip(now || '*empty*', 1000)}`,
+-        ] });
++            `**Before:** ${clip(old || '*empty*', 600)}`,
++            `**After:** ${clip(now || '*empty*', 600)}`,
++        ] }, { compact: true });
+ }
+ export function logBulkDelete(store, logs, messages) {
+     const first = messages.first();
+     if (!first?.guildId || !logsCategory(store, first.guildId, 'messages'))
+         return;
+-    const known = [...messages.values()].filter(m => text(m) && !m.author?.bot).slice(0, 15).reverse();
++    const known = [...messages.values()].filter(m => text(m) && !m.author?.bot);
++    const shown = known.slice(0, 8).reverse();
+     recordEvent(store, logs, first.guildId, { category: 'messages', action: `🧹 ${messages.size} Messages Bulk-Deleted`, color: Colors.Red, channelId: first.channelId,
+-        details: [`**Channel:** <#${first.channelId}>`, ...known.map(m => `${m.author?.username ?? 'unknown'}: ${clip(text(m), 120)}`)] });
++        details: [`**Channel:** <#${first.channelId}>`, ...shown.map(m => `${m.author?.username ?? 'unknown'}: ${clip(text(m), 100)}`),
++            ...(known.length > shown.length ? [`**More:** ${known.length - shown.length} additional message(s) omitted`] : [])] }, { compact: true });
+ }
+diff --git a/dist/features/rejoin-roles.js b/dist/features/rejoin-roles.js
+index f4f6ee4..fd5ebe1 100644
+--- a/dist/features/rejoin-roles.js
++++ b/dist/features/rejoin-roles.js
+@@ -34,11 +34,12 @@ export function onRejoin(store, logs, member) {
+     const still = saved.roles.filter(id => member.guild.roles.cache.has(id));
+     if (!still.length)
+         return;
+-    const list = still.map(id => `<@&${id}>`).join(' ');
++    const shown = still.slice(0, 8);
++    const list = shown.map(id => `<@&${id}>`).join(' ');
++    const more = still.length > shown.length ? `\n…and ${still.length - shown.length} more role(s)` : '';
+     logs.push(member.guild.id, new EmbedBuilder().setColor(Colors.Blurple).setTitle('Member Rejoined')
+-        .setAuthor({ name: member.user?.tag ?? member.id, iconURL: member.user?.displayAvatarURL?.() || undefined })
+-        .setDescription(`<@${member.id}> left <t:${Math.floor(saved.leftAt / 1000)}:R> and came back. They had **${still.length}** role(s):\n${list}`.slice(0, 3900))
+-        .setFooter({ text: `User ID: ${member.id} · Restore roles gives back what you are allowed to give` }).setTimestamp(), [restoreButton(member.id)]);
++        .setDescription(`<@${member.id}> came back <t:${Math.floor(saved.leftAt / 1000)}:R>. They had **${still.length}** role(s):\n${list}${more}`.slice(0, 3900))
++        .setFooter({ text: 'Use Restore roles to give back roles the staff member is allowed to grant.' }).setTimestamp(), [restoreButton(member.id)]);
+ }
+ /** Give back saved roles that this staff member is allowed to give. Throws if nothing could be given. */
+ export async function restoreRoles(store, guild, actorId, userId) {
+diff --git a/dist/features/roblox-tools.js b/dist/features/roblox-tools.js
+index f09ddf1..379f334 100644
+--- a/dist/features/roblox-tools.js
++++ b/dist/features/roblox-tools.js
+@@ -71,12 +71,15 @@ export async function syncGroupRoles(store, member, robloxId) {
+     return add.length || remove.length ? ` Group rank ${rank}: ${add.length} role(s) added, ${remove.length} removed.` : '';
+ }
+ /** A profile card for /roblox lookup. */
+-export async function lookupCard(store, guild, robloxId) {
++export async function lookupCard(store, guild, robloxId, bloxlinkDiscordIds = null) {
+     const [user, past, groups, avatar] = await Promise.all([robloxUser(robloxId), robloxPastNames(robloxId), robloxGroups(robloxId), robloxAvatar(robloxId)]);
+     if (!user)
+         return null;
+     const age = accountAgeDays(user.created);
+-    const linked = store.all('SELECT user_id FROM links WHERE guild_id=? AND roblox_id=?', guild, robloxId).map(r => `<@${r.user_id}>`);
++    const linked = [...new Set([
++            ...store.all('SELECT user_id FROM links WHERE guild_id=? AND roblox_id=?', guild, robloxId).map(r => String(r.user_id)),
++            ...(bloxlinkDiscordIds ?? []),
++        ])].map(id => `<@${id}>`);
+     const block = blacklistEntry(store, guild, robloxId);
+     const c = groupConfig(store, guild), inGroup = c.groupId ? groups?.find(g => g.groupId === c.groupId) : null;
+     const lines = [
+diff --git a/dist/index.js b/dist/index.js
+index 788d0cc..7e265b5 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -31,7 +31,7 @@ import { indexTree, treeJson } from './bot/command-tree.js';
+ import { Roblox } from './integrations/roblox.js';
+ import { Security } from './security/security.js';
+ import { Snapshots } from './recovery/snapshots.js';
+-import { recordAuditEvent, recordMemberEvent } from './audit/event-log.js';
++import { flushPendingRoleChangeLogs, recordAuditEvent, recordMemberEvent } from './audit/event-log.js';
+ import { catchUp, lastSeen, markSeen } from './audit/downtime.js';
+ import { presenceOverride } from './bot/dev-tools.js';
+ import { clearAutomod, processAutomod } from './features/automod.js';
+@@ -461,6 +461,11 @@ async function shutdown(code = 0) {
+     shuttingDown = true;
+     timers.forEach(clearInterval);
+     lifecycle.close();
++    // Persist buffered role summaries to the outbox before closing the store.
++    try {
++        flushPendingRoleChangeLogs();
++    }
++    catch { }
+     client.destroy();
+     server.close();
+     try {
+diff --git a/dist/integrations/roblox.js b/dist/integrations/roblox.js
+index 479f257..61ebcc7 100644
+--- a/dist/integrations/roblox.js
++++ b/dist/integrations/roblox.js
+@@ -79,6 +79,104 @@ export class Roblox {
+             return { kind: 'error' };
+         }
+     }
++    /** Resolve a Roblox account to Discord members through Bloxlink; null means the lookup is unavailable. */
++    async discordIdsForRoblox(guild, robloxId) {
++        const key = config.bloxlinkKey;
++        if (!key || this.store.get('SELECT enabled FROM provider_config WHERE guild_id=? AND provider=?', guild, 'bloxlink')?.enabled === 0)
++            return null;
++        if (!/^\d{1,20}$/.test(robloxId) || (this.providerCooldown.get('bloxlink') ?? 0) > Date.now() || (this.providerCooldown.get(`bloxlink:${guild}`) ?? 0) > Date.now())
++            return null;
++        try {
++            this.store.assertAuthorized(guild);
++            const response = await this.http.get(`${guild}:bloxlink:reverse:${robloxId}`, `https://api.blox.link/v4/public/guilds/${guild}/roblox-to-discord/${robloxId}`, { Authorization: key });
++            if (response.status === 404) {
++                this.observed('bloxlink', guild, true, 'Provider responded; no linked Discord accounts were found.');
++                return [];
++            }
++            if (response.status === 401 || response.status === 403) {
++                this.observed('bloxlink', guild, false, `HTTP ${response.status}; check BLOXLINK_API_KEY and server access.`);
++                this.providerCooldown.set(`bloxlink:${guild}`, Date.now() + REJECTED_KEY_PAUSE_MS);
++                console.warn(`[verification] Bloxlink rejected the API key for guild ${guild} (HTTP ${response.status}); check BLOXLINK_API_KEY and server access. Pausing lookups for 5 minutes.`);
++                return null;
++            }
++            if (!response.ok) {
++                this.observed('bloxlink', guild, false, `HTTP ${response.status}; retry after the provider pause.`);
++                if (response.status === 429 || response.status >= 500)
++                    this.providerCooldown.set('bloxlink', Date.now() + 60000);
++                console.warn(`[verification] Bloxlink reverse lookup HTTP ${response.status}; credentials and response bodies omitted.`);
++                return null;
++            }
++            const data = await response.json();
++            if (!Array.isArray(data.discordIDs)) {
++                this.observed('bloxlink', guild, false, 'Provider returned an incomplete reverse-lookup response.');
++                return null;
++            }
++            const ids = [...new Set(data.discordIDs.map(String).filter(id => /^\d{17,20}$/.test(id)))];
++            this.observed('bloxlink', guild, true, ids.length ? 'Provider returned linked Discord accounts.' : 'Provider returned no linked Discord accounts.');
++            return ids;
++        }
++        catch {
++            this.observed('bloxlink', guild, false, 'Network/request failure; try again later.');
++            return null;
++        }
++    }
++    /** Explicitly request Bloxlink to re-run its configured verification for a member. This is a non-retried POST. */
++    async updateBloxlinkUser(member) {
++        const guild = member.guild.id;
++        return this.queue.run(`${guild}:${member.id}`, async () => {
++            this.store.assertAuthorized(guild);
++            const key = config.bloxlinkKey;
++            if (!key)
++                throw new AppError('INTEGRATION_ERROR', 'Bloxlink is not configured. Set BLOXLINK_API_KEY in .env.');
++            if (this.store.get('SELECT enabled FROM provider_config WHERE guild_id=? AND provider=?', guild, 'bloxlink')?.enabled === 0)
++                throw new AppError('INTEGRATION_ERROR', 'Bloxlink verification is disabled in this server.');
++            if (this.store.get('SELECT enabled FROM feature_settings WHERE guild_id=? AND feature=?', guild, 'verification')?.enabled === 0)
++                throw new AppError('INTEGRATION_ERROR', 'Verification is disabled in this server.');
++            if (this.store.get('SELECT 1 FROM backups WHERE guild_id=? AND user_id=? AND active=1', guild, member.id))
++                throw new AppError('INTEGRATION_ERROR', 'Bloxlink updates are unavailable while this member is quarantined.');
++            const paused = Math.max(this.providerCooldown.get('bloxlink') ?? 0, this.providerCooldown.get(`bloxlink:${guild}`) ?? 0);
++            if (paused > Date.now())
++                throw new AppError('INTEGRATION_ERROR', 'Bloxlink requests are temporarily paused after a provider error. Try again later.');
++            const fresh = await member.guild.members.fetch({ user: member.id, force: true }).catch(() => null);
++            if (!fresh)
++                throw new AppError('VALIDATION_ERROR', 'That member is no longer in this server.');
++            this.store.assertAuthorized(guild);
++            let response;
++            try {
++                response = await fetch(`https://api.blox.link/v4/public/guilds/${guild}/update-user/${member.id}`, {
++                    method: 'POST', headers: { Authorization: key }, signal: AbortSignal.timeout(10000),
++                });
++            }
++            catch {
++                this.observed('bloxlink', guild, false, 'Update request failed or timed out; check Bloxlink before retrying.');
++                throw new AppError('INTEGRATION_ERROR', 'The Bloxlink update request failed or timed out. Check the member in Bloxlink before retrying.');
++            }
++            if (response.status === 401 || response.status === 403) {
++                this.observed('bloxlink', guild, false, `HTTP ${response.status}; check BLOXLINK_API_KEY and server access.`);
++                this.providerCooldown.set(`bloxlink:${guild}`, Date.now() + REJECTED_KEY_PAUSE_MS);
++                console.warn(`[verification] Bloxlink rejected the API key for guild ${guild} (HTTP ${response.status}); check BLOXLINK_API_KEY and server access. Pausing requests for 5 minutes.`);
++                throw new AppError('INTEGRATION_ERROR', 'Bloxlink rejected the API key for this server. Check BLOXLINK_API_KEY and its server access.');
++            }
++            if (response.status === 404) {
++                this.observed('bloxlink', guild, true, 'Provider could not find a linked account or current server member.');
++                throw new AppError('VALIDATION_ERROR', 'Bloxlink could not find a linked account for that member in this server.');
++            }
++            if (!response.ok) {
++                this.observed('bloxlink', guild, false, `HTTP ${response.status}; retry after the provider pause.`);
++                if (response.status === 429 || response.status >= 500)
++                    this.providerCooldown.set('bloxlink', Date.now() + 60000);
++                console.warn(`[verification] Bloxlink update HTTP ${response.status}; credentials and response bodies omitted.`);
++                throw new AppError('INTEGRATION_ERROR', `Bloxlink update failed (HTTP ${response.status}). Check Bloxlink before retrying.`);
++            }
++            const data = await response.json().catch(() => null);
++            if (!data || typeof data !== 'object')
++                throw new AppError('INTEGRATION_ERROR', 'Bloxlink returned an unreadable update response. Check the member in Bloxlink.');
++            this.store.assertAuthorized(guild);
++            const roleNames = (value) => Array.isArray(value) ? [...new Set(value.filter((name) => typeof name === 'string').map(name => name.trim()).filter(Boolean))].slice(0, 20) : [];
++            this.observed('bloxlink', guild, true, 'Member update completed.');
++            return { addedRoles: roleNames(data.addedRoles), removedRoles: roleNames(data.removedRoles), nickname: typeof data.nickname === 'string' ? data.nickname : null };
++        });
++    }
+     clearGuild(id) {
+         this.http.clearPrefix(`${id}:`);
+         for (const provider of ['rover', 'bloxlink']) {
+diff --git a/dist/ui/layout-ui.js b/dist/ui/layout-ui.js
+index 1e9a6fa..3b26efd 100644
+--- a/dist/ui/layout-ui.js
++++ b/dist/ui/layout-ui.js
+@@ -32,14 +32,21 @@ export async function showLayoutReview(ctx, i, key, pending) {
+     const components = pending.components ?? selectComponents();
+     if (pending.destination)
+         await checkDestination(ctx, destination, i.user.id, components);
+-    const plan = await ctx.store.withAuthorized(destination.id, () => ctx.snapshots.plan(destination, ctx.snapshots.load(destination.id, pending.snapshot).data, pending.prune, components));
++    // Keep every destination-scoped read (plan, snapshot body and per-server number) in the
++    // destination context. A cross-server copy is invoked while the source context is active.
++    const review = await ctx.store.withAuthorized(destination.id, async () => {
++        const { data } = ctx.snapshots.load(destination.id, pending.snapshot);
++        const plan = await ctx.snapshots.plan(destination, data, pending.prune, components);
++        const number = ctx.snapshots.numberOf(destination.id, pending.snapshot);
++        return { data, plan, number };
++    });
++    const { data, plan, number } = review;
+     pending.fingerprint = plan.fingerprint;
+     const names = components.map(c => c[0].toUpperCase() + c.slice(1));
+-    const data = ctx.store.readGuild(destination.id, () => ctx.snapshots.load(destination.id, pending.snapshot).data);
+     const settings = data.settings ? Object.keys(data.settings).join(', ') : 'No guild settings stored in this older snapshot';
+-    const summary = `**${pending.destination ? 'Copy layout to' : 'Restore server'}:** ${destination.name} (${destination.id})\n**Snapshot:** #${ctx.snapshots.numberOf(destination.id, pending.snapshot)}\n**Components:** ${names.join(', ')}\n${components.includes('settings') ? `**Supported settings:** ${settings}\n` : ''}**Create:** ${plan.roleCreate} roles · ${plan.channelCreate} categories/channels\n**Update/reorder candidates:** ${plan.roleUpdate} roles · ${plan.channelUpdate} categories/channels\n**Delete extras:** ${plan.roleDelete.length} roles · ${plan.channelDelete.length} channels\n**Settings changes:** ${plan.settingsUpdate}\n**Skipped:** ${plan.skipped.length}\n\nA fresh destination backup is required before any changes. Existing objects are matched before creation. ${components.includes('permissions') ? 'Saved permissions, including privileged permissions, will be applied.' : 'Existing permissions are preserved; new channels begin private.'}\n${pending.prune ? 'Explicit pruning will permanently delete the reviewed extras only if there are no skipped objects or failures.\n' : ''}Confirmation expires in two minutes and checks for server changes.`;
++    const summary = `**${pending.destination ? 'Copy layout to' : 'Restore server'}:** ${destination.name} (${destination.id})\n**Snapshot:** #${number}\n**Components:** ${names.join(', ')}\n${components.includes('settings') ? `**Supported settings:** ${settings}\n` : ''}**Create:** ${plan.roleCreate} roles · ${plan.channelCreate} categories/channels\n**Update/reorder candidates:** ${plan.roleUpdate} roles · ${plan.channelUpdate} categories/channels\n**Delete extras:** ${plan.roleDelete.length} roles · ${plan.channelDelete.length} channels\n**Settings changes:** ${plan.settingsUpdate}\n**Skipped:** ${plan.skipped.length}\n\nA fresh destination backup is required before any changes. Existing objects are matched before creation. ${components.includes('permissions') ? 'Saved permissions, including privileged permissions, will be applied.' : 'Existing permissions are preserved; new channels begin private.'}\n${pending.prune ? 'Explicit pruning will permanently delete the reviewed extras only if there are no skipped objects or failures.\n' : ''}Confirmation expires in two minutes and checks for server changes.`;
+     const manifest = [
+-        `Snapshot #${ctx.snapshots.numberOf(destination.id, pending.snapshot)} -> ${destination.name} (${destination.id})`,
++        `Snapshot #${number} -> ${destination.name} (${destination.id})`,
+         `Selected: ${names.join(', ')}`,
+         ...data.roles.filter(r => components.includes('roles') || components.includes('permissions')).map(r => `Role: ${r.name} (${r.id}) -> ${plan.roleMap[r.id] ?? 'create if Roles selected'}; snapshot position ${r.position}${plan.blockedRoles.includes(r.id) ? '; skipped' : ''}`),
+         ...data.channels.filter(c => components.includes('permissions') || components.includes(c.type === 4 ? 'categories' : 'channels')).map(c => `${c.type === 4 ? 'Category' : 'Channel'}: ${c.name} (${c.id}) -> ${plan.channelMap[c.id] ?? 'create if layout component selected'}; parent ${c.parent ?? 'none'}; position ${c.position}; ${c.overwrites.length} saved overwrites${plan.blockedChannels.includes(c.id) ? '; skipped' : ''}`),
+diff --git a/docs/commands.md b/docs/commands.md
+index b5f19af..16d3e71 100644
+--- a/docs/commands.md
++++ b/docs/commands.md
+@@ -281,6 +281,7 @@ Roblox: look up accounts, blacklist, shared ban network and group rank sync
+ | `/roblox unbind` | Stop giving a role from group ranks | Head Admin+ |
+ | `/roblox binds` | Show the group and its rank → role binds | Helper+ |
+ | `/roblox sync` | Re-check someone's Roblox verification and group roles now | Helper+ |
++| `/roblox bloxlink-sync` | Ask Bloxlink to re-sync this member's linked roles and nickname | Admin+ |
+ 
+ ## /ask
+ 
+diff --git a/docs/ranks.md b/docs/ranks.md
+index 869747d..b9d2d66 100644
+--- a/docs/ranks.md
++++ b/docs/ranks.md
+@@ -123,6 +123,7 @@ Server rank: lifting ordinary bans and accepting appeals, raid tools, automod, s
+ - `/antinuke scan`: Safety scan: powerful roles, roles above Vanguard, bots with Administrator
+ - `/mod massban`: Raid cleanup: ban up to 200 user IDs at once (whitelisted staff only) _(must also be on the anti-nuke whitelist)_
+ - `/mod unban`: Admins and owners: lift a ban by user ID (genrebans and hardbans need bot-wide staff) _(ordinary bans only; a genreban needs an Overseer+ for a one-server exception, or a Supreme Leader+ to lift it everywhere; a hardban needs a Developer)_
++- `/roblox bloxlink-sync`: Ask Bloxlink to re-sync this member's linked roles and nickname
+ - `/security antiping bypass`: Allow or disallow a role to mention protected staff
+ - `/security antiping disable`: Disable staff mention blocking
+ - `/security antiping enable`: Enable blocking mentions of configured staff
+diff --git a/src/audit/downtime.ts b/src/audit/downtime.ts
+index a1e4690..45d4c0c 100644
+--- a/src/audit/downtime.ts
++++ b/src/audit/downtime.ts
+@@ -7,7 +7,7 @@ import type { Settings, Store } from '../database/db.js';
+ import type { LogQueue } from '../logging.js';
+ import { responsibleActor } from '../security/security.js';
+ import { embed } from '../ui/ui.js';
+-import { describeAudit, eventLogConfig, recordEvent } from './event-log.js';
++import { eventLogConfig, recordAuditEvent } from './event-log.js';
+ import { QUIET_RESTART_MS, shouldPost } from './notices.js';
+ // When the bot was last known to be running, updated every minute and on shutdown.
+ 
+@@ -99,11 +99,8 @@ export async function catchUp(guild: Guild, store: Store, logs: LogQueue, truste
+         return;
+     const fetched = await guild.fetchAuditLogs({ limit: 100 }).catch(() => null);
+     const missed = fetched ? [...fetched.entries.values()].filter(e => e.createdTimestamp > offlineSince && e.createdTimestamp <= now).reverse() : [];
+-    for (const entry of missed) {
+-        const event = describeAudit(entry, guild);
+-        if (event)
+-            recordEvent(store, logs, guild.id, event);
+-    }
++    for (const entry of missed)
++        recordAuditEvent(store, logs, entry, guild);
+     const summary = summarizeMissed(missed, guild, settings, trusted);
+     if (!summary.lines.length)
+         return;
+diff --git a/src/audit/event-log.ts b/src/audit/event-log.ts
+index 344ca6a..4c81106 100644
+--- a/src/audit/event-log.ts
++++ b/src/audit/event-log.ts
+@@ -42,6 +42,8 @@ export interface LogEvent {
+     actorUnverified?: boolean;
+     /** Label for the actor field (default "By"). */
+     actorLabel?: string;
++    /** Use mentions as the only actor/target identifiers instead of repeating raw IDs in the footer. */
++    compact?: boolean;
+     /** Label for the target field (default "Target"). */
+     targetLabel?: string;
+     color?: number;
+@@ -79,15 +81,15 @@ export function logsCategory(store: Store, guildId: string, category: LogCategor
+ 
+ const FIELD = /^\*\*(.+?):\*\*\s?([\s\S]*)$/;
+ 
+-/** Compact embed: coloured sidebar, the person's avatar, one field per detail, IDs and a timestamp. */
++/** Render a log embed with actor, target, details, and timestamp; compact cards avoid repeated IDs. */
+ export function renderEvent(event: LogEvent): EmbedBuilder {
+     const at = event.at ?? Date.now();
+     const e = new EmbedBuilder().setColor(event.color ?? CATEGORY_COLOR[event.category]).setTitle(event.action.slice(0, 256)).setTimestamp(at);
+-    if (event.author) e.setAuthor({ name: event.author.name.slice(0, 256), iconURL: event.author.iconURL ?? undefined });
++    if (event.author && !event.compact) e.setAuthor({ name: event.author.name.slice(0, 256), iconURL: event.author.iconURL ?? undefined });
+     const fields: { name: string; value: string; inline?: boolean }[] = [];
+     const loose: string[] = [];
+     if (event.target) fields.push({ name: event.targetLabel ?? 'Target', value: event.target, inline: true });
+-    if (event.actorId) fields.push({ name: event.actorLabel ?? 'By', value: `<@${event.actorId}> (\`${event.actorId}\`)`, inline: true });
++    if (event.actorId) fields.push({ name: event.actorLabel ?? 'By', value: event.compact ? `<@${event.actorId}>` : `<@${event.actorId}> (\`${event.actorId}\`)`, inline: true });
+     else if (event.actorUnverified) fields.push({ name: event.actorLabel ?? 'By', value: 'Unavailable (could not be verified)', inline: true });
+     for (const line of event.details ?? []) {
+         const m = FIELD.exec(line);
+@@ -97,13 +99,18 @@ export function renderEvent(event: LogEvent): EmbedBuilder {
+     if (loose.length) e.setDescription(loose.join('\n').slice(0, 3900));
+     if (fields.length) e.addFields(fields);
+     if (event.image) e.setImage(event.image);
+-    const ids = [event.targetId && `${event.targetLabel ? `${event.targetLabel} ` : ''}ID: ${event.targetId}`, event.actorId && `By: ${event.actorId}`].filter(Boolean).join(' · ');
++    const ids = event.compact ? '' : [event.targetId && `${event.targetLabel ? `${event.targetLabel} ` : ''}ID: ${event.targetId}`, event.actorId && `By: ${event.actorId}`].filter(Boolean).join(' · ');
+     e.setFooter({ text: ids || 'Ghost Vanguard' });
+     return e;
+ }
+ 
++function compactTarget(target: string | null | undefined) {
++    const mention = /^(<@\d+>)(?:\s+\([\s\S]*\))?$/.exec(target ?? '');
++    return mention ? mention[1]! : target;
++}
++
+ /** Store an event and post it to the event log channel, if logging is on for its category. */
+-export function recordEvent(store: Store, logs: LogQueue, guildId: string, event: LogEvent): boolean {
++export function recordEvent(store: Store, logs: LogQueue, guildId: string, event: LogEvent, options: { post?: boolean; compact?: boolean } = {}): boolean {
+     const config = eventLogConfig(store, guildId);
+     if (!config.enabled || !config.categories.has(event.category))
+         return false;
+@@ -117,7 +124,10 @@ export function recordEvent(store: Store, logs: LogQueue, guildId: string, event
+         ...(clean.details ?? []),
+     ];
+     store.run('INSERT INTO event_log(guild_id,at,category,action,actor_id,target_id,target,summary) VALUES(?,?,?,?,?,?,?,?)', guildId, at, event.category, event.action, event.actorId ?? null, event.targetId ?? null, clean.target ?? null, lines.join('\n') || event.action);
+-    logs.push(guildId, renderEvent(clean), [], config.channelId);
++    if (options.post !== false) {
++        const display = options.compact ? { ...clean, compact: true, author: null, target: compactTarget(clean.target) } : clean;
++        logs.push(guildId, renderEvent(display), [], config.channelId);
++    }
+     return true;
+ }
+ 
+@@ -368,10 +378,94 @@ export function describeAudit(entry: GuildAuditLogsEntry, guild: Guild, options:
+         author: user ? { name: user.tag ?? user.username, iconURL: user.displayAvatarURL() } : null, channelId };
+ }
+ 
++const ROLE_CHANGE_GROUP_WINDOW_MS = 4000;
++
++interface PendingRoleChangeLog {
++    store: Store;
++    logs: LogQueue;
++    guildId: string;
++    event: LogEvent;
++    added: Set<string>;
++    removed: Set<string>;
++    otherDetails: Set<string>;
++    count: number;
++    timer: ReturnType<typeof setTimeout>;
++}
++
++const pendingRoleChangeLogs = new Map<string, PendingRoleChangeLog>();
++
++function addRoleEventDetails(batch: PendingRoleChangeLog, event: LogEvent) {
++    for (const line of event.details ?? []) {
++        const match = FIELD.exec(line);
++        if (!match) {
++            if (line.trim()) batch.otherDetails.add(line);
++            continue;
++        }
++        const label = match[1]!.toLowerCase();
++        const roles = label === 'roles added' ? batch.added : label === 'roles removed' ? batch.removed : null;
++        if (!roles) {
++            batch.otherDetails.add(line);
++            continue;
++        }
++        for (const role of match[2]!.split(/,\s*/).map(value => value.trim()).filter(Boolean))
++            roles.add(role);
++    }
++}
++
++function flushRoleChangeLog(key: string) {
++    const batch = pendingRoleChangeLogs.get(key);
++    if (!batch) return;
++    clearTimeout(batch.timer);
++    pendingRoleChangeLogs.delete(key);
++
++    const config = eventLogConfig(batch.store, batch.guildId);
++    if (!config.enabled || !config.categories.has(batch.event.category) || isExcluded(batch.store, batch.guildId, batch.event.channelId)) return;
++
++    const details: string[] = [];
++    if (batch.added.size) details.push(`**Added:** ${[...batch.added].join(', ')}`);
++    if (batch.removed.size) details.push(`**Removed:** ${[...batch.removed].join(', ')}`);
++    details.push(...batch.otherDetails);
++    const summary: LogEvent = {
++        ...batch.event,
++        action: batch.count > 1 ? `Role changes · ${batch.count} updates` : 'Role changes',
++        details,
++        target: batch.event.targetId ? `<@${batch.event.targetId}>` : compactTarget(batch.event.target),
++        author: null,
++        compact: true,
++        color: Colors.Purple,
++    };
++    const clean: LogEvent = { ...summary, details: (summary.details ?? []).map(detail => redact(detail)), target: redact(summary.target) };
++    batch.logs.push(batch.guildId, renderEvent(clean), [], config.channelId);
++}
++
++function queueRoleChangeLog(store: Store, logs: LogQueue, guildId: string, event: LogEvent) {
++    const key = `${guildId}:${event.actorId}:${event.targetId}`;
++    let batch = pendingRoleChangeLogs.get(key);
++    if (!batch) {
++        batch = { store, logs, guildId, event, added: new Set(), removed: new Set(), otherDetails: new Set(), count: 0,
++            timer: setTimeout(() => flushRoleChangeLog(key), ROLE_CHANGE_GROUP_WINDOW_MS) };
++        pendingRoleChangeLogs.set(key, batch);
++    }
++    batch.event = { ...event, author: event.author ?? batch.event.author, target: event.target ?? batch.event.target };
++    batch.count++;
++    addRoleEventDetails(batch, event);
++}
++
++/** Flush pending role summaries immediately, for shutdown and deterministic tests. */
++export function flushPendingRoleChangeLogs() {
++    for (const key of [...pendingRoleChangeLogs.keys()]) flushRoleChangeLog(key);
++}
++
+ export function recordAuditEvent(store: Store, logs: LogQueue, entry: GuildAuditLogsEntry, guild: Guild) {
+     const event = describeAudit(entry, guild, { ignoreBotRoutine: logChannels(store, guild.id).ignoreBotRoutine });
+-    if (event)
+-        recordEvent(store, logs, guild.id, event);
++    if (!event) return;
++    if (event.action === 'Roles Updated' && event.actorId && event.targetId) {
++        // Preserve every audit event in history, but post rapid same-actor/same-target edits as one card.
++        if (recordEvent(store, logs, guild.id, event, { post: false }))
++            queueRoleChangeLog(store, logs, guild.id, event);
++        return;
++    }
++    recordEvent(store, logs, guild.id, event, { compact: true });
+ }
+ 
+ export function recordMemberEvent(store: Store, logs: LogQueue, member: GuildMember | PartialGuildMember, joined: boolean) {
+@@ -381,5 +475,5 @@ export function recordMemberEvent(store: Store, logs: LogQueue, member: GuildMem
+         category: 'members', action: joined ? 'Member joined' : 'Member left',
+         targetId: member.id, target: `<@${member.id}>${user?.tag ? ` (${user.tag})` : ''}`,
+         details: joined && created ? [`**Account:**${created.replace(' · account', '')}`] : [],
+-    });
++    }, { compact: true });
+ }
+diff --git a/src/bot/ranks.ts b/src/bot/ranks.ts
+index b3734d6..27693c4 100644
+--- a/src/bot/ranks.ts
++++ b/src/bot/ranks.ts
+@@ -100,7 +100,7 @@ export function explicitRank(store: Store, guildId: string | null, userId: strin
+ /** Minimum rank per command, subcommand ("command/sub") or button prefix. Missing = ranks don't apply. */
+ export const COMMAND_RANK: Record<string, number> = {
+     // Helper
+-    'moderation/warn': 1, 'antinuke-plus': 4, 'antinuke-plus/scan': 3, botq: 4, 'warnings/status': 1, warnings: 4, emergency: 3, webhooks: 3, webhook: 3, aimod: 1, roblox: 4, 'roblox/lookup': 1, 'roblox/sync': 1, 'roblox/blacklist': 2, 'roblox/unblacklist': 2, 'roblox/blacklisted': 1, 'roblox/binds': 1, 'case/search': 1, 'appeals/pending': 2, appeal: 2, 'staff/report': 3, automod: 3, welcome: 3, appeals: 4, 'moderation/timeout': 1, 'moderation/history': 1, 'note/add': 1, 'note/list': 1, 'case/view': 1, 'case/recent': 1,
++    'moderation/warn': 1, 'antinuke-plus': 4, 'antinuke-plus/scan': 3, botq: 4, 'warnings/status': 1, warnings: 4, emergency: 3, webhooks: 3, webhook: 3, aimod: 1, roblox: 4, 'roblox/lookup': 1, 'roblox/sync': 1, 'roblox/bloxlink-sync': 3, 'roblox/blacklist': 2, 'roblox/unblacklist': 2, 'roblox/blacklisted': 1, 'roblox/binds': 1, 'case/search': 1, 'appeals/pending': 2, appeal: 2, 'staff/report': 3, automod: 3, welcome: 3, appeals: 4, 'moderation/timeout': 1, 'moderation/history': 1, 'note/add': 1, 'note/list': 1, 'case/view': 1, 'case/recent': 1,
+     // Moderator. Lifting a ban is Admin: Moderators can ban, but only Admins and owners undo bans.
+     'moderation/unban': 3,
+     moderation: 2, bans: 2, tempban: 2, softban: 2, 'role/who-can-give': 4, nick: 2, slowmode: 2, 'case/reason': 2, 'note/remove': 2, newacct: 2,
+diff --git a/src/commands/roblox/roblox.ts b/src/commands/roblox/roblox.ts
+index 8701608..af98ce2 100644
+--- a/src/commands/roblox/roblox.ts
++++ b/src/commands/roblox/roblox.ts
+@@ -42,7 +42,9 @@ export default defineCommand(new SlashCommandBuilder().setName('roblox').setDesc
+     .addSubcommand(s => s.setName('unbind').setDescription('Stop giving a role from group ranks').addRoleOption(o => o.setName('role').setDescription('Discord role').setRequired(true)))
+     .addSubcommand(s => s.setName('binds').setDescription('Show the group and its rank → role binds'))
+     .addSubcommand(s => s.setName('sync').setDescription('Re-check someone\'s Roblox verification and group roles now')
+-        .addUserOption(o => o.setName('member').setDescription('Member (default: you)'))),
++        .addUserOption(o => o.setName('member').setDescription('Member (default: you)')))
++    .addSubcommand(s => s.setName('bloxlink-sync').setDescription('Ask Bloxlink to re-sync this member\'s linked roles and nickname')
++        .addUserOption(o => o.setName('member').setDescription('Member to update').setRequired(true))),
+ { category: 'verification', access: 'security', cooldown: 2000 }, async (ctx, i) => {
+     const sub = i.options.getSubcommand(), guild = i.guildId;
+     if (sub === 'lookup') {
+@@ -50,14 +52,30 @@ export default defineCommand(new SlashCommandBuilder().setName('roblox').setDesc
+         let id: string | null = null;
+         if (member) {
+             id = ctx.store.get('SELECT roblox_id FROM links WHERE guild_id=? AND user_id=?', guild, member.id)?.roblox_id ?? null;
+-            if (!id) throw new AppError('VALIDATION_ERROR', `<@${member.id}> has not verified a Roblox account here.`);
++            if (!id) {
++                const inGuild = await i.guild!.members.fetch(member.id).catch(() => null);
++                if (!inGuild) throw new AppError('VALIDATION_ERROR', `<@${member.id}> is not in this server.`);
++                id = await ctx.roblox.identify(inGuild);
++            }
++            if (!id) throw new AppError('VALIDATION_ERROR', `<@${member.id}> has no Roblox account linked through Vanguard or a configured provider.`);
+         } else if (account) id = await resolveRoblox(account);
+         else throw new AppError('VALIDATION_ERROR', 'Give a Roblox account or pick a member.');
+-        const card = await lookupCard(ctx.store, guild, String(id));
++        const bloxlinkIds = await ctx.roblox.discordIdsForRoblox(guild, String(id));
++        const card = await lookupCard(ctx.store, guild, String(id), bloxlinkIds);
+         if (!card) throw new AppError('INTEGRATION_ERROR', 'Roblox did not return that account. Try again in a moment.');
+         await i.editReply({ embeds: [card], allowedMentions: { parse: [] } });
+         return;
+     }
++    if (sub === 'bloxlink-sync') {
++        const target = i.options.getUser('member', true);
++        const member = await i.guild!.members.fetch(target.id).catch(() => null);
++        if (!member) throw new AppError('VALIDATION_ERROR', 'That member is not in this server.');
++        const result = await ctx.roblox.updateBloxlinkUser(member);
++        const safe = (name: string) => name.replace(/[\r\n]/g, ' ').replaceAll('`', 'ˋ').replaceAll('@', '＠').slice(0, 60);
++        const names = (items: string[]) => items.length ? items.map(name => `\`${safe(name)}\``).join(', ') : 'None';
++        const nickname = result.nickname ? `\n**Nickname:** \`${safe(result.nickname)}\`` : '';
++        return `Bloxlink sync completed for <@${member.id}>.\n**Added:** ${names(result.addedRoles)}\n**Removed:** ${names(result.removedRoles)}${nickname}`;
++    }
+     if (sub === 'blacklist' || sub === 'unblacklist') {
+         const id = await resolveRoblox(i.options.getString('account', true));
+         if (sub === 'blacklist') {
+diff --git a/src/features/message-logs.ts b/src/features/message-logs.ts
+index 137f379..1af1bf7 100644
+--- a/src/features/message-logs.ts
++++ b/src/features/message-logs.ts
+@@ -12,7 +12,6 @@ import { logsCategory, recordEvent } from '../audit/event-log.js';
+  * from the audit log, so "Deleted by" is never filled in by guesswork.
+  */
+ const text = (m: Message | PartialMessage) => m.partial || m.content == null ? null : m.content;
+-const author = (m: Message | PartialMessage) => m.author ? { name: m.author.tag ?? m.author.username, iconURL: typeof m.author.displayAvatarURL === 'function' ? m.author.displayAvatarURL() : null } : null;
+ const IMAGE = /\.(png|jpe?g|gif|webp)$/i;
+ 
+ function attachments(m: Message | PartialMessage): { line: string | null; image: string | null } {
+@@ -29,35 +28,37 @@ export function logDeletedMessage(store: Store, logs: LogQueue, m: Message | Par
+     if (!m.guildId || m.author?.bot || m.webhookId || !logsCategory(store, m.guildId, 'messages')) return;
+     const body = text(m);
+     const files = attachments(m);
+-    recordEvent(store, logs, m.guildId, { category: 'messages', action: '🗑️ Message Deleted', color: Colors.Red, targetId: m.author?.id ?? null,
+-        author: author(m), channelId: m.channelId, image: files.image,
++    recordEvent(store, logs, m.guildId, { category: 'messages', action: '🗑️ Message Deleted', color: Colors.Red,
++        targetId: m.author?.id ?? null, target: m.author ? `<@${m.author.id}>` : 'Unavailable (message sent before Vanguard started)', targetLabel: 'Author',
++        channelId: m.channelId, image: files.image,
+         details: [
+-            `**Author:** ${m.author ? `<@${m.author.id}> (\`${m.author.id}\`)` : 'Unavailable (message sent before Vanguard started)'}`,
+             `**Channel:** <#${m.channelId}>`,
+             `**Message ID:** \`${m.id}\``,
+-            `**Content:** ${body === null ? 'Unavailable (message sent before Vanguard started)' : body ? clip(body, 1000) : '*No text*'}`,
++            `**Content:** ${body === null ? 'Unavailable (message sent before Vanguard started)' : body ? clip(body, 600) : '*No text*'}`,
+             files.line ?? '',
+-        ].filter(Boolean) });
++        ].filter(Boolean) }, { compact: true });
+ }
+ 
+ export function logEditedMessage(store: Store, logs: LogQueue, before: Message | PartialMessage, after: Message | PartialMessage) {
+     if (!after.guildId || after.author?.bot || after.webhookId || !logsCategory(store, after.guildId, 'messages')) return;
+     const old = text(before), now = text(after);
+     if (old === null || old === now || now === null) return; // unknown "before", embeds loading or pins also fire "edits"
+-    recordEvent(store, logs, after.guildId, { category: 'messages', action: '✏️ Message Edited', color: Colors.Yellow, targetId: after.author?.id ?? null,
+-        author: author(after), channelId: after.channelId,
++    recordEvent(store, logs, after.guildId, { category: 'messages', action: '✏️ Message Edited', color: Colors.Yellow,
++        targetId: after.author?.id ?? null, target: after.author ? `<@${after.author.id}>` : 'Unavailable', targetLabel: 'Author',
++        channelId: after.channelId,
+         details: [
+-            `**Author:** <@${after.author?.id}> (\`${after.author?.id}\`)`,
+             `**Channel:** <#${after.channelId}> · [jump to message](${after.url})`,
+-            `**Before:** ${clip(old || '*empty*', 1000)}`,
+-            `**After:** ${clip(now || '*empty*', 1000)}`,
+-        ] });
++            `**Before:** ${clip(old || '*empty*', 600)}`,
++            `**After:** ${clip(now || '*empty*', 600)}`,
++        ] }, { compact: true });
+ }
+ 
+ export function logBulkDelete(store: Store, logs: LogQueue, messages: ReadonlyCollection<Snowflake, Message | PartialMessage>) {
+     const first = messages.first();
+     if (!first?.guildId || !logsCategory(store, first.guildId, 'messages')) return;
+-    const known = [...messages.values()].filter(m => text(m) && !m.author?.bot).slice(0, 15).reverse();
++    const known = [...messages.values()].filter(m => text(m) && !m.author?.bot);
++    const shown = known.slice(0, 8).reverse();
+     recordEvent(store, logs, first.guildId, { category: 'messages', action: `🧹 ${messages.size} Messages Bulk-Deleted`, color: Colors.Red, channelId: first.channelId,
+-        details: [`**Channel:** <#${first.channelId}>`, ...known.map(m => `${m.author?.username ?? 'unknown'}: ${clip(text(m)!, 120)}`)] });
++        details: [`**Channel:** <#${first.channelId}>`, ...shown.map(m => `${m.author?.username ?? 'unknown'}: ${clip(text(m)!, 100)}`),
++            ...(known.length > shown.length ? [`**More:** ${known.length - shown.length} additional message(s) omitted`] : [])] }, { compact: true });
+ }
+diff --git a/src/features/rejoin-roles.ts b/src/features/rejoin-roles.ts
+index 5e70c9a..3e7fed1 100644
+--- a/src/features/rejoin-roles.ts
++++ b/src/features/rejoin-roles.ts
+@@ -37,11 +37,12 @@ export function onRejoin(store: Store, logs: LogQueue, member: GuildMember) {
+     if (!saved) return;
+     const still = saved.roles.filter(id => member.guild.roles.cache.has(id));
+     if (!still.length) return;
+-    const list = still.map(id => `<@&${id}>`).join(' ');
++    const shown = still.slice(0, 8);
++    const list = shown.map(id => `<@&${id}>`).join(' ');
++    const more = still.length > shown.length ? `\n…and ${still.length - shown.length} more role(s)` : '';
+     logs.push(member.guild.id, new EmbedBuilder().setColor(Colors.Blurple).setTitle('Member Rejoined')
+-        .setAuthor({ name: member.user?.tag ?? member.id, iconURL: member.user?.displayAvatarURL?.() || undefined })
+-        .setDescription(`<@${member.id}> left <t:${Math.floor(saved.leftAt / 1000)}:R> and came back. They had **${still.length}** role(s):\n${list}`.slice(0, 3900))
+-        .setFooter({ text: `User ID: ${member.id} · Restore roles gives back what you are allowed to give` }).setTimestamp(), [restoreButton(member.id)]);
++        .setDescription(`<@${member.id}> came back <t:${Math.floor(saved.leftAt / 1000)}:R>. They had **${still.length}** role(s):\n${list}${more}`.slice(0, 3900))
++        .setFooter({ text: 'Use Restore roles to give back roles the staff member is allowed to grant.' }).setTimestamp(), [restoreButton(member.id)]);
+ }
+ 
+ export interface RestoreResult { given: string[]; skipped: { id: string; reason: string }[]; already: number }
+diff --git a/src/features/roblox-tools.ts b/src/features/roblox-tools.ts
+index e2c802e..b105283 100644
+--- a/src/features/roblox-tools.ts
++++ b/src/features/roblox-tools.ts
+@@ -83,11 +83,14 @@ export async function syncGroupRoles(store: Store, member: GuildMember, robloxId
+ }
+ 
+ /** A profile card for /roblox lookup. */
+-export async function lookupCard(store: Store, guild: string, robloxId: string) {
++export async function lookupCard(store: Store, guild: string, robloxId: string, bloxlinkDiscordIds: string[] | null = null) {
+     const [user, past, groups, avatar] = await Promise.all([robloxUser(robloxId), robloxPastNames(robloxId), robloxGroups(robloxId), robloxAvatar(robloxId)]);
+     if (!user) return null;
+     const age = accountAgeDays(user.created);
+-    const linked = store.all('SELECT user_id FROM links WHERE guild_id=? AND roblox_id=?', guild, robloxId).map(r => `<@${r.user_id}>`);
++    const linked = [...new Set([
++        ...store.all('SELECT user_id FROM links WHERE guild_id=? AND roblox_id=?', guild, robloxId).map(r => String(r.user_id)),
++        ...(bloxlinkDiscordIds ?? []),
++    ])].map(id => `<@${id}>`);
+     const block = blacklistEntry(store, guild, robloxId);
+     const c = groupConfig(store, guild), inGroup = c.groupId ? groups?.find(g => g.groupId === c.groupId) : null;
+     const lines = [
+diff --git a/src/index.ts b/src/index.ts
+index 1b1fa0c..82f176d 100644
+--- a/src/index.ts
++++ b/src/index.ts
+@@ -32,7 +32,7 @@ import { Roblox } from './integrations/roblox.js';
+ import { Security } from './security/security.js';
+ import { Snapshots } from './recovery/snapshots.js';
+ import { embed } from './ui/ui.js';
+-import { logsCategory, recordAuditEvent, recordMemberEvent } from './audit/event-log.js';
++import { flushPendingRoleChangeLogs, logsCategory, recordAuditEvent, recordMemberEvent } from './audit/event-log.js';
+ import { catchUp, lastSeen, markSeen } from './audit/downtime.js';
+ import { presenceOverride } from './bot/dev-tools.js';
+ import { clearAutomod, processAutomod } from './features/automod.js';
+@@ -481,6 +481,8 @@ async function shutdown(code = 0) {
+     shuttingDown = true;
+     timers.forEach(clearInterval);
+     lifecycle.close();
++    // Persist buffered role summaries to the outbox before closing the store.
++    try { flushPendingRoleChangeLogs(); } catch { }
+     client.destroy();
+     server.close();
+     try {
+diff --git a/src/integrations/roblox.ts b/src/integrations/roblox.ts
+index acebbe2..5b62ade 100644
+--- a/src/integrations/roblox.ts
++++ b/src/integrations/roblox.ts
+@@ -19,6 +19,12 @@ type Lookup = {
+     rejected?: boolean;
+ };
+ 
++export interface BloxlinkUpdateResult {
++    addedRoles: string[];
++    removedRoles: string[];
++    nickname: string | null;
++}
++
+ const PROVIDER_NAMES = { rover: 'RoVer', bloxlink: 'Bloxlink' } as const;
+ const KEY_SETTINGS = { rover: 'ROVER_API_KEY', bloxlink: 'BLOXLINK_API_KEY' } as const;
+ /** How long to stop calling a provider for one server after it rejects our key. */
+@@ -94,6 +100,99 @@ export class Roblox {
+         }
+     }
+ 
++    /** Resolve a Roblox account to Discord members through Bloxlink; null means the lookup is unavailable. */
++    async discordIdsForRoblox(guild: string, robloxId: string): Promise<string[] | null> {
++        const key = config.bloxlinkKey;
++        if (!key || this.store.get('SELECT enabled FROM provider_config WHERE guild_id=? AND provider=?', guild, 'bloxlink')?.enabled === 0)
++            return null;
++        if (!/^\d{1,20}$/.test(robloxId) || (this.providerCooldown.get('bloxlink') ?? 0) > Date.now() || (this.providerCooldown.get(`bloxlink:${guild}`) ?? 0) > Date.now())
++            return null;
++        try {
++            this.store.assertAuthorized(guild);
++            const response = await this.http.get(`${guild}:bloxlink:reverse:${robloxId}`,
++                `https://api.blox.link/v4/public/guilds/${guild}/roblox-to-discord/${robloxId}`, { Authorization: key });
++            if (response.status === 404) {
++                this.observed('bloxlink', guild, true, 'Provider responded; no linked Discord accounts were found.');
++                return [];
++            }
++            if (response.status === 401 || response.status === 403) {
++                this.observed('bloxlink', guild, false, `HTTP ${response.status}; check BLOXLINK_API_KEY and server access.`);
++                this.providerCooldown.set(`bloxlink:${guild}`, Date.now() + REJECTED_KEY_PAUSE_MS);
++                console.warn(`[verification] Bloxlink rejected the API key for guild ${guild} (HTTP ${response.status}); check BLOXLINK_API_KEY and server access. Pausing lookups for 5 minutes.`);
++                return null;
++            }
++            if (!response.ok) {
++                this.observed('bloxlink', guild, false, `HTTP ${response.status}; retry after the provider pause.`);
++                if (response.status === 429 || response.status >= 500) this.providerCooldown.set('bloxlink', Date.now() + 60000);
++                console.warn(`[verification] Bloxlink reverse lookup HTTP ${response.status}; credentials and response bodies omitted.`);
++                return null;
++            }
++            const data = await response.json() as { discordIDs?: unknown };
++            if (!Array.isArray(data.discordIDs)) {
++                this.observed('bloxlink', guild, false, 'Provider returned an incomplete reverse-lookup response.');
++                return null;
++            }
++            const ids = [...new Set(data.discordIDs.map(String).filter(id => /^\d{17,20}$/.test(id)))];
++            this.observed('bloxlink', guild, true, ids.length ? 'Provider returned linked Discord accounts.' : 'Provider returned no linked Discord accounts.');
++            return ids;
++        } catch {
++            this.observed('bloxlink', guild, false, 'Network/request failure; try again later.');
++            return null;
++        }
++    }
++
++    /** Explicitly request Bloxlink to re-run its configured verification for a member. This is a non-retried POST. */
++    async updateBloxlinkUser(member: GuildMember): Promise<BloxlinkUpdateResult> {
++        const guild = member.guild.id;
++        return this.queue.run(`${guild}:${member.id}`, async () => {
++            this.store.assertAuthorized(guild);
++            const key = config.bloxlinkKey;
++            if (!key) throw new AppError('INTEGRATION_ERROR', 'Bloxlink is not configured. Set BLOXLINK_API_KEY in .env.');
++            if (this.store.get('SELECT enabled FROM provider_config WHERE guild_id=? AND provider=?', guild, 'bloxlink')?.enabled === 0)
++                throw new AppError('INTEGRATION_ERROR', 'Bloxlink verification is disabled in this server.');
++            if (this.store.get('SELECT enabled FROM feature_settings WHERE guild_id=? AND feature=?', guild, 'verification')?.enabled === 0)
++                throw new AppError('INTEGRATION_ERROR', 'Verification is disabled in this server.');
++            if (this.store.get('SELECT 1 FROM backups WHERE guild_id=? AND user_id=? AND active=1', guild, member.id))
++                throw new AppError('INTEGRATION_ERROR', 'Bloxlink updates are unavailable while this member is quarantined.');
++            const paused = Math.max(this.providerCooldown.get('bloxlink') ?? 0, this.providerCooldown.get(`bloxlink:${guild}`) ?? 0);
++            if (paused > Date.now()) throw new AppError('INTEGRATION_ERROR', 'Bloxlink requests are temporarily paused after a provider error. Try again later.');
++            const fresh = await member.guild.members.fetch({ user: member.id, force: true }).catch(() => null);
++            if (!fresh) throw new AppError('VALIDATION_ERROR', 'That member is no longer in this server.');
++            this.store.assertAuthorized(guild);
++            let response: Response;
++            try {
++                response = await fetch(`https://api.blox.link/v4/public/guilds/${guild}/update-user/${member.id}`, {
++                    method: 'POST', headers: { Authorization: key }, signal: AbortSignal.timeout(10000),
++                });
++            } catch {
++                this.observed('bloxlink', guild, false, 'Update request failed or timed out; check Bloxlink before retrying.');
++                throw new AppError('INTEGRATION_ERROR', 'The Bloxlink update request failed or timed out. Check the member in Bloxlink before retrying.');
++            }
++            if (response.status === 401 || response.status === 403) {
++                this.observed('bloxlink', guild, false, `HTTP ${response.status}; check BLOXLINK_API_KEY and server access.`);
++                this.providerCooldown.set(`bloxlink:${guild}`, Date.now() + REJECTED_KEY_PAUSE_MS);
++                console.warn(`[verification] Bloxlink rejected the API key for guild ${guild} (HTTP ${response.status}); check BLOXLINK_API_KEY and server access. Pausing requests for 5 minutes.`);
++                throw new AppError('INTEGRATION_ERROR', 'Bloxlink rejected the API key for this server. Check BLOXLINK_API_KEY and its server access.');
++            }
++            if (response.status === 404) {
++                this.observed('bloxlink', guild, true, 'Provider could not find a linked account or current server member.');
++                throw new AppError('VALIDATION_ERROR', 'Bloxlink could not find a linked account for that member in this server.');
++            }
++            if (!response.ok) {
++                this.observed('bloxlink', guild, false, `HTTP ${response.status}; retry after the provider pause.`);
++                if (response.status === 429 || response.status >= 500) this.providerCooldown.set('bloxlink', Date.now() + 60000);
++                console.warn(`[verification] Bloxlink update HTTP ${response.status}; credentials and response bodies omitted.`);
++                throw new AppError('INTEGRATION_ERROR', `Bloxlink update failed (HTTP ${response.status}). Check Bloxlink before retrying.`);
++            }
++            const data = await response.json().catch(() => null) as Partial<BloxlinkUpdateResult> | null;
++            if (!data || typeof data !== 'object') throw new AppError('INTEGRATION_ERROR', 'Bloxlink returned an unreadable update response. Check the member in Bloxlink.');
++            this.store.assertAuthorized(guild);
++            const roleNames = (value: unknown) => Array.isArray(value) ? [...new Set(value.filter((name): name is string => typeof name === 'string').map(name => name.trim()).filter(Boolean))].slice(0, 20) : [];
++            this.observed('bloxlink', guild, true, 'Member update completed.');
++            return { addedRoles: roleNames(data.addedRoles), removedRoles: roleNames(data.removedRoles), nickname: typeof data.nickname === 'string' ? data.nickname : null };
++        });
++    }
++
+     clearGuild(id: string) {
+         this.http.clearPrefix(`${id}:`);
+         for (const provider of ['rover','bloxlink']) {this.observations.delete(`${provider}:${id}`);this.providerCooldown.delete(`${provider}:${id}`);}
+diff --git a/src/ui/layout-ui.ts b/src/ui/layout-ui.ts
+index da6ca08..9d1c8f9 100644
+--- a/src/ui/layout-ui.ts
++++ b/src/ui/layout-ui.ts
+@@ -37,14 +37,21 @@ export async function showLayoutReview(ctx: CommandContext, i: any, key: string,
+     const components = pending.components ?? selectComponents();
+     if (pending.destination)
+         await checkDestination(ctx, destination, i.user.id, components);
+-    const plan = await ctx.store.withAuthorized(destination.id, () => ctx.snapshots.plan(destination, ctx.snapshots.load(destination.id, pending.snapshot).data, pending.prune, components));
++    // Keep every destination-scoped read (plan, snapshot body and per-server number) in the
++    // destination context. A cross-server copy is invoked while the source context is active.
++    const review = await ctx.store.withAuthorized(destination.id, async () => {
++        const { data } = ctx.snapshots.load(destination.id, pending.snapshot);
++        const plan = await ctx.snapshots.plan(destination, data, pending.prune, components);
++        const number = ctx.snapshots.numberOf(destination.id, pending.snapshot);
++        return { data, plan, number };
++    });
++    const { data, plan, number } = review;
+     pending.fingerprint = plan.fingerprint;
+     const names = components.map(c => c[0]!.toUpperCase() + c.slice(1));
+-    const data = ctx.store.readGuild(destination.id, () => ctx.snapshots.load(destination.id, pending.snapshot).data);
+     const settings = data.settings ? Object.keys(data.settings).join(', ') : 'No guild settings stored in this older snapshot';
+-    const summary = `**${pending.destination ? 'Copy layout to' : 'Restore server'}:** ${destination.name} (${destination.id})\n**Snapshot:** #${ctx.snapshots.numberOf(destination.id, pending.snapshot)}\n**Components:** ${names.join(', ')}\n${components.includes('settings') ? `**Supported settings:** ${settings}\n` : ''}**Create:** ${plan.roleCreate} roles · ${plan.channelCreate} categories/channels\n**Update/reorder candidates:** ${plan.roleUpdate} roles · ${plan.channelUpdate} categories/channels\n**Delete extras:** ${plan.roleDelete.length} roles · ${plan.channelDelete.length} channels\n**Settings changes:** ${plan.settingsUpdate}\n**Skipped:** ${plan.skipped.length}\n\nA fresh destination backup is required before any changes. Existing objects are matched before creation. ${components.includes('permissions') ? 'Saved permissions, including privileged permissions, will be applied.' : 'Existing permissions are preserved; new channels begin private.'}\n${pending.prune ? 'Explicit pruning will permanently delete the reviewed extras only if there are no skipped objects or failures.\n' : ''}Confirmation expires in two minutes and checks for server changes.`;
++    const summary = `**${pending.destination ? 'Copy layout to' : 'Restore server'}:** ${destination.name} (${destination.id})\n**Snapshot:** #${number}\n**Components:** ${names.join(', ')}\n${components.includes('settings') ? `**Supported settings:** ${settings}\n` : ''}**Create:** ${plan.roleCreate} roles · ${plan.channelCreate} categories/channels\n**Update/reorder candidates:** ${plan.roleUpdate} roles · ${plan.channelUpdate} categories/channels\n**Delete extras:** ${plan.roleDelete.length} roles · ${plan.channelDelete.length} channels\n**Settings changes:** ${plan.settingsUpdate}\n**Skipped:** ${plan.skipped.length}\n\nA fresh destination backup is required before any changes. Existing objects are matched before creation. ${components.includes('permissions') ? 'Saved permissions, including privileged permissions, will be applied.' : 'Existing permissions are preserved; new channels begin private.'}\n${pending.prune ? 'Explicit pruning will permanently delete the reviewed extras only if there are no skipped objects or failures.\n' : ''}Confirmation expires in two minutes and checks for server changes.`;
+     const manifest = [
+-        `Snapshot #${ctx.snapshots.numberOf(destination.id, pending.snapshot)} -> ${destination.name} (${destination.id})`,
++        `Snapshot #${number} -> ${destination.name} (${destination.id})`,
+         `Selected: ${names.join(', ')}`,
+             ...data.roles.filter(r => components.includes('roles') || components.includes('permissions')).map(r => `Role: ${r.name} (${r.id}) -> ${plan.roleMap[r.id] ?? 'create if Roles selected'}; snapshot position ${r.position}${plan.blockedRoles.includes(r.id) ? '; skipped' : ''}`),
+             ...data.channels.filter(c => components.includes('permissions') || components.includes(c.type === 4 ? 'categories' : 'channels')).map(c => `${c.type === 4 ? 'Category' : 'Channel'}: ${c.name} (${c.id}) -> ${plan.channelMap[c.id] ?? 'create if layout component selected'}; parent ${c.parent ?? 'none'}; position ${c.position}; ${c.overwrites.length} saved overwrites${plan.blockedChannels.includes(c.id) ? '; skipped' : ''}`),
+diff --git a/test/batch1.test.ts b/test/batch1.test.ts
+index 7c3163d..5cb686e 100644
+--- a/test/batch1.test.ts
++++ b/test/batch1.test.ts
+@@ -90,6 +90,9 @@ test('deleted and edited messages are logged with their text when message loggin
+         store.withAuthorized(G, async () => configureEventLog(store, G, { enabled: true, channelId: '444444444444444444' }));
+         logDeletedMessage(store, queue, msg('hello there'));
+         assert.match(JSON.stringify(logs[0].e), /Message Deleted/); assert.match(JSON.stringify(logs[0].e), /hello there/);
++        assert.equal(logs[0].e.author, undefined, 'message author is shown once in the field');
++        assert.equal(logs[0].e.fields.find((field: any) => field.name === 'Author')?.value, `<@${U}>`);
++        assert.equal(logs[0].e.footer.text, 'Ghost Vanguard');
+         logDeletedMessage(store, queue, msg(null));
+         assert.match(JSON.stringify(logs[1].e), /Unavailable \(message sent before Vanguard started\)/);
+         logDeletedMessage(store, queue, msg('bot text', true));
+diff --git a/test/event-log.test.ts b/test/event-log.test.ts
+index a4e9da7..d0bf39e 100644
+--- a/test/event-log.test.ts
++++ b/test/event-log.test.ts
+@@ -3,7 +3,7 @@ import test from 'node:test';
+ import assert from 'node:assert/strict';
+ import { AuditLogEvent } from 'discord.js';
+ import { Store } from '../src/database/db.js';
+-import { configureEventLog, describeAudit, eventLogConfig, logsCategory, recentEvents, recordEvent } from '../src/audit/event-log.js';
++import { configureEventLog, describeAudit, eventLogConfig, flushPendingRoleChangeLogs, logsCategory, recentEvents, recordAuditEvent, recordEvent } from '../src/audit/event-log.js';
+ import { restartNotice, summarizeMissed, formatDuration } from '../src/audit/downtime.js';
+ 
+ const guild: any = { id: 'g', client: { user: { id: 'bot' } } };
+@@ -41,6 +41,21 @@ test('audit entries become readable log events with the right category and actor
+     assert.match(prune.details![0]!, /12 member\(s\) inactive for 30 day/);
+ });
+ 
++test('audit cards use compact mentions while full actor and target details remain in history', () => {
++    const { store } = setup();
++    configureEventLog(store, 'g', { enabled: true, channelId: 'events' });
++    const sent: any[] = [];
++    const logs: any = { push: (_guildId: string, message: any) => sent.push(message.toJSON()) };
++    recordAuditEvent(store, logs, entry(AuditLogEvent.MemberKick, { targetId: '12345678901234567', target: { tag: 'andrey' } }, 'mod1'), guild);
++    assert.equal(sent.length, 1);
++    assert.equal(sent[0]!.author, undefined);
++    assert.equal(sent[0]!.fields.find((field: any) => field.name === 'Target')?.value, '<@12345678901234567>');
++    assert.equal(sent[0]!.fields.find((field: any) => field.name === 'Moderator')?.value, '<@mod1>');
++    assert.equal(sent[0]!.footer.text, 'Ghost Vanguard');
++    assert.match(String(store.get('SELECT summary FROM event_log WHERE guild_id=?', 'g')?.summary), /andrey/);
++    store.close();
++});
++
+ test("the bot's own actions are skipped (its commands and the ban log report them), others are credited", () => {
+     assert.equal(describeAudit(entry(AuditLogEvent.ChannelCreate, {}, 'bot'), guild), null);
+     assert.equal(describeAudit(entry(AuditLogEvent.MemberBanAdd, { reason: '223456789012345678: raiding' }, 'bot'), guild), null, '/mod ban is already logged as a case and in #bans');
+@@ -66,6 +81,56 @@ test('nothing is stored or posted until logging is enabled, and disabled categor
+     store.close();
+ });
+ 
++test('rapid role edits are grouped into one compact message while every audit entry stays in history', () => {
++    const { store } = setup();
++    configureEventLog(store, 'g', { enabled: true, channelId: 'events' });
++    const sent: { embed: any; channel: string | null }[] = [];
++    const logs: any = { push: (_guildId: string, message: any, _files: unknown, channel: string | null) => sent.push({ embed: message.toJSON(), channel }) };
++    const roleEntry = (actor: string, target: string, changes: any[]) => entry(AuditLogEvent.MemberRoleUpdate,
++        { targetId: target, target: { tag: 'andrey' }, changes }, actor);
++
++    recordAuditEvent(store, logs, roleEntry('mod', 'u1', [{ key: '$add', new: [{ id: 'r1' }] }]), guild);
++    recordAuditEvent(store, logs, roleEntry('mod', 'u1', [
++        { key: '$add', new: [{ id: 'r2' }] }, { key: '$remove', new: [{ id: 'r3' }] },
++    ]), guild);
++    assert.equal(sent.length, 0, 'waits briefly to collect rapid edits');
++    flushPendingRoleChangeLogs();
++
++    assert.equal(sent.length, 1);
++    assert.equal(sent[0]!.channel, 'events');
++    assert.equal(sent[0]!.embed.title, 'Role changes · 2 updates');
++    const fields = sent[0]!.embed.fields;
++    assert.equal(fields.find((field: any) => field.name === 'Target')?.value, '<@u1>');
++    assert.equal(fields.find((field: any) => field.name === 'Added')?.value, '<@&r1>, <@&r2>');
++    assert.equal(fields.find((field: any) => field.name === 'Removed')?.value, '<@&r3>');
++    assert.equal(fields.find((field: any) => field.name === 'Changed by')?.value, '<@mod>');
++    assert.equal(sent[0]!.embed.author, undefined, 'the target is not repeated as the embed author');
++    assert.equal(sent[0]!.embed.footer.text, 'Ghost Vanguard', 'raw actor and target IDs are not repeated in the footer');
++    assert.equal(recentEvents(store, 'g').total, 2, 'both original audit entries remain searchable');
++    store.close();
++});
++
++test('role edits by different actors, targets, or guilds are never combined', () => {
++    const { store } = setup();
++    configureEventLog(store, 'g', { enabled: true });
++    configureEventLog(store, 'g2', { enabled: true });
++    const guild2: any = { id: 'g2', client: { user: { id: 'bot' } } };
++    const sent: any[] = [];
++    const logs: any = { push: (_guildId: string, message: any) => sent.push(message.toJSON()) };
++    const roleEntry = (actor: string, target: string, role: string) => entry(AuditLogEvent.MemberRoleUpdate,
++        { targetId: target, target: { tag: target }, changes: [{ key: '$add', new: [{ id: role }] }] }, actor);
++
++    recordAuditEvent(store, logs, roleEntry('mod1', 'u1', 'r1'), guild);
++    recordAuditEvent(store, logs, roleEntry('mod2', 'u1', 'r2'), guild);
++    recordAuditEvent(store, logs, roleEntry('mod1', 'u2', 'r3'), guild);
++    recordAuditEvent(store, logs, roleEntry('mod1', 'u1', 'r4'), guild2);
++    flushPendingRoleChangeLogs();
++    assert.equal(sent.length, 4);
++    assert.equal(recentEvents(store, 'g').total, 3);
++    assert.equal(recentEvents(store, 'g2').total, 1);
++    store.close();
++});
++
+ test('a dedicated event log channel is used, and settings persist', () => {
+     const { store, logs, pushed } = setup();
+     configureEventLog(store, 'g', { enabled: true, channelId: 'events' });
+diff --git a/test/ranks.test.ts b/test/ranks.test.ts
+index 5ea324a..9e8f445 100644
+--- a/test/ranks.test.ts
++++ b/test/ranks.test.ts
+@@ -53,6 +53,7 @@ test('each rank opens exactly its commands, without needing Discord permissions'
+     store.run('INSERT INTO feature_settings VALUES(?,?,?)', G, 'moderation', 0);
+     assert.equal(guard.allowed({ ...defaults, category: 'moderation' }, G, 'u', member('u'), 'moderation', 'moderation/ban'), false, 'switched-off features stay off for every rank');
+     assert.equal(requiredRank('help/'), undefined, 'everyday commands are not rank-gated');
++    assert.equal(requiredRank('roblox/bloxlink-sync'), RANKS.admin, 'running Bloxlink role updates is Admin-only');
+     store.close();
+ });
+ 
+diff --git a/test/recovery.test.ts b/test/recovery.test.ts
+index 53ad538..470611d 100644
+--- a/test/recovery.test.ts
++++ b/test/recovery.test.ts
+@@ -366,6 +366,21 @@ test('layout copy remaps source objects and repeated copies reuse destination ma
+     f.store.close();
+ });
+ 
++test('layout-copy review reads destination snapshot numbers inside the destination scope', async () => {
++    const f = fixture(), id = f.insert(), replies: any[] = [];
++    authorize(f.store, 'source');
++    f.guild.ownerId = 'owner';
++    f.guild.members.fetch = async ({ user }: any) => ({ id: user });
++    const ctx: any = { snapshots: f.service, store: f.store, lifecycle: { isReady: () => true },
++        client: { guilds: { cache: new Collection([['g', f.guild]]) } } };
++    const interaction: any = { guild: { id: 'source', name: 'Source' }, user: { id: 'owner' }, editReply: async (r: any) => replies.push(r) };
++    const pending = { guild: 'source', user: 'owner', destination: 'g', snapshot: id, prune: false, fingerprint: '', components: selectComponents(), expires: Date.now() + 10000 };
++    await f.store.withAuthorized('source', () => showLayoutReview(ctx, interaction, 'key', pending));
++    assert.equal(replies.length, 1);
++    assert.match(replies[0].embeds[0].toJSON().description, /Snapshot:\*\* #1/);
++    f.store.close();
++});
++
+ test('confirmation menus put All first, expand components, and remain valid after partial selection', async () => {
+     const f = fixture(), id = f.insert(), replies: any[] = [];
+     const pending = { guild: 'g', user: 'owner', snapshot: id, prune: false, fingerprint: '', components: selectComponents(), expires: Date.now() + 10000 };
+diff --git a/test/rejoin-roles.test.ts b/test/rejoin-roles.test.ts
+index 679e526..05c7db3 100644
+--- a/test/rejoin-roles.test.ts
++++ b/test/rejoin-roles.test.ts
+@@ -54,6 +54,8 @@ test('rejoin posts a card with a Restore roles button', () => {
+         assert.equal(posts.length, 1);
+         assert.equal(posts[0].e.title, 'Member Rejoined');
+         assert.match(posts[0].e.description, /had \*\*2\*\* role/);
++        assert.equal(posts[0].e.author, undefined, 'the member is not repeated in the embed author');
++        assert.doesNotMatch(posts[0].e.footer.text, /User ID/);
+         assert.equal(posts[0].rows[0].toJSON().components[0].custom_id, `rejoin:restore:${USER}`);
+     } finally { store.close(); }
+ });
+diff --git a/test/roblox.test.ts b/test/roblox.test.ts
+index 5cbacdb..63da668 100644
+--- a/test/roblox.test.ts
++++ b/test/roblox.test.ts
+@@ -5,6 +5,7 @@ import { PermissionsBitField } from 'discord.js';
+ import { config } from '../src/config.js';
+ import { Store } from '../src/database/db.js';
+ import { Roblox } from '../src/integrations/roblox.js';
++import { lookupCard } from '../src/features/roblox-tools.js';
+ import type { LogQueue } from '../src/logging.js';
+ 
+ function fixture() {
+@@ -37,6 +38,92 @@ async function withFetch(fn: typeof fetch, testFn: () => Promise<void>) {
+     }
+ }
+ 
++async function withBloxlinkFetch(fn: typeof fetch, testFn: () => Promise<void>) {
++    const original = globalThis.fetch, oldR = config.roverKey, oldB = config.bloxlinkKey;
++    globalThis.fetch = fn;
++    config.roverKey = '';
++    config.bloxlinkKey = 'mock-bloxlink-key';
++    try {
++        await testFn();
++    } finally {
++        globalThis.fetch = original;
++        config.roverKey = oldR;
++        config.bloxlinkKey = oldB;
++    }
++}
++
++test('Roblox profile cards merge local and Bloxlink linked Discord accounts without duplicates', async () => {
++    const f = fixture();
++    f.store.run('INSERT INTO links VALUES(?,?,?,?,?)', 'g', 'local-user', '123', 'RobloxName', 0);
++    const original = globalThis.fetch;
++    globalThis.fetch = async (input: any) => {
++        const url = String(input);
++        if (url.endsWith('/v1/users/123')) return Response.json({ id: 123, name: 'RobloxName', displayName: 'RobloxName', created: '2020-01-01T00:00:00Z', isBanned: false, description: '' });
++        if (url.includes('username-history')) return Response.json({ data: [] });
++        if (url.includes('/groups/roles')) return Response.json({ data: [] });
++        if (url.includes('thumbnails')) return Response.json({ data: [] });
++        throw new Error(`Unexpected Roblox URL: ${url}`);
++    };
++    try {
++        const card = await lookupCard(f.store, 'g', '123', ['local-user', '214858075650260992']);
++        assert.match(card!.toJSON().description!, /<@local-user>/);
++        assert.match(card!.toJSON().description!, /<@214858075650260992>/);
++        assert.equal((card!.toJSON().description!.match(/<@local-user>/g) ?? []).length, 1);
++    } finally {
++        globalThis.fetch = original;
++        f.store.close();
++    }
++});
++
++test('Bloxlink reverse lookup requests the current guild and accepts only Discord IDs', async () => {
++    const f = fixture();
++    const requests: { url: string; authorization: string }[] = [];
++    await withBloxlinkFetch(async (input: any, init: any) => {
++        requests.push({ url: String(input), authorization: init.headers.Authorization });
++        return Response.json({ discordIDs: ['214858075650260992', '314858075650260993', '214858075650260992', 'not-an-id'] });
++    }, async () => {
++        assert.deepEqual(await f.roblox.discordIdsForRoblox('g', '146941966'), ['214858075650260992', '314858075650260993']);
++        assert.match(requests[0]!.url, /guilds\/g\/roblox-to-discord\/146941966$/);
++        assert.equal(requests[0]!.authorization, 'mock-bloxlink-key');
++    });
++    f.store.close();
++});
++
++test('Bloxlink update-user is one explicit POST and returns the changed roles and nickname', async () => {
++    const f = fixture();
++    let calls = 0;
++    await withBloxlinkFetch(async (input: any, init: any) => {
++        calls++;
++        assert.match(String(input), /guilds\/g\/update-user\/u$/);
++        assert.equal(init.method, 'POST');
++        assert.equal(init.headers.Authorization, 'mock-bloxlink-key');
++        return Response.json({ addedRoles: ['Verified', 'Staff'], removedRoles: ['Unverified'], nickname: 'RobloxName' });
++    }, async () => {
++        assert.deepEqual(await f.roblox.updateBloxlinkUser(f.member), { addedRoles: ['Verified', 'Staff'], removedRoles: ['Unverified'], nickname: 'RobloxName' });
++        assert.equal(calls, 1);
++    });
++    f.store.close();
++});
++
++test('Bloxlink update-user refuses quarantined members before making the request', async () => {
++    const f = fixture();
++    f.store.run('INSERT INTO backups VALUES(?,?,?,?,?)', 'g', 'u', '[]', 0, 1);
++    await withBloxlinkFetch(async () => { throw new Error('Quarantined member must not be sent to Bloxlink'); }, async () => {
++        await assert.rejects(f.roblox.updateBloxlinkUser(f.member), /while this member is quarantined/);
++    });
++    f.store.close();
++});
++
++test('Bloxlink update-user is not retried automatically after a server error', async () => {
++    const f = fixture();
++    let calls = 0;
++    await withBloxlinkFetch(async () => { calls++; return new Response('{}', { status: 502 }); }, async () => {
++        await assert.rejects(f.roblox.updateBloxlinkUser(f.member), /Check Bloxlink before retrying/);
++        assert.equal(calls, 1);
++    });
++    f.store.close();
++});
++
+ test('provider outage preserves the verified role', async () => {
+     const f = fixture();
+     await withFetch(async () => new Response('{}', { status: 503 }), async () => {
+diff --git a/test/server-logging.test.ts b/test/server-logging.test.ts
+index b80e8d2..02eecd0 100644
+--- a/test/server-logging.test.ts
++++ b/test/server-logging.test.ts
+@@ -99,6 +99,26 @@ test('events render as compact embeds: fields, avatar, IDs and an "unavailable"
+     } finally { store.close(); }
+ });
+ 
++test('compact log cards show mentions once while stored history keeps full target details', () => {
++    const store = new Store(':memory:'); authorize(store, G);
++    const posted: any[] = [];
++    const logs: any = { push: (_g: string, e: any) => posted.push(e.toJSON()) };
++    try {
++        configureEventLog(store, G, { enabled: true, channelId: 'log' });
++        recordEvent(store, logs, G, { category: 'members', action: 'Roles Updated', actorId: 'mod1', targetId: '12345678901234567',
++            target: '<@12345678901234567> (andrey)', author: { name: 'andrey' }, details: ['**Roles added:** <@&r1>'] }, { compact: true });
++        const card = posted[0]!;
++        assert.equal(card.author, undefined);
++        assert.deepEqual(card.fields.map((f: any) => f.name), ['Target', 'By', 'Roles added']);
++        assert.equal(card.fields[0].value, '<@12345678901234567>');
++        assert.equal(card.fields[1].value, '<@mod1>');
++        assert.equal(card.footer.text, 'Ghost Vanguard');
++        const stored = store.get('SELECT target,summary FROM event_log WHERE guild_id=?', G)!;
++        assert.equal(stored.target, '<@12345678901234567> (andrey)');
++        assert.match(stored.summary, /andrey/);
++    } finally { store.close(); }
++});
++
+ test('excluded channels are not logged; routine bot channel renames are skipped unless turned back on', async () => {
+     const store = new Store(':memory:'); authorize(store, G);
+     const posted: any[] = [];

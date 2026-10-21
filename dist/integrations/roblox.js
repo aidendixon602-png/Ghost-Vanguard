@@ -184,7 +184,7 @@ export class Roblox {
             this.providerCooldown.delete(`${provider}:${id}`);
         }
     }
-    async sync(member) {
+    async sync(member, opts = {}) {
         return this.queue.run(`${member.guild.id}:${member.id}`, async () => {
             this.store.assertAuthorized(member.guild.id);
             if (this.store.get('SELECT enabled FROM feature_settings WHERE guild_id=? AND feature=?', member.guild.id, 'verification')?.enabled === 0)
@@ -235,7 +235,7 @@ export class Roblox {
                 if (fresh.roles.cache.has(role.id))
                     await fresh.roles.remove(role, 'Roblox verification policy failed');
                 this.store.run('DELETE FROM links WHERE guild_id=? AND user_id=?', member.guild.id, member.id);
-                throw new AppError('INTEGRATION_ERROR', blocked ? 'This Roblox account is banned or is on this server’s recorded Roblox blacklist.' : `Your Roblox account must be at least ${s.minAge} days old; it is ${age} days old.`);
+                throw new AppError('INTEGRATION_ERROR', blocked ? 'This Roblox account is banned or is on this serverâ€™s recorded Roblox blacklist.' : `Your Roblox account must be at least ${s.minAge} days old; it is ${age} days old.`);
             }
             if (!this.store.settings(member.guild.id).authorized || this.store.get('SELECT 1 FROM backups WHERE guild_id=? AND user_id=? AND active=1', member.guild.id, member.id))
                 throw new AppError('INTEGRATION_ERROR', 'Verification was canceled because server authorization or quarantine status changed.');
@@ -243,7 +243,12 @@ export class Roblox {
             if (!checkedRole || !checkedRole.editable || dangerous(checkedRole.permissions.bitfield))
                 throw new AppError('INTEGRATION_ERROR', 'The verified role became unsafe or unavailable during verification.');
             this.store.assertAuthorized(member.guild.id);
-            await fresh.roles.add(checkedRole, 'Roblox account verified');
+            const hadRole = fresh.roles.cache.has(checkedRole.id);
+            let roleAdded = false;
+            if (!hadRole) {
+                await fresh.roles.add(checkedRole, 'Roblox account verified');
+                roleAdded = true;
+            }
             let nickname = '';
             if (s.nickname && fresh.nickname !== profile.name) {
                 if (fresh.manageable) {
@@ -260,7 +265,7 @@ export class Roblox {
             }
             this.store.run('INSERT INTO links VALUES(?,?,?,?,?) ON CONFLICT(guild_id,user_id) DO UPDATE SET roblox_id=excluded.roblox_id,username=excluded.username,synced=excluded.synced', member.guild.id, member.id, result.id, profile.name, Date.now());
             const ranks = await syncGroupRoles(this.store, fresh, String(result.id)).catch(() => '');
-            this.logs.push(member.guild.id, embed('Roblox verification', `<@${member.id}> → **${profile.name}** (${result.id})${nickname}${ranks}`, Colors.Green));
+            this.logs.push(member.guild.id, embed('Roblox verification', `<@${member.id}> â†’ **${profile.name}** (${result.id})${nickname}${ranks}`, Colors.Green));
             return `Verified as **${profile.name}** (${result.id}).${nickname}${ranks}`;
         });
     }
@@ -282,7 +287,7 @@ export class Roblox {
                 }
                 if (member) {
                     this.store.run('UPDATE links SET synced=? WHERE guild_id=? AND user_id=?', Date.now(), row.guild_id, row.user_id);
-                    await this.store.withAuthorized(guild.id, () => this.sync(member)).catch(() => { });
+                    await this.store.withAuthorized(guild.id, () => this.sync(member, { silent: true })).catch(() => { });
                 }
                 else
                     this.store.run('DELETE FROM links WHERE guild_id=? AND user_id=?', row.guild_id, row.user_id);

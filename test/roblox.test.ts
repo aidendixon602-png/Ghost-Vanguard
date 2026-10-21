@@ -191,6 +191,7 @@ test('confirmed unlink revokes role and removes stored link', async () => {
 
 test('valid provider mapping grants only the configured role and persists the link', async () => {
     const f = fixture();
+    f.member.roles.cache.clear();
     await withFetch(async (url) => String(url).includes('users.roblox.com') ? Response.json({ name: 'VerifiedRoblox', created: '2020-01-01T00:00:00Z', isBanned: false }) : Response.json({ robloxId: '123' }), async () => {
         assert.match(await f.roblox.sync(f.member), /VerifiedRoblox/);
         assert.deepEqual(f.changes, ['add']);

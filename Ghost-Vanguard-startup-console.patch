@@ -1,0 +1,135 @@
+diff --git a/dist/console-ui.js b/dist/console-ui.js
+index bc650db..501e122 100644
+--- a/dist/console-ui.js
++++ b/dist/console-ui.js
+@@ -12,6 +12,12 @@ export const style = {
+     cyan: paint('36'),
+ };
+ const RULE = '━'.repeat(60);
++const PANEL_WIDTH = 72;
++const stripAnsi = (value) => value.replace(/\x1b\[[0-9;]*m/g, '');
++const visibleLength = (value) => Array.from(stripAnsi(value)).length;
++const frame = (top, fill, end) => style.cyan(`  ${top}${fill.repeat(PANEL_WIDTH + 2)}${end}`);
++const panelRow = (content) => `  │ ${content}${' '.repeat(Math.max(0, PANEL_WIDTH - visibleLength(content)))} │`;
++const detail = (label, value) => panelRow(`${style.cyan(label.padEnd(10))} ${value}`);
+ /** 393216 -> "384 KB". */
+ export function readableSize(bytes) {
+     if (bytes < 1024)
+@@ -24,21 +30,23 @@ export function readableSize(bytes) {
+     }
+     return `${value >= 10 ? Math.round(value) : value.toFixed(1)} ${units[unit]}`;
+ }
+-const row = (ok, label, value) => `  ${ok ? style.green('✔') : style.yellow('!')} ${label.padEnd(13)} ${value}`;
+-/** The block printed once the bot is connected and ready. */
++/** A compact, framed status panel printed once the bot is connected and ready. */
+ export function startupSummary(info) {
+     const integrations = Object.entries(info.integrations)
+-        .map(([name, on]) => on ? `${name} ${style.green('✔')}` : style.dim(`${name} off`)).join('   ');
++        .map(([name, on]) => on ? `${name} ${style.green('ON')}` : `${name} ${style.dim('off')}`).join('  ·  ');
++    const network = info.servers > 0 ? `${info.servers} connected` : style.yellow('not in any servers yet');
++    const commandState = info.commandsUpdated ? style.yellow('updated on Discord') : style.green('up to date');
+     return [
+         '',
+-        style.cyan(RULE),
+-        `  ${style.bold('MIDTOWN VANGUARD')}  ${style.dim(`v${info.version}`)}`,
+-        style.cyan(RULE),
+-        row(true, 'Online', `as ${style.bold(info.tag)}`),
+-        row(info.servers > 0, 'Servers', info.servers > 0 ? `${info.servers} connected` : 'not in any servers yet'),
+-        row(true, 'Commands', `${info.commands} registered · ${info.commandsUpdated ? 'updated on Discord' : 'up to date'}`),
+-        row(true, 'Integrations', integrations),
+-        row(true, 'Health', info.health),
++        frame('╭', '─', '╮'),
++        panelRow(`${style.bold('MIDTOWN VANGUARD')}  ${style.dim(`v${info.version}`)}  ${style.cyan('SECURITY OPERATIONS')}`),
++        panelRow(`${style.green('● SYSTEM ONLINE')}  ${style.dim('as')} ${style.bold(info.tag)}`),
++        frame('├', '─', '┤'),
++        detail('NETWORK', network),
++        detail('COMMANDS', `${info.commands} registered  ·  ${commandState}`),
++        detail('MODULES', integrations),
++        detail('HEALTH', info.health),
++        frame('╰', '─', '╯'),
+         '',
+     ];
+ }
+diff --git a/src/console-ui.ts b/src/console-ui.ts
+index c7c7876..e7709e5 100644
+--- a/src/console-ui.ts
++++ b/src/console-ui.ts
+@@ -14,6 +14,12 @@ export const style = {
+ };
+ 
+ const RULE = '━'.repeat(60);
++const PANEL_WIDTH = 72;
++const stripAnsi = (value: string) => value.replace(/\x1b\[[0-9;]*m/g, '');
++const visibleLength = (value: string) => Array.from(stripAnsi(value)).length;
++const frame = (top: string, fill: string, end: string) => style.cyan(`  ${top}${fill.repeat(PANEL_WIDTH + 2)}${end}`);
++const panelRow = (content: string) => `  │ ${content}${' '.repeat(Math.max(0, PANEL_WIDTH - visibleLength(content)))} │`;
++const detail = (label: string, value: string) => panelRow(`${style.cyan(label.padEnd(10))} ${value}`);
+ 
+ /** 393216 -> "384 KB". */
+ export function readableSize(bytes: number): string {
+@@ -28,8 +34,6 @@ export function readableSize(bytes: number): string {
+     return `${value >= 10 ? Math.round(value) : value.toFixed(1)} ${units[unit]}`;
+ }
+ 
+-const row = (ok: boolean, label: string, value: string) => `  ${ok ? style.green('✔') : style.yellow('!')} ${label.padEnd(13)} ${value}`;
+-
+ export interface StartupInfo {
+     version: string;
+     tag: string;
+@@ -40,20 +44,23 @@ export interface StartupInfo {
+     health: string;
+ }
+ 
+-/** The block printed once the bot is connected and ready. */
++/** A compact, framed status panel printed once the bot is connected and ready. */
+ export function startupSummary(info: StartupInfo): string[] {
+     const integrations = Object.entries(info.integrations)
+-        .map(([name, on]) => on ? `${name} ${style.green('✔')}` : style.dim(`${name} off`)).join('   ');
++        .map(([name, on]) => on ? `${name} ${style.green('ON')}` : `${name} ${style.dim('off')}`).join('  ·  ');
++    const network = info.servers > 0 ? `${info.servers} connected` : style.yellow('not in any servers yet');
++    const commandState = info.commandsUpdated ? style.yellow('updated on Discord') : style.green('up to date');
+     return [
+         '',
+-        style.cyan(RULE),
+-        `  ${style.bold('MIDTOWN VANGUARD')}  ${style.dim(`v${info.version}`)}`,
+-        style.cyan(RULE),
+-        row(true, 'Online', `as ${style.bold(info.tag)}`),
+-        row(info.servers > 0, 'Servers', info.servers > 0 ? `${info.servers} connected` : 'not in any servers yet'),
+-        row(true, 'Commands', `${info.commands} registered · ${info.commandsUpdated ? 'updated on Discord' : 'up to date'}`),
+-        row(true, 'Integrations', integrations),
+-        row(true, 'Health', info.health),
++        frame('╭', '─', '╮'),
++        panelRow(`${style.bold('MIDTOWN VANGUARD')}  ${style.dim(`v${info.version}`)}  ${style.cyan('SECURITY OPERATIONS')}`),
++        panelRow(`${style.green('● SYSTEM ONLINE')}  ${style.dim('as')} ${style.bold(info.tag)}`),
++        frame('├', '─', '┤'),
++        detail('NETWORK', network),
++        detail('COMMANDS', `${info.commands} registered  ·  ${commandState}`),
++        detail('MODULES', integrations),
++        detail('HEALTH', info.health),
++        frame('╰', '─', '╯'),
+         '',
+     ];
+ }
+diff --git a/test/console-ui.test.ts b/test/console-ui.test.ts
+new file mode 100644
+index 0000000..1195fb8
+--- /dev/null
++++ b/test/console-ui.test.ts
+@@ -0,0 +1,17 @@
++import test from 'node:test';
++import assert from 'node:assert/strict';
++import { startupSummary } from '../src/console-ui.js';
++
++test('startup console panel clearly reports online state and module status', () => {
++    const lines = startupSummary({ version: '3.0.0', tag: 'Ghost Vanguard#5397', servers: 10, commands: 68, commandsUpdated: false,
++        integrations: { RoVer: false, Bloxlink: false, AI: true }, health: 'http://0.0.0.0:9576/healthz' });
++    const text = lines.join('\n');
++    assert.match(text, /MIDTOWN VANGUARD/);
++    assert.match(text, /SYSTEM ONLINE/);
++    assert.match(text, /10 connected/);
++    assert.match(text, /68 registered.*up to date/);
++    assert.match(text, /RoVer off.*Bloxlink off.*AI ON/);
++    assert.match(text, /healthz/);
++    assert.ok(lines.some(line => line.startsWith('  ╭')));
++    assert.ok(lines.some(line => line.startsWith('  ╰')));
++});
