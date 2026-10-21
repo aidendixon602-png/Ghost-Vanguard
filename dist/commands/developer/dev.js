@@ -30,8 +30,8 @@ export default defineCommand(new SlashCommandBuilder().setName('dev').setDescrip
     .addSubcommand(s => s.setName('status-reset').setDescription('Return to the normal rotating status'))
     .addSubcommand(s => s.setName('update').setDescription('Automatic GitHub updates: see the status, or install now (Developer)')
     .addStringOption(o => o.setName('action').setDescription('What to do (default: status)').addChoices({ name: 'Show status', value: 'status' }, { name: 'Check and install now', value: 'now' })))
-    .addSubcommand(s => s.setName('sync').setDescription('Force re-register slash commands globally (and instantly in this server)')
-    .addStringOption(o => o.setName('guild_id').setDescription('Optional: also push instantly to this server ID (bypasses 1h global cache)').setMinLength(17).setMaxLength(20))), { responseKind: 'info', category: 'developer', developerOnly: true, requiresAuthorization: false }, async (ctx, i) => {
+    .addSubcommand(s => s.setName('sync').setDescription('Re-register commands globally and clear duplicate guild-scoped copies in this server')
+    .addStringOption(o => o.setName('guild_id').setDescription('Optional: instant test-sync to this server ID (creates temporary guild+global duplicates there)').setMinLength(17).setMaxLength(20))), { responseKind: 'info', category: 'developer', developerOnly: true, requiresAuthorization: false }, async (ctx, i) => {
     const sub = i.options.getSubcommand();
     if (sub === 'update') {
         const op = (i.options.getString('action') ?? 'status');
@@ -85,45 +85,48 @@ export default defineCommand(new SlashCommandBuilder().setName('dev').setDescrip
         return 'Back to the normal rotating status.';
     }
     if (sub === 'sync') {
-        const { syncCommands, syncGuildCommands, cleanLegacyGuildCommands, outdatedGlobalCommands } = await import('../../bot/command-sync.js');
+        const { syncCommands, syncGuildCommands, cleanLegacyGuildCommands, clearGuildCommands, outdatedGlobalCommands } = await import('../../bot/command-sync.js');
         const { treeJson } = await import('../../bot/command-tree.js');
         const rest = ctx.client.rest;
         const desired = treeJson(ctx.registry);
         const guildOverride = i.options.getString('guild_id')?.trim();
-        const targetGuild = guildOverride || i.guildId;
-        // Collect every command Discord still has that the code no longer defines. The bulk overwrites
-        // below delete them (a PUT replaces the whole command set), so this is what actually gets removed.
-        const deleted = new Set(await outdatedGlobalCommands(rest, config.clientId, desired).catch(() => []));
+        // Global is the single source of truth. Note the global commands the code no longer defines; the
+        // bulk overwrite below deletes them.
+        const removed = new Set(await outdatedGlobalCommands(rest, config.clientId, desired).catch(() => []));
         await syncCommands(rest, config.clientId, desired, { force: true });
         let extra = '';
-        if (targetGuild && /^\d{17,20}$/.test(targetGuild)) {
-            // The one-time legacy cleanup must run (and set its migration flag) BEFORE the instant sync,
-            // or it would wipe the commands we register just below — and a later startup would too.
+        if (guildOverride && /^\d{17,20}$/.test(guildOverride)) {
+            // Opt-in fast-test path: register guild-scoped copies so they appear in ~5s. They live ALONGSIDE
+            // the global set, so that guild lists each command twice until cleared — hence the warning.
             try {
-                await cleanLegacyGuildCommands(rest, config.clientId, targetGuild, ctx.store);
+                await cleanLegacyGuildCommands(rest, config.clientId, guildOverride, ctx.store);
             }
             catch { }
             try {
-                // A guild PUT replaces that guild's set too, so any stale guild-scoped command (one that was
-                // shadowing the global list with an old version) is deleted here.
-                for (const name of await syncGuildCommands(rest, config.clientId, targetGuild, desired))
-                    deleted.add(name);
-                extra = `\nGuild instant sync: **${targetGuild}** — commands appear in ~5s (global can take up to 1h).`;
+                await syncGuildCommands(rest, config.clientId, guildOverride, desired);
+                extra = `\n⚡ Instant test sync to **${guildOverride}** (~5s). These are guild-scoped copies, so that server lists each command **twice** (guild + global) until you run \`/dev sync\` there with no guild_id to clear them.`;
             }
             catch (e) {
-                extra = `\nGuild sync failed for ${targetGuild}: ${String(e?.message ?? e).slice(0, 300)}`;
+                extra = `\nGuild sync failed for ${guildOverride}: ${String(e?.message ?? e).slice(0, 300)}`;
             }
         }
         else {
+            // Default: this server uses the global set only. Remove any guild-scoped commands (from a legacy
+            // version or an earlier instant sync) so each command shows exactly once — this is the duplicate fix.
+            try {
+                for (const name of await clearGuildCommands(rest, config.clientId, i.guildId))
+                    removed.add(name);
+            }
+            catch { }
             try {
                 await cleanLegacyGuildCommands(rest, config.clientId, i.guildId, ctx.store);
             }
             catch { }
         }
-        const deletedLine = deleted.size
-            ? `\n🗑️ Deleted **${deleted.size}** outdated command(s): ${[...deleted].map(n => `\`${n}\``).join(', ')}`
-            : '\n✓ No outdated commands to delete — Discord already matches the code.';
-        return `**Slash commands re-registered**\nGlobal: **${desired.length}** commands — Discord will show them within 1 hour.\nThis server (\`${i.guildId}\`) was also pushed instantly, so try \`/verify\` / \`/dev\` now.${extra}${deletedLine}\n\n-# Tip: refresh picker (Ctrl+K → type /dev) or re-invite with https://discord.com/api/oauth2/authorize?client_id=${config.clientId}&scope=applications.commands+bot&permissions=8`;
+        const removedLine = removed.size
+            ? `\n🗑️ Removed **${removed.size}** duplicate/outdated command(s): ${[...removed].slice(0, 30).map(n => `\`${n}\``).join(', ')}${removed.size > 30 ? ` …+${removed.size - 30} more` : ''}`
+            : '\n✓ No duplicate or outdated commands found.';
+        return `**Slash commands re-registered**\nGlobal: **${desired.length}** commands — global changes can take up to 1 hour to appear in Discord.${extra}${removedLine}\n\n-# Guild-scoped duplicates clear in seconds; reopen the command picker (or Ctrl+R) if the extra copies still show.`;
     }
     return `**Database:** ${ctx.store.get('PRAGMA quick_check')?.quick_check}\n**Connected servers:** ${ctx.client.guilds.cache.size}\n**Loaded commands:** ${ctx.registry.commands.size}\n**Version:** ${VERSION}${codeVersion()}\n**Verification:** Custom (VG- code in Roblox bio) — no Bloxlink/RoVer needed\n**RoVer configured:** ${!!config.roverKey}\n**Bloxlink configured:** ${!!config.bloxlinkKey}\n**AI configured:** ${config.aiEnabled && !!config.openaiKey}\n**Uptime:** ${Math.floor(process.uptime())} seconds`;
 });
