@@ -51,11 +51,22 @@ export async function syncCommands(rest: Pick<REST, 'get' | 'put'>, application:
     return true;
 }
 
-export async function syncGuildCommands(rest: Pick<REST, 'get' | 'put'>, application: string, guildId: string, desired: any[]) {
+/** Bulk-overwrite one guild's commands and return the names that were removed (present before, gone from `desired`). */
+export async function syncGuildCommands(rest: Pick<REST, 'get' | 'put'>, application: string, guildId: string, desired: any[]): Promise<string[]> {
     const route = Routes.applicationGuildCommands(application, guildId);
+    const current = await rest.get(route).catch(() => []) as any[];
+    const want = new Set(desired.map((c: any) => c.name));
+    const removed = current.filter((c: any) => !want.has(c.name)).map((c: any) => String(c.name));
     await rest.put(route, { body: desired });
-    logEvent('command_sync', { result: 'guild_updated', guildId, count: desired.length });
-    return true;
+    logEvent('command_sync', { result: 'guild_updated', guildId, count: desired.length, removed });
+    return removed;
+}
+
+/** Global command names Discord currently has that `desired` no longer defines (the ones a bulk overwrite deletes). */
+export async function outdatedGlobalCommands(rest: Pick<REST, 'get'>, application: string, desired: any[]): Promise<string[]> {
+    const current = await rest.get(Routes.applicationCommands(application)).catch(() => []) as any[];
+    const want = new Set(desired.map((c: any) => c.name));
+    return current.filter((c: any) => !want.has(c.name)).map((c: any) => String(c.name));
 }
 
 export async function cleanLegacyGuildCommands(rest: Pick<REST, 'get' | 'put'>, application: string, guildId: string, store: Store) {

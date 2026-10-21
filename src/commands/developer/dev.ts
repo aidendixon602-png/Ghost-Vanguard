@@ -88,23 +88,35 @@ export default defineCommand(new SlashCommandBuilder().setName('dev').setDescrip
         return 'Back to the normal rotating status.';
     }
     if (sub === 'sync') {
-        const { syncCommands, syncGuildCommands, cleanLegacyGuildCommands } = await import('../../bot/command-sync.js');
+        const { syncCommands, syncGuildCommands, cleanLegacyGuildCommands, outdatedGlobalCommands } = await import('../../bot/command-sync.js');
         const { treeJson } = await import('../../bot/command-tree.js');
+        const rest = ctx.client.rest as any;
         const desired = treeJson(ctx.registry);
         const guildOverride = i.options.getString('guild_id')?.trim();
-        await syncCommands(ctx.client.rest as any, config.clientId, desired, { force: true });
-        let extra = '';
         const targetGuild = guildOverride || i.guildId;
+        // Collect every command Discord still has that the code no longer defines. The bulk overwrites
+        // below delete them (a PUT replaces the whole command set), so this is what actually gets removed.
+        const deleted = new Set(await outdatedGlobalCommands(rest, config.clientId, desired).catch(() => []));
+        await syncCommands(rest, config.clientId, desired, { force: true });
+        let extra = '';
         if (targetGuild && /^\d{17,20}$/.test(targetGuild)) {
             // The one-time legacy cleanup must run (and set its migration flag) BEFORE the instant sync,
             // or it would wipe the commands we register just below — and a later startup would too.
-            try { await cleanLegacyGuildCommands(ctx.client.rest as any, config.clientId, targetGuild, ctx.store); } catch {}
-            try { await syncGuildCommands(ctx.client.rest as any, config.clientId, targetGuild, desired); extra = `\nGuild instant sync: **${targetGuild}** — commands appear in ~5s (global can take up to 1h).`; }
+            try { await cleanLegacyGuildCommands(rest, config.clientId, targetGuild, ctx.store); } catch {}
+            try {
+                // A guild PUT replaces that guild's set too, so any stale guild-scoped command (one that was
+                // shadowing the global list with an old version) is deleted here.
+                for (const name of await syncGuildCommands(rest, config.clientId, targetGuild, desired)) deleted.add(name);
+                extra = `\nGuild instant sync: **${targetGuild}** — commands appear in ~5s (global can take up to 1h).`;
+            }
             catch (e: any) { extra = `\nGuild sync failed for ${targetGuild}: ${String(e?.message ?? e).slice(0, 300)}`; }
         } else {
-            try { await cleanLegacyGuildCommands(ctx.client.rest as any, config.clientId, i.guildId!, ctx.store); } catch {}
+            try { await cleanLegacyGuildCommands(rest, config.clientId, i.guildId!, ctx.store); } catch {}
         }
-        return `**Slash commands re-registered**\nGlobal: **${desired.length}** commands — Discord will show them within 1 hour.\nThis server (\`${i.guildId}\`) was also pushed instantly, so try \`/verify\` / \`/dev\` now.${extra}\n\n-# Tip: refresh picker (Ctrl+K → type /dev) or re-invite with https://discord.com/api/oauth2/authorize?client_id=${config.clientId}&scope=applications.commands+bot&permissions=8`;
+        const deletedLine = deleted.size
+            ? `\n🗑️ Deleted **${deleted.size}** outdated command(s): ${[...deleted].map(n => `\`${n}\``).join(', ')}`
+            : '\n✓ No outdated commands to delete — Discord already matches the code.';
+        return `**Slash commands re-registered**\nGlobal: **${desired.length}** commands — Discord will show them within 1 hour.\nThis server (\`${i.guildId}\`) was also pushed instantly, so try \`/verify\` / \`/dev\` now.${extra}${deletedLine}\n\n-# Tip: refresh picker (Ctrl+K → type /dev) or re-invite with https://discord.com/api/oauth2/authorize?client_id=${config.clientId}&scope=applications.commands+bot&permissions=8`;
     }
     return `**Database:** ${ctx.store.get('PRAGMA quick_check')?.quick_check}\n**Connected servers:** ${ctx.client.guilds.cache.size}\n**Loaded commands:** ${ctx.registry.commands.size}\n**Version:** ${VERSION}${codeVersion()}\n**Verification:** Custom (VG- code in Roblox bio) — no Bloxlink/RoVer needed\n**RoVer configured:** ${!!config.roverKey}\n**Bloxlink configured:** ${!!config.bloxlinkKey}\n**AI configured:** ${config.aiEnabled && !!config.openaiKey}\n**Uptime:** ${Math.floor(process.uptime())} seconds`;
 });
