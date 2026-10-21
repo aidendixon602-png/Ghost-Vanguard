@@ -1,5 +1,4 @@
 import { CommandInteractionOptionResolver } from 'discord.js';
-import { isDeveloperPrefixOnly } from './registry.js';
 export const UMBRELLAS = [
     { name: 'antinuke', description: 'Anti-nuke readiness, observe/enforce controls, rules and exceptions', entries: [
             { child: 'antinuke', mode: 'flat' }, { child: 'antinuke-plus', mode: 'flat' }, { child: 'trust', mode: 'group', as: 'whitelist' }
@@ -43,7 +42,7 @@ export const UMBRELLAS = [
         ] },
 ];
 /** Shown on their own: used often or by everyone. */
-export const STANDALONE = ['help', 'verify', 'roblox', 'ask', 'role'];
+export const STANDALONE = ['help', 'verify', 'roblox', 'ask', 'role', 'restart'];
 /** Old shortcuts that the grouped tree already covers (/antinuke enable, /antinuke disable). */
 export const RETIRED = ['enable', 'disable'];
 const GROUP_DESCRIPTIONS = { server: 'Authorize, inspect, list, ban or unban servers' };
@@ -54,16 +53,11 @@ function slashOptions(def, options, prefix = '') {
     const out = [];
     for (const option of options) {
         if (option.type === 1) {
-            const path = prefix ? `${prefix}/${option.name}` : option.name;
-            const key = `${def.data.name}/${path}`;
-            if (isDeveloperPrefixOnly({ ...def.metadata, ...def.subcommands?.[path] }, key))
-                continue;
             out.push({ ...option, options: option.options ?? [] });
             continue;
         }
         if (option.type === 2) {
-            const path = prefix ? `${prefix}/${option.name}` : option.name;
-            const children = slashOptions(def, option.options ?? [], path);
+            const children = slashOptions(def, option.options ?? [], prefix ? `${prefix}/${option.name}` : option.name);
             if (children.length)
                 out.push({ ...option, options: children });
             continue;
@@ -72,14 +66,14 @@ function slashOptions(def, options, prefix = '') {
     }
     return out;
 }
-/** The command list sent to Discord; developer-only actions remain available through comma commands only. */
+/** The command list sent to Discord — slash is primary, comma aliases remain for compatibility. */
 export function treeJson(registry) {
     const out = [];
     for (const u of UMBRELLAS) {
         const options = [];
         for (const e of u.entries) {
             const def = registry.commands.get(`1:${e.child}`);
-            if (!def || isDeveloperPrefixOnly(def.metadata, e.child))
+            if (!def)
                 continue;
             const j = json(def);
             const filtered = slashOptions(def, j.options ?? []);
@@ -105,14 +99,14 @@ export function treeJson(registry) {
     }
     for (const name of STANDALONE) {
         const def = registry.commands.get(`1:${name}`);
-        if (def && !isDeveloperPrefixOnly(def.metadata, name))
+        if (def)
             out.push({ ...json(def), options: slashOptions(def, json(def).options ?? []) });
     }
     // Anything not placed in the tree (a newly added command) still shows up on its own, unless it's developer-only.
     const placed = new Set([...UMBRELLAS.flatMap(u => u.entries.map(e => e.child)), ...STANDALONE, ...RETIRED]);
     for (const def of registry.commands.values()) {
         const data = json(def);
-        if (!placed.has(data.name) && !isDeveloperPrefixOnly(def.metadata, data.name))
+        if (!placed.has(data.name))
             out.push({ ...data, options: slashOptions(def, data.options ?? []) });
     }
     return out;

@@ -169,7 +169,7 @@ test('the server\'s Vanguard logging channel is preferred over other private cha
     const store = new Store(':memory:');
     const { guild } = fakeGuild('723456789012345678');
     authorize(store, guild.id);
-    const logChannel = { ...guild.channels.cache.get('system'), id: 'logs', name: 'midtown-vanguard-logging' };
+    const logChannel = { ...guild.channels.cache.get('system'), id: 'logs', name: 'ghost-vanguard-logging' };
     guild.channels.cache.set('logs', logChannel);
     await store.withAuthorized(guild.id, async () => store.run('INSERT INTO event_log_config(guild_id,enabled,channel_id,categories) VALUES(?,1,?,?)', guild.id, 'logs', 'moderation'));
     const lifecycle = new GuildLifecycle(store, { guilds: { cache: new Collection([[guild.id, guild]]) } } as any, () => { }, async () => { });

@@ -216,7 +216,7 @@ export function validateArguments(schema: any, supplied: readonly any[]) {
         if (option.type === 3) {
             if (typeof value !== 'string' || !value.trim() || value.length > (rule.max_length ?? 1000) || value.length < (rule.min_length ?? 1))
                 throw new AppError('VALIDATION_ERROR', `Invalid length for ${option.name}.`);
-            if (option.name.endsWith('_id') && !(/roblox/.test(option.name) ? /^[1-9]\d{0,19}$/ : /^\d{17,20}$/).test(value))
+            if (option.name.endsWith('_id') && !((/roblox/.test(option.name) || option.name === 'group_id') ? /^[1-9]\d{0,19}$/ : /^\d{17,20}$/).test(value))
                 throw new AppError('VALIDATION_ERROR', `Invalid ID for ${option.name}.`);
             if (/url$/.test(option.name)) {
                 try {

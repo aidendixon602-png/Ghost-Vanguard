@@ -1,16 +1,23 @@
 import { ChannelType, Colors, EmbedBuilder, OverwriteType, PermissionFlagsBits, type Guild, type GuildBasedChannel, type OverwriteResolvable, type TextChannel } from 'discord.js';
+import { DEFAULT_CHANNELS, LEGACY_CHANNELS } from '../branding.js';
 import type { Store } from '../database/db.js';
 import { getFeature, setFeature } from '../features/settings.js';
 import { configureEventLog, eventLogConfig } from './event-log.js';
 
 /**
  * Where Vanguard's logs go in each server:
- *   #bans                       one record per ban, with developer Unban / Reban buttons
- *   #midtown-vanguard-logging   server events (messages, roles, channels, members) and bot actions
+ *   #bans                      one record per ban, with developer Unban / Reban buttons
+ *   #ghost-vanguard-logging    server events (messages, roles, channels, members) and bot actions
  * Settings are saved per server; existing channels are reused, never duplicated.
  */
-export const BANS_CHANNEL = 'bans';
-export const LOGGING_CHANNEL = 'midtown-vanguard-logging';
+export const BANS_CHANNEL = DEFAULT_CHANNELS.bans;
+export const LOGGING_CHANNEL = DEFAULT_CHANNELS.logging;
+/**
+ * Names used by older releases. A server that already has one keeps using it instead of getting a
+ * second log channel; the name is only reported, Vanguard never renames a server's channels by itself.
+ */
+export const LEGACY_LOGGING_CHANNELS: string[] = [...LEGACY_CHANNELS.logging];
+export const LOGGING_CHANNEL_NAMES = [LOGGING_CHANNEL, ...LEGACY_LOGGING_CHANNELS];
 
 export interface LogChannels {
     bansChannelId: string | null;
@@ -50,8 +57,12 @@ function privateOverwrites(store: Store, guild: Guild): OverwriteResolvable[] {
 
 type Found = { channel: TextChannel; created: boolean; how: string };
 
-/** Use the chosen channel, the saved one, one with the expected name, or create a private one. */
-async function resolveChannel(store: Store, guild: Guild, name: string, chosen: GuildBasedChannel | null, saved: string | null, reason: string): Promise<Found> {
+/**
+ * Use the chosen channel, the saved one, one with an expected name (the current name or a legacy
+ * one), or create a private one. A legacy name is reused as it is: Vanguard never renames channels.
+ */
+async function resolveChannel(store: Store, guild: Guild, names: string | string[], chosen: GuildBasedChannel | null, saved: string | null, reason: string): Promise<Found> {
+    const wanted = Array.isArray(names) ? names : [names];
     const text = (c: GuildBasedChannel | null | undefined) => c && c.type === ChannelType.GuildText ? c as TextChannel : null;
     if (chosen) {
         const c = text(chosen);
@@ -60,9 +71,9 @@ async function resolveChannel(store: Store, guild: Guild, name: string, chosen: 
     }
     const savedChannel = text(saved ? guild.channels.cache.get(saved) ?? await guild.channels.fetch(saved).catch(() => null) : null);
     if (savedChannel) return { channel: savedChannel, created: false, how: 'already set up' };
-    const named = text(guild.channels.cache.find(c => c.type === ChannelType.GuildText && c.name === name));
-    if (named) return { channel: named, created: false, how: 'existing channel reused' };
-    const created = await guild.channels.create({ name, type: ChannelType.GuildText, permissionOverwrites: privateOverwrites(store, guild), reason });
+    const named = text(guild.channels.cache.find(c => c.type === ChannelType.GuildText && wanted.includes(c.name)));
+    if (named) return { channel: named, created: false, how: named.name === wanted[0] ? 'existing channel reused' : `existing channel reused (still named #${named.name})` };
+    const created = await guild.channels.create({ name: wanted[0]!, type: ChannelType.GuildText, permissionOverwrites: privateOverwrites(store, guild), reason });
     return { channel: created, created: true, how: 'created (private: staff only)' };
 }
 
@@ -107,7 +118,7 @@ export async function setupLogChannels(store: Store, guild: Guild, by: string, c
     const reason = `Ghost Vanguard log setup by ${by}`;
     const current = logChannels(store, guild.id);
     const bans = await resolveChannel(store, guild, BANS_CHANNEL, chosen.bans ?? null, current.bansChannelId, reason);
-    const logging = await resolveChannel(store, guild, LOGGING_CHANNEL, chosen.logging ?? null, eventLogConfig(store, guild.id).channelId, reason);
+    const logging = await resolveChannel(store, guild, LOGGING_CHANNEL_NAMES, chosen.logging ?? null, eventLogConfig(store, guild.id).channelId, reason);
     if (bans.channel.id === logging.channel.id) throw new Error('Ban logs and server logs need two different channels.');
     setLogChannels(store, guild.id, { bansChannelId: bans.channel.id }, by);
     configureEventLog(store, guild.id, { enabled: true, channelId: logging.channel.id });

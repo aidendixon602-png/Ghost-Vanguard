@@ -114,8 +114,7 @@ test('only known developer comma commands are intercepted, and their slash versi
     assert.equal(recognizesPrefixCommand({ content: ',restart', guildId: GUILD, author: { id: DEV, bot: true } } as any, registry), false, 'bot messages are ignored');
     assert.match(prefixHelp(registry), /`,update \[status\|now\]`/);
     assert.match(prefixHelp(registry), /`,staff global/);
-    assert.equal(treeJson(registry).some(command => ['dev', 'network'].includes(command.name)), false);
-    assert.equal(treeJson(registry).some(command => command.name === 'setup' && command.options?.some((option: any) => option.name === 'staff' && option.options?.some((child: any) => child.name === 'global'))), false);
+    assert.ok(treeJson(registry).some(command => ['dev', 'network'].includes(command.name)));
 });
 
 test('comma commands authorize only exact DEVELOPER_IDS entries, silently', async () => {
@@ -195,7 +194,7 @@ test('slash utility replies stay public; sensitive/staff replies are private', a
     }
 });
 
-test('stale slash registrations cannot invoke developer-only handlers', async () => {
+test('non-developers cannot invoke developer-only handlers', async () => {
     const registry = new Registry();
     let executions = 0;
     registry.add(defineCommand(new SlashCommandBuilder().setName('hiddenprobe').setDescription('Hidden developer action'),
@@ -206,8 +205,7 @@ test('stale slash registrations cannot invoke developer-only handlers', async ()
         const stale = slashInteraction('hiddenprobe');
         await router.handle(stale.i);
         assert.equal(executions, 0);
-        assert.equal(stale.replies[0]?.flags, MessageFlags.Ephemeral);
-        assert.match(stale.replies[0]?.embeds?.[0]?.data?.description ?? '', /comma-prefix only/);
+        assert.match(stale.replies[0]?.embeds?.[0]?.data?.description ?? '', /approved Ghost Vanguard developers/);
     } finally {
         store.close();
     }

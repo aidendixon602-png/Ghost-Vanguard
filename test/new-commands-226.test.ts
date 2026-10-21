@@ -74,14 +74,15 @@ test('/dev update talks to launch.js, and explains when it is not available', as
     assert.match(disabled, /Restart in the hosting panel/, 'explains how to apply the fix');
 });
 
-test('/dev update is comma-only and restarts stay on ,restart', async () => {
+test('/dev update and restarts are available in slash and comma commands', async () => {
     const subcommands = (dev.data.options ?? []).map(option => option.name);
     assert.ok(subcommands.includes('update'), 'the handler and GitHub updater remain intact');
     assert.equal(subcommands.includes('restart'), false);
     const registry = new Registry();
     await registry.load();
     const tree = treeJson(registry);
-    assert.equal(tree.some(command => command.name === 'dev'), false, '/dev is hidden from the slash-command list');
+    assert.ok(tree.some(command => command.name === 'dev'), '/dev is in the slash-command list');
+    assert.ok(tree.some(command => command.name === 'restart'), '/restart is in the slash-command list');
     assert.match(prefixHelp(registry), /`,update \[status\|now\]`/);
     assert.match(prefixHelp(registry), /`,restart`/);
 });

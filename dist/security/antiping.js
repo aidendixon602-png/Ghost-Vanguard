@@ -1,4 +1,5 @@
 import { AutoModerationRuleTriggerType, Colors, EmbedBuilder } from 'discord.js';
+import { PRODUCT_NAME } from '../branding.js';
 import { AppError } from '../errors.js';
 import { noteThreat } from './threat-board.js';
 export const ANTIPING_RULE_NAME = 'Vanguard Staff Anti-Ping';
@@ -70,7 +71,7 @@ export async function processStaffMention(ctx, input) {
         if (!hit || !ctx.store.observe(`staff-ping:${message.id}`, guild.id, message.author.id, 'staff_ping', message.id))
             return;
         const results = [];
-        const notice = new EmbedBuilder().setColor(Colors.Blurple).setTitle('🔕 Mentions Disabled').setDescription('This user has **@mentions disabled**.\n\nNeed assistance? Please open a ticket in **#support** and provide the reason you’re trying to reach them.').setFooter({ text: 'Midtown • Mention Protection' });
+        const notice = new EmbedBuilder().setColor(Colors.Blurple).setTitle('🔕 Mentions Disabled').setDescription('This user has **@mentions disabled**.\n\nNeed assistance? Please open a ticket in **#support** and provide the reason you’re trying to reach them.').setFooter({ text: `${PRODUCT_NAME} • Mention Protection` });
         active();
         try {
             await message.reply({ embeds: [notice], allowedMentions: { parse: [], repliedUser: false } });

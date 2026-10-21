@@ -43,11 +43,12 @@ test('the bot reacts only to listed members, only in the server they were added 
     } finally { store.close(); for (const s of ['', '-wal', '-shm']) try { (await import('node:fs')).rmSync(file + s); } catch {} }
 });
 
-test('developer auto-reactions are absent from slash commands', async () => {
+test('developer auto-reactions are grouped under /dev in slash commands', async () => {
     const registry = new Registry();
     await registry.load(new URL('../src/commands', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'));
     indexTree(registry);
     const tree = treeJson(registry);
-    assert.equal(tree.some(command => command.name === 'dev'), false);
-    assert.equal(tree.some(command => command.options?.some((option: any) => option.name === 'autoreact')), false);
+    const dev = tree.find(command => command.name === 'dev');
+    assert.ok(dev);
+    assert.ok(dev.options?.some((option: any) => option.name === 'autoreact'));
 });

@@ -3,13 +3,18 @@ import { defineCommand } from '../../bot/registry.js';
 import { AppError } from '../../errors.js';
 import { embed } from '../../ui/ui.js';
 import { RANKS, RANK_LABEL, rankOf } from '../../bot/ranks.js';
-export default defineCommand(new SlashCommandBuilder().setName('guild-config').setDescription('Server owner: command access, features, verification providers and backup schedule')
+import { addWorkspaceSubcommands, executeWorkspaceSubcommand } from '../../workspace/setup-command.js';
+const guildConfigBuilder = new SlashCommandBuilder().setName('guild-config').setDescription('Server owner: command access, features, verification providers and backup schedule')
     .addSubcommand(s => s.setName('provider').setDescription('Enable or disable a configured verification provider').addStringOption(o => o.setName('provider').setDescription('Provider').setRequired(true).addChoices({ name: 'RoVer', value: 'rover' }, { name: 'Bloxlink', value: 'bloxlink' })).addBooleanOption(o => o.setName('enabled').setDescription('Enable this provider for this guild').setRequired(true)))
     .addSubcommand(s => s.setName('permission-role').setDescription('Give a Discord role a Vanguard staff rank (Head Admin, Admin, Moderator, Helper)').addRoleOption(o => o.setName('role').setDescription('Role').setRequired(true)).addStringOption(o => o.setName('access').setDescription('Rank for this role').setRequired(true).addChoices({ name: 'Head Admin (security and anti-nuke)', value: 'headadmin' }, { name: 'Admin (raid tools, lockdown, logs)', value: 'admin' }, { name: 'Moderator (moderation commands)', value: 'moderator' }, { name: 'Helper (warn, timeout, notes)', value: 'helper' }, { name: 'Remove access', value: 'remove' })))
     .addSubcommand(s => s.setName('command').setDescription('Turn one Vanguard command on/off or change its cooldown').addStringOption(o => o.setName('command').setDescription('Command name without /').setRequired(true)).addBooleanOption(o => o.setName('enabled').setDescription('Enabled').setRequired(true)).addIntegerOption(o => o.setName('cooldown').setDescription('Cooldown in milliseconds').setMinValue(0).setMaxValue(3600000)))
     .addSubcommand(s => s.setName('feature').setDescription('Turn moderation, verification, AI or backups on/off').addStringOption(o => o.setName('feature').setDescription('Feature').setRequired(true).addChoices(...['moderation', 'verification', 'ai', 'snapshots'].map(value => ({ name: value, value })))).addBooleanOption(o => o.setName('enabled').setDescription('Enabled').setRequired(true)))
-    .addSubcommand(s => s.setName('backups').setDescription('Configure scheduled server layout backups').addBooleanOption(o => o.setName('enabled').setDescription('Automatic backups').setRequired(true)).addIntegerOption(o => o.setName('hours').setDescription('Interval hours').setMinValue(1).setMaxValue(168)).addIntegerOption(o => o.setName('keep').setDescription('Keep this many scheduled layout backups').setMinValue(1).setMaxValue(1000))), { category: 'configuration', access: 'owner' }, async (ctx, i) => {
+    .addSubcommand(s => s.setName('backups').setDescription('Configure scheduled server layout backups').addBooleanOption(o => o.setName('enabled').setDescription('Automatic backups').setRequired(true)).addIntegerOption(o => o.setName('hours').setDescription('Interval hours').setMinValue(1).setMaxValue(168)).addIntegerOption(o => o.setName('keep').setDescription('Keep this many scheduled layout backups').setMinValue(1).setMaxValue(1000)));
+addWorkspaceSubcommands(guildConfigBuilder);
+export default defineCommand(guildConfigBuilder, { category: 'configuration', access: 'owner' }, async (ctx, i) => {
     const sub = i.options.getSubcommand(), guild = i.guildId, user = i.user.id;
+    if (sub.startsWith('workspace-'))
+        return executeWorkspaceSubcommand(ctx, i);
     let before, after, component;
     if (sub === 'provider') {
         const provider = i.options.getString('provider', true);

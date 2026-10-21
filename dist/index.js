@@ -40,6 +40,8 @@ import { clearAutomod, processAutomod } from './features/automod.js';
 import { checkAltAccount, historyOnJoin, sendWelcome } from './features/joins.js';
 import { logRankChange } from './features/hr.js';
 import { runSchedules } from './features/schedules.js';
+import { runWorkspaceReminders } from './workspace/reports.js';
+import { disableWorkspacePanels } from './workspace/panels.js';
 import { handleAppealDm } from './features/appeals.js';
 import { announceComeback, dailyBackupDm, heartbeat } from './features/bot-health.js';
 import { aiModerate } from './features/ai-moderation.js';
@@ -58,7 +60,7 @@ import { recoveryEmbed } from './ui/notice.js';
 import { warnEmptyDatabase } from './features/bot-health.js';
 const errors = validateConfig();
 if (errors.length) {
-    console.error(`\n${style.red('âœ– Ghost Vanguard cannot start.')} Fix these settings in .env:\n${errors.map(e => `  â€¢ ${e}`).join('\n')}\n`);
+    console.error(`\n${style.red('✖ Ghost Vanguard cannot start.')} Fix these settings in .env:\n${errors.map(e => `  • ${e}`).join('\n')}\n`);
     process.exit(1);
 }
 const healthUrl = `http://${config.host}:${config.port}/healthz`;
@@ -107,6 +109,7 @@ const lifecycle = new GuildLifecycle(store, client, id => {
     clearAutomod(id);
     roblox.clearGuild(id);
     forgetGuildTickets(store, id);
+    void disableWorkspacePanels(client, store, id).catch(() => undefined);
 }, async (guild) => {
     await scam.initialize(guild);
     store.save(store.settings(guild.id));
@@ -407,6 +410,8 @@ timers.push(setInterval(() => task('database backups', databaseBackups.scheduled
 timers.push(setInterval(() => task('layout backups', scheduledLayouts()), 60000));
 timers.push(setInterval(() => { if (startupReady)
     task('schedules', runSchedules({ store, logs, client, ready: id => lifecycle.isReady(id), locks: snapshots.locks })); }, 60000));
+timers.push(setInterval(() => { if (startupReady)
+    task('workspace reminders', runWorkspaceReminders({ store, client, ready: id => startupReady && lifecycle.isReady(id) })); }, 60000));
 timers.push(setInterval(() => task('heartbeat', heartbeat()), 60000));
 timers.push(setInterval(() => { if (startupReady)
     task('daily backup DM', dailyBackupDm(store, client, kind => databaseBackups.create(kind))); }, 600000));
@@ -493,9 +498,9 @@ try {
 }
 catch (error) {
     const code = String(error?.code ?? ''), why = code === 'TokenInvalid' ? 'Discord rejected DISCORD_TOKEN. Reset the token in the Developer Portal (Bot page) and paste the new one into .env.'
-        : /disallowed intents/i.test(String(error?.message)) ? 'An intent is switched off. Developer Portal â†’ Bot: turn on Server Members Intent and Message Content Intent.'
+        : /disallowed intents/i.test(String(error?.message)) ? 'An intent is switched off. Developer Portal → Bot: turn on Server Members Intent and Message Content Intent.'
             : 'Check your internet connection, VPN or firewall, then try again.';
-    console.error(`Discord login failed: ${code || 'error'} â€” ${String(error?.message ?? error).slice(0, 200)}
+    console.error(`Discord login failed: ${code || 'error'} — ${String(error?.message ?? error).slice(0, 200)}
 ${why}`);
     await shutdown(1);
 }
