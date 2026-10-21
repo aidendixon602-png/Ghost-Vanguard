@@ -121,9 +121,9 @@ export const COMMAND_RANK: Record<string, number> = {
     authorizedservers: 5, serverauth: 5, 'dev/diagnostics': 5, 'dev/status': 5, 'dev/status-reset': 5, 'dev/broadcast': 5, 'staff/list': 1, 'staff/check': 1,
     // Overseer
     'dev/inspect': 6, authserver: 6,
-    // Bot developer tools: available as /dev slash commands (comma aliases remain).
+    // Formerly rank-gated bot tools now use the comma-only Developer surface.
     dev: 7, 'dev/update': 7, database: 7, autoreact: 7,
-    // Network-ban issuance/revocation: Developers use /network (`,genreban` aliases remain); Supreme Leaders may still lift genrebans from ban-log controls.
+    // Network-ban issuance/revocation uses comma commands; Supreme Leaders may still lift genrebans from ban-log controls.
     genreban: 7, ungenreban: 7, hardban: 7, netexception: 7,
     // Developer only (the bot owner and DEVELOPER_IDS): anything that can take the bot down, rewrite its data or
     // reach every server at once. No Discord permission, server role or lower rank unlocks these.

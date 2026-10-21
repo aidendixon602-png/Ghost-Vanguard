@@ -1,5 +1,4 @@
 import { AuditLogEvent, Colors, EmbedBuilder, PermissionsBitField, type Guild, type GuildAuditLogsEntry, type GuildMember, type PartialGuildMember } from 'discord.js';
-import { PRODUCT_NAME } from '../branding.js';
 import { redact } from './redact.js';
 import { isExcluded, logChannels } from './log-setup.js';
 import type { Store } from '../database/db.js';
@@ -101,7 +100,7 @@ export function renderEvent(event: LogEvent): EmbedBuilder {
     if (fields.length) e.addFields(fields);
     if (event.image) e.setImage(event.image);
     const ids = event.compact ? '' : [event.targetId && `${event.targetLabel ? `${event.targetLabel} ` : ''}ID: ${event.targetId}`, event.actorId && `By: ${event.actorId}`].filter(Boolean).join(' · ');
-    e.setFooter({ text: ids || PRODUCT_NAME });
+    e.setFooter({ text: ids || 'Ghost Vanguard' });
     return e;
 }
 

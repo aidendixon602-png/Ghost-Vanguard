@@ -5,11 +5,10 @@ import { isDeveloperPrefixOnly, type Definition, type Registry } from './registr
  * How commands appear in Discord's "/" menu. Discord lists a bot's commands A→Z and that order
  * cannot be changed, so related commands are grouped under a few top-level commands:
  *
- *   /antinuke  /mod  /security  /ticket  /setup  /recovery  /info  /dev  /network  (+ /help /verify /roblox /ask /role)
+ *   /antinuke  /mod  /security  /ticket  /setup  /recovery  /info  (+ /help /verify /roblox /ask /role)
  *
- * Developer actions (/dev and /network) are now slash commands requiring DEVELOPER_IDS / developer rank.
- * Comma-prefix aliases (`,help`, `,restart`, etc.) remain for backward compatibility but slash is primary.
- * Grouped entries are re-shaped (commandName, subcommand, options) so their original modules run
+ * The former /dev and /network developer actions are filtered out of the slash tree and use comma commands.
+ * Remaining grouped entries are re-shaped (commandName, subcommand, options) so their original modules run
  * as if they had been called directly. Permissions, ranks, cooldowns and on/off switches keep using the
  * original names.
  *
@@ -56,7 +55,7 @@ export const UMBRELLAS: Umbrella[] = [
 ];
 
 /** Shown on their own: used often or by everyone. */
-export const STANDALONE = ['help', 'verify', 'roblox', 'ask', 'role', 'restart'];
+export const STANDALONE = ['help', 'verify', 'roblox', 'ask', 'role'];
 /** Old shortcuts that the grouped tree already covers (/antinuke enable, /antinuke disable). */
 export const RETIRED = ['enable', 'disable'];
 
@@ -70,11 +69,16 @@ function slashOptions(def: Definition, options: any[], prefix = ''): any[] {
     const out: any[] = [];
     for (const option of options) {
         if (option.type === 1) {
+            const path = prefix ? `${prefix}/${option.name}` : option.name;
+            const key = `${def.data.name}/${path}`;
+            if (isDeveloperPrefixOnly({ ...def.metadata, ...def.subcommands?.[path] }, key))
+                continue;
             out.push({ ...option, options: option.options ?? [] });
             continue;
         }
         if (option.type === 2) {
-            const children = slashOptions(def, option.options ?? [], prefix ? `${prefix}/${option.name}` : option.name);
+            const path = prefix ? `${prefix}/${option.name}` : option.name;
+            const children = slashOptions(def, option.options ?? [], path);
             if (children.length)
                 out.push({ ...option, options: children });
             continue;
@@ -84,14 +88,14 @@ function slashOptions(def: Definition, options: any[], prefix = ''): any[] {
     return out;
 }
 
-/** The command list sent to Discord — slash is primary, comma aliases remain for compatibility. */
+/** The command list sent to Discord; developer-only actions remain available through comma commands only. */
 export function treeJson(registry: Registry) {
     const out: any[] = [];
     for (const u of UMBRELLAS) {
         const options: any[] = [];
         for (const e of u.entries) {
             const def = registry.commands.get(`1:${e.child}`);
-            if (!def) continue;
+            if (!def || isDeveloperPrefixOnly(def.metadata, e.child)) continue;
             const j = json(def);
             const filtered = slashOptions(def, j.options ?? []);
             if (e.mode === 'single' && e.in) {
@@ -111,13 +115,13 @@ export function treeJson(registry: Registry) {
     }
     for (const name of STANDALONE) {
         const def = registry.commands.get(`1:${name}`);
-        if (def) out.push({ ...json(def), options: slashOptions(def, json(def).options ?? []) });
+        if (def && !isDeveloperPrefixOnly(def.metadata, name)) out.push({ ...json(def), options: slashOptions(def, json(def).options ?? []) });
     }
     // Anything not placed in the tree (a newly added command) still shows up on its own, unless it's developer-only.
     const placed = new Set([...UMBRELLAS.flatMap(u => u.entries.map(e => e.child)), ...STANDALONE, ...RETIRED]);
     for (const def of registry.commands.values()) {
         const data = json(def);
-        if (!placed.has(data.name))
+        if (!placed.has(data.name) && !isDeveloperPrefixOnly(def.metadata, data.name))
             out.push({ ...data, options: slashOptions(def, data.options ?? []) });
     }
     return out;

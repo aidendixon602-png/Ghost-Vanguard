@@ -1,11 +1,10 @@
 import { Colors, EmbedBuilder, Guild, GuildMember, PermissionFlagsBits } from 'discord.js';
-import { PRODUCT_NAME } from '../branding.js';
 import { clip } from '../core.js';
 import { AppError } from '../errors.js';
 
 export function embed(title: string, description: string, color: number = Colors.Blurple) {
     return new EmbedBuilder().setColor(color).setTitle(title).setDescription(clip(description, 3900))
-        .setFooter({ text: PRODUCT_NAME }).setTimestamp();
+        .setFooter({ text: 'Ghost Vanguard' }).setTimestamp();
 }
 
 export function checkTarget(actor: GuildMember, target: GuildMember, bot: GuildMember) {

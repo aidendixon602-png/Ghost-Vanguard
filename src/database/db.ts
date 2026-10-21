@@ -42,10 +42,9 @@ export interface Row {
  * both built from this one list, and test/schema.test.ts fails if a table with a guild
  * column is missing from it, so a new table cannot quietly escape the guard.
  */
-export const GUILD_SCOPED_TABLES = ['verification_pending', 'scam_config', 'scam_domains', 'scam_images', 'scam_exclusions', 'scam_events', 'antinuke_presets', 'antinuke_event_payloads', 'antiping_config', 'antiping_targets', 'antinuke_options', 'event_log_config', 'event_log', 'lockdowns', 'lockdown_overwrites', 'lockdown_notices', 'guild_config', 'antinuke_rules', 'antinuke_defaults', 'provider_config', 'permission_roles', 'command_settings', 'feature_settings', 'backup_config', 'configuration_history', 'grants', 'observations', 'incidents', 'backups', 'cases', 'links', 'blocked_accounts', 'snapshots', 'snapshot_metadata', 'recovery_mappings', 'recovery_history', 'outbox', 'member_notes', 'tempbans', 'raidmode', 'newaccount_config', 'staff_roles', 'guild_features', 'appeals', 'duty_sessions', 'autoreact_users', 'ban_records', 'role_rules', 'left_roles', 'panel_actions',
+export const GUILD_SCOPED_TABLES = ['scam_config', 'scam_domains', 'scam_images', 'scam_exclusions', 'scam_events', 'antinuke_presets', 'antinuke_event_payloads', 'antiping_config', 'antiping_targets', 'antinuke_options', 'event_log_config', 'event_log', 'lockdowns', 'lockdown_overwrites', 'lockdown_notices', 'guild_config', 'antinuke_rules', 'antinuke_defaults', 'provider_config', 'permission_roles', 'command_settings', 'feature_settings', 'backup_config', 'configuration_history', 'grants', 'observations', 'incidents', 'backups', 'cases', 'links', 'blocked_accounts', 'snapshots', 'snapshot_metadata', 'recovery_mappings', 'recovery_history', 'outbox', 'member_notes', 'tempbans', 'raidmode', 'newaccount_config', 'staff_roles', 'guild_features', 'appeals', 'duty_sessions', 'autoreact_users', 'ban_records', 'role_rules', 'left_roles', 'panel_actions',
     'ticket_config', 'ticket_types', 'ticket_panels', 'ticket_records', 'ticket_blocks',
-    'threat_scores', 'threat_events', 'threat_actions',
-    'workspace_config', 'workspace_counters', 'workspace_submissions', 'workspace_reviews', 'workspace_records', 'workspace_tasks', 'workspace_staff', 'workspace_sessions', 'workspace_panels', 'workspace_jobs', 'workspace_audit', 'workspace_operations'] as const;
+    'threat_scores', 'threat_events', 'threat_actions'] as const;
 
 /** Tables carrying a guild column that are intentionally not scope-guarded. */
 // roblox_network is shared on purpose: servers that opt in share their Roblox blacklist with each other.
@@ -299,94 +298,8 @@ export class Store {
                 user_id TEXT NOT NULL, action TEXT NOT NULL, detail TEXT NOT NULL, by_id TEXT NOT NULL, at INTEGER NOT NULL,
                 undone_at INTEGER, undone_by TEXT);
             CREATE INDEX IF NOT EXISTS threat_actions_guild ON threat_actions(guild_id, at DESC);`);
-        // Workspace: durable, guild-scoped state for the reusable button-based management desk.
-        // JSON columns deliberately hold profile-specific mappings so Archives rules do not leak into other guilds.
-        this.db.exec(`CREATE TABLE IF NOT EXISTS workspace_config (
-                guild_id TEXT PRIMARY KEY REFERENCES guild_data(guild_id) ON DELETE CASCADE,
-                enabled INTEGER NOT NULL DEFAULT 0 CHECK(enabled IN (0,1)),
-                modules_json TEXT NOT NULL DEFAULT '{}', branding_json TEXT NOT NULL DEFAULT '{}',
-                forms_json TEXT NOT NULL DEFAULT '{}', review_json TEXT NOT NULL DEFAULT '{}',
-                roles_json TEXT NOT NULL DEFAULT '{}', channels_json TEXT NOT NULL DEFAULT '{}',
-                sheets_json TEXT NOT NULL DEFAULT '{}', reminders_json TEXT NOT NULL DEFAULT '{}',
-                updated_by TEXT, updated_at INTEGER NOT NULL, validated_at INTEGER, disabled_at INTEGER);
-            CREATE TABLE IF NOT EXISTS workspace_counters (
-                guild_id TEXT NOT NULL REFERENCES guild_data(guild_id) ON DELETE CASCADE,
-                name TEXT NOT NULL, value INTEGER NOT NULL DEFAULT 0,
-                PRIMARY KEY(guild_id,name));
-            CREATE TABLE IF NOT EXISTS workspace_submissions (
-                guild_id TEXT NOT NULL REFERENCES guild_data(guild_id) ON DELETE CASCADE,
-                submission_id TEXT NOT NULL, contributor_id TEXT NOT NULL, contributor_username TEXT NOT NULL,
-                received_at INTEGER NOT NULL, title TEXT NOT NULL, author TEXT, source_url TEXT, document_date TEXT,
-                midtown_connection TEXT, sharing_permission TEXT, restrictions TEXT, notes TEXT, reference TEXT,
-                status TEXT NOT NULL DEFAULT 'Received' CHECK(status IN ('Received','Under review','Needs information','Accepted','Restricted','Declined')),
-                reviewer_id TEXT, decision_at INTEGER, record_id TEXT, sheet_row INTEGER, last_error TEXT, updated_at INTEGER NOT NULL,
-                PRIMARY KEY(guild_id,submission_id));
-            CREATE INDEX IF NOT EXISTS workspace_submissions_queue ON workspace_submissions(guild_id,status,received_at);
-            CREATE INDEX IF NOT EXISTS workspace_submissions_contributor ON workspace_submissions(guild_id,contributor_id,received_at);
-            CREATE TABLE IF NOT EXISTS workspace_reviews (
-                guild_id TEXT NOT NULL REFERENCES guild_data(guild_id) ON DELETE CASCADE,
-                submission_id TEXT NOT NULL, assigned_reviewer TEXT, status TEXT NOT NULL DEFAULT 'Received'
-                    CHECK(status IN ('Received','Under review','Needs information','Accepted','Restricted','Declined')),
-                decision_date INTEGER, review_notes TEXT NOT NULL DEFAULT '', source_opened_at INTEGER,
-                sheet_row INTEGER, updated_at INTEGER NOT NULL,
-                PRIMARY KEY(guild_id,submission_id),
-                FOREIGN KEY(guild_id,submission_id) REFERENCES workspace_submissions(guild_id,submission_id) ON DELETE CASCADE);
-            CREATE TABLE IF NOT EXISTS workspace_records (
-                guild_id TEXT NOT NULL REFERENCES guild_data(guild_id) ON DELETE CASCADE,
-                record_id TEXT NOT NULL, submission_id TEXT NOT NULL, title TEXT NOT NULL, document_date TEXT,
-                author TEXT, source_url TEXT, midtown_connection TEXT, access_level TEXT NOT NULL
-                    CHECK(access_level IN ('Public','Restricted','Staff only')),
-                record_status TEXT NOT NULL DEFAULT 'Under review'
-                    CHECK(record_status IN ('Preserved','Needs correction','Under review')),
-                archive_url TEXT, reviewed_by TEXT, review_date INTEGER, notes TEXT NOT NULL DEFAULT '',
-                sheet_row INTEGER, operation_status TEXT NOT NULL DEFAULT 'pending'
-                    CHECK(operation_status IN ('pending','written','failed')), last_error TEXT, updated_at INTEGER NOT NULL,
-                PRIMARY KEY(guild_id,record_id), UNIQUE(guild_id,submission_id));
-            CREATE INDEX IF NOT EXISTS workspace_records_title ON workspace_records(guild_id,title);
-            CREATE TABLE IF NOT EXISTS workspace_tasks (
-                guild_id TEXT NOT NULL REFERENCES guild_data(guild_id) ON DELETE CASCADE,
-                task_id TEXT NOT NULL, description TEXT NOT NULL, issued_at INTEGER NOT NULL, issued_by TEXT NOT NULL,
-                owner_id TEXT, due_at INTEGER, priority TEXT NOT NULL DEFAULT 'Normal'
-                    CHECK(priority IN ('Normal','High','Urgent')),
-                status TEXT NOT NULL DEFAULT 'Not started'
-                    CHECK(status IN ('Not started','In progress','Blocked','Completed','Cancelled')),
-                completed_at INTEGER, notes TEXT NOT NULL DEFAULT '', sheet_row INTEGER, updated_at INTEGER NOT NULL,
-                PRIMARY KEY(guild_id,task_id));
-            CREATE INDEX IF NOT EXISTS workspace_tasks_queue ON workspace_tasks(guild_id,status,due_at);
-            CREATE TABLE IF NOT EXISTS workspace_staff (
-                guild_id TEXT NOT NULL REFERENCES guild_data(guild_id) ON DELETE CASCADE,
-                user_id TEXT NOT NULL, username TEXT NOT NULL, role TEXT NOT NULL DEFAULT '', roster_status TEXT NOT NULL DEFAULT 'Listed'
-                    CHECK(roster_status IN ('Listed','Leave','Inactive','Removed','Unassigned')),
-                joined_date TEXT, last_review TEXT, updated_at INTEGER NOT NULL, reference TEXT, notes TEXT NOT NULL DEFAULT '', source_hash TEXT,
-                PRIMARY KEY(guild_id,user_id));
-            CREATE TABLE IF NOT EXISTS workspace_sessions (
-                guild_id TEXT NOT NULL REFERENCES guild_data(guild_id) ON DELETE CASCADE,
-                session_id TEXT NOT NULL, user_id TEXT NOT NULL, kind TEXT NOT NULL, data_json TEXT NOT NULL,
-                created_at INTEGER NOT NULL, expires_at INTEGER NOT NULL,
-                PRIMARY KEY(guild_id,session_id));
-            CREATE INDEX IF NOT EXISTS workspace_sessions_expiry ON workspace_sessions(guild_id,expires_at);
-            CREATE TABLE IF NOT EXISTS workspace_panels (
-                guild_id TEXT NOT NULL REFERENCES guild_data(guild_id) ON DELETE CASCADE,
-                kind TEXT NOT NULL CHECK(kind IN ('member','staff','tasks')),
-                channel_id TEXT NOT NULL, message_id TEXT NOT NULL, updated_at INTEGER NOT NULL,
-                PRIMARY KEY(guild_id,kind));
-            CREATE TABLE IF NOT EXISTS workspace_jobs (
-                guild_id TEXT NOT NULL REFERENCES guild_data(guild_id) ON DELETE CASCADE,
-                kind TEXT NOT NULL, next_at INTEGER NOT NULL DEFAULT 0, last_at INTEGER, last_message_id TEXT,
-                PRIMARY KEY(guild_id,kind));
-            CREATE TABLE IF NOT EXISTS workspace_audit (
-                id INTEGER PRIMARY KEY AUTOINCREMENT, guild_id TEXT NOT NULL REFERENCES guild_data(guild_id) ON DELETE CASCADE,
-                at INTEGER NOT NULL, actor_id TEXT, action TEXT NOT NULL, item_id TEXT, detail TEXT NOT NULL DEFAULT '');
-            CREATE INDEX IF NOT EXISTS workspace_audit_guild ON workspace_audit(guild_id,at DESC);
-            CREATE TABLE IF NOT EXISTS workspace_operations (
-                guild_id TEXT NOT NULL REFERENCES guild_data(guild_id) ON DELETE CASCADE,
-                operation_id TEXT NOT NULL, kind TEXT NOT NULL, item_id TEXT NOT NULL, state TEXT NOT NULL,
-                attempts INTEGER NOT NULL DEFAULT 0, data_json TEXT NOT NULL DEFAULT '{}', last_error TEXT, updated_at INTEGER NOT NULL,
-                PRIMARY KEY(guild_id,operation_id));
-            CREATE INDEX IF NOT EXISTS workspace_operations_item ON workspace_operations(guild_id,kind,item_id);`);
         // 2.32: roles a member had when they left, so staff can give them all back in one click if they rejoin.
         this.db.exec(`CREATE TABLE IF NOT EXISTS left_roles (guild_id TEXT NOT NULL REFERENCES guild_data(guild_id) ON DELETE CASCADE, user_id TEXT NOT NULL, roles TEXT NOT NULL, left_at INTEGER NOT NULL, PRIMARY KEY(guild_id, user_id));`);
-        this.db.exec(`CREATE TABLE IF NOT EXISTS verification_pending (guild_id TEXT NOT NULL REFERENCES guild_data(guild_id) ON DELETE CASCADE, user_id TEXT NOT NULL, roblox_id TEXT NOT NULL, roblox_name TEXT NOT NULL, code TEXT NOT NULL, created_at INTEGER NOT NULL, PRIMARY KEY(guild_id, user_id));`);
         this.db.exec(`CREATE TABLE IF NOT EXISTS autoreact_users (guild_id TEXT NOT NULL REFERENCES guild_data(guild_id) ON DELETE CASCADE, user_id TEXT NOT NULL, emoji TEXT NOT NULL, by_id TEXT NOT NULL, at INTEGER NOT NULL, PRIMARY KEY(guild_id, user_id));`);
         // 2.16.3: Supreme Leader can be given by command, so bot_staff accepts 'supreme'. Rebuild older tables (no rows lost).
         if (!String((this.db.prepare("SELECT sql FROM sqlite_master WHERE name='bot_staff'").get() as { sql?: string } | undefined)?.sql ?? '').includes("'supreme'"))

@@ -1,5 +1,3 @@
-import { PRODUCT_NAME_UPPER } from './branding.js';
-
 // Human-friendly console output for the default "pretty" log format.
 // JSON logging (LOG_FORMAT=json) never goes through here.
 // Colors only in a real terminal; NO_COLOR turns them off, FORCE_COLOR turns them on.
@@ -55,7 +53,7 @@ export function startupSummary(info: StartupInfo): string[] {
     return [
         '',
         frame('╭', '─', '╮'),
-        panelRow(`${style.bold(PRODUCT_NAME_UPPER)}  ${style.dim(`v${info.version}`)}  ${style.cyan('SECURITY OPERATIONS')}`),
+        panelRow(`${style.bold('MIDTOWN VANGUARD')}  ${style.dim(`v${info.version}`)}  ${style.cyan('SECURITY OPERATIONS')}`),
         panelRow(`${style.green('● SYSTEM ONLINE')}  ${style.dim('as')} ${style.bold(info.tag)}`),
         frame('├', '─', '┤'),
         detail('NETWORK', network),

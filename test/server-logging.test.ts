@@ -182,13 +182,13 @@ function fakeGuild(existing: string[] = [], o: { everyoneCanView?: boolean; botP
     return { guild, created, sentTo };
 }
 
-test('setup creates private #bans and #ghost-vanguard-logging once, then reuses them', async () => {
+test('setup creates private #bans and #midtown-vanguard-logging once, then reuses them', async () => {
     const store = new Store(':memory:'); authorize(store, G);
     try {
         await store.withAuthorized(G, async () => store.run("INSERT INTO staff_roles(guild_id,role_id,level) VALUES(?,?,'admin')", G, '800000000000000001'));
         const { guild, created } = fakeGuild();
         const first = await store.withAuthorized(G, () => setupLogChannels(store, guild, 'admin'));
-        assert.deepEqual(created.map(c => c.name), ['bans', 'ghost-vanguard-logging']);
+        assert.deepEqual(created.map(c => c.name), ['bans', 'midtown-vanguard-logging']);
         const overwrites = created[0].permissionOverwrites;
         assert.deepEqual(overwrites[0].deny, [PermissionFlagsBits.ViewChannel], '@everyone cannot see the log channels');
         assert.ok(overwrites.some((o: any) => o.id === '800000000000000001' && o.allow.includes(PermissionFlagsBits.ViewChannel)), 'staff can read them');
@@ -203,23 +203,10 @@ test('setup creates private #bans and #ghost-vanguard-logging once, then reuses 
 test('setup reuses channels that already exist by name', async () => {
     const store = new Store(':memory:'); authorize(store, G);
     try {
-        const { guild, created } = fakeGuild(['bans', 'ghost-vanguard-logging']);
+        const { guild, created } = fakeGuild(['bans', 'midtown-vanguard-logging']);
         const result = await store.withAuthorized(G, () => setupLogChannels(store, guild, 'admin'));
         assert.equal(created.length, 0);
         assert.equal(result.bans.how, 'existing channel reused');
-        assert.equal(result.logging.how, 'existing channel reused');
-    } finally { store.close(); }
-});
-
-test('a server still using the old #midtown-vanguard-logging name keeps it instead of getting a second channel', async () => {
-    const store = new Store(':memory:'); authorize(store, G);
-    try {
-        const { guild, created } = fakeGuild(['bans', 'midtown-vanguard-logging']);
-        const result = await store.withAuthorized(G, () => setupLogChannels(store, guild, 'admin'));
-        assert.equal(created.length, 0, 'no duplicate log channel is created');
-        assert.equal(result.logging.channel.name, 'midtown-vanguard-logging', 'the saved channel is reused as it is');
-        assert.equal(result.logging.how, 'existing channel reused (still named #midtown-vanguard-logging)');
-        assert.equal(eventLogConfig(store, G).channelId, result.logging.channel.id);
     } finally { store.close(); }
 });
 

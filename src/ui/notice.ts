@@ -1,11 +1,10 @@
 import { EmbedBuilder } from 'discord.js';
-import { PRODUCT_NAME } from '../branding.js';
 
 /**
  * System notices (startup, protection, recovery) as tidy embeds: "**Name:** value" lines become
  * fields, everything else is the description. Same text as before, easier to read.
  */
-export function noticeEmbed(title: string, lines: string[], color: number, footer = PRODUCT_NAME) {
+export function noticeEmbed(title: string, lines: string[], color: number, footer = 'Ghost Vanguard') {
     const e = new EmbedBuilder().setColor(color).setTitle(title).setTimestamp().setFooter({ text: footer });
     const text: string[] = [];
     const fields: { name: string; value: string; inline: boolean }[] = [];

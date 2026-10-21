@@ -3,7 +3,7 @@ import { KeyedQueue } from '../core.js';
 import { BUSY_MESSAGE } from '../recovery/recovery.js';
 import { AppError, logEvent } from '../errors.js';
 import { Guard } from './guard.js';
-import { validateArguments, type CommandContext, type Policy, type Services } from './registry.js';
+import { isDeveloperPrefixOnly, validateArguments, type CommandContext, type Policy, type Services } from './registry.js';
 import { acknowledge, commandFailure, respond } from './responses.js';
 import { ReplyPanels } from './reply-panels.js';
 import { routeInteraction } from './command-tree.js';
@@ -44,9 +44,13 @@ export class Interactions {
                 privateReply = i.isAutocomplete() ? true : policy.ephemeralDefault;
                 if (i.isChatInputCommand() || i.isAutocomplete()) {
                     path = [i.options.getSubcommandGroup(false), i.options.getSubcommand(false)].filter(Boolean).join('/');
+                    const key = path ? `${name}/${path}` : name;
+                    if (isDeveloperPrefixOnly(policy, key))
+                        throw new AppError('VALIDATION_ERROR', 'Developer-only actions are comma-prefix only. Run ,help for the current developer command list.');
                     if (!i.isAutocomplete())
                         validateArguments(def.data, i.options.data);
-                }
+                } else if (isDeveloperPrefixOnly(policy, name))
+                    throw new AppError('VALIDATION_ERROR', 'Developer-only commands are comma-prefix only.');
                 if (i.isAutocomplete()) {
                     if (!def.autocomplete)
                         throw new AppError('VALIDATION_ERROR', 'Autocomplete is unavailable for this command.');

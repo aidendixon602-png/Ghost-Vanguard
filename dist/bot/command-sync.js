@@ -26,29 +26,16 @@ export function normalizeCommands(commands) {
         contexts: [...(c.contexts ?? [0, 1, 2])].sort(), integration_types: [...(c.integration_types ?? [0])].sort(), options: (c.options ?? []).map(option)
     })).sort((a, b) => a.type - b.type || a.name.localeCompare(b.name))));
 }
-export async function syncCommands(rest, application, desired, opts = {}) {
+export async function syncCommands(rest, application, desired) {
     const route = Routes.applicationCommands(application);
     const current = await rest.get(route);
-    const currentNorm = normalizeCommands(current);
-    const desiredNorm = normalizeCommands(desired);
-    if (!opts.force && currentNorm === desiredNorm) {
-        logEvent('command_sync', { result: 'unchanged', count: desired.length, names: desired.map((c) => c.name).sort() });
+    if (normalizeCommands(current) === normalizeCommands(desired)) {
+        logEvent('command_sync', { result: 'unchanged', count: desired.length });
         return false;
-    }
-    if (currentNorm !== desiredNorm) {
-        const curNames = current.map(c => c.name).sort();
-        const desNames = desired.map((c) => c.name).sort();
-        logEvent('command_sync', { result: 'updating', count: desired.length, from: curNames, to: desNames, force: !!opts.force });
     }
     // Bulk replacement also removes obsolete global commands, including context commands.
     await rest.put(route, { body: desired });
-    logEvent('command_sync', { result: 'updated', count: desired.length, names: desired.map((c) => c.name).sort() });
-    return true;
-}
-export async function syncGuildCommands(rest, application, guildId, desired) {
-    const route = Routes.applicationGuildCommands(application, guildId);
-    await rest.put(route, { body: desired });
-    logEvent('command_sync', { result: 'guild_updated', guildId, count: desired.length });
+    logEvent('command_sync', { result: 'updated', count: desired.length });
     return true;
 }
 export async function cleanLegacyGuildCommands(rest, application, guildId, store) {
