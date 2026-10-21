@@ -251,7 +251,7 @@ Bot developers: diagnostics, updates, servers and the database
 | `/dev status` | Show a custom bot status instead of the rotation | Bot Manager+ |
 | `/dev status-reset` | Return to the normal rotating status | Bot Manager+ |
 | `/dev update` | Automatic GitHub updates: see the status, or install now (Developer) | Supreme Leader+ |
-| `/dev sync` | Force re-register slash commands globally (and instantly in this server) | Supreme Leader+ |
+| `/dev sync` | Re-register commands globally and clear duplicate guild-scoped copies in this server | Supreme Leader+ |
 | `/dev server info` | Developer: show this server's authorization details | Bot Manager+ |
 | `/dev server unban` | Developer: remove a server ban | Developer |
 
@@ -339,7 +339,7 @@ Every slash command above also works with a `,` prefix (e.g. `,dev status`). The
 `,dev inspect <guild_id>` — Read-only overview of any server Vanguard knows
 `,dev status <text> [--minutes <number>] [--presence online|idle|dnd]` — Show a custom bot status instead of the rotation
 `,dev status-reset` — Return to the normal rotating status
-`,dev sync [--guild_id <guild_id>]` — Force re-register slash commands globally (and instantly in this server)
+`,dev sync [--guild_id <guild_id>]` — Re-register commands globally and clear duplicate guild-scoped copies in this server
 `,genreban <user> [--reason <reason>] [--evidence <evidence>] [attach file] [--delete_messages 0|3600|86400|604800]` — Developer: ban a user from every authorized server until ,ungenreban
 `,hardban <user> [--reason <reason>] [--evidence <evidence>] [attach file] [--delete_messages 0|3600|86400|604800]` — Developer: permanently ban a user from every authorized server until ,unhardban
 `,netexception list [--user_id <user_id>]` — Active genreban exceptions, newest first

@@ -55,6 +55,20 @@ export async function syncGuildCommands(rest, application, guildId, desired) {
     logEvent('command_sync', { result: 'guild_updated', guildId, count: desired.length, removed });
     return removed;
 }
+/**
+ * Remove every guild-scoped command from a guild so only the global set shows there. This is the fix for
+ * duplicate commands: when the same command is registered both globally and in a guild, Discord lists it
+ * twice in that guild. Returns the names that were removed.
+ */
+export async function clearGuildCommands(rest, application, guildId) {
+    const route = Routes.applicationGuildCommands(application, guildId);
+    const current = await rest.get(route).catch(() => []);
+    const removed = current.map((c) => String(c.name));
+    if (removed.length)
+        await rest.put(route, { body: [] });
+    logEvent('command_sync', { result: 'guild_cleared', guildId, removed: removed.length });
+    return removed;
+}
 /** Global command names Discord currently has that `desired` no longer defines (the ones a bulk overwrite deletes). */
 export async function outdatedGlobalCommands(rest, application, desired) {
     const current = await rest.get(Routes.applicationCommands(application)).catch(() => []);

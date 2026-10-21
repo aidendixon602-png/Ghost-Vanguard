@@ -32,7 +32,7 @@ Bot-wide, every server: everything below. A Supreme Leader can lift genrebans fr
 - `/dev database backups`: List recent database backups
 - `/dev database status`: Show database health, storage, backup and migration status
 - `/dev database verify`: Recheck backup checksum and database integrity
-- `/dev sync`: Force re-register slash commands globally (and instantly in this server)
+- `/dev sync`: Re-register commands globally and clear duplicate guild-scoped copies in this server
 - `/dev update`: Automatic GitHub updates: see the status, or install now (Developer)
 - `/network exceptions list`: Active genreban exceptions, newest first
 - `/network exceptions revoke`: Cancel an exception: the genreban applies in that server again
