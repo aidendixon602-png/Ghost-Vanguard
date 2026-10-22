@@ -130,7 +130,7 @@ Server setup: logs, staff ranks, welcome, config, permissions
 | `/setup config command` | Turn one Vanguard command on/off or change its cooldown | Owner |
 | `/setup config feature` | Turn moderation, verification, AI or backups on/off | Owner |
 | `/setup config backups` | Configure scheduled server layout backups | Owner |
-| `/setup config workspace-setup` | Save and validate this guild’s Workspace profile | Owner |
+| `/setup config workspace-setup` | Open the guided Workspace setup panel (channels, roles, sheet — no manual IDs) | Owner |
 | `/setup config workspace-publish` | Post or update the configured persistent panels | Owner |
 | `/setup config workspace-status` | Show Workspace setup status | Owner |
 | `/setup config workspace-enable` | Enable the validated Workspace integration | Owner |
