@@ -116,7 +116,7 @@ Server rank: anti-nuke, whitelist, control panel, backups and staff ranks. Given
 - `/setup config workspace-disable`: Disable Workspace and stop its reminders without deleting records
 - `/setup config workspace-enable`: Enable the validated Workspace integration
 - `/setup config workspace-publish`: Post or update the configured persistent panels
-- `/setup config workspace-setup`: Save and validate this guild’s Workspace profile
+- `/setup config workspace-setup`: Open the guided Workspace setup panel (channels, roles, sheet — no manual IDs)
 - `/setup config workspace-status`: Show Workspace setup status
 - `/setup config workspace-sync`: Preview and synchronize recognized staff members
 - `/setup history list`: Show recent setting changes and who made them

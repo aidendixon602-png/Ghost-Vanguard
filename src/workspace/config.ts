@@ -25,13 +25,33 @@ export const GENERIC_ROLES: WorkspaceRoles = { reviewerRoleIds: [], managerRoleI
 export const GENERIC_CHANNELS: WorkspaceChannels = { memberPanelId: null, staffPanelId: null, taskPanelId: null, documentEntryId: null, directiveEntryId: null, auditLogId: null, reminderId: null, publicDocumentsId: null, publicArchiveNotificationsId: null };
 export const GENERIC_REMINDERS: WorkspaceReminders = { enabled: false, channelId: null, schedule: 'weekly', timezone: 'UTC', weekday: 1, hour: 9, minute: 0, mentionResponsible: false };
 
+/**
+ * A working default column layout (A, B, C … in the order below). Field keys match what the Sheet
+ * writers emit, so a generic setup validates and writes correctly with no hand-written mapping_json.
+ * No `headers` are pinned, so live validation only checks that each mapped column has *some* header.
+ */
 export const EMPTY_SHEETS = (): WorkspaceSheets => ({
     spreadsheetId: '', headerRow: 7, firstDataRow: 8, lastDataRow: 207, allowExpansion: false,
-    archiveRegister: { name: 'Archive Register', headerRow: 7, firstDataRow: 8, lastDataRow: 207, columns: {} },
-    submissionReviews: { name: 'Submission Reviews', headerRow: 7, firstDataRow: 8, lastDataRow: 207, columns: {} },
-    staffRoster: { name: 'Staff Roster', headerRow: 7, firstDataRow: 8, lastDataRow: 207, columns: {} },
-    directiveTracker: { name: 'Directive Tracker', headerRow: 7, firstDataRow: 8, lastDataRow: 207, columns: {} },
+    archiveRegister: { name: 'Archive Register', headerRow: 7, firstDataRow: 8, lastDataRow: 207, columns: { recordId: 'A', title: 'B', documentDate: 'C', author: 'D', sourceUrl: 'E', midtownConnection: 'F', accessLevel: 'G', recordStatus: 'H', archiveUrl: 'I', reviewedBy: 'J', reviewDate: 'K', notes: 'L' } },
+    submissionReviews: { name: 'Submission Reviews', headerRow: 7, firstDataRow: 8, lastDataRow: 207, columns: { submissionId: 'A', receivedDate: 'B', contributor: 'C', documentTitle: 'D', sourceUrl: 'E', assignedReviewer: 'F', reviewStatus: 'G', decisionDate: 'H', recordId: 'I', reviewNotes: 'J' } },
+    staffRoster: { name: 'Staff Roster', headerRow: 7, firstDataRow: 8, lastDataRow: 207, columns: { username: 'A', userId: 'B', role: 'C', rosterStatus: 'D', joinedDate: 'E', lastReview: 'F', updated: 'G', reference: 'H', mention: 'I', notes: 'J' } },
+    directiveTracker: { name: 'Directive Tracker', headerRow: 7, firstDataRow: 8, lastDataRow: 207, columns: { taskId: 'A', description: 'B', issuedDate: 'C', issuedBy: 'D', assignedTo: 'E', dueDate: 'F', status: 'G', priority: 'H', completedDate: 'I', notes: 'J' } },
 });
+
+/** Apply a mapping_json override (worksheet names, column letters, header text) onto a config's sheets. */
+export function applyMappingJson(cfg: WorkspaceConfig, raw: string | null): void {
+    if (!raw) return;
+    let parsed: any;
+    try { parsed = JSON.parse(raw); } catch { throw new Error('mapping_json must be valid JSON.'); }
+    for (const key of ['archiveRegister', 'submissionReviews', 'staffRoster', 'directiveTracker']) {
+        if (!parsed[key]) continue;
+        if (typeof parsed[key] !== 'object') throw new Error(`${key} mapping must be an object.`);
+        const sheet = (cfg.sheets as any)[key] as { name: string; columns: Record<string, string>; headers?: Record<string, string> };
+        if (parsed[key].name !== undefined) sheet.name = String(parsed[key].name);
+        if (parsed[key].columns) sheet.columns = Object.fromEntries(Object.entries(parsed[key].columns).map(([field, column]) => [field, String(column).toUpperCase()]));
+        if (parsed[key].headers) sheet.headers = Object.fromEntries(Object.entries(parsed[key].headers).map(([field, header]) => [field, String(header)]));
+    }
+}
 
 export function genericConfig(guildId: string): WorkspaceConfig {
     return { guildId, enabled: false, modules: Object.fromEntries(WORKSPACE_MODULES.map(m => [m, true])) as Record<WorkspaceModule, boolean>,
@@ -94,7 +114,7 @@ export function validateWorkspaceConfig(cfg: WorkspaceConfig): string[] {
         if (!cfg.reminders.timezone || !/^[A-Za-z_]+\/[A-Za-z_]+(?:\/[A-Za-z_]+)?$/.test(cfg.reminders.timezone) && cfg.reminders.timezone !== 'UTC') errors.push('Reminder timezone must be an IANA timezone.');
         if (!Number.isInteger(cfg.reminders.hour) || cfg.reminders.hour < 0 || cfg.reminders.hour > 23 || !Number.isInteger(cfg.reminders.minute) || cfg.reminders.minute < 0 || cfg.reminders.minute > 59) errors.push('Reminder time is invalid.');
     }
-    if (cfg.modules.submissions && (!cfg.sheets.submissionReviews.columns.submissionId || !cfg.sheets.submissionReviews.columns.title)) errors.push('Submission Reviews must map submissionId and title.');
+    if (cfg.modules.submissions && (!cfg.sheets.submissionReviews.columns.submissionId || !cfg.sheets.submissionReviews.columns.documentTitle)) errors.push('Submission Reviews must map submissionId and documentTitle.');
     if (cfg.modules.records && (!cfg.sheets.archiveRegister.columns.recordId || !cfg.sheets.archiveRegister.columns.title)) errors.push('Archive Register must map recordId and title.');
     if (cfg.modules.tasks && (!cfg.sheets.directiveTracker.columns.taskId || !cfg.sheets.directiveTracker.columns.description)) errors.push('Directive Tracker must map taskId and description.');
     if (cfg.modules.staff && (!cfg.sheets.staffRoster.columns.userId || !cfg.sheets.staffRoster.columns.username)) errors.push('Staff Roster must map userId and username.');
