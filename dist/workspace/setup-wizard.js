@@ -25,6 +25,51 @@ const ROLE_FIELDS = [
 function load(ctx, guildId) {
     return getWorkspaceConfig(ctx.store, guildId) ?? genericConfig(guildId);
 }
+const LOG_CATEGORY = /log|audit/i;
+const AUDIT_CHANNEL = /audit|mod-?log|server-?log|^logs?$|-logs?$|^logging$/i;
+/**
+ * Pre-fill empty channel and role slots by scanning the guild: the audit log comes from an existing
+ * logging category (or a log-named channel), and role groups from roles whose name or permissions mark
+ * them as admins/mods/staff. Only fills blanks — never overwrites a choice already made.
+ */
+function autoFill(guild, cfg) {
+    const notes = [];
+    const chans = [...guild.channels.cache.values()];
+    const text = chans.filter((c) => c.type === ChannelType.GuildText || c.type === ChannelType.GuildAnnouncement);
+    const logCats = new Set(chans.filter((c) => c.type === ChannelType.GuildCategory && LOG_CATEGORY.test(c.name)).map((c) => c.id));
+    const inLogCat = text.filter((c) => c.parentId && logCats.has(c.parentId));
+    const named = (re) => text.find((c) => re.test(c.name)) ?? null;
+    const setChan = (key, pick, label) => {
+        if (cfg.channels[key] || !pick)
+            return;
+        cfg.channels[key] = pick.id;
+        if (key === 'reminderId')
+            cfg.reminders.channelId = pick.id;
+        notes.push(`${label} → <#${pick.id}>`);
+    };
+    setChan('auditLogId', named(AUDIT_CHANNEL) ?? inLogCat[0] ?? null, 'Audit log');
+    setChan('reminderId', named(/remind|announce/i) ?? named(/general/i), 'Reminder');
+    setChan('staffPanelId', named(/staff|admin[-\s]?(chat|commands?)?|mod[-\s]?(chat|commands?)/i), 'Staff panel');
+    setChan('memberPanelId', named(/general|chat|lobby|commands?|^bot/i), 'Member panel');
+    const roles = [...guild.roles.cache.values()].filter((r) => r.id !== guild.id && !r.managed);
+    const has = (r, p) => { try {
+        return r.permissions.has(p);
+    }
+    catch {
+        return false;
+    } };
+    const pick = (re, perms) => roles.filter((r) => re.test(r.name) || perms.some(p => has(r, p))).slice(0, 5).map((r) => r.id);
+    const setRoles = (key, ids, label) => {
+        if (cfg.roles[key].length || !ids.length)
+            return;
+        cfg.roles[key] = ids;
+        notes.push(`${label} → ${ids.length} role(s)`);
+    };
+    setRoles('managerRoleIds', pick(/admin|manager|owner|director|head|lead/i, [PermissionFlagsBits.Administrator, PermissionFlagsBits.ManageGuild]), 'Managers');
+    setRoles('reviewerRoleIds', pick(/review|senior|moderator|\bmod\b/i, [PermissionFlagsBits.ModerateMembers, PermissionFlagsBits.ManageMessages]), 'Reviewers');
+    setRoles('staffRoleIds', pick(/staff|team|helper|support|moderator|\bmod\b/i, []), 'Staff');
+    return notes;
+}
 /** Persist an in-progress edit. Any change marks the config unvalidated until Save & validate re-checks it. */
 function saveDraft(ctx, cfg, actor) {
     cfg.validatedAt = null;
@@ -39,7 +84,7 @@ function row(...c) {
 }
 const noMentions = { parse: [] };
 const check = (ok) => ok ? '✅' : '❌';
-function home(cfg) {
+function home(cfg, detected = []) {
     const configErrors = validateWorkspaceConfig(cfg);
     const modules = Object.entries(cfg.modules).filter(([, on]) => on).map(([n]) => n);
     const channelsSet = CHANNEL_FIELDS.filter(([k]) => cfg.channels[k]).length;
@@ -51,14 +96,16 @@ function home(cfg) {
         `**Column layout:** default A–L (press **Column layout** only if your sheet differs)`,
         `**Channels set:** ${channelsSet}/${CHANNEL_FIELDS.length} · **Role groups set:** ${rolesSet}/${ROLE_FIELDS.length}`,
         `**Reminders:** ${cfg.reminders.enabled ? `on · ${cfg.reminders.timezone} ${String(cfg.reminders.hour).padStart(2, '0')}:${String(cfg.reminders.minute).padStart(2, '0')}` : 'off'}`,
+        detected.length ? `\n🔎 **Auto-detected from this server:**\n${detected.map(d => `• ${d}`).join('\n')}` : '',
         '',
         configErrors.length ? `⚠️ **Before it can go live:**\n${configErrors.map(e => `• ${e}`).join('\n')}` : cfg.validatedAt ? '✅ Validated and enabled.' : '✅ Config looks complete — press **Save & validate** to check the live workbook and go live.',
-    ];
+    ].filter(Boolean);
     return {
         embeds: [embed('🧩 Workspace setup', lines.join('\n'), cfg.branding.primaryColor)],
         components: [
             row(button('wscfgopen:basics', 'Spreadsheet & name', ButtonStyle.Primary), button('wscfg:modules', 'Modules'), button('wscfgopen:mapping', 'Column layout')),
             row(button('wscfg:channels', 'Channels'), button('wscfg:roles', 'Roles'), button('wscfg:reminders', 'Reminders')),
+            row(button('wscfg:autodetect', '🔎 Auto-detect channels & roles')),
             row(button('wscfg:save', 'Save & validate', ButtonStyle.Success), button('wscfg:publish', 'Publish panels', ButtonStyle.Secondary, !cfg.validatedAt), button('wscfg:home', 'Refresh')),
         ],
         allowedMentions: noMentions,
@@ -101,10 +148,14 @@ function remindersModal(cfg) {
 }
 /** Launch the wizard from `/setup config workspace-setup`. */
 export async function openSetupWizard(ctx, i) {
+    const fresh = !getWorkspaceConfig(ctx.store, i.guildId);
     const cfg = load(ctx, i.guildId);
-    if (!getWorkspaceConfig(ctx.store, i.guildId))
-        saveWorkspaceConfig(ctx.store, cfg, i.user.id); // seed a draft row
-    return i.editReply(home(cfg));
+    let detected = [];
+    if (fresh) {
+        detected = autoFill(i.guild, cfg); // first open: pre-fill channels/roles from the server
+        saveWorkspaceConfig(ctx.store, cfg, i.user.id);
+    }
+    return i.editReply(home(cfg, detected));
 }
 async function onButton(ctx, i) {
     const name = i.customId.slice('wscfg:'.length);
@@ -123,6 +174,11 @@ async function onButton(ctx, i) {
         cfg.reminders.enabled = !cfg.reminders.enabled;
         saveDraft(ctx, cfg, i.user.id);
         return i.editReply(remindersScreen(cfg));
+    }
+    if (name === 'autodetect') {
+        const detected = autoFill(i.guild, cfg);
+        saveDraft(ctx, cfg, i.user.id);
+        return i.editReply(home(cfg, detected.length ? detected : ['Nothing new to fill — channels/roles already set, or no logging category/roles matched by name.']));
     }
     if (name === 'publish') {
         if (!cfg.validatedAt)
