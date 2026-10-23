@@ -7,7 +7,7 @@ import { AppError } from '../errors.js';
 import { noteThreat } from './threat-board.js';
 import { embed, memberOrNull } from '../ui/ui.js';
 import { incidentCard } from '../ui/incident-card.js';
-import { sendGlobalAlert, snapshotMember } from './global-alert.js';
+import { dmGlobalAlert, sendGlobalAlert, snapshotMember } from './global-alert.js';
 /** How far back an incident alert looks for channels and roles the actor deleted. */
 const DELETION_LOOKBACK_MS = 10 * 60 * 1000;
 const ruleByKey = (key) => RULES.find(r => r.key === key);
@@ -220,12 +220,15 @@ export class Security {
         const rows = buttons.length ? [new ActionRowBuilder().addComponents(...buttons)] : [];
         this.logs.push(guild.id, incidentCard({ incident, actor, rule: active, mode: warnOnly ? 'warn' : s.mode, count, result, progress, deleted, targetId: entry.targetId ?? null }), rows);
         try {
-            sendGlobalAlert(this.store, this.logs, {
+            const info = {
                 guild: { id: guild.id, name: guild.name }, actor, snapshot, rule: active, mode: warnOnly ? 'warn' : s.mode, incident,
                 failed: /cannot|unavailable|failed|Protected|no longer a member|not contained|incomplete/i.test(result.split(' [')[0]),
                 reverted: active.revert ? progress : null,
                 jumpUrl: `https://discord.com/channels/${guild.id}${s.logChannelId ? `/${s.logChannelId}` : ''}`,
-            });
+            };
+            sendGlobalAlert(this.store, this.logs, info);
+            // The same card by DM to the trusted people (TRUSTED_DM_IDS). Never waits on Discord here.
+            void dmGlobalAlert(guild.client, this.store, info).catch(() => 0);
         }
         catch { /* the feed is extra; the server's own alert above is what matters */ }
     }

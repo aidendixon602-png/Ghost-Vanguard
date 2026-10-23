@@ -1,4 +1,5 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, Colors, EmbedBuilder } from 'discord.js';
+import { dmTrusted } from '../bot/trusted-dm.js';
 import { clip } from '../core.js';
 /**
  * Global anti-nuke feed: every anti-nuke trigger in any Midtown server is also posted to one channel
@@ -67,4 +68,51 @@ export function sendGlobalAlert(store, logs, info) {
     const { embed, row } = globalAlertCard(info);
     logs.push(target.guildId, embed, [row], target.channelId);
     return true;
+}
+/**
+ * The same card, DMed to the trusted people (TRUSTED_DM_IDS, default: the bot owner) for every anti-nuke
+ * strip in any server. On by default; `/dev alerts dm:false` turns it off. During a nuke the same person
+ * is DMed about at most once every 5 minutes per server, and at most 15 DMs go out per 10 minutes, so a
+ * raid can't flood your DMs (the global channel and each server's log still get every alert).
+ */
+const DM_KEY = 'global_antinuke_dm';
+export function dmSetting(store) {
+    const raw = store.get('SELECT value FROM runtime_meta WHERE key=?', DM_KEY)?.value;
+    try {
+        const v = raw ? JSON.parse(String(raw)) : null;
+        return { on: v?.on ?? true, warnings: v?.warnings ?? false };
+    }
+    catch {
+        return { on: true, warnings: false };
+    }
+}
+export function setDmSetting(store, value) {
+    store.run('INSERT INTO runtime_meta(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value', DM_KEY, JSON.stringify(value));
+}
+const recentDms = new Map();
+let windowStart = 0, windowCount = 0;
+export const DM_PER_ACTOR_MS = 5 * 60000, DM_WINDOW_MS = 10 * 60000, DM_WINDOW_MAX = 15;
+/** Test hook: forget the rate limits. */
+export const resetDmLimits = () => { recentDms.clear(); windowStart = 0; windowCount = 0; };
+export async function dmGlobalAlert(client, store, info, now = Date.now()) {
+    const setting = dmSetting(store);
+    if (!setting.on || (info.mode === 'warn' && !setting.warnings))
+        return 0;
+    const key = `${info.guild.id}:${info.actor}`;
+    if ((recentDms.get(key) ?? 0) > now)
+        return 0;
+    if (now - windowStart > DM_WINDOW_MS) {
+        windowStart = now;
+        windowCount = 0;
+    }
+    if (windowCount >= DM_WINDOW_MAX)
+        return 0;
+    recentDms.set(key, now + DM_PER_ACTOR_MS);
+    windowCount++;
+    if (recentDms.size > 2000)
+        for (const [k, until] of recentDms)
+            if (until <= now)
+                recentDms.delete(k);
+    const { embed, row } = globalAlertCard(info);
+    return dmTrusted(client, { embeds: [embed], components: [row] });
 }

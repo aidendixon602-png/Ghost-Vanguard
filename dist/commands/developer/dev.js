@@ -8,7 +8,8 @@ import { presenceLines } from '../../security/protection-stats.js';
 import { spawnSync } from 'node:child_process';
 import { askLauncher, describeUpdate } from '../../bot/updater-link.js';
 import { DEVELOPER_ONLY_MESSAGE, botRank, RANKS } from '../../bot/ranks.js';
-import { globalAlertCard, globalAlertTarget, setGlobalAlertTarget } from '../../security/global-alert.js';
+import { dmSetting, globalAlertCard, globalAlertTarget, setDmSetting, setGlobalAlertTarget } from '../../security/global-alert.js';
+import { trustedRecipients } from '../../bot/trusted-dm.js';
 import { RULES } from '../../core.js';
 /** Which GitHub commit is running, and whether automatic updates are on (no secrets shown). */
 function codeVersion() {
@@ -33,7 +34,8 @@ export default defineCommand(new SlashCommandBuilder().setName('dev').setDescrip
     .addSubcommand(s => s.setName('alerts').setDescription('Developer: post every anti-nuke trigger from every server to one channel')
     .addChannelOption(o => o.setName('channel').setDescription('Where the global alerts go (leave empty to see the current setup)').addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement))
     .addBooleanOption(o => o.setName('warnings').setDescription('Also post first-time warnings, not just strips (default: no)'))
-    .addBooleanOption(o => o.setName('off').setDescription('Stop the global alerts')))
+    .addBooleanOption(o => o.setName('off').setDescription('Stop posting to the global channel'))
+    .addBooleanOption(o => o.setName('dm').setDescription('DM each strip to TRUSTED_DM_IDS too (default: on)')))
     .addSubcommand(s => s.setName('update').setDescription('Automatic GitHub updates: see the status, or install now (Developer)')
     .addStringOption(o => o.setName('action').setDescription('What to do (default: status)').addChoices({ name: 'Show status', value: 'status' }, { name: 'Check and install now', value: 'now' })))
     .addSubcommand(s => s.setName('sync').setDescription('Re-register commands globally and clear duplicate guild-scoped copies in this server')
@@ -48,6 +50,13 @@ export default defineCommand(new SlashCommandBuilder().setName('dev').setDescrip
     }
     if (sub === 'alerts') {
         const current = globalAlertTarget(ctx.store);
+        const dm = i.options.getBoolean('dm');
+        const dmLine = () => { const d = dmSetting(ctx.store); const who = trustedRecipients().map(id => `<@${id}>`).join(' ') || 'nobody (set TRUSTED_DM_IDS)'; return `**DMs:** ${d.on ? `on, to ${who}${d.warnings ? ' (warnings too)' : ' (strips only)'}` : 'off'}`; };
+        if (dm !== null) {
+            setDmSetting(ctx.store, { on: dm, warnings: i.options.getBoolean('warnings') ?? dmSetting(ctx.store).warnings });
+            if (!i.options.getChannel('channel') && !i.options.getBoolean('off'))
+                return `Anti-nuke DMs are now **${dm ? 'on' : 'off'}**.\n${dmLine()}`;
+        }
         if (i.options.getBoolean('off')) {
             if (!current)
                 return 'Global anti-nuke alerts are already off.';
@@ -58,12 +67,12 @@ export default defineCommand(new SlashCommandBuilder().setName('dev').setDescrip
         const warnings = i.options.getBoolean('warnings');
         if (!channel) {
             if (!current)
-                return '**Global anti-nuke alerts are off.** Turn them on with `/dev alerts channel:#channel`: every anti-nuke trigger in every server is then also posted there, with the server, the person, the roles they held and a Jump to Server button.';
+                return `**Global alert channel:** not set. Add one with \`/dev alerts channel:#channel\`: every anti-nuke trigger in every server is then also posted there.\n${dmLine()}`;
             if (warnings !== null) {
                 setGlobalAlertTarget(ctx.store, { ...current, warnings, by: i.user.id, at: Date.now() });
                 return `Global anti-nuke alerts now ${warnings ? '**include**' : 'leave out'} first-time warnings. Channel: <#${current.channelId}>.`;
             }
-            return `**Global anti-nuke alerts are on** in <#${current.channelId}> (\`${current.guildId}\`).\n**Warnings:** ${current.warnings ? 'posted too' : 'strips only'}\n-# Set by <@${current.by}> <t:${Math.floor(current.at / 1000)}:R>. Change with \`/dev alerts channel:\`, stop with \`/dev alerts off:true\`.`;
+            return `**Global anti-nuke alerts are on** in <#${current.channelId}> (\`${current.guildId}\`).\n**Warnings:** ${current.warnings ? 'posted too' : 'strips only'}\n${dmLine()}\n-# Set by <@${current.by}> <t:${Math.floor(current.at / 1000)}:R>. Change with \`/dev alerts channel:\`, stop with \`/dev alerts off:true\`.`;
         }
         const guild = i.guild;
         const real = guild?.channels.cache.get(channel.id);

@@ -74,3 +74,31 @@ test('a real trigger is posted to the global channel with the roles held before 
         assert.match(JSON.stringify(pushes.filter(p => p.channel === 'feed').at(-1)!.embed), /Anti-nuke Warning/, 'warnings posted when switched on');
     } finally { store.close(); }
 });
+
+test('every strip is DMed to the trusted people with the same card, rate-limited so a raid cannot flood DMs', async () => {
+    const { dmGlobalAlert, dmSetting, setDmSetting, resetDmLimits, DM_WINDOW_MAX } = await import('../src/security/global-alert.js');
+    const { config } = await import('../src/config.js');
+    const store = new Store(':memory:');
+    const sent: { to: string; payload: any }[] = [];
+    const client: any = { users: { fetch: async (id: string) => ({ send: async (payload: any) => { sent.push({ to: id, payload }); } }) } };
+    const before = new Set(config.trustedDmIds);
+    config.trustedDmIds.clear(); config.trustedDmIds.add('111111111111111111');
+    resetDmLimits();
+    const info = (actor: string, mode = 'enforce') => ({ guild: { id: 'g', name: 'Central Bank of West Midtown' }, actor, snapshot: { username: 'cam', avatarUrl: null, bot: false, roles: ['Staff'] },
+        rule: timeout, mode, incident: 23, failed: false, reverted: { completed: 1, failed: 0, skipped: 0 }, jumpUrl: 'https://discord.com/channels/g/log' });
+    try {
+        assert.deepEqual(dmSetting(store), { on: true, warnings: false }, 'on by default, strips only');
+        assert.equal(await dmGlobalAlert(client, store, info('a'), 1000), 1);
+        assert.equal(sent[0]!.to, '111111111111111111');
+        const card = sent[0]!.payload.embeds[0].toJSON();
+        assert.equal(card.title, 'Anti-nuke Triggered');
+        assert.match(JSON.stringify(card.fields), /Central Bank of West Midtown/);
+        assert.equal(sent[0]!.payload.components[0].toJSON().components[0].label, 'Jump to Server');
+        assert.equal(await dmGlobalAlert(client, store, info('a'), 2000), 0, 'same person and server: once per 5 minutes');
+        assert.equal(await dmGlobalAlert(client, store, info('w', 'warn'), 3000), 0, 'warnings are not DMed by default');
+        for (let n = 0; n < DM_WINDOW_MAX + 5; n++) await dmGlobalAlert(client, store, info(`x${n}`), 4000 + n);
+        assert.equal(sent.length, DM_WINDOW_MAX, 'at most 15 DMs per 10 minutes');
+        resetDmLimits(); setDmSetting(store, { on: false, warnings: false });
+        assert.equal(await dmGlobalAlert(client, store, info('b'), 1000), 0, '/dev alerts dm:false turns them off');
+    } finally { config.trustedDmIds.clear(); for (const id of before) config.trustedDmIds.add(id); resetDmLimits(); store.close(); }
+});
