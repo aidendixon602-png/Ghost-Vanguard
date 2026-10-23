@@ -335,7 +335,7 @@ Every slash command above also works with a `,` prefix (e.g. `,dev status`). The
 `,database status` — Show database health, storage, backup and migration status
 `,database verify <backup>` — Recheck backup checksum and database integrity
 `,deauthserver DEAUTHORIZE` — Developer: remove this server's authorization and leave
-`,dev alerts [--channel <channel>] [--warnings] [--off]` — Developer: post every anti-nuke trigger from every server to one channel
+`,dev alerts [--channel <channel>] [--warnings] [--off] [--dm]` — Developer: post every anti-nuke trigger from every server to one channel
 `,dev broadcast <message> [--title <title>] [--confirm <confirm>]` — Post an announcement to every authorized server's log channel
 `,dev diagnostics` — Inspect runtime health without secrets
 `,dev inspect <guild_id>` — Read-only overview of any server Vanguard knows

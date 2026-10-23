@@ -7,12 +7,12 @@ Generated from the bot itself (`npm run docs`). Every rank can also use everythi
 - **Developer is the top rank** (the bot owner and `DEVELOPER_IDS`). Restarts, installing updates, restoring data, removing servers, bot-wide ranks and lifting hardbans are Developer only, so giving someone Supreme Leader or lower cannot break the bot.
 - **Unbans:** ordinary bans are lifted by Admins and server owners; genrebans by a Supreme Leader or Developer (or a one-server exception from an Overseer+); hardbans only by a Developer.
 - **Comma commands** (`,help`, `,restart`…) need an exact `DEVELOPER_IDS` entry; `BOT_OWNER_ID` alone is not enough.
-- **Anti-nuke** ignores only Developers, Supreme Leaders, the server owner and whitelisted people. Every other rank is still watched.
+- **Anti-nuke watches everyone.** Developers, server owners and whitelisted people are alerted on but never punished; every other rank, Supreme Leaders included, is punished.
 - Check anyone with `/setup staff check user:@them`; see all ranks with `/setup staff list`.
 
 ## 🧰 Developer
 
-The top rank: the bot owner (`BOT_OWNER_ID`) and anyone in `DEVELOPER_IDS`. Everything, including the tools that can take the bot down or reach every server at once: restarts, installing updates, restoring database settings, removing or banning servers, giving bot-wide ranks and lifting hardbans. Ignored by anti-nuke. Set only in `.env`.
+The top rank: the bot owner (`BOT_OWNER_ID`) and anyone in `DEVELOPER_IDS`. Everything, including the tools that can take the bot down or reach every server at once: restarts, installing updates, restoring database settings, removing or banning servers, giving bot-wide ranks and lifting hardbans. Watched by anti-nuke, but never punished. Set only in `.env`.
 
 - `/dev alerts`: Developer: post every anti-nuke trigger from every server to one channel
 - `/dev database restore-settings`: Developer: put back lost settings from an old backup file; anything newer is kept
@@ -25,14 +25,14 @@ The top rank: the bot owner (`BOT_OWNER_ID`) and anyone in `DEVELOPER_IDS`. Ever
 
 ## 🏠 Server Owner
 
-Whoever owns a Discord server, in that server only. Above Supreme Leader there: everything server-side, including security admins and undoing setting changes. No bot-wide tools (network bans, /dev, the database). Ignored by anti-nuke.
+Whoever owns a Discord server, in that server only. Above Supreme Leader there: everything server-side, including security admins and undoing setting changes. No bot-wide tools (network bans, /dev, the database). Watched by anti-nuke, but never punished.
 
 - `/security admin`: Server owner: add, remove or list security admins
 - `/setup history restore`: Server owner: undo a setting change by its number
 
 ## 👑 Supreme Leader
 
-Bot-wide, every server: everything except the Developer-only tools. Diagnostics, update status, database health and backups, genrebans and hardbans, lifting genrebans. Ignored by anti-nuke. Given with `/setup staff global` or `SUPREME_LEADER_IDS`.
+Bot-wide, every server: everything except the Developer-only tools. Diagnostics, update status, database health and backups, genrebans and hardbans, lifting genrebans. Punished by anti-nuke like anyone else. Given with `/setup staff global` or `SUPREME_LEADER_IDS`.
 
 - `/dev autoreact add`: React to every message from a member (🐐 by default)
 - `/dev autoreact list`: Members the bot auto-reacts to in this server
