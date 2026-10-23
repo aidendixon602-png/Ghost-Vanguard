@@ -2,7 +2,7 @@ import { SlashCommandBuilder } from 'discord.js';
 import { defineCommand } from '../../bot/registry.js';
 import { canUsePrefixRestart, requestPrefixRestart } from '../../bot/prefix-restart.js';
 import { clearRestartNotice, restartInProgressText, restartNoticeText, saveRestartNotice } from '../../bot/restart-notice.js';
-import { PREFIX_DELETE_DELAY_MS, schedulePrefixMessageDeletion } from '../../bot/prefix-cleanup.js';
+import { prefixDeleteDelayMs, schedulePrefixMessageDeletion } from '../../bot/prefix-cleanup.js';
 import { AppError } from '../../errors.js';
 export default defineCommand(new SlashCommandBuilder()
     .setName('restart')
@@ -35,10 +35,10 @@ export default defineCommand(new SlashCommandBuilder()
     if (channelId && messageId) {
         if (!saveRestartNotice(ctx.store, channelId, messageId, requestedAt)) {
             await i.editReply({ content: restartInProgressText() }).catch(() => { });
-            schedulePrefixMessageDeletion(ctx.client, ctx.store, channelId, messageId, Date.now() + PREFIX_DELETE_DELAY_MS);
+            schedulePrefixMessageDeletion(ctx.client, ctx.store, channelId, messageId, Date.now() + prefixDeleteDelayMs());
             return;
         }
-        schedulePrefixMessageDeletion(ctx.client, ctx.store, channelId, messageId, requestedAt + PREFIX_DELETE_DELAY_MS);
+        schedulePrefixMessageDeletion(ctx.client, ctx.store, channelId, messageId, requestedAt + prefixDeleteDelayMs());
     }
     else if (channelId) {
         // No message ID — still store with a placeholder so restart still happens; notice won't be edited back
@@ -63,5 +63,5 @@ export default defineCommand(new SlashCommandBuilder()
     const msg = failureText[result] ?? 'The restart could not be scheduled.';
     await i.editReply({ content: msg }).catch(() => { });
     if (channelId && messageId)
-        schedulePrefixMessageDeletion(ctx.client, ctx.store, channelId, messageId, Date.now() + PREFIX_DELETE_DELAY_MS);
+        schedulePrefixMessageDeletion(ctx.client, ctx.store, channelId, messageId, Date.now() + prefixDeleteDelayMs());
 });

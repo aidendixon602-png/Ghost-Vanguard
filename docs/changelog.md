@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.1.2: comma commands stay longer
+- Comma commands (`,restart`, `,help`…) and the bot's replies now stay for **60 seconds** before they are deleted (was 10), long enough to read the result.
+- New `COMMA_DELETE_SECONDS` in `.env` sets the time; `0` keeps them and never deletes.
+
 ## 3.1.1: security alerts DM the bot Developers
 - **Anti-nuke alerts, protected-role and protected-user alerts are now DMed to every bot Developer** (`BOT_OWNER_ID` and `DEVELOPER_IDS`) as well as `TRUSTED_DM_IDS`. Each person gets one DM even if they are on both lists, and the same rate limit applies.
 - Backup files and other bot DMs still go only to `TRUSTED_DM_IDS`.
