@@ -314,3 +314,30 @@ test('trust panel: save replaces what they had, presets expand, Everything wins,
  await assert.rejects(registry.components[0]!.execute(ctx,{customId:`tp:111111111111111111:222222222222222222:save:u${T}:0:1`,guildId:'333333333333333333',user:{id:'222222222222222222'}} as any),/belongs to someone else/);
  }finally{store.close();}
 });
+
+test('whitelisted people are recorded quietly (no cards) unless ALERT_EXEMPT=true; a partial whitelist says what is missing',async()=>{
+ const saved=process.env.ALERT_EXEMPT;
+ try {
+  let {store,security,guild,logs}=setup();
+  store.grant('g','mod','trust','owner');
+  process.env.ALERT_EXEMPT='';
+  for(const n of [1,2,3,4,5])await security.audit({id:`q${n}`,executorId:'mod',action:AuditLogEvent.MemberBanAdd,targetId:`t${n}`,createdTimestamp:Date.now()} as any,guild);
+  assert.deepEqual(store.all('SELECT mode FROM incidents').map(r=>r.mode),['exempt'],'still recorded');
+  assert.equal(logs.length,0,'but no card in the log');
+  store.close();
+  ({store,security,guild,logs}=setup());
+  store.grant('g','mod','trust','owner');
+  process.env.ALERT_EXEMPT='true';
+  for(const n of [1,2,3,4,5])await security.audit({id:`r${n}`,executorId:'mod',action:AuditLogEvent.MemberBanAdd,targetId:`t${n}`,createdTimestamp:Date.now()} as any,guild);
+  assert.match(JSON.stringify(logs.at(-1).toJSON()),/not punished/,'ALERT_EXEMPT=true brings the card back');
+  store.close();
+  ({store,security,guild,logs}=setup());
+  store.grant('g','mod','trust:mass_ban','owner');store.grant('g','mod','trust:timeout','owner');
+  security.punish=async()=>'Removed 1 dangerous role(s).';
+  for(const n of [1,2,3,4,5])await security.audit({id:`k${n}`,executorId:'mod',action:AuditLogEvent.MemberKick,targetId:`k${n}`,createdTimestamp:Date.now()} as any,guild);
+  const card=logs.at(-1).toJSON();
+  assert.equal(card.title,'Anti-nuke Triggered');
+  assert.match(card.fields.find((f:any)=>f.name==='Whitelist').value,/but not for \*\*Kick\*\*/);
+  store.close();
+ } finally {process.env.ALERT_EXEMPT=saved??'';}
+});

@@ -9,6 +9,8 @@ import type { LogQueue } from '../logging.js';
 import { noteThreat } from './threat-board.js';
 import { embed, memberOrNull } from '../ui/ui.js';
 import { incidentCard } from '../ui/incident-card.js';
+import { alertExempt } from '../bot/env-rules.js';
+import { scopeName } from '../ui/antinuke-panel.js';
 import { dmGlobalAlert, sendGlobalAlert, snapshotMember, type GlobalAlertInfo } from './global-alert.js';
 
 type Change = {
@@ -234,12 +236,13 @@ export class Security {
         if (deleted.channels || deleted.roles)
             buttons.push(new ButtonBuilder().setCustomId(`incident:restore:${incident}`).setLabel('Review restore').setStyle(ButtonStyle.Secondary));
         const rows = buttons.length ? [new ActionRowBuilder<ButtonBuilder>().addComponents(...buttons)] : [];
-        this.logs.push(guild.id, incidentCard({ incident, actor, rule: active, mode: warnOnly ? 'warn' : s.mode, count, result, progress, deleted, targetId: entry.targetId ?? null }), rows);
+        this.logs.push(guild.id, incidentCard({ incident, actor, rule: active, mode: warnOnly ? 'warn' : s.mode, count, result, progress, deleted, targetId: entry.targetId ?? null, whitelistNote: this.partialWhitelist(guild, actor, active) }), rows);
         try {
             const info: GlobalAlertInfo = {
                 guild: { id: guild.id, name: guild.name }, actor, snapshot, rule: active, mode: warnOnly ? 'warn' : s.mode, incident,
                 failed: /cannot|unavailable|failed|Protected|no longer a member|not contained|incomplete/i.test(result.split(' [')[0]!),
                 reverted: active.revert ? progress : null,
+                whitelistNote: this.partialWhitelist(guild, actor, active),
                 jumpUrl: `https://discord.com/channels/${guild.id}${s.logChannelId ? `/${s.logChannelId}` : ''}`,
             };
             sendGlobalAlert(this.store, this.logs, info, guild.client);
@@ -252,6 +255,8 @@ export class Security {
     private async alertExempt(guild: Guild, actor: string, rule: Rule, count: number, reason: string, targetId: string | null, logChannelId: string | null) {
         const result = `Not punished: ${reason}. Nothing was undone.`;
         const incident = this.store.incident(guild.id, actor, rule.key, 'exempt', result);
+        // Recorded either way (/antinuke incidents); cards and DMs only with ALERT_EXEMPT=true.
+        if (!alertExempt()) return;
         const snapshot = snapshotMember(await memberOrNull(guild, actor).catch(() => null));
         this.logs.push(guild.id, incidentCard({ incident, actor, rule, mode: 'exempt', exemptReason: reason, count, result, progress: { completed: 0, failed: 0, skipped: 0 }, deleted: this.recentDeletions(guild.id, actor, Date.now()), targetId }));
         try {
@@ -260,6 +265,19 @@ export class Security {
             sendGlobalAlert(this.store, this.logs, info, guild.client);
             void dmGlobalAlert(guild.client, this.store, info).catch(() => 0);
         } catch { }
+    }
+
+    /**
+     * Someone with whitelist entries that don't cover this rule: say what they are whitelisted for and what is
+     * missing, so staff know why a "whitelisted" person was punished and how to allow it. Null when they have none.
+     */
+    partialWhitelist(guild: Guild, actor: string, rule: Rule): string | null {
+        const ids = [actor, ...(guild.members?.cache?.get(actor)?.roles.cache.keys() ?? [])];
+        const marks = ids.map(() => '?').join(',');
+        const kinds = this.store.all(`SELECT kind FROM grants WHERE guild_id=? AND user_id IN (${marks}) AND (kind LIKE 'trust:%' OR kind LIKE 'trust_role:%') AND (expires IS NULL OR expires>?)`, guild.id, ...ids, Date.now())
+            .map(r => String(r.kind).split(':')[1]!).filter(Boolean);
+        if (!kinds.length) return null;
+        return `Whitelisted for **${scopeName([...new Set(kinds)])}**, but not for **${rule.title}**. If they should be allowed to do this, add it with \`/antinuke whitelist add\` (or pick "Everything").`;
     }
 
     private readonly headsUps = new Map<string, number>();

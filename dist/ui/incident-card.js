@@ -41,6 +41,8 @@ export function incidentCard(info) {
     if (info.deleted.channels || info.deleted.roles)
         fields.push({ name: 'Deleted in the last 10 min', value: `${info.deleted.channels} channel(s), ${info.deleted.roles} role(s). Press **Review restore** to preview putting them back.`, inline: false });
     const detail = info.result.replace(/ Reverts: \d+ completed, \d+ failed, \d+ skipped\.$/, '').replace(/ \[(completed|failed|skipped)\] /g, '\n• ');
+    if (info.whitelistNote && info.mode !== 'exempt')
+        fields.push({ name: 'Whitelist', value: info.whitelistNote.slice(0, 1000), inline: false });
     fields.push({ name: 'Details', value: detail.slice(0, 1000) || '—', inline: false });
     return new EmbedBuilder().setColor(color).setTitle(info.mode === 'warn' ? 'Anti-nuke Warning' : info.mode === 'exempt' ? 'Anti-nuke Alert (not punished)' : 'Anti-nuke Triggered').setDescription(headline)
         .addFields(fields).setFooter({ text: `Incident #${info.incident} · User ID: ${info.actor}` }).setTimestamp();

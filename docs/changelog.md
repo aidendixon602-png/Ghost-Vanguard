@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.2.1: whitelisted people stay quiet
+- **Whitelisted people no longer set off alerts.** The server owner, Developers and whitelisted people are still never punished, and their incidents are now recorded quietly in `/antinuke incidents` with no log card, global post or DM. Set `ALERT_EXEMPT=true` in `.env` to get the alerts back.
+- **When a partly whitelisted person is stripped, the alert says why.** A new **Whitelist** line names what they are covered for and what was missing (e.g. *Whitelisted for Basic moderation, but not for Permission Grant*), with how to add it. It shows in the security log, the global feed and the DM.
+
 ## 3.2.0: a cleaner command menu
 - **`/security` is split into three commands, one per job:**
   - `/automod`: spam, invites, links, AI moderation, alts, quiet hours, plus `scam` and `antiping`
