@@ -98,6 +98,18 @@ export class Security {
         return id === guild.ownerId || id === guild.client.user?.id || developers.has(id) || this.store.hasGrant(guild.id, id, 'trust') || [...(guild.members?.cache?.get(id)?.roles.cache.keys() ?? [])].some(role => !ignoreRoles.includes(role) && this.store.hasGrant(guild.id, role, 'trust_role'));
     }
 
+    /**
+     * Why anti-nuke must not punish this person, or null. They are still watched: when they hit a limit,
+     * the alert, the global feed and the DM all go out, marked "not punished".
+     */
+    exemptReason(guild: Guild, id: string, ignoreRoles: string[] = []): string | null {
+        if (id === guild.ownerId) return 'the server owner';
+        if (developers.has(id)) return 'a Developer';
+        if (this.store.hasGrant(guild.id, id, 'trust')) return 'on the full whitelist';
+        if ([...(guild.members?.cache?.get(id)?.roles.cache.keys() ?? [])].some(role => !ignoreRoles.includes(role) && this.store.hasGrant(guild.id, role, 'trust_role'))) return 'whitelisted by role';
+        return null;
+    }
+
     /** Rule-only whitelist: the user (kind "trust:<rule>") or one of their roles ("trust_role:<rule>") skips just that rule. */
     trustedFor(guild: Guild, id: string, rule: string, ignoreRoles: string[] = []): boolean {
         return this.store.hasGrant(guild.id, id, `trust:${rule}`) || [...(guild.members?.cache?.get(id)?.roles.cache.keys() ?? [])].some(role => !ignoreRoles.includes(role) && this.store.hasGrant(guild.id, role, `trust_role:${rule}`));
@@ -111,13 +123,15 @@ export class Security {
             const actor = responsibleActor(entry, guild);
             if (actor && this.store.get("SELECT 1 FROM grants WHERE guild_id=? AND (kind='trust_role' OR kind LIKE 'trust_role:%') AND (expires IS NULL OR expires>?)", guild.id, Date.now())) await memberOrNull(guild, actor).catch(() => null);
             const newlyAssigned = entry.action === AuditLogEvent.MemberRoleUpdate && entry.targetId === actor ? (changesOf(entry).find(c=>c.key==='$add')?.new ?? []).map((r:{id:string})=>r.id) : [];
-            if (!s.authorized || !actor || this.trusted(guild, actor, newlyAssigned))
+            // Everyone is watched except Vanguard itself (its own actions are attributed to the staff member behind them).
+            if (!s.authorized || !actor || actor === guild.client.user?.id)
                 return;
+            // Owner, Developers and whitelisted people are watched too, but never punished.
+            const exempt = this.exemptReason(guild, actor, newlyAssigned);
             if (entry.action === AuditLogEvent.MemberRoleUpdate && entry.targetId && entry.targetId !== actor) await memberOrNull(guild, entry.targetId).catch(() => null);
             for (const { rule, eventId } of this.rulesFor(entry, guild, actor, newlyAssigned))
                 // A role the actor just gave themselves cannot exempt that same action.
-                if (!this.trustedFor(guild, actor, rule.key, newlyAssigned))
-                    await this.evaluate(entry, guild, actor, rule, eventId);
+                await this.evaluate(entry, guild, actor, rule, eventId, exempt ?? (this.trustedFor(guild, actor, rule.key, newlyAssigned) ? 'whitelisted for this action' : null));
         });
     }
 
@@ -151,7 +165,7 @@ export class Security {
         return found;
     }
 
-    private async evaluate(entry: GuildAuditLogsEntry, guild: Guild, actor: string, rule: Rule, eventId: string) {
+    private async evaluate(entry: GuildAuditLogsEntry, guild: Guild, actor: string, rule: Rule, eventId: string, exempt: string | null = null) {
         const s = this.store.settings(guild.id);
         const now = Date.now();
         const at = entry.createdTimestamp;
@@ -166,11 +180,12 @@ export class Security {
         const count = this.store.count(guild.id, actor, rule.key, now - active.seconds * 1000);
         if (count < active.count) {
             // Still monitoring: one step before the limit, staff get a quiet heads-up (no action taken).
-            if (count === active.count - 1 && active.count >= 3 && s.mode === 'enforce') this.headsUp(guild, actor, active, count, now);
+            if (!exempt && count === active.count - 1 && active.count >= 3 && s.mode === 'enforce') this.headsUp(guild, actor, active, count, now);
             return;
         }
         if (this.store.get("SELECT 1 FROM incidents WHERE guild_id=? AND actor_id=? AND rule=? AND at>? AND mode<>'warn'", guild.id, actor, rule.key, now - active.seconds * 1000))
             return;
+        if (exempt) return this.alertExempt(guild, actor, active, count, exempt, entry.targetId ?? null, s.logChannelId);
         // Everyday rules warn first (people, not bots); a second offence within the hour gets the real punishment.
         const warnOnly = s.mode === 'enforce' && WARN_FIRST.has(rule.key)
             && !this.store.get("SELECT 1 FROM incidents WHERE guild_id=? AND actor_id=? AND mode='warn' AND at>?", guild.id, actor, now - WARNING_MEMORY_MS)
@@ -231,6 +246,20 @@ export class Security {
             // The same card by DM to the trusted people (TRUSTED_DM_IDS). Never waits on Discord here.
             void dmGlobalAlert(guild.client, this.store, info).catch(() => 0);
         } catch { /* the feed is extra; the server's own alert above is what matters */ }
+    }
+
+    /** Someone anti-nuke never punishes hit a limit: record it and alert everywhere, but take no action. */
+    private async alertExempt(guild: Guild, actor: string, rule: Rule, count: number, reason: string, targetId: string | null, logChannelId: string | null) {
+        const result = `Not punished: ${reason}. Nothing was undone.`;
+        const incident = this.store.incident(guild.id, actor, rule.key, 'exempt', result);
+        const snapshot = snapshotMember(await memberOrNull(guild, actor).catch(() => null));
+        this.logs.push(guild.id, incidentCard({ incident, actor, rule, mode: 'exempt', exemptReason: reason, count, result, progress: { completed: 0, failed: 0, skipped: 0 }, deleted: this.recentDeletions(guild.id, actor, Date.now()), targetId }));
+        try {
+            const info: GlobalAlertInfo = { guild: { id: guild.id, name: guild.name }, actor, snapshot, rule, mode: 'exempt', exemptReason: reason, incident, failed: false, reverted: null,
+                jumpUrl: `https://discord.com/channels/${guild.id}${logChannelId ? `/${logChannelId}` : ''}` };
+            sendGlobalAlert(this.store, this.logs, info);
+            void dmGlobalAlert(guild.client, this.store, info).catch(() => 0);
+        } catch { }
     }
 
     private readonly headsUps = new Map<string, number>();

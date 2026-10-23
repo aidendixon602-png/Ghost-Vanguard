@@ -102,3 +102,14 @@ test('every strip is DMed to the trusted people with the same card, rate-limited
         assert.equal(await dmGlobalAlert(client, store, info('b'), 1000), 0, '/dev alerts dm:false turns them off');
     } finally { config.trustedDmIds.clear(); for (const id of before) config.trustedDmIds.add(id); resetDmLimits(); store.close(); }
 });
+
+test('exempt people get a blue "not punished" card in the log, the global feed and the DM', async () => {
+    const { incidentCard } = await import('../src/ui/incident-card.js');
+    const card = incidentCard({ incident: 4, actor: 'owner', rule: timeout, mode: 'exempt', exemptReason: 'the server owner', count: 10, result: 'Not punished: the server owner. Nothing was undone.', progress: { completed: 0, failed: 0, skipped: 0 }, deleted: { channels: 0, roles: 0 }, targetId: null }).toJSON();
+    assert.equal(card.title, 'Anti-nuke Alert (not punished)');
+    assert.match(card.description!, /not punished\*\* because they are the server owner/);
+    assert.equal(card.fields!.find(f => f.name === 'Punishment')!.value, 'None (the server owner)');
+    const g = globalAlertCard({ guild: { id: 'g', name: 'G' }, actor: 'owner', snapshot: { username: 'o', avatarUrl: null, bot: false, roles: [] }, rule: timeout, mode: 'exempt', exemptReason: 'a Developer', incident: 4, failed: false, jumpUrl: 'https://discord.com/channels/g' }).embed.toJSON();
+    assert.equal(g.title, 'Anti-nuke Alert (not punished)');
+    assert.equal(g.fields!.find(f => f.name === 'Punishment')!.value, 'None (a Developer)');
+});

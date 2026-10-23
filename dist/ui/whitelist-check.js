@@ -7,12 +7,12 @@ export function whitelistCheck(store, guild, userId, roleIds, isBot, now = Date.
     const e = new EmbedBuilder().setTitle('Anti-nuke check').setFooter({ text: `User ID: ${userId}` }).setTimestamp();
     const auto = userId === guild.ownerId ? 'the server owner' : developers.has(userId) ? 'a Ghost Vanguard developer' : userId === guild.client?.user?.id ? 'Ghost Vanguard itself' : null;
     if (auto)
-        return e.setColor(Colors.Green).setDescription(`<@${userId}> is **${auto}**, so anti-nuke never acts on them.`);
+        return e.setColor(Colors.Green).setDescription(userId === guild.client?.user?.id ? `<@${userId}> is **${auto}**. Its own actions count against the staff member who asked for them.` : `<@${userId}> is **${auto}**, so anti-nuke never punishes them. They are still watched: if they hit a limit, you get an alert.`);
     const live = (kind, id = userId) => store.get('SELECT expires FROM grants WHERE guild_id=? AND user_id=? AND kind=? AND (expires IS NULL OR expires>?)', guild.id, id, kind, now);
     const full = live('trust');
     const fullRole = roleIds.find(r => live('trust_role', r));
     if (full || fullRole)
-        return e.setColor(Colors.Green).setDescription(`<@${userId}> has a **full bypass** (${full ? when(full.expires) : `from the role <@&${fullRole}>, ${when(live('trust_role', fullRole).expires)}`}). Anti-nuke ignores everything they do.`);
+        return e.setColor(Colors.Green).setDescription(`<@${userId}> has a **full bypass** (${full ? when(full.expires) : `from the role <@&${fullRole}>, ${when(live('trust_role', fullRole).expires)}`}). They are never punished, but still watched: if they hit a limit, you get an alert.`);
     const skips = [];
     const checked = [];
     for (const rule of RULES.filter(r => r.key !== 'join_flood')) {
@@ -40,5 +40,5 @@ export function whitelistCheck(store, guild, userId, roleIds, isBot, now = Date.
         notes.push('🔒 **Quarantined** from an earlier incident: staff roles given to them are removed again. Use the alert\'s **Undo strip** button or `/security release`.');
     return e.setColor(skips.length ? Colors.Blurple : Colors.Greyple)
         .setDescription(`${skips.length ? `<@${userId}> is whitelisted for **${skips.length}** rule(s).` : `<@${userId}> is **not whitelisted**. Anti-nuke checks everything they do.`}${notes.length ? `\n\n${notes.join('\n')}` : ''}`)
-        .addFields(...(skips.length ? [{ name: 'Anti-nuke ignores', value: skips.join('\n').slice(0, 1024) }] : []), { name: 'Still checked', value: checked.join('\n').slice(0, 1024) || 'Nothing.' }, { name: 'Change it', value: '`/antinuke whitelist add` to whitelist them · `/antinuke whitelist remove` to take them off', inline: false });
+        .addFields(...(skips.length ? [{ name: 'Not punished for (still alerted)', value: skips.join('\n').slice(0, 1024) }] : []), { name: 'Still checked', value: checked.join('\n').slice(0, 1024) || 'Nothing.' }, { name: 'Change it', value: '`/antinuke whitelist add` to whitelist them · `/antinuke whitelist remove` to take them off', inline: false });
 }

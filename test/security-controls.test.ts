@@ -54,13 +54,15 @@ test('legacy disabled toggles and loosened limits cannot weaken the fixed preset
  }finally{store.close();}
 });
 
-test('role whitelist uses current membership and expiry; expired role grants do not bypass',async()=>{
+test('role whitelist uses current membership and expiry; whitelisted people are watched but never punished',async()=>{
  const {store,security,guild}=setup();try {
  const member:any={id:'actor',roles:{cache:new Collection([['staff',{}]])}};
  guild.members.cache.set('actor',member);guild.members.fetch=async()=>member;
  store.grant('g','staff','trust_role','owner',1);
  assert.equal(security.trusted(guild,'actor'),true);
- await security.audit({id:'e',executorId:'actor',action:AuditLogEvent.MemberBanAdd,targetId:'target',createdTimestamp:Date.now()} as any,guild);assert.equal(store.all('SELECT * FROM observations').length,0);
+ let punished=0;security.punish=async()=>{punished++;return 'Removed 1 dangerous role(s).';};
+ for(const n of [1,2,3,4,5])await security.audit({id:'e'+n,executorId:'actor',action:AuditLogEvent.MemberBanAdd,targetId:'target'+n,createdTimestamp:Date.now()} as any,guild);
+ assert.equal(store.all('SELECT * FROM observations').length,5,'still watched');assert.deepEqual(store.all('SELECT mode FROM incidents').map(r=>r.mode),['exempt'],'alerted');assert.equal(punished,0,'never punished');
  store.run('UPDATE grants SET expires=? WHERE guild_id=?',Date.now()-1,'g');assert.equal(security.trusted(guild,'actor'),false);
  }finally{store.close();}
 });
@@ -240,14 +242,14 @@ test('whitelist panel: pick a duration, re-selecting changes the duration, and r
  } finally {store.close();}
 });
 
-test('a rule-only whitelist skips just that rule; every other rule still catches them',async()=>{
+test('a rule-only whitelist stops punishment for just that rule (still alerted); every other rule still punishes',async()=>{
  const {store,security,guild}=setup();try {
  const now=Date.now();
  store.grant('g','mod','trust:mass_ban','owner');
  for(const n of [1,2,3,4,5])await security.audit({id:`b${n}`,executorId:'mod',action:AuditLogEvent.MemberBanAdd,targetId:`t${n}`,createdTimestamp:now} as any,guild);
- assert.equal(store.all('SELECT * FROM incidents').length,0,'bans are skipped');
+ assert.deepEqual(store.all('SELECT rule,mode FROM incidents').map(r=>`${r.rule}:${r.mode}`),['mass_ban:exempt'],'bans: alert only, not punished');
  for(const n of [1,2,3,4,5])await security.audit({id:`k${n}`,executorId:'mod',action:AuditLogEvent.MemberKick,targetId:`k${n}`,createdTimestamp:now} as any,guild);
- assert.equal(store.all('SELECT rule FROM incidents').map(r=>r.rule).join(),'mass_kick','kicks still trigger');
+ assert.deepEqual(store.all("SELECT rule FROM incidents WHERE mode<>'exempt'").map(r=>r.rule),['mass_kick'],'kicks are still punished');
  }finally{store.close();}
 });
 

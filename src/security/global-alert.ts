@@ -45,8 +45,9 @@ export interface GlobalAlertInfo {
     actor: string;
     snapshot: ActorSnapshot;
     rule: Rule;
-    /** 'enforce' | 'warn' | 'observe' */
+    /** 'enforce' | 'warn' | 'observe' | 'exempt' (watched but never punished: owner, Developer, whitelisted) */
     mode: string;
+    exemptReason?: string;
     incident: number;
     /** Strip/kick/ban could not be applied. */
     failed: boolean;
@@ -58,17 +59,17 @@ const cap = (s: string) => s[0]!.toUpperCase() + s.slice(1);
 
 export function globalAlertCard(info: GlobalAlertInfo) {
     const punishment = cap(info.rule.punishment ?? 'strip');
-    const warn = info.mode === 'warn', watch = info.mode !== 'enforce' && !warn;
+    const warn = info.mode === 'warn', exempt = info.mode === 'exempt', watch = info.mode !== 'enforce' && !warn && !exempt;
     const e = new EmbedBuilder()
-        .setColor(warn ? Colors.Yellow : watch ? Colors.Orange : info.failed ? Colors.DarkOrange : Colors.Red)
-        .setTitle(warn ? 'Anti-nuke Warning' : 'Anti-nuke Triggered')
+        .setColor(exempt ? Colors.Blurple : warn ? Colors.Yellow : watch ? Colors.Orange : info.failed ? Colors.DarkOrange : Colors.Red)
+        .setTitle(warn ? 'Anti-nuke Warning' : exempt ? 'Anti-nuke Alert (not punished)' : 'Anti-nuke Triggered')
         .addFields(
             { name: 'Guild', value: `**${clip(info.guild.name, 200)}**\n\`${info.guild.id}\``, inline: true },
             { name: 'User', value: `${info.snapshot.username ? clip(info.snapshot.username, 100) : 'Unknown'}\n(\`${info.actor}\`)`, inline: true },
             { name: 'Bot', value: info.snapshot.bot === null ? 'Unknown' : info.snapshot.bot ? 'Yes' : 'No', inline: true },
             { name: 'Triggered Action', value: info.rule.title, inline: true },
             { name: 'Threshold', value: `${info.rule.count} in ${info.rule.seconds}s`, inline: true },
-            { name: 'Punishment', value: warn ? `Warning (next time: ${punishment})` : watch ? `None (watch-only mode; would be ${punishment})` : info.failed ? `${punishment} (failed: check role order)` : punishment, inline: true },
+            { name: 'Punishment', value: exempt ? `None (${info.exemptReason ?? 'exempt'})` : warn ? `Warning (next time: ${punishment})` : watch ? `None (watch-only mode; would be ${punishment})` : info.failed ? `${punishment} (failed: check role order)` : punishment, inline: true },
             { name: 'Highest Role', value: clip(info.snapshot.roles[0] ?? 'None', 200), inline: false },
             { name: 'Roles Held', value: clip(info.snapshot.roles.join(', ') || 'None', 1024), inline: false },
         );
