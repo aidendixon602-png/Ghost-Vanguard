@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { MessageFlags, SlashCommandBuilder } from 'discord.js';
 import { config } from '../src/config.js';
 import { PrefixCommands, recognizesPrefixCommand, prefixHelp } from '../src/bot/prefix-commands.js';
-import { PREFIX_DELETE_DELAY_MS, restorePrefixMessageDeletions, schedulePrefixMessageDeletion } from '../src/bot/prefix-cleanup.js';
+import { prefixDeleteDelayMs, restorePrefixMessageDeletions, schedulePrefixMessageDeletion } from '../src/bot/prefix-cleanup.js';
 import { Registry, defineCommand } from '../src/bot/registry.js';
 import { Interactions } from '../src/bot/interactions.js';
 import { treeJson } from '../src/bot/command-tree.js';
@@ -215,7 +215,15 @@ test('prefix cleanup persists and restores deletion jobs, then deletes the bot m
     const store = new Store(':memory:');
     const client = fakeClient();
     try {
-        assert.equal(PREFIX_DELETE_DELAY_MS, 10_000);
+        const saved = process.env.COMMA_DELETE_SECONDS;
+        process.env.COMMA_DELETE_SECONDS = '';
+        assert.equal(prefixDeleteDelayMs(), 60_000, 'default: one minute');
+        process.env.COMMA_DELETE_SECONDS = '300'; assert.equal(prefixDeleteDelayMs(), 300_000, 'set in .env');
+        process.env.COMMA_DELETE_SECONDS = 'junk'; assert.equal(prefixDeleteDelayMs(), 60_000, 'bad value: default');
+        process.env.COMMA_DELETE_SECONDS = '0';
+        assert.equal(schedulePrefixMessageDeletion(client, store, 'channel', 'kept', Date.now()), null, '0 keeps them');
+        assert.equal(store.get('SELECT 1 FROM prefix_message_cleanup WHERE message_id=?', 'kept'), undefined);
+        process.env.COMMA_DELETE_SECONDS = saved ?? '';
         store.run('INSERT INTO prefix_message_cleanup(id,channel_id,message_id,delete_at) VALUES(?,?,?,?)', 'restore-me', 'channel', 'old-message', Date.now() - 1);
         assert.equal(restorePrefixMessageDeletions(client, store), 1);
         await new Promise(resolve => setTimeout(resolve, 30));

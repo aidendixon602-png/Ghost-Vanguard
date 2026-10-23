@@ -1,5 +1,5 @@
 import { logEvent } from '../errors.js';
-import { PREFIX_DELETE_DELAY_MS, schedulePrefixMessageDeletion } from './prefix-cleanup.js';
+import { prefixDeleteDelayMs, schedulePrefixMessageDeletion } from './prefix-cleanup.js';
 /** ETA shown in Discord. This is informational only; it does not delay the restart. */
 export const RESTART_ETA_MS = 30_000;
 const NOTICE_ROW_ID = 1;
@@ -36,7 +36,7 @@ export async function completeRestartNotice(client, store, now, servers, command
         return false;
     // Consume it before making network calls, so a missing/deleted message cannot block a later restart.
     clearRestartNotice(store);
-    const deleteNoticeLater = () => schedulePrefixMessageDeletion(client, store, String(row.channel_id), String(row.message_id), Date.now() + PREFIX_DELETE_DELAY_MS);
+    const deleteNoticeLater = () => schedulePrefixMessageDeletion(client, store, String(row.channel_id), String(row.message_id), Date.now() + prefixDeleteDelayMs());
     const channel = await client.channels.fetch(String(row.channel_id)).catch(() => null);
     if (!channel?.isTextBased?.() || !channel.messages?.fetch) {
         logEvent('restart_notice_unavailable', { reason: 'channel unavailable or not text-based' });

@@ -9,7 +9,7 @@
 Anti-nuke and the threat board · Moderation and audit logging · Ticket desk · Live dashboard · Server recovery
 
 [![CI](https://github.com/aidendixon602-png/Ghost-Vanguard/actions/workflows/ci.yml/badge.svg)](https://github.com/aidendixon602-png/Ghost-Vanguard/actions/workflows/ci.yml)
-![Version](https://img.shields.io/badge/version-3.1.1-6d5ae6)
+![Version](https://img.shields.io/badge/version-3.1.2-6d5ae6)
 ![Tests](https://img.shields.io/badge/tests-545%20passing-2EA043)
 ![Node](https://img.shields.io/badge/node-24-339933?logo=node.js&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
@@ -88,7 +88,7 @@ Every command has a minimum rank, and each rank includes everything below it. Bo
 | **Moderator** | One server | Bans, kicks, tempbans, purges, ban records, denying appeals |
 | **Helper** | One server | Warnings, short timeouts, cases and notes |
 
-**Developer is the top bot-wide rank:** the bot owner (`BOT_OWNER_ID`) and IDs in `DEVELOPER_IDS`. Developer-only actions are hidden from the slash menu and handled as comma-prefix commands. Every comma command requires the exact user ID in `DEVELOPER_IDS`—`BOT_OWNER_ID` alone is not enough, so add the owner's ID there too. Use `/help` for available slash commands and `,help` for the Developer command list. Sensitive and admin slash replies are private (ephemeral); ordinary public utility replies stay public.
+**Developer is the top bot-wide rank:** the bot owner (`BOT_OWNER_ID`) and IDs in `DEVELOPER_IDS`. Developer-only actions are hidden from the slash menu and handled as comma-prefix commands. Every comma command requires the exact user ID in `DEVELOPER_IDS`—`BOT_OWNER_ID` alone is not enough, so add the owner's ID there too. Use `/help` for available slash commands and `,help` for the Developer command list. Comma commands and the bot's replies are deleted after 60 seconds so they don't linger in public channels; set `COMMA_DELETE_SECONDS` (`0` keeps them). Sensitive and admin slash replies are private (ephemeral); ordinary public utility replies stay public.
 
 **Who can lift a ban**
 
@@ -175,6 +175,7 @@ Copy [`.env.example`](.env.example) to `.env` and set at least:
 | `DASHBOARD_TOKEN` | Recommended | Require a token for the dashboard and its API when enabled. Without it the dashboard is open to anyone who can reach the port, so keep it on localhost |
 | `BOT_OWNER_ID` | Recommended | The bot owner: Developer rank for ordinary permission checks, and the default for `TRUSTED_DM_IDS`. Add this ID to `DEVELOPER_IDS` separately to use comma commands |
 | `SUPREME_LEADER_IDS` | No | Supreme Leaders: bot-wide rank below Developer; may lift genrebans from ban-log controls, but do not get comma commands. Nobody is built in; every start prints who has bot-wide access |
+| `COMMA_DELETE_SECONDS` | No | How long comma commands and their replies stay before being deleted (default `60`; `0` keeps them) |
 | `ANTINUKE_LOCK` | Recommended | `true`: only Developers can turn anti-nuke off or weaken it; servers switched off come back on at start |
 | `PROTECTED_USERS` | No | People staff can never ban, kick, time out or de-role; manual attempts are undone and alerted |
 | `PROTECTED_ROLES`, `PROTECTED_ROLE_ASSIGNERS` | No | Roles only the listed people (and Developers) may give; anyone else's grant is taken back |

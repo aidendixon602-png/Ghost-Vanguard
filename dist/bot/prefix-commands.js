@@ -3,7 +3,7 @@ import { AppError, failure, logEvent } from '../errors.js';
 import { Guard } from './guard.js';
 import { canUsePrefixRestart, requestPrefixRestart } from './prefix-restart.js';
 import { clearRestartNotice, restartInProgressText, restartNoticeText, saveRestartNotice } from './restart-notice.js';
-import { PREFIX_DELETE_DELAY_MS, schedulePrefixMessageDeletion } from './prefix-cleanup.js';
+import { prefixDeleteDelayMs, schedulePrefixMessageDeletion } from './prefix-cleanup.js';
 import { isDeveloperPrefixOnly, validateArguments } from './registry.js';
 const ALIASES = {
     update: { command: 'dev', path: ['update'] },
@@ -44,7 +44,7 @@ export class PrefixCommands {
                 return;
             }
             // The caller's message is queued for deletion as soon as a valid developer command is accepted.
-            schedulePrefixMessageDeletion(this.services.client, this.services.store, command.channelId, command.id, requestedAt + PREFIX_DELETE_DELAY_MS);
+            schedulePrefixMessageDeletion(this.services.client, this.services.store, command.channelId, command.id, requestedAt + prefixDeleteDelayMs());
             if (invocation.special === 'help') {
                 await this.sendAndExpire(command, prefixHelp(this.services.registry));
                 return;
@@ -65,11 +65,11 @@ export class PrefixCommands {
     async restart(message, requestedAt) {
         if (!canUsePrefixRestart(message.author.id))
             return;
-        schedulePrefixMessageDeletion(this.services.client, this.services.store, message.channelId, message.id, requestedAt + PREFIX_DELETE_DELAY_MS);
+        schedulePrefixMessageDeletion(this.services.client, this.services.store, message.channelId, message.id, requestedAt + prefixDeleteDelayMs());
         const notice = await message.reply(restartNoticeText(requestedAt));
         if (!saveRestartNotice(this.services.store, message.channelId, notice.id, requestedAt)) {
             await notice.edit(restartInProgressText());
-            schedulePrefixMessageDeletion(this.services.client, this.services.store, message.channelId, notice.id, Date.now() + PREFIX_DELETE_DELAY_MS);
+            schedulePrefixMessageDeletion(this.services.client, this.services.store, message.channelId, notice.id, Date.now() + prefixDeleteDelayMs());
             return;
         }
         const result = await requestPrefixRestart(message.author.id);
@@ -87,7 +87,7 @@ export class PrefixCommands {
         }
         clearRestartNotice(this.services.store);
         await notice.edit(failureText[result] ?? 'The restart could not be scheduled.');
-        schedulePrefixMessageDeletion(this.services.client, this.services.store, message.channelId, notice.id, Date.now() + PREFIX_DELETE_DELAY_MS);
+        schedulePrefixMessageDeletion(this.services.client, this.services.store, message.channelId, notice.id, Date.now() + prefixDeleteDelayMs());
     }
     async execute(message, invocation) {
         const def = invocation.def;
@@ -126,7 +126,7 @@ export class PrefixCommands {
         else if (!response._prefixReply)
             await response.editReply('Done.');
         for (const reply of response._prefixReplies)
-            schedulePrefixMessageDeletion(this.services.client, this.services.store, message.channelId, reply.id, Date.now() + PREFIX_DELETE_DELAY_MS);
+            schedulePrefixMessageDeletion(this.services.client, this.services.store, message.channelId, reply.id, Date.now() + prefixDeleteDelayMs());
         logEvent('command_activity', { command: invocation.commandName, subcommand: invocation.path.join('/'), user: message.author.tag,
             userId: message.author.id, guildId: message.guildId, guild: message.guild.name, result: 'success', source: 'prefix' });
     }
@@ -135,7 +135,7 @@ export class PrefixCommands {
         for (const part of splitText(content)) {
             const reply = await message.reply(part);
             replies.push(reply);
-            schedulePrefixMessageDeletion(this.services.client, this.services.store, message.channelId, reply.id, Date.now() + PREFIX_DELETE_DELAY_MS);
+            schedulePrefixMessageDeletion(this.services.client, this.services.store, message.channelId, reply.id, Date.now() + prefixDeleteDelayMs());
         }
         return replies[0];
     }

@@ -3,7 +3,17 @@ import type { Client } from 'discord.js';
 import type { Store } from '../database/db.js';
 import { logEvent } from '../errors.js';
 
-export const PREFIX_DELETE_DELAY_MS = 10_000;
+/**
+ * How long comma commands (`,restart`, `,help`…) and the bot's replies stay before they are deleted.
+ * COMMA_DELETE_SECONDS in .env: default 60; `0` keeps them (never deleted). Deleting keeps developer
+ * commands out of public channels.
+ */
+export const DEFAULT_PREFIX_DELETE_SECONDS = 60;
+export function prefixDeleteDelayMs(): number {
+    const raw = process.env.COMMA_DELETE_SECONDS?.trim();
+    const seconds = raw === undefined || raw === '' ? DEFAULT_PREFIX_DELETE_SECONDS : Number(raw);
+    return Number.isFinite(seconds) && seconds >= 0 ? Math.min(seconds, 86_400) * 1000 : DEFAULT_PREFIX_DELETE_SECONDS * 1000;
+}
 const RETRY_DELETE_MS = 30_000;
 
 /** Save a deletion job before scheduling it, so it survives a bot restart. */
@@ -12,8 +22,10 @@ export function schedulePrefixMessageDeletion(
     store: Store,
     channelId: string,
     messageId: string,
-    deleteAt = Date.now() + PREFIX_DELETE_DELAY_MS,
-): string {
+    deleteAt = Date.now() + prefixDeleteDelayMs(),
+): string | null {
+    // COMMA_DELETE_SECONDS=0: keep comma commands and replies.
+    if (prefixDeleteDelayMs() === 0) return null;
     const id = randomUUID();
     store.run('INSERT INTO prefix_message_cleanup(id,channel_id,message_id,delete_at) VALUES(?,?,?,?)', id, channelId, messageId, deleteAt);
     arm(client, store, id, deleteAt);
