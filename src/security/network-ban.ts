@@ -9,6 +9,7 @@ import { AppError, logEvent } from '../errors.js';
 import type { LogQueue } from '../logging.js';
 import { BOT_BELOW_TARGET, classify, MISSING_BAN_PERMISSION, type Outcome } from '../ui/progress.js';
 import { embed } from '../ui/ui.js';
+import { isProtectedUser } from '../bot/env-rules.js';
 
 /**
  * Developer bans that reach every server Ghost Vanguard protects.
@@ -159,6 +160,8 @@ export function assertTargetable(client: Client, userId: string, actorId: string
         throw new AppError('VALIDATION_ERROR', 'Ghost Vanguard cannot ban itself.');
     if (developers.has(userId) || isSupreme(userId) || userId === config.ownerId)
         throw new AppError('VALIDATION_ERROR', 'That user is a Ghost Vanguard developer or Supreme Leader, and cannot be network-banned.');
+    if (isProtectedUser(userId) && !developers.has(actorId))
+        throw new AppError('VALIDATION_ERROR', 'That user is a protected user (set in the bot settings), so only a Developer can network-ban them.');
 }
 
 /** Every server a network ban applies to, in a stable order. */

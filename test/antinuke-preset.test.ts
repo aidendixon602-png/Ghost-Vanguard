@@ -398,3 +398,18 @@ test('one step before a limit, staff get a single heads-up and nothing is done t
   assert.equal(pushed.filter(p=>p.title==='Anti-nuke heads-up').length,1,'only one heads-up per window');
  } finally {store.close();}
 });
+
+test('ANTINUKE_LOCK: a server someone switched off is switched back on at start, with a notice; without the lock the choice is kept',async()=>{
+ const store=new Store(':memory:');authorize(store);const saved=process.env.ANTINUKE_LOCK;
+ try {
+  const {guild}=readinessGuild();
+  const s=store.settings('g');s.enabled=false;s.logChannelId='log';store.save(s);store.setAntinukeStaffDisabled('g',true);
+  const alerts:any[]=[];const logs:any={push:(_g:any,e:any)=>alerts.push(e.toJSON())};
+  process.env.ANTINUKE_LOCK='';
+  assert.equal(await applyDefaultAntinuke(store,guild,logs),'opted-out','not locked: the off choice is respected');
+  process.env.ANTINUKE_LOCK='true';
+  assert.notEqual(await applyDefaultAntinuke(store,guild,logs),'opted-out');
+  assert.equal(antinukeOptedOut(store,'g'),false);assert.equal(store.settings('g').enabled,true);
+  assert.match(JSON.stringify(alerts),/Anti-nuke switched back on/);
+ } finally {process.env.ANTINUKE_LOCK=saved??'';store.close();}
+});

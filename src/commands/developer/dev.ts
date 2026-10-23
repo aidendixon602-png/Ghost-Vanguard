@@ -10,6 +10,7 @@ import { askLauncher, describeUpdate } from '../../bot/updater-link.js';
 import { DEVELOPER_ONLY_MESSAGE, botRank, RANKS } from '../../bot/ranks.js';
 import { dmSetting, globalAlertCard, globalAlertTarget, setDmSetting, setGlobalAlertTarget } from '../../security/global-alert.js';
 import { trustedRecipients } from '../../bot/trusted-dm.js';
+import { envGlobalAlertChannel } from '../../bot/env-rules.js';
 import { RULES } from '../../core.js';
 
 /** Which GitHub commit is running, and whether automatic updates are on (no secrets shown). */
@@ -51,13 +52,16 @@ export default defineCommand(new SlashCommandBuilder().setName('dev').setDescrip
         return describeUpdate(await askLauncher(op), op);
     }
     if (sub === 'alerts') {
-        const current = globalAlertTarget(ctx.store);
+        const current = globalAlertTarget(ctx.store, ctx.client);
+        const fixed = envGlobalAlertChannel();
         const dm = i.options.getBoolean('dm');
         const dmLine = () => { const d = dmSetting(ctx.store); const who = trustedRecipients().map(id => `<@${id}>`).join(' ') || 'nobody (set TRUSTED_DM_IDS)'; return `**DMs:** ${d.on ? `on, to ${who}${d.warnings ? ' (warnings too)' : ' (strips only)'}` : 'off'}`; };
         if (dm !== null) {
             setDmSetting(ctx.store, { on: dm, warnings: i.options.getBoolean('warnings') ?? dmSetting(ctx.store).warnings });
             if (!i.options.getChannel('channel') && !i.options.getBoolean('off')) return `Anti-nuke DMs are now **${dm ? 'on' : 'off'}**.\n${dmLine()}`;
         }
+        if (fixed && (i.options.getBoolean('off') || i.options.getChannel('channel') || (dm === null && i.options.getBoolean('warnings') !== null)))
+            return `The global alert channel is fixed in the bot settings (\`GLOBAL_ALERT_CHANNEL_ID\` → <#${fixed}>), so it can only be changed in \`.env\`.${current ? '' : ' Vanguard cannot see that channel right now: check the ID and that the bot is in that server.'}\n${dmLine()}`;
         if (i.options.getBoolean('off')) {
             if (!current) return 'Global anti-nuke alerts are already off.';
             setGlobalAlertTarget(ctx.store, null);

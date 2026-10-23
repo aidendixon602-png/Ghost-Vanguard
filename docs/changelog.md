@@ -1,5 +1,18 @@
 # Changelog
 
+## 3.1.0: stronger anti-nuke, alerts everywhere, and settings locked in .env
+- **Ranks:** Developer (the bot owner and `DEVELOPER_IDS`) has full control. **Server Owner** (whoever owns the Discord server) now outranks Supreme Leaders in their own server, but bot-wide tools (`/dev`, `/restart`, the database, network bans, server authorization, bot-wide ranks) only ever look at bot ranks. Giving bot-wide ranks is Developer only.
+- **Anti-nuke watches everyone.** The server owner, Developers and whitelisted people are no longer skipped: when they hit a limit you get a blue **Anti-nuke Alert (not punished)** card everywhere, but nothing is stripped or undone. Supreme Leaders and every other rank are punished like anyone else.
+- **Global anti-nuke feed:** every trigger in every server also goes to one channel (`GLOBAL_ALERT_CHANNEL_ID`, or `/dev alerts channel:`), with the server, the person, the action, the limit, the punishment, every role they held before the strip and a **Jump to Server** button.
+- **Anti-nuke DMs:** the same card is DMed to `TRUSTED_DM_IDS` for every strip, rate-limited so a raid can't flood your DMs. `/dev alerts dm:false` turns it off.
+- **New settings locked in `.env`** (nobody can change them from Discord; restart after editing):
+  - `ANTINUKE_LOCK=true`: only Developers can turn anti-nuke off or change its layers, and servers someone switched off come back on at every start.
+  - `PROTECTED_USERS`: staff can't ban, kick, time out, strip or take roles from these people. Manual bans, timeouts and role removals are undone and alerted; kicks are alerted.
+  - `PROTECTED_ROLES` + `PROTECTED_ROLE_ASSIGNERS`: only the listed people and Developers may give these roles; anyone else's grant is taken back and alerted.
+  - `COMMAND_BLACKLIST`: block specific people from specific commands in every server (`*` = everything).
+  - `GLOBAL_ALERT_CHANNEL_ID` / `GLOBAL_ALERT_WARNINGS`: the global feed channel.
+- The startup Access block shows all of these, so you can confirm they loaded.
+
 ## Unreleased: no more hard-coded legacy names, and honest provider errors
 - **One name, one place.** The product name now comes from a single constant, so the startup panel, embed footers, the mention-protection notice and the default log channel all say Ghost Vanguard. New servers get **#ghost-vanguard-logging**.
 - **Existing servers keep the channel they have.** A server still using the older **#midtown-vanguard-logging** reuses it instead of getting a second log channel, and setup says so ("existing channel reused (still named #…)"). Vanguard never renames a channel by itself: rename it yourself, or run `/setup logs setup logging_channel:` and pick any channel.

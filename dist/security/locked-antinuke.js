@@ -3,6 +3,7 @@ import { Colors } from 'discord.js';
 import { RULES } from '../core.js';
 import { logEvent } from '../errors.js';
 import { readiness } from './readiness.js';
+import { antinukeLocked } from '../bot/env-rules.js';
 /**
  * The anti-nuke preset is fixed: the 17 rules in RULES, their limits, punishments and reverts.
  * New servers start in observe mode. Enforcement requires the readiness check and an explicit
@@ -29,6 +30,15 @@ export async function applyDefaultAntinuke(store, guild, logs) {
     if (!store.isAuthorized(guild.id))
         return 'unchanged';
     const s = store.settings(guild.id);
+    // ANTINUKE_LOCK (.env): nobody may leave a server unprotected, so a staff "off" choice is undone at every start.
+    if (antinukeLocked() && antinukeOptedOut(store, guild.id)) {
+        setAntinukeChoice(store, guild.id, true);
+        logEvent('antinuke_lock_reenabled', { guildId: guild.id });
+        logs.push(guild.id, noticeEmbed('🔒 Anti-nuke switched back on', [
+            'Anti-nuke had been turned off here, but it is locked in the bot settings (`ANTINUKE_LOCK`), so it is on again.',
+            'Only a Developer can turn it off while the lock is set.',
+        ], Colors.Orange));
+    }
     if (antinukeOptedOut(store, guild.id)) {
         if (s.enabled) {
             s.enabled = false;

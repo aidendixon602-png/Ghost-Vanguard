@@ -2,7 +2,7 @@ import { NO_REASON } from '../../core.js';
 import { Colors, PermissionFlagsBits, SlashCommandBuilder } from 'discord.js';
 import { defineCommand } from '../../bot/registry.js';
 import { AppError } from '../../errors.js';
-import { checkTarget, embed, memberOrNull } from '../../ui/ui.js';
+import { assertNotProtectedUser, checkTarget, embed, memberOrNull } from '../../ui/ui.js';
 import { confirmDanger } from '../../ui/danger-ui.js';
 import { staffReason } from '../../security/raidmode.js';
 import { existingBan } from '../../security/network-ban.js';
@@ -16,6 +16,7 @@ export default defineCommand(new SlashCommandBuilder().setName('softban').setDes
     const user = i.options.getUser('user', true), reason = (i.options.getString('reason') ?? NO_REASON), seconds = i.options.getInteger('delete_messages') ?? 86400;
     const target = await memberOrNull(i.guild, user.id), me = await i.guild.members.fetchMe();
     if ([ctx.actor!.id, me.id, i.guild.ownerId].includes(user.id)) throw new AppError('VALIDATION_ERROR', 'You cannot target yourself, this bot, or the server owner.');
+    assertNotProtectedUser(user.id, ctx.actor!.id);
     if (target) checkTarget(ctx.actor!, target, me);
     await confirmDanger(ctx, i, {
         title: 'Softban a member', summary: `**${user.tag}** (\`${user.id}\`)\n**Reason:** ${reason}`,

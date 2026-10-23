@@ -53,3 +53,24 @@ const ids = (raw = '') => new Set(raw.split(',').map(v => v.trim()).filter(v => 
 export const protectedRoles = () => ids(process.env.PROTECTED_ROLES);
 export const protectedRoleAssigners = () => ids(process.env.PROTECTED_ROLE_ASSIGNERS);
 export const isProtectedRole = (roleId: string) => protectedRoles().has(roleId);
+
+/**
+ * PROTECTED_USERS: people staff can never ban, kick, time out or take roles from, through Vanguard or by hand.
+ * Vanguard refuses those commands, and if someone does it by hand in Discord it is undone where Discord allows
+ * (unban, timeout lifted, roles given back) and you are alerted. Only Developers can act on them.
+ * Anti-nuke still contains a protected person who sets it off (a protected account can still be hacked).
+ *   PROTECTED_USERS=111111111111111111,222222222222222222
+ */
+export const protectedUsers = () => ids(process.env.PROTECTED_USERS);
+export const isProtectedUser = (userId: string) => protectedUsers().has(userId);
+
+/**
+ * ANTINUKE_LOCK=true: anti-nuke can't be weakened from Discord. Only Developers can turn it off or change the
+ * extra protection layers, and servers someone switched off are switched back on at every start.
+ */
+export const antinukeLocked = () => /^(1|true|yes|on)$/i.test(process.env.ANTINUKE_LOCK?.trim() ?? '');
+/** Commands that weaken anti-nuke; with ANTINUKE_LOCK only Developers may use them. */
+export const ANTINUKE_LOCK_KEYS = new Set(['antinuke/disable', 'disable', 'antinuke-plus/settings']);
+
+/** GLOBAL_ALERT_CHANNEL_ID: the global anti-nuke feed channel, fixed in .env (overrides `/dev alerts`). */
+export const envGlobalAlertChannel = () => /^\d{17,20}$/.test(process.env.GLOBAL_ALERT_CHANNEL_ID?.trim() ?? '') ? process.env.GLOBAL_ALERT_CHANNEL_ID!.trim() : null;

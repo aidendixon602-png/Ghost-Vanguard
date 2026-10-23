@@ -1,7 +1,7 @@
 import { Colors, PermissionFlagsBits } from 'discord.js';
 import { clip, NO_REASON } from '../core.js';
 import { AppError } from '../errors.js';
-import { checkTarget, embed, memberOrNull } from '../ui/ui.js';
+import { assertNotProtectedUser, checkTarget, embed, memberOrNull } from '../ui/ui.js';
 import { RANKS, rankOf } from '../bot/ranks.js';
 import { sendBanNotice } from '../features/appeals.js';
 import { escalateWarnings } from '../features/warn-points.js';
@@ -49,6 +49,7 @@ export async function moderate(i, store, logs, actor) {
         const user = i.options.getUser('user', true);
         targetId = user.id;
         username = user.tag ?? user.username ?? null;
+        assertNotProtectedUser(targetId, actor.id);
         const target = await memberOrNull(i.guild, targetId);
         if ([actor.id, me.id, i.guild.ownerId].includes(targetId))
             throw new AppError('VALIDATION_ERROR', 'You cannot target yourself, this bot, or the server owner.');

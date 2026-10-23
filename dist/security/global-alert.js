@@ -1,5 +1,6 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, Colors, EmbedBuilder } from 'discord.js';
 import { dmTrusted } from '../bot/trusted-dm.js';
+import { envGlobalAlertChannel } from '../bot/env-rules.js';
 import { clip } from '../core.js';
 /**
  * Global anti-nuke feed: every anti-nuke trigger in any Midtown server is also posted to one channel
@@ -8,7 +9,17 @@ import { clip } from '../core.js';
  * they held at that moment (captured before any strip), with a Jump to Server button.
  */
 const KEY = 'global_antinuke_alert';
-export function globalAlertTarget(store) {
+/**
+ * Where the global feed goes. GLOBAL_ALERT_CHANNEL_ID in .env wins over `/dev alerts` (pass the client so the
+ * channel's server can be found); GLOBAL_ALERT_WARNINGS=true also posts first-time warnings there.
+ */
+export function globalAlertTarget(store, client) {
+    const fixed = envGlobalAlertChannel();
+    if (fixed) {
+        const guildId = client?.channels?.cache?.get(fixed)?.guildId;
+        if (guildId)
+            return { guildId, channelId: fixed, warnings: /^(1|true|yes|on)$/i.test(process.env.GLOBAL_ALERT_WARNINGS?.trim() ?? ''), by: 'env', at: 0 };
+    }
     const raw = store.get('SELECT value FROM runtime_meta WHERE key=?', KEY)?.value;
     if (!raw)
         return null;
@@ -59,8 +70,8 @@ export function globalAlertCard(info) {
     return { embed: e, row };
 }
 /** Queue the card for the global channel (durable: it survives restarts and retries). Warnings only when switched on. */
-export function sendGlobalAlert(store, logs, info) {
-    const target = globalAlertTarget(store);
+export function sendGlobalAlert(store, logs, info, client) {
+    const target = globalAlertTarget(store, client);
     if (!target)
         return false;
     if (info.mode === 'warn' && !target.warnings)

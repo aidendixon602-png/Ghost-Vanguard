@@ -1,5 +1,6 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, Colors, EmbedBuilder, type Client, type GuildMember } from 'discord.js';
 import { dmTrusted } from '../bot/trusted-dm.js';
+import { envGlobalAlertChannel } from '../bot/env-rules.js';
 import type { Store } from '../database/db.js';
 import type { LogQueue } from '../logging.js';
 import type { Rule } from '../core.js';
@@ -15,7 +16,16 @@ const KEY = 'global_antinuke_alert';
 
 export interface GlobalAlertTarget { guildId: string; channelId: string; warnings: boolean; by: string; at: number }
 
-export function globalAlertTarget(store: Store): GlobalAlertTarget | null {
+/**
+ * Where the global feed goes. GLOBAL_ALERT_CHANNEL_ID in .env wins over `/dev alerts` (pass the client so the
+ * channel's server can be found); GLOBAL_ALERT_WARNINGS=true also posts first-time warnings there.
+ */
+export function globalAlertTarget(store: Store, client?: Pick<Client, 'channels'>): GlobalAlertTarget | null {
+    const fixed = envGlobalAlertChannel();
+    if (fixed) {
+        const guildId = (client?.channels?.cache?.get(fixed) as { guildId?: string } | undefined)?.guildId;
+        if (guildId) return { guildId, channelId: fixed, warnings: /^(1|true|yes|on)$/i.test(process.env.GLOBAL_ALERT_WARNINGS?.trim() ?? ''), by: 'env', at: 0 };
+    }
     const raw = store.get('SELECT value FROM runtime_meta WHERE key=?', KEY)?.value;
     if (!raw) return null;
     try { const t = JSON.parse(String(raw)); return t?.guildId && t?.channelId ? t : null; } catch { return null; }
@@ -85,8 +95,8 @@ export function globalAlertCard(info: GlobalAlertInfo) {
 }
 
 /** Queue the card for the global channel (durable: it survives restarts and retries). Warnings only when switched on. */
-export function sendGlobalAlert(store: Store, logs: LogQueue, info: GlobalAlertInfo): boolean {
-    const target = globalAlertTarget(store);
+export function sendGlobalAlert(store: Store, logs: LogQueue, info: GlobalAlertInfo, client?: Pick<Client, 'channels'>): boolean {
+    const target = globalAlertTarget(store, client);
     if (!target) return false;
     if (info.mode === 'warn' && !target.warnings) return false;
     const { embed, row } = globalAlertCard(info);

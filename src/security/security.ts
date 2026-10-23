@@ -242,7 +242,7 @@ export class Security {
                 reverted: active.revert ? progress : null,
                 jumpUrl: `https://discord.com/channels/${guild.id}${s.logChannelId ? `/${s.logChannelId}` : ''}`,
             };
-            sendGlobalAlert(this.store, this.logs, info);
+            sendGlobalAlert(this.store, this.logs, info, guild.client);
             // The same card by DM to the trusted people (TRUSTED_DM_IDS). Never waits on Discord here.
             void dmGlobalAlert(guild.client, this.store, info).catch(() => 0);
         } catch { /* the feed is extra; the server's own alert above is what matters */ }
@@ -257,7 +257,7 @@ export class Security {
         try {
             const info: GlobalAlertInfo = { guild: { id: guild.id, name: guild.name }, actor, snapshot, rule, mode: 'exempt', exemptReason: reason, incident, failed: false, reverted: null,
                 jumpUrl: `https://discord.com/channels/${guild.id}${logChannelId ? `/${logChannelId}` : ''}` };
-            sendGlobalAlert(this.store, this.logs, info);
+            sendGlobalAlert(this.store, this.logs, info, guild.client);
             void dmGlobalAlert(guild.client, this.store, info).catch(() => 0);
         } catch { }
     }
