@@ -10,7 +10,7 @@ export default defineCommand(new SlashCommandBuilder().setName('unlock').setDesc
     const result = await ctx.snapshots.locks.run([i.guildId], () => unlockGuild(ctx, i.guild, i.user.id, i.options.getString('message'), !i.options.getBoolean('keep_notices'), progress));
     const summary = `**${result.restored}** of ${result.total} channels restored${result.noticesRemoved ? ` · ${result.noticesRemoved} notices removed` : ''}${result.messages ? ` · ${result.messages} messages posted` : ''}${result.missing ? ` · ${result.missing} deleted during the lockdown` : ''}`;
     if (result.failed)
-        return `${summary} · **${result.failed} could not be restored yet.** The lockdown stays recorded; run \`/security unlock\` again (check that Vanguard can still manage those channels).`;
+        return `${summary} · **${result.failed} could not be restored yet.** The lockdown stays recorded; run \`/raid unlock\` again (check that Vanguard can still manage those channels).`;
     const event = { category: 'moderation', action: 'Lockdown lifted', actorId: i.user.id, details: [summary] };
     if (!logsCategory(ctx.store, i.guildId, 'moderation') || !recordEvent(ctx.store, ctx.logs, i.guildId, event))
         ctx.logs.push(i.guildId, embed('🔓 Lockdown lifted', `By <@${i.user.id}>\n${summary}`, Colors.Green));

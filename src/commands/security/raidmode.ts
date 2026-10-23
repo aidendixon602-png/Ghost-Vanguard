@@ -16,7 +16,7 @@ export default defineCommand(new SlashCommandBuilder().setName('raidmode').setDe
         const s = raidState(ctx.store, guild);
         return s.enabled
             ? `**Raid mode: ON** · accounts under **${s.minAgeDays} days** old are **${s.action === 'kick' ? 'kicked' : 'timed out'}**${s.until ? ` · ends <t:${Math.floor(s.until / 1000)}:R>` : ' · until switched off'}\nHandled so far: **${s.handled}** · started by ${s.by ? `<@${s.by}>` : 'unknown'}`
-            : `**Raid mode: off.** Last run handled ${s.handled} join(s). Start it with \`/security raidmode on\`.`;
+            : `**Raid mode: off.** Last run handled ${s.handled} join(s). Start it with \`/raid mode on\`.`;
     }
     if (sub === 'off') {
         const before = raidState(ctx.store, guild);

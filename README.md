@@ -9,7 +9,7 @@
 Anti-nuke and the threat board · Moderation and audit logging · Ticket desk · Live dashboard · Server recovery
 
 [![CI](https://github.com/aidendixon602-png/Ghost-Vanguard/actions/workflows/ci.yml/badge.svg)](https://github.com/aidendixon602-png/Ghost-Vanguard/actions/workflows/ci.yml)
-![Version](https://img.shields.io/badge/version-3.1.2-6d5ae6)
+![Version](https://img.shields.io/badge/version-3.2.0-6d5ae6)
 ![Tests](https://img.shields.io/badge/tests-545%20passing-2EA043)
 ![Node](https://img.shields.io/badge/node-24-339933?logo=node.js&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
@@ -113,7 +113,7 @@ Anti-nuke answers an incident immediately; the threat board is the memory that d
 
 Never automatic: whitelisted people, the bot itself, the server owner, servers with protection off or unauthorized, observe mode, and anything inside a ten-minute cooldown. A quiet attacker cools off — scores halve once a day and entries expire a week after the last incident.
 
-`/security threats list` shows the board, `view` shows one member's full history, and `clear`, `release` and `strike` (Head Admin and above) are how staff undo or force an action. Every automatic action is in the server's log channel too, and **all of them are reversible**. Full detail: [docs/user/threat-board.md](docs/user/threat-board.md).
+`/antinuke threats list` shows the board, `view` shows one member's full history, and `clear`, `release` and `strike` (Head Admin and above) are how staff undo or force an action. Every automatic action is in the server's log channel too, and **all of them are reversible**. Full detail: [docs/user/threat-board.md](docs/user/threat-board.md).
 
 ## Dashboard
 
@@ -130,19 +130,21 @@ A staff member posts the panel once with `/ticket setup`; members press a button
 
 ## Commands
 
-Commands are grouped under a small number of top-level entries:
+Commands are grouped by job, one top-level command each. Every command in Discord's `/` menu says what it does and who can use it (for example *Ban a user · Moderator+*).
 
 | Command | Purpose |
 |---|---|
-| `/antinuke` | Status, enable/disable, checks, safety scan, settings, whitelist |
-| `/mod` | Bans, kicks, timeouts, warnings, purge, ban records, cases, notes, appeals |
-| `/ticket` | Ticket panel, types, setup, claim, close, transcripts, block list, weekly report |
+| `/antinuke` | Status, on/off, checks, safety scan, settings, whitelist, incidents, quarantine, threat board |
+| `/automod` | Spam, invites, links, AI moderation, alts, quiet hours, scam links, staff-ping protection |
+| `/raid` | Lockdown and unlock, raid mode, emergency mode, new accounts, webhooks, health check |
+| `/mod` | Ban, kick, timeout, warn, purge, slowmode, ban records, cases, notes, warnings, appeals, nicknames |
 | `/role` | Give, remove and restore roles; who can give which role |
-| `/security` | Lockdown, emergency mode, raid mode, automod, scam protection, anti-ping, quarantine, threats |
-| `/setup` | Control panel, logging, staff ranks, welcome, configuration, permissions, history |
+| `/setup` | Control panel, security settings and admins, logging, staff ranks, welcome, config, permissions, history |
+| `/ticket` | Ticket panel, types, setup, claim, close, transcripts, block list |
 | `/recovery` | Snapshots, backups, layout copy |
 | `/info` | Users, roles, server, bot, latency |
 | `/roblox` | Verification, lookups, blacklist, group binds |
+| `/dev`, `/network`, `/restart` | Bot staff: diagnostics, updates, alerts, servers, database, network bans |
 | `,` commands | Developer operations: restart, updates, diagnostics, database, server authorization, global ranks and network bans. Every comma command requires an exact `DEVELOPER_IDS` entry, including for the bot owner |
 
 `/help` in Discord lists only the slash commands available to you; `,help` lists Developer comma commands for authorized IDs. Sensitive/admin slash replies are ephemeral; ordinary public utility replies stay public. The full reference is in **[docs/commands.md](docs/commands.md)**.

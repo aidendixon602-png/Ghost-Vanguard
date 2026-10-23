@@ -85,7 +85,7 @@ export function registerIncidentControls(registry: Registry) {
                     'Anti-nuke still watches them: doing the same thing again strips them again. Whitelist them with `/antinuke whitelist add` if this is normal for them.',
                 ],
                 label: 'Give roles back',
-                reversal: 'Use `/security quarantine` on them to strip them again.',
+                reversal: 'Use `/antinuke quarantine` on them to strip them again.',
                 run: async () => {
                     const again = undoPlan(ctx.store, i.guildId, id, i.user.id, i.guild?.ownerId);
                     const result = await ctx.security.release(i.guild, again.actor, true);
@@ -110,6 +110,6 @@ export function undoPlan(store: Store, guildId: string, incidentId: number, user
     const removed = /^Removed (\d+) dangerous role/.exec(result);
     if (!removed || removed[1] === '0') throw new AppError('VALIDATION_ERROR', 'This incident did not remove any roles, so there is nothing to undo.');
     if (!store.get('SELECT 1 FROM backups WHERE guild_id=? AND user_id=?', guildId, incident.actor_id))
-        throw new AppError('VALIDATION_ERROR', 'Their saved roles are gone (already restored with `/security release`, or they left). Nothing to undo.');
+        throw new AppError('VALIDATION_ERROR', 'Their saved roles are gone (already restored with `/antinuke release`, or they left). Nothing to undo.');
     return { actor: String(incident.actor_id), rule: String(incident.rule), roles: Number(removed[1]) };
 }

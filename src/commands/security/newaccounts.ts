@@ -21,11 +21,11 @@ export default defineCommand(new SlashCommandBuilder().setName('newaccounts').se
 { category: 'security', access: 'security', cooldown: 1500 }, async (ctx, i) => {
     const sub = i.options.getSubcommand(), guild = i.guildId, current = newAccountConfig(ctx.store, guild);
     if (sub === 'status') {
-        if (!current.enabled) return '**New-account rule: off.** Turn it on with `/security newaccounts on`.';
+        if (!current.enabled) return '**New-account rule: off.** Turn it on with `/raid newaccounts on`.';
         const me = await i.guild.members.fetchMe();
         const perm = current.action === 'kick' ? PermissionFlagsBits.KickMembers : PermissionFlagsBits.ModerateMembers;
         const warn = current.action !== 'alert' && !me.permissions.has(perm) ? `\n⚠ Vanguard is missing **${current.action === 'kick' ? 'Kick Members' : 'Timeout Members'}**, so new accounts are only reported.` : '';
-        return `**New-account rule: ON**\nDiscord accounts younger than **${current.minAgeDays} days** are **${LABEL[current.action]}** when they join. Staff get an alert with Let in / Kick / Ban buttons, and a warning when the name resembles a banned account.\nBots and whitelisted accounts are skipped. During \`/security raidmode\`, raid mode handles joins instead.${warn}`;
+        return `**New-account rule: ON**\nDiscord accounts younger than **${current.minAgeDays} days** are **${LABEL[current.action]}** when they join. Staff get an alert with Let in / Kick / Ban buttons, and a warning when the name resembles a banned account.\nBots and whitelisted accounts are skipped. During \`/raid mode\`, raid mode handles joins instead.${warn}`;
     }
     if (sub === 'off') {
         setNewAccountConfig(ctx.store, guild, i.user.id, { enabled: false });

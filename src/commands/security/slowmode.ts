@@ -13,7 +13,7 @@ export default defineCommand(new SlashCommandBuilder().setName('slowmode').setDe
     const channel = chosen ? await i.guild.channels.fetch(chosen.id).catch(() => null) : null;
     if (!channel || !('setRateLimitPerUser' in channel)) throw new AppError('VALIDATION_ERROR', 'Choose a text, announcement, forum or voice channel.');
     if (!channel.permissionsFor(ctx.actor!)?.has(PermissionFlagsBits.ManageChannels)) throw new AppError('PERMISSION_ERROR', 'You need Manage Channels in that channel.');
-    await (channel as any).setRateLimitPerUser(delay, staffReason(ctx.actor!.id, `/security slowmode ${delay}s`));
+    await (channel as any).setRateLimitPerUser(delay, staffReason(ctx.actor!.id, `/mod slowmode ${delay}s`));
     const label = CHOICES.find(([, v]) => v === delay)?.[0] ?? `${delay} seconds`;
     return delay ? `Slowmode in <#${channel.id}> set to **${label}**.` : `Slowmode **off** in <#${channel.id}>.`;
 });

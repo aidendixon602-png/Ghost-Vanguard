@@ -1,4 +1,5 @@
 import { displayPath, RETIRED, treeJson } from '../bot/command-tree.js';
+import { describe } from '../bot/command-descriptions.js';
 import { requiredRank } from '../bot/ranks.js';
 import { accessLabel } from './help-ui.js';
 import { prefixHelp } from '../bot/prefix-commands.js';
@@ -8,7 +9,7 @@ const LEVELS = [
     [7, '👑 Supreme Leader', 'Bot-wide, every server: everything except the Developer-only tools. Diagnostics, update status, database health and backups, genrebans and hardbans, lifting genrebans. Punished by anti-nuke like anyone else. Given with `/setup staff global` or `SUPREME_LEADER_IDS`.'],
     [6, '🔭 Overseer', 'Bot-wide, every server: Bot Manager plus inspecting and authorizing servers, and letting a genrebanned person back into one server. Given with `/setup staff global`.'],
     [5, '🛠️ Bot Manager', 'Bot-wide, every server: Head Admin everywhere plus bot status, diagnostics and announcements. Given with `/setup staff global`.'],
-    [4, '🛡️ Head Admin', 'Server rank: anti-nuke, whitelist, control panel, backups and staff ranks. Given by linking a role with `/setup staff role`, or `/security admin` (owner). Discord\'s Administrator permission counts as Head Admin, except for actions that weaken protection.'],
+    [4, '🛡️ Head Admin', 'Server rank: anti-nuke, whitelist, control panel, backups and staff ranks. Given by linking a role with `/setup staff role`, or `/setup security-admins` (owner). Discord\'s Administrator permission counts as Head Admin, except for actions that weaken protection.'],
     [3, '🔧 Admin', 'Server rank: lifting ordinary bans and accepting appeals, raid tools, automod, scam protection and logging. Given with `/setup staff role`; Discord\'s Administrator permission also works for unbans.'],
     [2, '🔨 Moderator', 'Server rank, or Discord\'s matching permission (Ban/Kick/Timeout Members, Manage Messages): bans, kicks, purges, denying appeals. Cannot lift bans.'],
     [1, '🤝 Helper', 'Server rank: warnings, short timeouts, cases and notes. Given with `/setup staff role`.'],
@@ -36,7 +37,7 @@ export function commandLeaves(registry) {
             const need = requiredRank(key);
             const level = need !== undefined ? need : policy.developerOnly ? 7 : policy.access === 'owner' ? 4.5 : policy.access === 'security' ? 4 : policy.requiredPermissions?.length ? 2 : 0;
             const path = displayPath(json.name, sub.path.replaceAll('/', ' '));
-            leaves.push({ path, top: path.split(' ')[0].slice(1), description: sub.description, who: accessLabel(policy, key), level });
+            leaves.push({ path, top: path.split(' ')[0].slice(1), description: describe(path, sub.description), who: accessLabel(policy, key), level });
         }
     }
     return leaves;
@@ -50,11 +51,11 @@ const NOTES = {
     '/mod timeout': 'Helpers up to 60 minutes; Moderators longer',
     '/mod unban': 'ordinary bans only; an Overseer+ can grant a one-server genreban exception; Supreme Leaders can lift genrebans from the ban-log controls; `/network ungenreban`/`/network unhardban` (`,ungenreban`/`,unhardban` aliases) require an exact `DEVELOPER_IDS` entry',
     ',netexception revoke': 'exceptions are granted by Overseers and higher through `/mod unban` (alias for `/network exceptions revoke`)',
-    '/security threats list': 'Admin and above; the bot acts by itself above 25 points, always reversibly',
-    '/security threats view': 'Admin and above; shows every scored incident and automatic action',
-    '/security threats clear': 'Head Admin and above; clears the board entry only, cases and bans stay',
-    '/security threats release': 'Head Admin and above; unbans if they were struck',
-    '/security threats strike': 'Head Admin and above; the manual version of the automatic counter-attack',
+    '/antinuke threats list': 'Admin and above; the bot acts by itself above 25 points, always reversibly',
+    '/antinuke threats view': 'Admin and above; shows every scored incident and automatic action',
+    '/antinuke threats clear': 'Head Admin and above; clears the board entry only, cases and bans stay',
+    '/antinuke threats release': 'Head Admin and above; unbans if they were struck',
+    '/antinuke threats strike': 'Head Admin and above; the manual version of the automatic counter-attack',
     '/ticket claim': 'ticket staff role, Manage Server or a Vanguard rank',
     '/ticket unclaim': 'the staff member who claimed it, or an admin',
     '/ticket transfer': 'ticket staff only',

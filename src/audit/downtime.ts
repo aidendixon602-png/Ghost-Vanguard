@@ -106,6 +106,6 @@ export async function catchUp(guild: Guild, store: Store, logs: LogQueue, truste
         return;
     const title = summary.flagged ? '⚠️ Possible incident while Vanguard was offline' : 'Activity while Vanguard was offline';
     const intro = `Discord's audit log recorded ${summary.actions} protected action(s) between <t:${Math.floor(offlineSince / 1000)}:t> and <t:${Math.floor(now / 1000)}:t>. Anti-nuke could not respond to these live.`;
-    const advice = summary.flagged ? '\nReview them now. Use `/security quarantine` on the actor and `/recovery snapshot restore` to repair damage if needed.' : '';
+    const advice = summary.flagged ? '\nReview them now. Use `/antinuke quarantine` on the actor and `/recovery snapshot restore` to repair damage if needed.' : '';
     logs.push(guild.id, embed(title, `${intro}\n\n${summary.lines.join('\n')}${advice}`, summary.flagged ? Colors.Red : Colors.Orange));
 }

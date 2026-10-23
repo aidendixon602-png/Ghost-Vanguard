@@ -25,11 +25,11 @@ async function runLockSchedule(d, guild, now) {
         setFeature(d.store, guild.id, 'lockschedule', LOCK_SCHEDULE_DEFAULTS, { lockedBySchedule: true });
         const reopen = `${c.end} (UTC${c.utcOffset >= 0 ? '+' : ''}${c.utcOffset})`;
         const r = await d.locks.run([guild.id], () => lockGuild(d, guild, d.client.user.id, `Quiet hours: chat is paused until ${reopen}.`, SCHEDULE_REASON));
-        d.logs.push(guild.id, embed('🔒 Scheduled lockdown started', `Quiet hours began. **${r.locked}** of ${r.total} channels locked. Chat reopens automatically at **${reopen}**.\nUse \`/security unlock\` to end it early.`, Colors.Orange));
+        d.logs.push(guild.id, embed('🔒 Scheduled lockdown started', `Quiet hours began. **${r.locked}** of ${r.total} channels locked. Chat reopens automatically at **${reopen}**.\nUse \`/raid unlock\` to end it early.`, Colors.Orange));
     }
     else if (!inside && c.lockedBySchedule) {
         const state = lockdownState(d.store, guild.id);
-        // Only undo a lockdown this schedule made. A manual /security lockdown (e.g. during a raid) is left alone.
+        // Only undo a lockdown this schedule made. A manual /raid lockdown (e.g. during a raid) is left alone.
         const ours = state && String(state.reason ?? '') === SCHEDULE_REASON;
         if (ours && d.locks.busy(guild.id))
             return; // try again next minute; keep the flag so we do not forget

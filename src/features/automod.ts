@@ -8,7 +8,7 @@ import { getFeature } from './settings.js';
 
 /**
  * Spam guard and invite blocker. Staff (any Vanguard rank, Manage Messages, or anti-nuke trust) are
- * never touched. Both are on by default; /security automod turns them off or changes the limits.
+ * never touched. Both are on by default; /automod turns them off or changes the limits.
  *
  * Spam: too many people/roles pinged in one message, the same message repeated, or a burst of
  * messages. The messages are deleted and the sender is timed out.

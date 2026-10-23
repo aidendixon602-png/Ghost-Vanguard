@@ -115,7 +115,7 @@ export default defineCommand(new SlashCommandBuilder().setName('logs').setDescri
         const chosen = i.options.getChannel('channel');
         const channelId = chosen?.id ?? eventLogConfig(ctx.store, guild).channelId ?? settings.logChannelId;
         if (!channelId)
-            throw new AppError('VALIDATION_ERROR', 'Pick a channel, or set the security log channel first with `/security config`.');
+            throw new AppError('VALIDATION_ERROR', 'Pick a channel, or set the security log channel first with `/setup security`.');
         const channel = i.guild.channels.cache.get(channelId);
         const me = i.guild.members.me;
         if (!channel || !me || !channel.permissionsFor(me)?.has([PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.EmbedLinks]))

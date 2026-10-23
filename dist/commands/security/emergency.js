@@ -9,7 +9,7 @@ export default defineCommand(new SlashCommandBuilder().setName('emergency').setD
     .addSubcommand(s => s.setName('status').setDescription('Is emergency mode on?')), { category: 'security', access: 'security', cooldown: 2000 }, async (ctx, i) => {
     const sub = i.options.getSubcommand(), deps = { store: ctx.store, logs: ctx.logs, locks: ctx.snapshots.locks };
     if (sub === 'status')
-        return emergencyOn(ctx.store, i.guildId) ? '🚨 **Emergency mode is ON.** Use `/security emergency stop` when it is over.' : 'Emergency mode is off.';
+        return emergencyOn(ctx.store, i.guildId) ? '🚨 **Emergency mode is ON.** Use `/raid emergency stop` when it is over.' : 'Emergency mode is off.';
     if (sub === 'stop')
         return stopEmergency(deps, i.guild, i.user.id);
     if (sub === 'panel') {
@@ -25,7 +25,7 @@ export default defineCommand(new SlashCommandBuilder().setName('emergency').setD
         summary: `**${i.guild.name}** is under attack and needs to be locked down now.`,
         consequences: ['Every channel is locked for members (staff keep access).', 'Server invites are paused, so nobody new can join.', 'Raid mode turns on: anyone who still joins is removed.', 'Admin and Head Admin roles are pinged in the security log.'],
         label: 'Start emergency mode',
-        reversal: '`/security emergency stop` undoes all of it.',
+        reversal: '`/raid emergency stop` undoes all of it.',
         run: (c, b) => startEmergency({ store: c.store, logs: c.logs, locks: c.snapshots.locks }, b.guild, b.user.id),
     });
 }, { subcommands: { status: { responseKind: 'info' } } });

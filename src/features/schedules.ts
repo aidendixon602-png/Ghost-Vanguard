@@ -8,7 +8,7 @@ import { getFeature, setFeature } from './settings.js';
 /**
  * Timed jobs, checked once a minute:
  *  - Lockdown schedule ("quiet hours"): lock the server at the start time and unlock at the end.
- *    Only a lock this schedule made is undone; a manual /security lockdown is left alone.
+ *    Only a lock this schedule made is undone; a manual /raid lockdown is left alone.
  *  - Weekly staff activity report in the security log.
  */
 export interface LockScheduleConfig { enabled: boolean; start: string; end: string; utcOffset: number; lockedBySchedule: boolean }
@@ -39,10 +39,10 @@ async function runLockSchedule(d: ScheduleDeps, guild: Guild, now: number) {
         setFeature(d.store, guild.id, 'lockschedule', LOCK_SCHEDULE_DEFAULTS, { lockedBySchedule: true });
         const reopen = `${c.end} (UTC${c.utcOffset >= 0 ? '+' : ''}${c.utcOffset})`;
         const r = await d.locks.run([guild.id], () => lockGuild(d, guild, d.client.user!.id, `Quiet hours: chat is paused until ${reopen}.`, SCHEDULE_REASON));
-        d.logs.push(guild.id, embed('🔒 Scheduled lockdown started', `Quiet hours began. **${r.locked}** of ${r.total} channels locked. Chat reopens automatically at **${reopen}**.\nUse \`/security unlock\` to end it early.`, Colors.Orange));
+        d.logs.push(guild.id, embed('🔒 Scheduled lockdown started', `Quiet hours began. **${r.locked}** of ${r.total} channels locked. Chat reopens automatically at **${reopen}**.\nUse \`/raid unlock\` to end it early.`, Colors.Orange));
     } else if (!inside && c.lockedBySchedule) {
         const state = lockdownState(d.store, guild.id);
-        // Only undo a lockdown this schedule made. A manual /security lockdown (e.g. during a raid) is left alone.
+        // Only undo a lockdown this schedule made. A manual /raid lockdown (e.g. during a raid) is left alone.
         const ours = state && String(state.reason ?? '') === SCHEDULE_REASON;
         if (ours && d.locks.busy(guild.id)) return; // try again next minute; keep the flag so we do not forget
         if (ours) {

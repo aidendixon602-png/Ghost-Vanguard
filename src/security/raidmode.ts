@@ -51,7 +51,7 @@ export async function handleRaidJoin(store: Store, logs: LogQueue, member: Guild
     store.run('UPDATE raidmode SET handled=handled+1 WHERE guild_id=?', member.guild.id);
     const key = member.guild.id, entry = pending.get(key) ?? { count: 0, names: [], timer: setTimeout(() => {
         const done = pending.get(key); pending.delete(key);
-        if (done) logs.push(key, embed('Raid mode · new accounts handled', `${done.count} join(s) in the last 30 seconds:\n${done.names.slice(0, 15).join('\n')}${done.count > 15 ? `\n…and ${done.count - 15} more` : ''}\n\nTurn it off with \`/security raidmode off\` when the raid is over.`, Colors.Orange));
+        if (done) logs.push(key, embed('Raid mode · new accounts handled', `${done.count} join(s) in the last 30 seconds:\n${done.names.slice(0, 15).join('\n')}${done.count > 15 ? `\n…and ${done.count - 15} more` : ''}\n\nTurn it off with \`/raid mode off\` when the raid is over.`, Colors.Orange));
     }, 30000) };
     entry.timer.unref?.();
     entry.count++; entry.names.push(`<@${member.id}> (${member.user.tag}) · ${Math.floor(ageDays)}d old · ${result}`);

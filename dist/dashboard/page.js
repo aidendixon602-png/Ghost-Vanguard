@@ -101,7 +101,7 @@ footer{color:var(--muted);font-size:12.5px;text-align:center;padding:26px}
     </div>
   </div>
 </main>
-<footer>Ghost Vanguard dashboard · reading the bot's own database · every automatic action is reversible with <code>/security threats release</code></footer>
+<footer>Ghost Vanguard dashboard · reading the bot's own database · every automatic action is reversible with <code>/antinuke threats release</code></footer>
 <script>
 const TOKEN = ${tokenRequired ? `new URLSearchParams(location.search).get('token') || ''` : `''`};
 const q = p => p + (TOKEN ? (p.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(TOKEN) : '');

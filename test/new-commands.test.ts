@@ -117,11 +117,12 @@ test('/massban is limited to whitelisted staff and never bans protected accounts
 
 test('/help sections are in a fixed order and every command belongs to exactly one section', async () => {
     const registry = new Registry(); await registry.load();
-    const listed = HELP_SECTIONS.flatMap(s => s.commands);
-    assert.equal(new Set(listed).size, listed.length, 'no command listed twice');
+    // A module split across two top-level commands (security: /antinuke and /setup) is listed in both sections.
+    const listed = [...new Set(HELP_SECTIONS.flatMap(s => s.commands))];
+    assert.deepEqual(HELP_SECTIONS.flatMap(s => s.commands).filter((c, n, all) => all.indexOf(c) !== n), ['security'], 'only split modules are listed twice');
     const { RETIRED } = await import('../src/bot/command-tree.js');
     const names = [...registry.commands.values()].map(d => d.data.name).filter(n => !RETIRED.includes(n)).sort();
     assert.deepEqual([...listed].sort(), names, 'every command (except retired shortcuts) has a section');
-    assert.deepEqual(HELP_SECTIONS.slice(0, 3).map(s => s.key), ['antinuke', 'moderation', 'security']);
+    assert.deepEqual(HELP_SECTIONS.slice(0, 4).map(s => s.key), ['antinuke', 'automod', 'raid', 'moderation']);
     for (const d of registry.commands.values()) assert.ok((d.data as any).description.length <= 100, d.data.name);
 });

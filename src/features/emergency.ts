@@ -10,7 +10,7 @@ import { raidState, setRaidMode } from '../security/raidmode.js';
 
 /**
  * Emergency mode: one action for "we are being raided/nuked right now".
- *   - every channel locked (same as /security lockdown; staff keep access)
+ *   - every channel locked (same as /raid lockdown; staff keep access)
  *   - server invites paused, so nobody new can join
  *   - raid mode on (new joins are removed)
  *   - every Admin / Head Admin role is pinged in the security log
@@ -29,7 +29,7 @@ async function pingStaff(store: Store, guild: Guild, text: string) {
 
 export async function startEmergency(d: EmergencyDeps, guild: Guild, actorId: string): Promise<string> {
     // A second press (double click, two admins) must not overwrite what the first one recorded.
-    if (emergencyOn(d.store, guild.id)) return 'Emergency mode is already on. Use `/security emergency stop` when it is over.';
+    if (emergencyOn(d.store, guild.id)) return 'Emergency mode is already on. Use `/raid emergency stop` when it is over.';
     const steps: string[] = [];
     if (lockdownState(d.store, guild.id)) steps.push('🔒 Server was already locked down');
     else {
@@ -44,9 +44,9 @@ export async function startEmergency(d: EmergencyDeps, guild: Guild, actorId: st
     else { setRaidMode(d.store, guild.id, true, actorId, { action: 'kick' }); steps.push('🛑 Raid mode on (new joins are removed)'); }
     d.store.run('INSERT INTO runtime_meta(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value', `emergency:${guild.id}`, JSON.stringify({ by: actorId, at: Date.now(), pausedInvites: !invitesWerePaused, startedRaid: !raidWasOn }));
     await pingStaff(d.store, guild, `🚨 **EMERGENCY MODE** started by <@${actorId}>. Check the security log now.`);
-    d.logs.push(guild.id, embed('🚨 Emergency mode ON', `Started by <@${actorId}>\n${steps.join('\n')}\n\nWhen it is over, use \`/security emergency stop\` or the **All clear** button.`, Colors.Red));
+    d.logs.push(guild.id, embed('🚨 Emergency mode ON', `Started by <@${actorId}>\n${steps.join('\n')}\n\nWhen it is over, use \`/raid emergency stop\` or the **All clear** button.`, Colors.Red));
     logEvent('emergency_start', { guildId: guild.id, by: actorId });
-    return `**Emergency mode is ON.**\n${steps.join('\n')}\nUse \`/security emergency stop\` when it is over.`;
+    return `**Emergency mode is ON.**\n${steps.join('\n')}\nUse \`/raid emergency stop\` when it is over.`;
 }
 
 export async function stopEmergency(d: EmergencyDeps, guild: Guild, actorId: string): Promise<string> {
@@ -58,7 +58,7 @@ export async function stopEmergency(d: EmergencyDeps, guild: Guild, actorId: str
     if (lock && String(lock.reason) === EMERGENCY_REASON) {
         const r = await d.locks.run([guild.id], () => unlockGuild(d, guild, actorId, '✅ All clear. Chat is open again.', true));
         steps.push(`🔓 ${r.restored} of ${r.total} channels restored`);
-    } else if (lock) steps.push('🔒 A separate lockdown is still on; lift it with `/security unlock`');
+    } else if (lock) steps.push('🔒 A separate lockdown is still on; lift it with `/raid unlock`');
     if (state.pausedInvites) steps.push(await guild.disableInvites(false).then(() => '🚪 Invites back on', () => '⚠ Could not turn invites back on (needs Manage Server)'));
     // Only switch off raid mode if emergency mode switched it on.
     if (state.startedRaid !== false) { setRaidMode(d.store, guild.id, false, actorId); steps.push('🛑 Raid mode off'); }

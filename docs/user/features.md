@@ -28,7 +28,7 @@
 
 ## Lockdown
 
-`/security lockdown` pauses the whole server during a raid. For every text, announcement, forum, voice and stage channel it:
+`/raid lockdown` pauses the whole server during a raid. For every text, announcement, forum, voice and stage channel it:
 
 1. records the current state of the permissions it is about to change (in the database, before changing anything);
 2. posts the notice in public text channels (where `@everyone` can see the channel);
@@ -36,7 +36,7 @@
 
 Staff keep their access: roles or members with Administrator, Manage Server, Manage Channels, Manage Messages or Timeout Members, the server owner, and the bot. Categories are not changed.
 
-`/security unlock` restores exactly the permission bits the lockdown changed, removes any `@everyone` overwrite it created, deletes the notices (pass `keep_notices` to leave them) and can post a message where the notices were. Other permission edits made during the lockdown are kept. If a channel can't be restored (for example Vanguard lost access to it), the lockdown stays open and `/security unlock` can be run again. A lockdown survives restarts.
+`/raid unlock` restores exactly the permission bits the lockdown changed, removes any `@everyone` overwrite it created, deletes the notices (pass `keep_notices` to leave them) and can post a message where the notices were. Other permission edits made during the lockdown are kept. If a channel can't be restored (for example Vanguard lost access to it), the lockdown stays open and `/raid unlock` can be run again. A lockdown survives restarts.
 
 Snapshots taken during a lockdown capture the locked permissions, so lift the lockdown before taking a baseline you want to keep.
 
@@ -57,7 +57,7 @@ Turn categories on or off with `/setup logs category`, and browse with `/setup l
 
 ## Restarts and downtime
 
-All settings live in the database, so a restart or crash never resets anything. After each restart, every server's log channel gets a **back-online** notice listing the restored anti-nuke state and how long the bot was offline. The bot also reads Discord's audit log for that offline period: missed events are added to the event log, and destructive actions anti-nuke could not respond to are reported, with anyone at or above a rule's limit flagged. Nothing is enforced automatically for that period; review the report and use `/security quarantine` or `/recovery snapshot restore` if needed.
+All settings live in the database, so a restart or crash never resets anything. After each restart, every server's log channel gets a **back-online** notice listing the restored anti-nuke state and how long the bot was offline. The bot also reads Discord's audit log for that offline period: missed events are added to the event log, and destructive actions anti-nuke could not respond to are reported, with anyone at or above a rule's limit flagged. Nothing is enforced automatically for that period; review the report and use `/antinuke quarantine` or `/recovery snapshot restore` if needed.
 
 ## Guild administration
 

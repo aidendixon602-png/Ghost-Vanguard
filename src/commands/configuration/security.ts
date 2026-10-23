@@ -57,7 +57,7 @@ export default defineCommand(new SlashCommandBuilder().setName('security').setDe
         s.nickname = i.options.getBoolean('nickname_sync') ?? s.nickname;
         ctx.store.save(s, i.user.id);
         ctx.logs.push(i.guildId, embed('Security configuration saved', `Updated by <@${actor.id}>.`, Colors.Green));
-        return 'Configuration saved. Use /security status to review it.';
+        return 'Configuration saved. Use /setup status to review it.';
     }
     if (sub === 'admin') {
         const action = i.options.getString('action', true);
