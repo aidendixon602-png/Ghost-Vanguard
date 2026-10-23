@@ -19,7 +19,7 @@ export function healthPanel(ctx: CommandContext, guild: Guild, channelId: string
         ready.text,
         `**Scam scanning:** ${!scam.enabled?'explicitly disabled':!intent||!scamPermissions||!logReady?'paused • check intent, permissions and log access':'configured • basic prerequisites ready'}`,
         `**This channel:** ${omitted?'excluded (including parent exclusion)':channelReady?'included • deletion permission ready':'included • missing view/delete permission'}`,
-        `**Reporting channels:** ${exclusions.length?exclusions.slice(0,8).map(r=>`<#${r.channel_id}>`).join(', '):'none excluded • use /security scam exclude for evidence channels'}`,
+        `**Reporting channels:** ${exclusions.length?exclusions.slice(0,8).map(r=>`<#${r.channel_id}>`).join(', '):'none excluded • use /automod scam exclude for evidence channels'}`,
         `**AI image text:** ${!scam.vision?'not opted in':!config.aiEnabled||!config.openaiKey?'opted in • AI settings/key missing':`configured • model ${config.openaiModel} • not tested here`}`,
     ];
     for(const provider of ['rover','bloxlink'] as const) {
@@ -28,7 +28,7 @@ export function healthPanel(ctx: CommandContext, guild: Guild, channelId: string
     }
     const backup=ctx.store.get('SELECT last_backup FROM guild_data WHERE guild_id=?',guild.id)?.last_backup;
     const latest=ctx.store.get('SELECT COUNT(*) AS n FROM outbox WHERE guild_id=? AND attempts>=8',guild.id)?.n??0;
-    lines.push(`**Verified database backup:** ${backup?`<t:${Math.floor(backup/1000)}:R>`:'none recorded'}`,`**Security log delivery:** ${latest} messages exhausted retries • /security status`,
+    lines.push(`**Verified database backup:** ${backup?`<t:${Math.floor(backup/1000)}:R>`:'none recorded'}`,`**Security log delivery:** ${latest} messages exhausted retries • /setup status`,
         'Read-only status. Provider results describe observed requests; configuration alone does not prove authentication. Message Content must also be enabled in the Developer Portal.');
     return embed('Vanguard Health',lines.join('\n\n').slice(0,3900),ready.missing.length||ready.above.length||!s.enabled?Colors.Orange:Colors.Green);
 }

@@ -25,6 +25,6 @@ export default defineCommand(new SlashCommandBuilder().setName('welcome').setDes
         throw new AppError('VALIDATION_ERROR', 'Pick a **channel** for welcome messages.');
     const next = setFeature(ctx.store, guild, 'welcome', WELCOME_DEFAULTS, { enabled, channelId, message: i.options.getString('message') ?? current.message, verifyButton: i.options.getBoolean('verify_button') ?? current.verifyButton }, i.user.id);
     ctx.logs.push(guild, embed('Welcome messages changed', `By <@${i.user.id}> · ${enabled ? `on → <#${channelId}>` : 'off'}`, Colors.Orange));
-    const verifyNote = next.verifyButton && !ctx.store.settings(guild).verifiedRoleId ? '\n⚠ The Verify button only shows once a verified role is set with `/security setup verified_role`.' : '';
+    const verifyNote = next.verifyButton && !ctx.store.settings(guild).verifiedRoleId ? '\n⚠ The Verify button only shows once a verified role is set with `/setup security verified_role`.' : '';
     return enabled ? `Welcome messages **on** in <#${channelId}>.\n**Preview:** ${renderWelcome(next.message, ctx.actor)}${next.verifyButton ? '\nWith a **Verify with Roblox** button.' : ''}${verifyNote}\nTry it with \`/setup welcome test\`.` : 'Welcome messages **off**.';
 });

@@ -1,5 +1,28 @@
 # Changelog
 
+## 3.2.0: a cleaner command menu
+- **`/security` is split into three commands, one per job:**
+  - `/automod`: spam, invites, links, AI moderation, alts, quiet hours, plus `scam` and `antiping`
+  - `/raid`: `lockdown`, `unlock`, `health`, `webhooks`, `mode on|off|status` (was `raidmode`), `emergency`, `newaccounts`
+  - `/antinuke` now also has `incidents`, `quarantine`, `release` and `threats`
+- **`/setup`** gains `status`, `security` (was `/security config`) and `security-admins` (was `/security admin`).
+- **`/mod`** gains `slowmode`, and `/mod case` is now `/mod cases`.
+- **Every command has a new, consistent description** (short, starts with a verb) and the `/` menu shows who can use it, e.g. *Ban a user · Moderator+*. The wording lives in one file, `src/bot/command-descriptions.ts`, and `/help` and `docs/commands.md` use the same text.
+- **`/help` categories now match the menu:** Anti-nuke, Automod, Raid response, Moderation, Tickets, Server Setup, Backups, Roblox, Information, Developer.
+- Nothing else changed: same permissions, same buttons, same settings. Discord picks up the new menu on the next start (or `/dev sync`).
+
+| Old | New |
+|---|---|
+| `/security automod …` | `/automod …` |
+| `/security scam …` / `/security antiping …` | `/automod scam …` / `/automod antiping …` |
+| `/security lockdown`, `unlock`, `health`, `webhooks` | `/raid lockdown`, `unlock`, `health`, `webhooks` |
+| `/security raidmode …` | `/raid mode …` |
+| `/security emergency …` / `newaccounts …` | `/raid emergency …` / `/raid newaccounts …` |
+| `/security incidents`, `quarantine`, `release`, `threats …` | `/antinuke incidents`, `quarantine`, `release`, `threats …` |
+| `/security status`, `config`, `admin` | `/setup status`, `security`, `security-admins` |
+| `/security slowmode` | `/mod slowmode` |
+| `/mod case …` | `/mod cases …` |
+
 ## 3.1.2: comma commands stay longer
 - Comma commands (`,restart`, `,help`…) and the bot's replies now stay for **60 seconds** before they are deleted (was 10), long enough to read the result.
 - New `COMMA_DELETE_SECONDS` in `.env` sets the time; `0` keeps them and never deletes.

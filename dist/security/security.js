@@ -71,7 +71,7 @@ function escalationBits(entry, guild) {
  */
 export function responsibleActor(entry, guild) {
     const executor = entry.executorId;
-    // Every action Vanguard performs for a staff member (/mod, /mod role, /security slowmode, /mod nick, /mod massban...)
+    // Every action Vanguard performs for a staff member (/mod, /mod role, /mod slowmode, /mod nick, /mod massban...)
     // starts its audit reason with "<staff ID>: ", so it counts against that person, never the exempt bot.
     if (executor && executor === guild.client.user?.id)
         return /^(\d{17,20}): /.exec(entry.reason ?? '')?.[1] ?? executor;
@@ -499,12 +499,12 @@ export class Security {
                 const q = this.store.settings(member.guild.id).quarantineRoleId;
                 if (q && member.roles.cache.has(q))
                     await member.roles.remove(q, `Ghost Vanguard: quarantine lifted by ${by}`).catch(() => null);
-                this.logs.push(member.guild.id, embed('Quarantine lifted', `<@${by}> gave <@${member.id}> a staff role, so Vanguard ended their quarantine instead of removing it.\nTo quarantine them again use \`/security quarantine\`.`, Colors.Green));
+                this.logs.push(member.guild.id, embed('Quarantine lifted', `<@${by}> gave <@${member.id}> a staff role, so Vanguard ended their quarantine instead of removing it.\nTo quarantine them again use \`/antinuke quarantine\`.`, Colors.Green));
                 return;
             }
             const result = await this.contain(member.guild, member.id);
             if (/^Removed [1-9]/.test(result))
-                this.logs.push(member.guild.id, embed('Quarantine still active', `<@${member.id}> is quarantined from an earlier anti-nuke incident, so Vanguard removed the staff role they were given. ${result}\nTo let them keep staff roles, use \`/security release\` (or have a whitelisted admin give the role).`, Colors.Orange));
+                this.logs.push(member.guild.id, embed('Quarantine still active', `<@${member.id}> is quarantined from an earlier anti-nuke incident, so Vanguard removed the staff role they were given. ${result}\nTo let them keep staff roles, use \`/antinuke release\` (or have a whitelisted admin give the role).`, Colors.Orange));
         });
     }
     /** The trusted person who just added roles to this member, if the latest audit entry shows one. */

@@ -93,10 +93,10 @@ export async function lockGuild(ctx, guild, actorId, notice, reason, progress) {
     const { store } = ctx;
     const active = lockdownState(store, guild.id);
     if (active)
-        throw new AppError('VALIDATION_ERROR', `This server has been in lockdown since <t:${Math.floor(active.started_at / 1000)}:R>. Use /security unlock first.`);
+        throw new AppError('VALIDATION_ERROR', `This server has been in lockdown since <t:${Math.floor(active.started_at / 1000)}:R>. Use /raid unlock first.`);
     const channels = [...guild.channels.cache.values()].filter((c) => lockMask(c.type) !== 0n)
         .sort((a, b) => (a.rawPosition ?? 0) - (b.rawPosition ?? 0));
-    // Recorded first, so /security unlock works even if the bot stops partway through.
+    // Recorded first, so /raid unlock works even if the bot stops partway through.
     store.run('INSERT INTO lockdowns(guild_id,started_by,started_at,reason,message) VALUES(?,?,?,?,?)', guild.id, actorId, Date.now(), reason, notice);
     const auditReason = `Ghost Vanguard lockdown by ${actorId}: ${reason}`.slice(0, 500);
     const exempt = exemptFor(guild);
@@ -161,7 +161,7 @@ export async function unlockGuild(ctx, guild, actorId, message, removeNotices, p
             }
             catch {
                 result.failed++;
-                continue; // Keep the records so /security unlock can be run again.
+                continue; // Keep the records so /raid unlock can be run again.
             }
         }
         store.run('DELETE FROM lockdown_overwrites WHERE guild_id=? AND channel_id=?', guild.id, channelId);

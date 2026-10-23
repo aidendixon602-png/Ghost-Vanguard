@@ -1,5 +1,6 @@
 import { RANKS } from '../bot/ranks.js';
 import { displayPath, RETIRED } from '../bot/command-tree.js';
+import { describe } from '../bot/command-descriptions.js';
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, PermissionsBitField, StringSelectMenuBuilder } from 'discord.js';
 import { isAdminRestricted, RANK_LABEL, rankName, requiredRank } from '../bot/ranks.js';
 import { Guard } from '../bot/guard.js';
@@ -8,15 +9,16 @@ import { AppError } from '../errors.js';
 import { embed } from './ui.js';
 /** Sections in the order staff need them, and the order of commands inside each section. */
 export const HELP_SECTIONS = [
-    { key: 'antinuke', label: 'Anti-nuke', emoji: '🛡️', blurb: 'Stops raids and nukes; manage the whitelist', commands: ['antinuke', 'antinuke-plus', 'trust'] },
-    { key: 'moderation', label: 'Moderation', emoji: '🔨', blurb: 'Ban, kick, timeout, cases, notes and appeals', commands: ['moderation', 'tempban', 'softban', 'massban', 'role', 'bans', 'case', 'warnings', 'note', 'appeals', 'nick'] },
-    { key: 'security', label: 'Security', emoji: '🚨', blurb: 'Automod, raid mode, lockdowns and scam links', commands: ['security', 'threats', 'emergency', 'automod', 'raidmode', 'newaccounts', 'lockdown', 'unlock', 'slowmode', 'scam', 'antiping', 'webhooks', 'health'] },
-    { key: 'tickets', label: 'Tickets', emoji: '🎫', blurb: 'Support desk: the panel, staff tools and transcripts', commands: ['ticket', 'ticket-setup', 'ticket-panel', 'ticket-type', 'ticket-settings', 'ticket-stats'] },
-    { key: 'configuration', label: 'Server Setup', emoji: '⚙️', blurb: 'Staff ranks, welcome, logs and permissions', commands: ['panel', 'staff', 'welcome', 'logs', 'guild-config', 'perm', 'config-history'] },
-    { key: 'recovery', label: 'Backups', emoji: '💾', blurb: 'Save and restore the server layout', commands: ['snapshot', 'backup', 'copylayout'] },
-    { key: 'verification', label: 'Roblox', emoji: '🎮', blurb: 'Verification, lookups, blacklist and group ranks', commands: ['verify', 'roblox'] },
-    { key: 'utility', label: 'Information', emoji: 'ℹ️', blurb: 'Look up users, roles, the server and the bot', commands: ['help', 'userinfo', 'roleinfo', 'server-info', 'bot-info', 'ping', 'ask'] },
-    { key: 'developer', label: 'Developer', emoji: '🧰', blurb: 'Bot-wide staff; the risky tools are Developer only', commands: ['dev', 'restart', 'database', 'autoreact', 'authserver', 'serverauth', 'authorizedservers', 'deauthserver', 'banserver', 'unbanserver', 'genreban', 'ungenreban', 'hardban', 'unhardban', 'netexception'] },
+    { key: 'antinuke', label: 'Anti-nuke', emoji: '🛡️', blurb: 'Stops nukes: status, whitelist, incidents, quarantine, threat board', tops: ['antinuke'], commands: ['antinuke', 'antinuke-plus', 'trust', 'security', 'threats'] },
+    { key: 'automod', label: 'Automod', emoji: '🧹', blurb: 'Spam, links, invites, AI moderation, scam links and staff pings', tops: ['automod'], commands: ['automod', 'scam', 'antiping'] },
+    { key: 'raid', label: 'Raid response', emoji: '🚨', blurb: 'Lockdown, raid mode, emergency mode, new accounts and webhooks', tops: ['raid'], commands: ['lockdown', 'unlock', 'raidmode', 'emergency', 'newaccounts', 'health', 'webhooks'] },
+    { key: 'moderation', label: 'Moderation', emoji: '🔨', blurb: 'Ban, kick, timeout, warn, roles, cases, notes and appeals', tops: ['mod', 'role'], commands: ['moderation', 'tempban', 'softban', 'massban', 'slowmode', 'role', 'bans', 'case', 'warnings', 'note', 'appeals', 'nick'] },
+    { key: 'tickets', label: 'Tickets', emoji: '🎫', blurb: 'Support desk: the panel, staff tools and transcripts', tops: ['ticket'], commands: ['ticket', 'ticket-setup', 'ticket-panel', 'ticket-type', 'ticket-settings', 'ticket-stats'] },
+    { key: 'configuration', label: 'Server Setup', emoji: '⚙️', blurb: 'Control panel, logs, staff ranks, security settings, welcome', tops: ['setup'], commands: ['panel', 'security', 'staff', 'welcome', 'logs', 'guild-config', 'perm', 'config-history'] },
+    { key: 'recovery', label: 'Backups', emoji: '💾', blurb: 'Save and restore the server layout', tops: ['recovery'], commands: ['snapshot', 'backup', 'copylayout'] },
+    { key: 'verification', label: 'Roblox', emoji: '🎮', blurb: 'Verification, lookups, blacklist and group ranks', tops: ['roblox', 'verify'], commands: ['verify', 'roblox'] },
+    { key: 'utility', label: 'Information', emoji: 'ℹ️', blurb: 'Look up users, roles, the server and the bot', tops: ['info', 'help', 'ask'], commands: ['help', 'userinfo', 'roleinfo', 'server-info', 'bot-info', 'ping', 'ask'] },
+    { key: 'developer', label: 'Developer', emoji: '🧰', blurb: 'Bot-wide staff; the risky tools are Developer only', tops: ['dev', 'network', 'restart'], commands: ['dev', 'restart', 'database', 'autoreact', 'authserver', 'serverauth', 'authorizedservers', 'deauthserver', 'banserver', 'unbanserver', 'genreban', 'ungenreban', 'hardban', 'unhardban', 'netexception'] },
 ];
 /** Who can use a command, shown next to it in /help. */
 export function accessLabel(policy, key) {
@@ -39,7 +41,8 @@ export function accessLabel(policy, key) {
     return [rank && `${rank}+`, perms].filter(Boolean).join(' or ') || 'Everyone';
 }
 const labels = Object.fromEntries(HELP_SECTIONS.map(s => [s.key, s.label]));
-const sectionOf = (name, fallback) => HELP_SECTIONS.find(s => s.commands.includes(name))?.key ?? fallback;
+/** The section a command belongs to: the top-level command it appears under in Discord's "/" menu. */
+const sectionOf = (shown, fallback) => HELP_SECTIONS.find(s => s.tops.includes(shown.replace(/^\//, '').split(' ')[0]))?.key ?? fallback;
 const rank = (name) => { for (const s of HELP_SECTIONS) {
     const n = s.commands.indexOf(name);
     if (n >= 0)
@@ -51,16 +54,16 @@ export function helpCategories(ctx, guild, user) {
         const name = def.data.name;
         if (RETIRED.includes(name))
             continue;
-        const category = sectionOf(name, def.metadata.category);
         const add = (description, path = '', policy = def.metadata) => {
             const key = path ? `${name}/${path.replaceAll(' ', '/')}` : name;
             if (isDeveloperPrefixOnly(policy, key))
                 return;
             if (!guard.allowed(policy, guild, user, ctx.actor, name, key))
                 return;
-            const lines = groups.get(category) ?? [];
             const command = (def.data.type ?? 1) === 1 ? displayPath(name, path) : `${name} · context menu`;
-            lines.push({ order: rank(name) * 100 + lines.filter(l => l.order >= rank(name) * 100 && l.order < rank(name) * 100 + 100).length, text: `\`${command}\` · ${description} · *${accessLabel(policy, `${name}/${path.replaceAll(' ', '/')}`)}*` });
+            const category = sectionOf(command, def.metadata.category);
+            const lines = groups.get(category) ?? [];
+            lines.push({ order: rank(name) * 100 + lines.filter(l => l.order >= rank(name) * 100 && l.order < rank(name) * 100 + 100).length, text: `\`${command}\` · ${describe(command, description)} · *${accessLabel(policy, `${name}/${path.replaceAll(' ', '/')}`)}*` });
             groups.set(category, lines);
         };
         const visit = (options, prefix = '') => {
@@ -93,7 +96,7 @@ export function helpPage(ctx, guild, user, requested = '', requestedPage = 0) {
     if (!requested || requested === 'home' || !groups.some(g => g.key === requested)) {
         const total = groups.reduce((n, g) => n + g.lines.length, 0);
         const body = groups.map(g => `${section(g.key)?.emoji ?? '•'} **${g.label}** · ${g.lines.length}\n-# ${section(g.key)?.blurb ?? ''}`).join('\n');
-        return { embeds: [embed('Ghost Vanguard · Commands', `Type \`/\` and pick **Ghost Vanguard** to see the main commands:\n\`/antinuke\` \`/mod\` \`/role\` \`/security\` \`/setup\` \`/recovery\` \`/info\` \`/roblox\` \`/verify\`\n\n${body}\n\n-# ${total} commands available to you · pick a category below`)], components: [menu], allowedMentions: { parse: [] } };
+        return { embeds: [embed('Ghost Vanguard · Commands', `Type \`/\` and pick **Ghost Vanguard** to see the main commands:\n\`/antinuke\` \`/automod\` \`/raid\` \`/mod\` \`/role\` \`/setup\` \`/ticket\` \`/recovery\` \`/info\` \`/roblox\` \`/verify\`\n\n${body}\n\n-# ${total} commands available to you · pick a category below`)], components: [menu], allowedMentions: { parse: [] } };
     }
     const group = groups.find(g => g.key === requested);
     const pages = Math.ceil(group.lines.length / PER_PAGE), page = Math.min(Math.max(0, requestedPage), pages - 1);

@@ -26,7 +26,7 @@ export default defineCommand(new SlashCommandBuilder().setName('scam').setDescri
         .addAttachmentOption(o => o.setName('image').setDescription('Static PNG, JPEG or WebP up to 8 MiB').setRequired(true))
         .addStringOption(o => o.setName('name').setDescription('Reference name').setRequired(true).setMaxLength(80)))
     .addSubcommand(s => s.setName('image-remove').setDescription('Remove a custom image reference')
-        .addStringOption(o => o.setName('id').setDescription('Reference ID shown by /security scam list').setRequired(true).setMaxLength(50)))
+        .addStringOption(o => o.setName('id').setDescription('Reference ID shown by /automod scam list').setRequired(true).setMaxLength(50)))
     .addSubcommand(s => s.setName('list').setDescription('List blocked domains, image references and excluded channels')
         .addIntegerOption(o => o.setName('page').setDescription('Page number').setMinValue(1).setMaxValue(10)))
     .addSubcommand(s => s.setName('exclude').setDescription('Exclude or include a channel and its threads')
@@ -73,10 +73,10 @@ export default defineCommand(new SlashCommandBuilder().setName('scam').setDescri
             const vision = sub === 'vision' ? i.options.getBoolean('enabled', true) : !!before.vision;
             if (sub === 'vision' && vision && (!config.aiEnabled || !config.openaiKey)) throw new AppError('VALIDATION_ERROR', 'Configure AI_ENABLED=true, OPENAI_API_KEY and an image-capable OPENAI_MODEL, then restart. Vision sends scanned images to OpenAI and can incur API costs; results only alert staff.');
             ctx.store.run('INSERT INTO scam_config(guild_id,enabled,vision) VALUES(?,?,?) ON CONFLICT(guild_id) DO UPDATE SET enabled=excluded.enabled,vision=excluded.vision', guild, sub === 'enable' ? 1 : sub === 'disable' ? 0 : Number(before.enabled), Number(vision));
-            result = sub === 'vision' ? `AI image text scanning ${vision ? 'enabled (images sent to OpenAI; review alerts only)' : 'disabled'}.` : `Scam protection ${sub === 'enable' ? 'enabled. Exact known images and blocked domains will be deleted and their senders banned when permissions allow. Exclude reporting channels with /security scam exclude.' : 'disabled'}.`;
+            result = sub === 'vision' ? `AI image text scanning ${vision ? 'enabled (images sent to OpenAI; review alerts only)' : 'disabled'}.` : `Scam protection ${sub === 'enable' ? 'enabled. Exact known images and blocked domains will be deleted and their senders banned when permissions allow. Exclude reporting channels with /automod scam exclude.' : 'disabled'}.`;
             if (sub === 'enable') {
                 const ready = await scanner.initialize(i.guild);
-                result = ready ? 'Automatic scam protection is ready. Reporting exclusions are retained.' : 'Scam protection enabled, but automatic setup is paused. Check startup logs and /security scam status for missing permissions or log access.';
+                result = ready ? 'Automatic scam protection is ready. Reporting exclusions are retained.' : 'Scam protection enabled, but automatic setup is paused. Check startup logs and /automod scam status for missing permissions or log access.';
             }
         } else if (sub.startsWith('domain-')) {
             let value: string;

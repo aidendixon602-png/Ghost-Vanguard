@@ -10,7 +10,7 @@ import { staffReason } from '../security/raidmode.js';
 /**
  * Webhook guard. Webhooks can post as anyone, so they are a favourite nuke tool. Anti-nuke already
  * deletes webhooks made by people who are not whitelisted; on top of that, every new webhook (even
- * one made by staff) is reported with a Delete button, and /security webhooks lists them all.
+ * one made by staff) is reported with a Delete button, and /raid webhooks lists them all.
  */
 export function reportWebhook(store: Store, logs: LogQueue, entry: GuildAuditLogsEntry, guild: Guild) {
     if (entry.action !== AuditLogEvent.WebhookCreate || !entry.targetId || entry.executorId === guild.client.user?.id) return;

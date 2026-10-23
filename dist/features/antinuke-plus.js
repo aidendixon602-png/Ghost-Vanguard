@@ -15,15 +15,15 @@ const DANGEROUS_MASK = DANGEROUS.reduce((all, bit) => all | BigInt(bit), 0n);
 export function autoRaid(store, guild, now = Date.now()) {
     const c = plusConfig(store, guild);
     if (!c.raidAuto)
-        return 'Raid auto-trigger is off; turn on raid mode yourself with `/security raidmode on` if this is a raid.';
+        return 'Raid auto-trigger is off; turn on raid mode yourself with `/raid mode on` if this is a raid.';
     const current = raidState(store, guild, now);
     if (current.enabled)
         return 'Raid mode was already on.';
     if (store.settings(guild).mode !== 'enforce')
-        return 'Anti-nuke is in observe mode, so raid mode was **not** switched on. Turn it on with `/security raidmode on` if this is a raid.';
+        return 'Anti-nuke is in observe mode, so raid mode was **not** switched on. Turn it on with `/raid mode on` if this is a raid.';
     // Keep the server's own raid settings (minimum account age, kick or timeout).
     setRaidMode(store, guild, true, 'auto', { hours: c.raidAutoHours, minAgeDays: current.minAgeDays, action: current.action });
-    return `🛑 **Raid mode switched on automatically for ${c.raidAutoHours} hour${c.raidAutoHours === 1 ? '' : 's'}**: new accounts that join are removed. Turn it off early with \`/security raidmode off\`.`;
+    return `🛑 **Raid mode switched on automatically for ${c.raidAutoHours} hour${c.raidAutoHours === 1 ? '' : 's'}**: new accounts that join are removed. Turn it off early with \`/raid mode off\`.`;
 }
 const cdn = (path, hash, size, animated) => `https://cdn.discordapp.com/${path}/${hash}.${animated && hash.startsWith('a_') ? 'gif' : 'png'}?size=${size}`;
 const SETTINGS = {
@@ -253,7 +253,7 @@ export async function permissionAudit(guild) {
         dangerous(everyone.permissions.bitfield) ? '🔴 **@everyone has powerful permissions.** Remove them in Server Settings → Roles → @everyone.' : '✅ @everyone has no powerful permissions.',
         above.length ? `⚠ **${above.length} powerful role(s) sit above Vanguard**, so it cannot stop people with them. Drag Vanguard's role higher.` : '✅ Vanguard is above every powerful role.',
         botsWithAdmin.size ? `⚠ **Bots with Administrator:** ${[...botsWithAdmin.values()].map(m => `<@${m.id}>`).join(', ')}. A hacked bot can nuke the server; give bots only what they need.` : '✅ No other bot has Administrator.',
-        hooks !== null ? `**Webhooks:** ${hooks} · review with \`/security webhooks\`` : '',
+        hooks !== null ? `**Webhooks:** ${hooks} · review with \`/raid webhooks\`` : '',
         '', `**Powerful roles (${risky.length})**`, ...risky.slice(0, 15).map(line), risky.length > 15 ? `…and ${risky.length - 15} more` : '',
         '', '-# Powerful = Administrator, Manage Server/Roles/Channels/Webhooks/Messages, Ban, Kick, Timeout or @everyone mentions.',
     ].filter(l => l !== '').join('\n');

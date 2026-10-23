@@ -312,8 +312,19 @@ test('grouped command tree: fits Discord limits, routes back to the original mod
     assert.equal(nested.commandName, 'authserver'); assert.equal(nested.options.getSubcommand(false), null); assert.equal(nested.options.getString('guild_id'), '123456789012345678');
     const network = routeInteraction(real('network', [{ type: 1, name: 'hardban', options: [] }]));
     assert.equal(network.commandName, 'hardban');
-    const group = routeInteraction(real('security', [{ type: 2, name: 'automod', options: [{ type: 1, name: 'links', options: [{ type: 3, name: 'mode', value: 'off' }] }] }]));
+    const group = routeInteraction(real('automod', [{ type: 1, name: 'links', options: [{ type: 3, name: 'mode', value: 'off' }] }]));
     assert.equal(group.commandName, 'automod'); assert.equal(group.options.getSubcommand(), 'links'); assert.equal(group.options.data[0].name, 'links'); assert.equal(group.options.getString('mode'), 'off');
+    const scam = routeInteraction(real('automod', [{ type: 2, name: 'scam', options: [{ type: 1, name: 'status', options: [] }] }]));
+    assert.equal(scam.commandName, 'scam'); assert.equal(scam.options.getSubcommand(), 'status');
+    // One module split across two commands, and shown under another name.
+    const quarantine = routeInteraction(real('antinuke', [{ type: 1, name: 'quarantine', options: [] }]));
+    assert.equal(quarantine.commandName, 'security'); assert.equal(quarantine.options.getSubcommand(), 'quarantine');
+    const secConfig = routeInteraction(real('setup', [{ type: 1, name: 'security', options: [] }]));
+    assert.equal(secConfig.commandName, 'security'); assert.equal(secConfig.options.getSubcommand(), 'config', '/setup security runs security config');
+    const admins = routeInteraction(real('setup', [{ type: 1, name: 'security-admins', options: [] }]));
+    assert.equal(admins.options.getSubcommand(), 'admin');
+    const raidMode = routeInteraction(real('raid', [{ type: 2, name: 'mode', options: [{ type: 1, name: 'on', options: [] }] }]));
+    assert.equal(raidMode.commandName, 'raidmode'); assert.equal(raidMode.options.getSubcommand(), 'on');
     const single = routeInteraction(real('info', [{ type: 1, name: 'ping', options: [] }]));
     assert.equal(single.commandName, 'ping'); assert.equal(single.options.getSubcommand(false), null); assert.deepEqual(single.options.data, []);
     const renamed = routeInteraction(real('setup', [{ type: 2, name: 'config', options: [{ type: 1, name: 'feature', options: [] }] }]));
@@ -324,7 +335,12 @@ test('grouped command tree: fits Discord limits, routes back to the original mod
     const wrapped = new ReplyPanels().wrap(flat);
     assert.equal(wrapped.options.getSubcommand(), 'ban'); assert.equal(wrapped.options.data[0].name, 'ban'); assert.equal(wrapped.isChatInputCommand(), true);
     client.destroy();
-    assert.equal(displayPath('automod', 'links'), '/security automod links');
+    assert.equal(displayPath('automod', 'links'), '/automod links');
+    assert.equal(displayPath('security', 'quarantine'), '/antinuke quarantine');
+    assert.equal(displayPath('security', 'config'), '/setup security');
+    assert.equal(displayPath('security', 'admin'), '/setup security-admins');
+    assert.equal(displayPath('raidmode', 'on'), '/raid mode on');
+    assert.equal(displayPath('case', 'view'), '/mod cases view');
     assert.equal(displayPath('moderation', 'ban'), '/mod ban');
     assert.equal(displayPath('userinfo'), '/info user');
     // Each routed shape passes the original module's own argument check.

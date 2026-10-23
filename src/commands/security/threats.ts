@@ -8,7 +8,7 @@ import { rankOf, RANKS } from '../../bot/ranks.js';
 import { developers } from '../../bot/developers.js';
 
 /**
- * /security threats — the information board of who may be attacking, what they did, and what the bot
+ * /antinuke threats — the information board of who may be attacking, what they did, and what the bot
  * already did about it. Read-only for staff up to Admin; acting on someone (contain, strike, release)
  * needs the Head Admin rank, because it can ban people.
  */
@@ -120,6 +120,6 @@ export default defineCommand(new SlashCommandBuilder().setName('threats').setDes
         `⚔️ **Strike on ${member.displayName}.** Case #${caseNumber}.`,
         `**Defence:** ${stripped}`,
         banned ? '**Counter-attack:** banned.' : '**Counter-attack failed** — check my Ban Members permission and my role position.',
-        '-# Everything above is recorded: `/security threats view` shows it, `/security threats release` undoes it.',
+        '-# Everything above is recorded: `/antinuke threats view` shows it, `/antinuke threats release` undoes it.',
     ].join('\n');
 });

@@ -11,7 +11,7 @@ export async function previewHistory(ctx, i, id) {
     if (row.component === 'authorization')
         throw new AppError('VALIDATION_ERROR', 'Authorization history is retained for audit. Authorization must be changed by a developer through ,authserver, ,deauthserver or ,serverauth.');
     if (row.component === 'antiping')
-        throw new AppError('VALIDATION_ERROR', 'Anti-ping changes are retained for audit. Use /security antiping to change Discord protection and keep its rule synchronized.');
+        throw new AppError('VALIDATION_ERROR', 'Anti-ping changes are retained for audit. Use /automod antiping to change Discord protection and keep its rule synchronized.');
     const key = addConfirmation(ctx, { guild: i.guildId, user: i.user.id, snapshot: id, prune: false, fingerprint: row.before_json ?? 'null', action: 'history' });
     await i.editReply({ embeds: [embed('Confirm configuration rollback', `**History #${id} · ${row.component}**\nRestore the values from before this change. This can change Anti-Nuke mode, command access, or verification policy. A verified database backup is required before applying the rollback.\n\nPrevious values:\n${(row.before_json ?? 'Default/unconfigured state').slice(0, 2200)}\n\nExpires in two minutes.`)], components: [new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`history:apply:${key}`).setLabel('Restore previous configuration').setStyle(ButtonStyle.Danger), new ButtonBuilder().setCustomId(`history:cancel:${key}`).setLabel('Cancel').setStyle(ButtonStyle.Secondary))], allowedMentions: { parse: [] } });
 }

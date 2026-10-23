@@ -28,7 +28,7 @@ export class Interactions {
         // The command exactly as typed in Discord ("mod ban"), for COMMAND_BLACKLIST. Buttons and menus: null.
         const shown = i.isChatInputCommand() || i.isAutocomplete()
             ? [i.commandName, i.options.getSubcommandGroup(false), i.options.getSubcommand(false)].filter(Boolean).join(' ').toLowerCase() : null;
-        // Grouped commands (/mod ban, /security automod links) run their original module.
+        // Grouped commands (/mod ban, /automod links) run their original module.
         i = this.panels.wrap(routeInteraction(i));
         this.seen.set(i.id, Date.now());
         for (const [id, at] of this.seen)

@@ -268,14 +268,14 @@ export async function sweepThreats(deps: SweepDeps, limit = 15): Promise<SweepRe
                 if (plan.action === 'strike') {
                     const banned = await deps.ban?.(guild, row.user_id, `Ghost Vanguard threat board: ${levelLabel(level)}`).catch(() => false) ?? false;
                     text += banned
-                        ? '\n**Counter-attack:** banned. Lift it any time with `/mod unban`, or clear the board entry with `/security threats clear`.'
+                        ? '\n**Counter-attack:** banned. Lift it any time with `/mod unban`, or clear the board entry with `/antinuke threats clear`.'
                         : '\n**Counter-attack failed** (check my Ban Members permission and role position). The strip and the restore above still stand.';
                     if (banned)
                         local.struck++;
                 } else
                     local.contained++;
                 deps.logs.push(guild.id, embed(`🛡️ Threat board acted: ${plan.action === 'strike' ? 'strike' : 'contain'}`,
-                    `**Member:** <@${row.user_id}> (\`${row.user_id}\`)\n${text}\n-# Every automatic action is recorded and reversible. Only Developers and staff above this can stop the board with \`/security threats\`.`, plan.action === 'strike' ? Colors.Red : Colors.Orange));
+                    `**Member:** <@${row.user_id}> (\`${row.user_id}\`)\n${text}\n-# Every automatic action is recorded and reversible. Only Developers and staff above this can stop the board with \`/antinuke threats\`.`, plan.action === 'strike' ? Colors.Red : Colors.Orange));
             }
             return local;
         });
@@ -290,7 +290,7 @@ export async function sweepThreats(deps: SweepDeps, limit = 15): Promise<SweepRe
 
 export interface BoardSummary { total: number; critical: number; high: number; watch: number; top: ThreatRow[] }
 
-/** The numbers behind the dashboard and `/security threats list`. */
+/** The numbers behind the dashboard and `/antinuke threats list`. */
 export function boardSummary(store: Store, guildId: string, now = Date.now()): BoardSummary {
     const rows = board(store, guildId, 100).map(row => ({ ...row, score: decayedScore(row, now) }));
     return {

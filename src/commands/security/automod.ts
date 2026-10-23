@@ -98,8 +98,8 @@ export default defineCommand(new SlashCommandBuilder().setName('automod').setDes
         setFeature(ctx.store, guild, 'automod', AUTOMOD_DEFAULTS, { links: mode, allowedDomains: allowed }, i.user.id);
         ctx.logs.push(guild, embed('Automod · link rule changed', `By <@${i.user.id}> · ${mode}`, Colors.Orange));
         return mode === 'off' ? 'Links: **off**. Any website can be posted (other servers\' invites are still handled by the invite blocker).'
-            : mode === 'blocklist' ? `Links: **block list**. Only sites you block are removed. Blocked now: ${a.blockedDomains.join(', ') || 'none yet'}. Add one with \`/security automod link-list action:Block site:example.com\`.`
-            : `Links: **allow list**. Only these sites can be posted: ${allowed.join(', ')}.\nAdd more with \`/security automod link-list action:Allow site:example.com\`.`;
+            : mode === 'blocklist' ? `Links: **block list**. Only sites you block are removed. Blocked now: ${a.blockedDomains.join(', ') || 'none yet'}. Add one with \`/automod link-list action:Block site:example.com\`.`
+            : `Links: **allow list**. Only these sites can be posted: ${allowed.join(', ')}.\nAdd more with \`/automod link-list action:Allow site:example.com\`.`;
     }
     if (sub === 'link-list') {
         const action = i.options.getString('action', true), domain = cleanDomain(i.options.getString('site', true));
@@ -111,7 +111,7 @@ export default defineCommand(new SlashCommandBuilder().setName('automod').setDes
         if (allowed.length > 100 || blocked.length > 100) throw new AppError('VALIDATION_ERROR', 'Each list holds up to 100 sites.');
         setFeature(ctx.store, guild, 'automod', AUTOMOD_DEFAULTS, { allowedDomains: allowed, blockedDomains: blocked }, i.user.id);
         ctx.logs.push(guild, embed('Automod · link list changed', `By <@${i.user.id}> · ${action} **${domain}**`, Colors.Orange));
-        const modeNote = a.links === 'off' ? '\n-# Links are off right now; turn the rule on with `/security automod links`.' : '';
+        const modeNote = a.links === 'off' ? '\n-# Links are off right now; turn the rule on with `/automod links`.' : '';
         return `${action === 'allow' ? `**${domain}** is allowed` : action === 'block' ? `**${domain}** is blocked` : `**${domain}** was removed from the lists`} (sub-domains included).${modeNote}`;
     }
     if (sub === 'ai-ignore') {
@@ -132,7 +132,7 @@ export default defineCommand(new SlashCommandBuilder().setName('automod').setDes
         const next = setFeature(ctx.store, guild, 'lockschedule', LOCK_SCHEDULE_DEFAULTS, { enabled, start, end, utcOffset: i.options.getNumber('utc_offset') ?? current.utcOffset }, i.user.id);
         ctx.logs.push(guild, embed('Quiet hours changed', `By <@${i.user.id}> · ${enabled ? `${next.start} → ${next.end} (UTC${next.utcOffset >= 0 ? '+' : ''}${next.utcOffset})` : 'off'}`, Colors.Orange));
         return enabled
-            ? `Quiet hours **on**: the server locks every day at **${next.start}** and unlocks at **${next.end}** (UTC${next.utcOffset >= 0 ? '+' : ''}${next.utcOffset}). It works like \`/security lockdown\`: staff keep access, and \`/security unlock\` ends it early.`
+            ? `Quiet hours **on**: the server locks every day at **${next.start}** and unlocks at **${next.end}** (UTC${next.utcOffset >= 0 ? '+' : ''}${next.utcOffset}). It works like \`/raid lockdown\`: staff keep access, and \`/raid unlock\` ends it early.`
             : 'Quiet hours **off**. If a scheduled lock is running now, it is lifted within a minute.';
     }
     const change = sub === 'spam' ? { spam: enabled, mentionLimit: i.options.getInteger('mention_limit') ?? automodConfig(ctx.store, guild).mentionLimit, timeoutMinutes: i.options.getInteger('timeout_minutes') ?? automodConfig(ctx.store, guild).timeoutMinutes }

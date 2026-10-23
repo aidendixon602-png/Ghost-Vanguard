@@ -63,7 +63,7 @@ Nobody can change these from Discord. Restart after editing.
 | `/antinuke settings` | Extra protection layers (all on by default) |
 | `/antinuke whitelist add` | Panel: pick who, what they may do and for how long |
 | `/antinuke whitelist remove` · `list` · `check` · `bots` | Remove, list, explain one person's coverage, verification-bot exemptions |
-| `/security quarantine` · `release` | Strip and save someone's roles by hand, or give them back |
+| `/antinuke quarantine` · `release` | Strip and save someone's roles by hand, or give them back |
 | `/setup panel` | Private control channel with Restore / Strip / Revert / Logs buttons |
 
 ## Evidence and reverts

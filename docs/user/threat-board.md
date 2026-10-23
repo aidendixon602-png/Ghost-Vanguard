@@ -53,15 +53,15 @@ events behind a cleared entry are kept as evidence.
 
 | Command | Rank | What it does |
 |---|---|---|
-| `/security threats list` | Admin | The board: everyone above Watch, with their score, level and what was already done |
-| `/security threats view member:` | Admin | One member in full: every incident, every automatic action and the current plan |
-| `/security threats clear member:` | Head Admin | Clears the board entry. No ban or role is changed |
-| `/security threats release member:` | Head Admin | Undoes an automatic strike: unbans them and clears the entry, with the reason recorded |
-| `/security threats strike member: [reason]` | Head Admin | Counter-attacks now, regardless of level: strip, restore, ban |
+| `/antinuke threats list` | Admin | The board: everyone above Watch, with their score, level and what was already done |
+| `/antinuke threats view member:` | Admin | One member in full: every incident, every automatic action and the current plan |
+| `/antinuke threats clear member:` | Head Admin | Clears the board entry. No ban or role is changed |
+| `/antinuke threats release member:` | Head Admin | Undoes an automatic strike: unbans them and clears the entry, with the reason recorded |
+| `/antinuke threats strike member: [reason]` | Head Admin | Counter-attacks now, regardless of level: strip, restore, ban |
 
 Every automatic action appears in three places at once: the board itself, the server's log channel,
 and the audit trail for the case — with what decided it. **Every action is reversible:** lifting the
-ban (`/mod unban` or `/security threats release`) plus clearing the entry puts the member back where
+ban (`/mod unban` or `/antinuke threats release`) plus clearing the entry puts the member back where
 they were, and the roles the strip removed are saved first, so `/antinuke restore` can return them.
 
 ## Timing

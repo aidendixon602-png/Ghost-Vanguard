@@ -81,7 +81,7 @@ function pushAlert(logs, guildId, e, rows, line) {
         const done = alertWindow.get(guildId);
         alertWindow.delete(guildId);
         if (done?.extra.length)
-            logs.push(guildId, embed('New accounts · more joins held', `${done.extra.length} more new account(s) in the last minute:\n${done.extra.slice(0, 20).join('\n')}${done.extra.length > 20 ? `\n…and ${done.extra.length - 20} more` : ''}\n\nIf this is a raid, use \`/security raidmode on\`.`, Colors.Orange));
+            logs.push(guildId, embed('New accounts · more joins held', `${done.extra.length} more new account(s) in the last minute:\n${done.extra.slice(0, 20).join('\n')}${done.extra.length > 20 ? `\n…and ${done.extra.length - 20} more` : ''}\n\nIf this is a raid, use \`/raid mode on\`.`, Colors.Orange));
     }, 60000);
     w.timer.unref?.();
 }

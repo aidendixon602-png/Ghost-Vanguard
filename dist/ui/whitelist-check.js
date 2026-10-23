@@ -37,7 +37,7 @@ export function whitelistCheck(store, guild, userId, roleIds, isBot, now = Date.
     if (warned)
         notes.push(`⚠️ **Warned <t:${Math.floor(Number(warned.at) / 1000)}:R>.** Their next offence before <t:${Math.floor((Number(warned.at) + WARNING_MEMORY_MS) / 1000)}:t> is punished without another warning.`);
     if (store.get('SELECT 1 FROM backups WHERE guild_id=? AND user_id=? AND active=1', guild.id, userId))
-        notes.push('🔒 **Quarantined** from an earlier incident: staff roles given to them are removed again. Use the alert\'s **Undo strip** button or `/security release`.');
+        notes.push('🔒 **Quarantined** from an earlier incident: staff roles given to them are removed again. Use the alert\'s **Undo strip** button or `/antinuke release`.');
     return e.setColor(skips.length ? Colors.Blurple : Colors.Greyple)
         .setDescription(`${skips.length ? `<@${userId}> is whitelisted for **${skips.length}** rule(s).` : `<@${userId}> is **not whitelisted**. Anti-nuke checks everything they do.`}${notes.length ? `\n\n${notes.join('\n')}` : ''}`)
         .addFields(...(skips.length ? [{ name: 'Not punished for (still alerted)', value: skips.join('\n').slice(0, 1024) }] : []), { name: 'Still checked', value: checked.join('\n').slice(0, 1024) || 'Nothing.' }, { name: 'Change it', value: '`/antinuke whitelist add` to whitelist them · `/antinuke whitelist remove` to take them off', inline: false });

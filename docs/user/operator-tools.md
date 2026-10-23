@@ -6,17 +6,17 @@ Stop Vanguard before installing. The updater checks the database startup lease a
 
 ## Health
 
-`/security health` is restricted to existing authorized security administrators. It reports saved anti-nuke mode, bot/log permissions, role readiness, role bypasses, scam settings, current channel inclusion, reporting exclusions, AI configuration, observed verification-provider results, latest recorded verified database backup and exhausted security-log retries.
+`/raid health` is restricted to existing authorized security administrators. It reports saved anti-nuke mode, bot/log permissions, role readiness, role bypasses, scam settings, current channel inclusion, reporting exclusions, AI configuration, observed verification-provider results, latest recorded verified database backup and exhausted security-log retries.
 
 Provider configuration is not an authentication test. Results are last observed requests since restart, with the observation time and any active pause.
 
 ## Safe scam testing and reporting
 
-`/security scam test text:<text>` and `/security scam test image:<attachment>` use the same domain/image classification as live scanning. They take no deletion/ban actions, store no incident, and make no AI requests. Discord attachment downloads occur for image tests. Bounds remain static PNG/JPEG/WebP, 8 MiB and 8 megapixels. Two tests maximum at once; command cooldown is five seconds.
+`/automod scam test text:<text>` and `/automod scam test image:<attachment>` use the same domain/image classification as live scanning. They take no deletion/ban actions, store no incident, and make no AI requests. Discord attachment downloads occur for image tests. Bounds remain static PNG/JPEG/WebP, 8 MiB and 8 megapixels. Two tests maximum at once; command cooldown is five seconds.
 
 Exact reference/domain matches are confirmed; similar images and suspicious combinations are review results. No match is not a safety guarantee. Test results describe matching, not live readiness or permission to ban the supplied account.
 
-Before staff post scam evidence in a normal channel, run `/security scam exclude channel:<reporting-channel> excluded:true`. Its threads are also excluded. `/security health` lists the exclusions. Existing exclusions and deliberate disables survive updates. No reporting channel is guessed or automatically exempted.
+Before staff post scam evidence in a normal channel, run `/automod scam exclude channel:<reporting-channel> excluded:true`. Its threads are also excluded. `/raid health` lists the exclusions. Existing exclusions and deliberate disables survive updates. No reporting channel is guessed or automatically exempted.
 
 ## Bypasses and integration alerts
 

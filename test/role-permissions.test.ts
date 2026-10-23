@@ -372,16 +372,27 @@ test('the reorganized command list: the expected top-level commands and groups',
     try {
         indexTree(registry);
         const tree = treeJson(registry);
-        assert.deepEqual(tree.map(c => c.name), ['antinuke', 'mod', 'security', 'setup', 'ticket', 'recovery', 'info', 'network', 'dev', 'help', 'verify', 'roblox', 'ask', 'role', 'restart']);
+        assert.deepEqual(tree.map(c => c.name), ['antinuke', 'automod', 'raid', 'mod', 'setup', 'ticket', 'recovery', 'info', 'network', 'dev', 'help', 'verify', 'roblox', 'ask', 'role', 'restart']);
         assert.ok(tree.some(c => c.name === 'dev' || c.name === 'network'), 'developer command groups are registered as slash commands');
         const ticket = tree.find(c => c.name === 'ticket')!;
         assert.deepEqual(ticket.options.map((o: any) => o.name),
             ['setup', 'panel', 'types', 'settings', 'stats', 'claim', 'unclaim', 'transfer', 'priority', 'close', 'closerequest', 'add', 'remove', 'rename', 'history', 'block', 'unblock', 'blocked']);
         assert.deepEqual(ticket.options.find((o: any) => o.name === 'types').options.map((o: any) => o.name), ['add', 'edit', 'remove', 'list', 'reset']);
         const subs = (name: string) => tree.find(c => c.name === name)!.options.map((o: any) => o.name);
-        assert.deepEqual(subs('antinuke'), ['status', 'enable', 'disable', 'check', 'scan', 'settings', 'whitelist']);
-        assert.ok(!subs('security').includes('mention') && !subs('security').includes('roblox-block'), 'duplicates removed');
-        assert.ok(subs('setup').includes('permissions') && subs('mod').includes('notes'));
+        assert.deepEqual(subs('antinuke'), ['status', 'enable', 'disable', 'check', 'scan', 'settings', 'whitelist', 'incidents', 'quarantine', 'release', 'threats']);
+        assert.deepEqual(subs('raid'), ['lockdown', 'unlock', 'health', 'webhooks', 'mode', 'emergency', 'newaccounts']);
+        assert.deepEqual(subs('automod').slice(-2), ['scam', 'antiping']);
+        assert.deepEqual(subs('setup').slice(0, 4), ['panel', 'status', 'security', 'security-admins']);
+        assert.ok(subs('setup').includes('permissions') && subs('mod').includes('notes') && subs('mod').includes('cases') && subs('mod').includes('slowmode'));
+        // Every command in the menu says what it does, and staff commands say who can use them.
+        const leaves: any[] = [];
+        for (const c of tree) { const walk = (o: any[]) => { for (const x of o ?? []) x.type === 2 ? walk(x.options) : x.type === 1 && leaves.push(x); }; (c.options ?? []).some((o: any) => o.type <= 2) ? walk(c.options) : leaves.push(c); }
+        for (const l of leaves) assert.ok(l.description && l.description.length <= 100, `${l.name}: description within 100 characters`);
+        const desc = (top: string, ...path: string[]) => { let o: any = tree.find(c => c.name === top); for (const p of path) o = o.options.find((x: any) => x.name === p); return o.description; };
+        assert.equal(desc('mod', 'ban'), 'Ban a user · Moderator+');
+        assert.equal(desc('raid', 'mode', 'on'), 'Turn raid mode on · Admin+');
+        assert.equal(desc('restart'), 'Restart the bot · Developer');
+        assert.equal(desc('help'), 'Browse the commands you can use', 'everyone: no tag');
         for (const c of tree) assert.ok((c.options ?? []).length <= 25, `${c.name} fits Discord's 25-option limit`);
     } finally { store.close(); }
 });

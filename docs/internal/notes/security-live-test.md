@@ -8,7 +8,7 @@ an exempt account. Do not automate a normal user account.
 
 1. Invite Vanguard and authorize the test server with `,authserver` as a developer whose exact ID is listed in `DEVELOPER_IDS`.
 2. Place Vanguard above regular staff/test roles, grant the permissions reported by
-   `/antinuke check`, and set a security log channel with `/security config`.
+   `/antinuke check`, and set a security log channel with `/setup security`.
 3. Run `/recovery backup`, `/antinuke check`, then `/antinuke enable`. Confirm green status and the defaults.
 4. Run `/antinuke mode value:observe`. Have the untrusted helper create two disposable
    channels within 120 seconds. Confirm an incident with no punishment or deletion.

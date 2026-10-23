@@ -53,7 +53,7 @@ export async function handleRaidJoin(store, logs, member, trusted, now = Date.no
             const done = pending.get(key);
             pending.delete(key);
             if (done)
-                logs.push(key, embed('Raid mode · new accounts handled', `${done.count} join(s) in the last 30 seconds:\n${done.names.slice(0, 15).join('\n')}${done.count > 15 ? `\n…and ${done.count - 15} more` : ''}\n\nTurn it off with \`/security raidmode off\` when the raid is over.`, Colors.Orange));
+                logs.push(key, embed('Raid mode · new accounts handled', `${done.count} join(s) in the last 30 seconds:\n${done.names.slice(0, 15).join('\n')}${done.count > 15 ? `\n…and ${done.count - 15} more` : ''}\n\nTurn it off with \`/raid mode off\` when the raid is over.`, Colors.Orange));
         }, 30000) };
     entry.timer.unref?.();
     entry.count++;

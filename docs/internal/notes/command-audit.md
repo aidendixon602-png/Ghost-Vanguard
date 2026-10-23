@@ -22,12 +22,12 @@ Every module uses centrally enforced developer/server/user/bot permissions, imme
 | `/moderation history` | REWORK | `/moderation history` — User Moderate Members permission; bot moderation permission no longer unnecessarily required for DB/DM-only work. |
 | `/moderation purge` | REWORK | `/moderation purge` — Bot/user channel Manage Messages and bot Read Message History; bounded 1–100 count; case logging. |
 | `/security` | REWORK | Focused configuration/security commands; snapshots moved out. |
-| `/security status` | REWORK | `/security status` — Uses centralized policy/validation/response handling; guild-scoped data. |
-| `/security setup` | RENAME | `/security config` — Consistent configuration name; safe role/channel validation. |
-| `/security admin` | REWORK | `/security admin` — Central owner/developer restriction; security access never grants developer access. |
-| `/security incidents` | REWORK | `/security incidents` — Uses centralized policy/validation/response handling; guild-scoped data. |
-| `/security quarantine` | REWORK | `/security quarantine` — Uses centralized policy/validation/response handling; guild-scoped data. |
-| `/security release` | REWORK | `/security release` — Central owner/developer restriction when privileged restoration is requested; safe target checks. |
+| `/setup status` | REWORK | `/setup status` — Uses centralized policy/validation/response handling; guild-scoped data. |
+| `/setup security` | RENAME | `/setup security` — Consistent configuration name; safe role/channel validation. |
+| `/setup security-admins` | REWORK | `/setup security-admins` — Central owner/developer restriction; security access never grants developer access. |
+| `/antinuke incidents` | REWORK | `/antinuke incidents` — Uses centralized policy/validation/response handling; guild-scoped data. |
+| `/antinuke quarantine` | REWORK | `/antinuke quarantine` — Uses centralized policy/validation/response handling; guild-scoped data. |
+| `/antinuke release` | REWORK | `/antinuke release` — Central owner/developer restriction when privileged restoration is requested; safe target checks. |
 | `/security snapshot` | REPLACE | `/recovery snapshot create` — Separate snapshot registry module and permission policy. |
 | `/security restore` | REPLACE | `/recovery snapshot restore` — Same reviewed recovery contract with central guarded one-time confirmation. |
 | `/security roblox_block` | RENAME | `/security roblox-block` — Readable consistent hyphenated option; strict positive Roblox ID validation. |
