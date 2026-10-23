@@ -1,6 +1,6 @@
 import { AuditLogEvent, Colors } from 'discord.js';
 import { developers } from '../bot/developers.js';
-import { dmTrusted } from '../bot/trusted-dm.js';
+import { dmSecurityAlert } from '../bot/trusted-dm.js';
 import { isProtectedRole, protectedRoleAssigners } from '../bot/env-rules.js';
 import { embed } from '../ui/ui.js';
 import { responsibleActor } from './security.js';
@@ -32,6 +32,6 @@ export async function enforceProtectedRoles(store, logs, entry, guild) {
     const card = embed('Protected role blocked', `<@${actor}> gave ${roles} to <@${entry.targetId}>, but only \`PROTECTED_ROLE_ASSIGNERS\` and Developers may give it.\n${outcome}`, removed ? Colors.Orange : Colors.Red)
         .setFooter({ text: `Given by: ${actor} · Member: ${entry.targetId}` }).setTimestamp();
     logs.push(guild.id, card);
-    void dmTrusted(guild.client, { embeds: [embed('Protected role blocked', `**${guild.name}** (\`${guild.id}\`)\n<@${actor}> (\`${actor}\`) gave ${hits.map(r => `**${r.name ?? r.id}**`).join(', ')} to <@${entry.targetId}> (\`${entry.targetId}\`).\n${outcome}`, removed ? Colors.Orange : Colors.Red)] }).catch(() => 0);
+    void dmSecurityAlert(guild.client, { embeds: [embed('Protected role blocked', `**${guild.name}** (\`${guild.id}\`)\n<@${actor}> (\`${actor}\`) gave ${hits.map(r => `**${r.name ?? r.id}**`).join(', ')} to <@${entry.targetId}> (\`${entry.targetId}\`).\n${outcome}`, removed ? Colors.Orange : Colors.Red)] }).catch(() => 0);
     return removed ? ids : [];
 }

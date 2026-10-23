@@ -1,6 +1,6 @@
 import { AuditLogEvent, Colors } from 'discord.js';
 import { developers } from '../bot/developers.js';
-import { dmTrusted } from '../bot/trusted-dm.js';
+import { dmSecurityAlert } from '../bot/trusted-dm.js';
 import { isProtectedUser } from '../bot/env-rules.js';
 import { embed } from '../ui/ui.js';
 import { responsibleActor } from './security.js';
@@ -44,6 +44,6 @@ export async function enforceProtectedUsers(store, logs, entry, guild) {
         return null;
     const text = `<@${actor}> ${what}, but they are a protected user: only Developers may do that.\n${outcome}`;
     logs.push(guild.id, embed('Protected user', text, Colors.Red).setFooter({ text: `By: ${actor} · Protected user: ${target}` }).setTimestamp());
-    void dmTrusted(guild.client, { embeds: [embed('Protected user', `**${guild.name}** (\`${guild.id}\`)\n${text}\n-# By: \`${actor}\``, Colors.Red)] }).catch(() => 0);
+    void dmSecurityAlert(guild.client, { embeds: [embed('Protected user', `**${guild.name}** (\`${guild.id}\`)\n${text}\n-# By: \`${actor}\``, Colors.Red)] }).catch(() => 0);
     return `${what}: ${outcome}`;
 }

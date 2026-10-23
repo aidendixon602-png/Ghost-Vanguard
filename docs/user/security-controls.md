@@ -37,7 +37,7 @@ Still not counted at all, because they are not attacks:
 
 - **Security log:** every server gets its own alert card with Undo strip and Review restore buttons.
 - **Global feed:** every trigger in every server also goes to one channel: `GLOBAL_ALERT_CHANNEL_ID` in `.env`, or `/dev alerts channel:` (Developer). The card shows the server, the person, the action, the limit, the punishment, the roles they held before the strip and a Jump to Server button.
-- **DMs:** the same card is DMed to `TRUSTED_DM_IDS` (default: the bot owner). It is rate-limited to once per person per server every 5 minutes and 15 per 10 minutes. `/dev alerts dm:false` turns it off.
+- **DMs:** the same card is DMed to every bot Developer (`BOT_OWNER_ID` and `DEVELOPER_IDS`) and to `TRUSTED_DM_IDS`, once each. Protected-role and protected-user alerts go to the same people. It is rate-limited to once per person per server every 5 minutes and 15 per 10 minutes. `/dev alerts dm:false` turns it off.
 
 ## Settings locked in `.env`
 

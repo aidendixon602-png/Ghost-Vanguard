@@ -1,5 +1,5 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, Colors, EmbedBuilder, type Client, type GuildMember } from 'discord.js';
-import { dmTrusted } from '../bot/trusted-dm.js';
+import { dmSecurityAlert } from '../bot/trusted-dm.js';
 import { envGlobalAlertChannel } from '../bot/env-rules.js';
 import type { Store } from '../database/db.js';
 import type { LogQueue } from '../logging.js';
@@ -136,5 +136,5 @@ export async function dmGlobalAlert(client: Client | undefined, store: Store, in
     recentDms.set(key, now + DM_PER_ACTOR_MS); windowCount++;
     if (recentDms.size > 2000) for (const [k, until] of recentDms) if (until <= now) recentDms.delete(k);
     const { embed, row } = globalAlertCard(info);
-    return dmTrusted(client, { embeds: [embed], components: [row] });
+    return dmSecurityAlert(client, { embeds: [embed], components: [row] });
 }
