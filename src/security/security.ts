@@ -9,6 +9,7 @@ import type { LogQueue } from '../logging.js';
 import { noteThreat } from './threat-board.js';
 import { embed, memberOrNull } from '../ui/ui.js';
 import { incidentCard } from '../ui/incident-card.js';
+import { sendGlobalAlert, snapshotMember } from './global-alert.js';
 
 type Change = {
     key: string;
@@ -179,6 +180,8 @@ export class Security {
         // Every scored incident lands on the threat board, so one record feeds both halves:
         // the defence that already happens here and the counter-attack the board decides on.
         noteThreat(this.store, guild.id, actor, rule.key, `Anti-nuke ${active.title} (incident #${incident})`);
+        // Who they were and which roles they held before anything is removed (for the global alert feed).
+        const snapshot = snapshotMember(await memberOrNull(guild, actor).catch(() => null));
         let result = 'Observed only; no Discord actions taken.';
         const progress = {completed:0,failed:0,skipped:0};
         if (s.mode === 'enforce') {
@@ -217,6 +220,14 @@ export class Security {
             buttons.push(new ButtonBuilder().setCustomId(`incident:restore:${incident}`).setLabel('Review restore').setStyle(ButtonStyle.Secondary));
         const rows = buttons.length ? [new ActionRowBuilder<ButtonBuilder>().addComponents(...buttons)] : [];
         this.logs.push(guild.id, incidentCard({ incident, actor, rule: active, mode: warnOnly ? 'warn' : s.mode, count, result, progress, deleted, targetId: entry.targetId ?? null }), rows);
+        try {
+            sendGlobalAlert(this.store, this.logs, {
+                guild: { id: guild.id, name: guild.name }, actor, snapshot, rule: active, mode: warnOnly ? 'warn' : s.mode, incident,
+                failed: /cannot|unavailable|failed|Protected|no longer a member|not contained|incomplete/i.test(result.split(' [')[0]!),
+                reverted: active.revert ? progress : null,
+                jumpUrl: `https://discord.com/channels/${guild.id}${s.logChannelId ? `/${s.logChannelId}` : ''}`,
+            });
+        } catch { /* the feed is extra; the server's own alert above is what matters */ }
     }
 
     private readonly headsUps = new Map<string, number>();

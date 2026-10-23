@@ -14,6 +14,7 @@ Generated from the bot itself (`npm run docs`). Every rank can also use everythi
 
 The top bot-wide rank: the bot owner (`BOT_OWNER_ID`) and anyone in `DEVELOPER_IDS`. Developer operations are available as `/dev` and `/network` slash commands (comma `,` aliases still work for compatibility), including diagnostics, updates, database and server controls, global rank changes and network bans. Every developer action requires the exact user ID in `DEVELOPER_IDS`; `BOT_OWNER_ID` alone is not an exception.
 
+- `/dev alerts`: Developer: post every anti-nuke trigger from every server to one channel
 - `/dev database restore-settings`: Developer: put back lost settings from an old backup file; anything newer is kept
 - `/dev server ban`: Developer: ban a server from Vanguard
 - `/dev server deauthorize`: Developer: remove this server's authorization and leave

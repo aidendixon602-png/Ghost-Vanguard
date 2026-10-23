@@ -127,7 +127,7 @@ export const COMMAND_RANK: Record<string, number> = {
     genreban: 7, ungenreban: 7, hardban: 7, netexception: 7,
     // Developer only (the bot owner and DEVELOPER_IDS): anything that can take the bot down, rewrite its data or
     // reach every server at once. No Discord permission, server role or lower rank unlocks these.
-    'dev/restart': 8, 'database/restore-settings': 8, deauthserver: 8, banserver: 8, unbanserver: 8, 'staff/global': 8, unhardban: 8,
+    'dev/restart': 8, 'dev/alerts': 8, 'database/restore-settings': 8, deauthserver: 8, banserver: 8, unbanserver: 8, 'staff/global': 8, unhardban: 8,
 };
 
 /** Commands above Supreme Leader: only Developers. */
