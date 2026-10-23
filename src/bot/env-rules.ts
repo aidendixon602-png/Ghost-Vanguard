@@ -74,3 +74,10 @@ export const ANTINUKE_LOCK_KEYS = new Set(['antinuke/disable', 'disable', 'antin
 
 /** GLOBAL_ALERT_CHANNEL_ID: the global anti-nuke feed channel, fixed in .env (overrides `/dev alerts`). */
 export const envGlobalAlertChannel = () => /^\d{17,20}$/.test(process.env.GLOBAL_ALERT_CHANNEL_ID?.trim() ?? '') ? process.env.GLOBAL_ALERT_CHANNEL_ID!.trim() : null;
+
+/**
+ * ALERT_EXEMPT=true: also post alerts and DMs when someone anti-nuke never punishes (the server owner,
+ * Developers, whitelisted people) hits a limit. Off by default: those are recorded quietly in
+ * `/antinuke incidents`, so whitelisted staff doing their job don't flood the logs.
+ */
+export const alertExempt = () => /^(1|true|yes|on)$/i.test(process.env.ALERT_EXEMPT?.trim() ?? '');

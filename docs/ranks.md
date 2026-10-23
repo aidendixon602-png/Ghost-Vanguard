@@ -7,7 +7,7 @@ Generated from the bot itself (`npm run docs`). Every rank can also use everythi
 - **Developer is the top rank** (the bot owner and `DEVELOPER_IDS`). Restarts, installing updates, restoring data, removing servers, bot-wide ranks and lifting hardbans are Developer only, so giving someone Supreme Leader or lower cannot break the bot.
 - **Unbans:** ordinary bans are lifted by Admins and server owners; genrebans by a Supreme Leader or Developer (or a one-server exception from an Overseer+); hardbans only by a Developer.
 - **Comma commands** (`,help`, `,restart`…) need an exact `DEVELOPER_IDS` entry; `BOT_OWNER_ID` alone is not enough.
-- **Anti-nuke watches everyone.** Developers, server owners and whitelisted people are alerted on but never punished; every other rank, Supreme Leaders included, is punished.
+- **Anti-nuke watches everyone.** Developers, server owners and whitelisted people are never punished (recorded quietly; `ALERT_EXEMPT=true` alerts on them too); every other rank, Supreme Leaders included, is punished.
 - Check anyone with `/setup staff check user:@them`; see all ranks with `/setup staff list`.
 
 ## 🧰 Developer

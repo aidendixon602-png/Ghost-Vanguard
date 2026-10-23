@@ -62,6 +62,8 @@ export interface GlobalAlertInfo {
     /** Strip/kick/ban could not be applied. */
     failed: boolean;
     reverted?: { completed: number; failed: number; skipped: number } | null;
+    /** Whitelisted for other rules, but not this one. */
+    whitelistNote?: string | null;
     jumpUrl: string;
 }
 
@@ -87,6 +89,7 @@ export function globalAlertCard(info: GlobalAlertInfo) {
         const { completed, failed, skipped } = info.reverted;
         e.addFields({ name: 'Changes Reverted', value: [`${completed} undone`, failed && `${failed} failed`, skipped && `${skipped} skipped`].filter(Boolean).join(' · '), inline: false });
     }
+    if (info.whitelistNote && !exempt) e.addFields({ name: 'Whitelist', value: clip(info.whitelistNote, 1024), inline: false });
     if (info.snapshot.username) e.setAuthor({ name: clip(info.snapshot.username, 200), iconURL: /^https:\/\//.test(info.snapshot.avatarUrl ?? '') ? info.snapshot.avatarUrl! : undefined });
     e.setFooter({ text: `Global anti-nuke alert · Incident #${info.incident}` }).setTimestamp();
     const row = new ActionRowBuilder<ButtonBuilder>().addComponents(

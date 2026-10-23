@@ -16,7 +16,7 @@ The fixed 17-rule preset is loaded for authorized servers and survives restarts.
 
 Anti-nuke watches **everyone**. Nobody's actions are skipped, except Vanguard's own, which count against the staff member who asked for them.
 
-Some people are **never punished**. When they hit a limit, the alert, the global feed and the DM still go out as a blue **Anti-nuke Alert (not punished)** card, but nothing is stripped or undone:
+Some people are **never punished**. When they hit a limit it is recorded quietly in `/antinuke incidents` and nothing is stripped or undone. Set `ALERT_EXEMPT=true` in `.env` to also get a blue **Anti-nuke Alert (not punished)** card, global feed post and DM for them:
 
 | Who | Not punished for |
 |---|---|
@@ -24,7 +24,7 @@ Some people are **never punished**. When they hit a limit, the alert, the global
 | Full whitelist entries (user or role) | Everything |
 | Rule-specific whitelist entries | Only the chosen rules |
 
-Supreme Leaders and every other rank are punished like anyone else.
+Supreme Leaders and every other rank are punished like anyone else. If someone is whitelisted for some rules but sets off another one, they are punished, and the alert has a **Whitelist** line saying what they are covered for and what was missing.
 
 Still not counted at all, because they are not attacks:
 

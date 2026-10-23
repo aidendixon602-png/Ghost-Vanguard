@@ -9,7 +9,7 @@
 Anti-nuke and the threat board · Moderation and audit logging · Ticket desk · Live dashboard · Server recovery
 
 [![CI](https://github.com/aidendixon602-png/Ghost-Vanguard/actions/workflows/ci.yml/badge.svg)](https://github.com/aidendixon602-png/Ghost-Vanguard/actions/workflows/ci.yml)
-![Version](https://img.shields.io/badge/version-3.2.0-6d5ae6)
+![Version](https://img.shields.io/badge/version-3.2.1-6d5ae6)
 ![Tests](https://img.shields.io/badge/tests-545%20passing-2EA043)
 ![Node](https://img.shields.io/badge/node-24-339933?logo=node.js&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
@@ -98,7 +98,7 @@ Every command has a minimum rank, and each rank includes everything below it. Bo
 | Genreban | A Supreme Leader or Developer can lift it everywhere from ban-log controls; an Overseer or higher can let the person back into one server (`/mod unban`). The comma command `,ungenreban` requires an exact `DEVELOPER_IDS` entry |
 | Hardban | Developer only; `,unhardban` requires an exact `DEVELOPER_IDS` entry |
 
-Anti-nuke watches **everyone**. Developers, server owners and whitelisted people are alerted on (security log, global feed and DM) but never punished; everyone else, Supreme Leaders included, is. The complete list of commands for each rank is in **[docs/ranks.md](docs/ranks.md)**.
+Anti-nuke watches **everyone**. Developers, server owners and whitelisted people are never punished; their incidents are recorded quietly (set `ALERT_EXEMPT=true` to be alerted). Everyone else, Supreme Leaders included, is punished. The complete list of commands for each rank is in **[docs/ranks.md](docs/ranks.md)**.
 
 ## The threat board: defence and counter-attack
 
@@ -178,6 +178,7 @@ Copy [`.env.example`](.env.example) to `.env` and set at least:
 | `BOT_OWNER_ID` | Recommended | The bot owner: Developer rank for ordinary permission checks, and the default for `TRUSTED_DM_IDS`. Add this ID to `DEVELOPER_IDS` separately to use comma commands |
 | `SUPREME_LEADER_IDS` | No | Supreme Leaders: bot-wide rank below Developer; may lift genrebans from ban-log controls, but do not get comma commands. Nobody is built in; every start prints who has bot-wide access |
 | `COMMA_DELETE_SECONDS` | No | How long comma commands and their replies stay before being deleted (default `60`; `0` keeps them) |
+| `ALERT_EXEMPT` | No | `true`: also alert when the owner, Developers or whitelisted people hit a limit (default: recorded quietly) |
 | `ANTINUKE_LOCK` | Recommended | `true`: only Developers can turn anti-nuke off or weaken it; servers switched off come back on at start |
 | `PROTECTED_USERS` | No | People staff can never ban, kick, time out or de-role; manual attempts are undone and alerted |
 | `PROTECTED_ROLES`, `PROTECTED_ROLE_ASSIGNERS` | No | Roles only the listed people (and Developers) may give; anyone else's grant is taken back |
