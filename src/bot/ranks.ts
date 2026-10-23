@@ -5,18 +5,20 @@ import { developers } from './developers.js';
 
 /**
  * Vanguard staff ranks. Each rank can do everything the ranks below it can.
- * Bot-wide (by user ID): Developer (BOT_OWNER_ID + DEVELOPER_IDS, the top rank), Supreme Leader, Overseer, Bot Manager.
+ * Developer (BOT_OWNER_ID + DEVELOPER_IDS) is the top rank: full control, including the destructive bot tools.
+ * Server Owner: whoever owns a Discord server, in that server only. Above Supreme Leader there, but never any bot-wide tool.
+ * Bot-wide (by user ID): Supreme Leader, Overseer, Bot Manager. Per server (by role): Head Admin, Admin, Moderator, Helper.
  * Per server (by Discord role, /setup staff role): headadmin, admin, moderator, helper.
  * The server owner ranks just above headadmin in their own server.
  */
-export const RANKS = { helper: 1, moderator: 2, admin: 3, headadmin: 4, owner: 4.5, botmanager: 5, overseer: 6, supreme: 7, developer: 8 } as const;
+export const RANKS = { helper: 1, moderator: 2, admin: 3, headadmin: 4, botmanager: 5, overseer: 6, supreme: 7, owner: 7.5, developer: 8 } as const;
 export type RankName = keyof typeof RANKS;
 export const RANK_LABEL: Record<RankName, string> = {
     helper: 'Helper', moderator: 'Moderator', admin: 'Admin', headadmin: 'Head Admin', owner: 'Server Owner',
     botmanager: 'Bot Manager', overseer: 'Overseer', supreme: 'Supreme Leader', developer: 'Developer',
 };
 export const SERVER_LEVELS = ['helper', 'moderator', 'admin', 'headadmin'] as const;
-export const GLOBAL_LEVELS = ['botmanager', 'overseer'] as const;
+export const GLOBAL_LEVELS = ['botmanager', 'overseer', 'supreme'] as const;
 
 /** BOT_OWNER_ID plus SUPREME_LEADER_IDS. */
 export const supremeLeaders = () => [...new Set([config.ownerId, ...config.supremeExtra].filter(Boolean))];
@@ -68,20 +70,36 @@ export const hasAdministrator = (member?: GuildMember | null) => {
  * restricted actions; without a key it is counted.
  */
 export function rankOf(store: Store, guildId: string | null, userId: string, member?: GuildMember | null, key?: string): number {
+    // Bot-wide tools only ever look at bot ranks: owning a server or a server role never unlocks them.
+    if (isBotWide(key)) return botRank(store, userId);
     const explicit = explicitRank(store, guildId, userId, member);
     return guildId && hasAdministrator(member) && !isAdminRestricted(key) ? Math.max(explicit, ADMINISTRATOR_RANK) : explicit;
 }
 
-/** Rank from Vanguard itself only: developers, Supreme Leaders, owner, grants and staff roles. */
-export function explicitRank(store: Store, guildId: string | null, userId: string, member?: GuildMember | null): number {
+/** Bot-wide rank only: Developer, Supreme Leader, Overseer, Bot Manager. Server ownership and server roles never count. */
+export function botRank(store: Store, userId: string): number {
     // Developers (the bot owner and DEVELOPER_IDS) are the top rank.
     if (developers.has(userId)) return RANKS.developer;
-    if (isSupreme(userId)) return RANKS.supreme;
-    if ((store.db.prepare('SELECT level FROM bot_staff WHERE user_id=?').get(userId) as { level?: string } | undefined)?.level === 'supreme') return RANKS.supreme;
-    let rank = 0;
+    let rank = isSupreme(userId) ? RANKS.supreme : 0;
+    // Bot-wide ranks given with /setup staff global.
     const global = store.db.prepare('SELECT level FROM bot_staff WHERE user_id=?').get(userId) as { level?: string } | undefined;
-    if (global?.level && global.level in RANKS) rank = RANKS[global.level as RankName];
-    if (!guildId) return rank;
+    if (global?.level && (GLOBAL_LEVELS as readonly string[]).includes(global.level)) rank = Math.max(rank, RANKS[global.level as RankName]);
+    return rank;
+}
+
+/**
+ * Commands that act on the bot itself or on every server at once. Only bot ranks unlock them, so a Server
+ * Owner (above Supreme Leader in their own server) still cannot restart the bot, network-ban or touch the database.
+ */
+const BOT_WIDE = new Set(['dev', 'restart', 'database', 'autoreact', 'authserver', 'deauthserver', 'serverauth', 'authorizedservers', 'banserver', 'unbanserver',
+    'genreban', 'ungenreban', 'hardban', 'unhardban', 'netexception', 'staff/global']);
+export const isBotWide = (key?: string) => !!key && (BOT_WIDE.has(key.replace(/\/$/, '')) || BOT_WIDE.has(key.split('/')[0]!));
+
+/** Rank from Vanguard itself: bot ranks, the server owner, grants and staff roles (no Discord permissions). */
+export function explicitRank(store: Store, guildId: string | null, userId: string, member?: GuildMember | null): number {
+    let rank = botRank(store, userId);
+    if (rank >= RANKS.developer || !guildId) return rank;
+    // Server Owner: whoever owns this Discord server, in this server only (above Supreme Leader here).
     // Both ids must be present: a member object without them must never count as the owner.
     if (member?.guild && member.id && member.id === member.guild.ownerId) rank = Math.max(rank, RANKS.owner);
     // Older access settings still count: security admins = Head Admin, Vanguard moderator roles = Moderator.
@@ -113,7 +131,7 @@ export const COMMAND_RANK: Record<string, number> = {
     raidmode: 3, vgwelcome: 3, vgcommands: 0, lockdown: 3, unlock: 3, massban: 3, newaccounts: 3, scam: 3, logs: 3, antiping: 3, mention: 3, health: 3,
     // Head Admin
     // Owner-level actions that also sit under Head Admin commands: handing out security admins, undoing setting changes.
-    'security/admin': 4.5, 'config-history/restore': 4.5,
+    'security/admin': 7.5, 'config-history/restore': 7.5,
     antinuke: 4, panel: 4, vgpanel: 4, enable: 4, disable: 4, trust: 4, snapshot: 4, backup: 4, copylayout: 4, security: 4, 'guild-config': 4,
     'config-history': 4, perm: 4, 'case/delete': 4, staff: 4, anpanel: 4, trustlist: 4, tp: 4, snapshotdelete: 4, snapshotcancel: 4, snapshotpage: 4,
     restore: 4, layoutselect: 4, layoutcancel: 4, incident: 4, permui: 4,
@@ -127,16 +145,19 @@ export const COMMAND_RANK: Record<string, number> = {
     genreban: 7, ungenreban: 7, hardban: 7, netexception: 7,
     // Developer only (the bot owner and DEVELOPER_IDS): anything that can take the bot down, rewrite its data or
     // reach every server at once. No Discord permission, server role or lower rank unlocks these.
-    'dev/restart': 8, 'dev/alerts': 8, 'database/restore-settings': 8, deauthserver: 8, banserver: 8, unbanserver: 8, 'staff/global': 8, unhardban: 8,
+    restart: 8, 'dev/restart': 8, 'dev/alerts': 8, 'database/restore-settings': 8, deauthserver: 8, banserver: 8, unbanserver: 8, unhardban: 8,
+    // Giving bot-wide ranks: Developers only.
+    'staff/global': 8,
 };
 
-/** Commands above Supreme Leader: only Developers. */
-export const needsDeveloper = (key: string | undefined) => (requiredRank(key) ?? 0) > RANKS.supreme;
-export const DEVELOPER_ONLY_MESSAGE = 'Developer-only actions are available as comma commands to IDs listed in `DEVELOPER_IDS`. `BOT_OWNER_ID` alone is not an exception; add the owner ID to `DEVELOPER_IDS` to use them. Run `,help` for the current list.';
+/** Developer-only commands: nothing but the Developer rank unlocks them. */
+export const needsDeveloper = (key: string | undefined) => (requiredRank(key) ?? 0) >= RANKS.developer;
+export const DEVELOPER_ONLY_MESSAGE = 'Only a **Developer** (the bot owner, or someone in `DEVELOPER_IDS`) can do this. It affects the bot in every server (restarts, updates, the database, removing servers, bot-wide ranks or lifting hardbans). Comma commands (`,help`) need an exact `DEVELOPER_IDS` entry.';
+export const aboveSupremeMessage = (_key: string | undefined) => DEVELOPER_ONLY_MESSAGE;
 
 /** Who may lift a network ban everywhere: genreban = Supreme Leader or Developer, hardban = Developer only. */
 export function canLiftNetworkBan(store: Store, userId: string, kind: 'genreban' | 'hardban'): boolean {
-    return explicitRank(store, null, userId) >= (kind === 'hardban' ? RANKS.developer : RANKS.supreme);
+    return botRank(store, userId) >= (kind === 'hardban' ? RANKS.developer : RANKS.supreme);
 }
 
 /** "moderation/timeout" → its own entry, else "moderation". */

@@ -3,11 +3,11 @@ import { requiredRank } from '../bot/ranks.js';
 import { accessLabel } from './help-ui.js';
 import { prefixHelp } from '../bot/prefix-commands.js';
 const LEVELS = [
-    [8, '🧰 Developer', 'The top bot-wide rank: the bot owner (`BOT_OWNER_ID`) and anyone in `DEVELOPER_IDS`. Developer operations are available as `/dev` and `/network` slash commands (comma `,` aliases still work for compatibility), including diagnostics, updates, database and server controls, global rank changes and network bans. Every developer action requires the exact user ID in `DEVELOPER_IDS`; `BOT_OWNER_ID` alone is not an exception.'],
-    [7, '👑 Supreme Leader', 'Bot-wide, every server: everything below. A Supreme Leader can lift genrebans from ban-log controls, but Developer comma commands require an exact `DEVELOPER_IDS` entry. Given with `/setup staff global` or `SUPREME_LEADER_IDS`.'],
-    [6, '🔭 Overseer', 'Bot-wide, every server: everything below, and can grant a one-server genreban exception through `/mod unban`. Developer comma commands require an exact `DEVELOPER_IDS` entry. Given with `/setup staff global`.'],
-    [5, '🛠️ Bot Manager', 'Bot-wide, every server: Head Admin-level access across servers. This rank does not unlock comma commands; those require an exact `DEVELOPER_IDS` entry. Given with `/setup staff global`.'],
-    [4.5, '🏠 Server Owner', 'The owner of a server, in that server: everything a Head Admin can do, plus security admins and undoing setting changes. Cannot lift genrebans or hardbans. Ignored by anti-nuke.'],
+    [8, '🧰 Developer', 'The top rank: the bot owner (`BOT_OWNER_ID`) and anyone in `DEVELOPER_IDS`. Everything, including the tools that can take the bot down or reach every server at once: restarts, installing updates, restoring database settings, removing or banning servers, giving bot-wide ranks and lifting hardbans. Ignored by anti-nuke. Set only in `.env`.'],
+    [7.5, '🏠 Server Owner', 'Whoever owns a Discord server, in that server only. Above Supreme Leader there: everything server-side, including security admins and undoing setting changes. No bot-wide tools (network bans, /dev, the database). Ignored by anti-nuke.'],
+    [7, '👑 Supreme Leader', 'Bot-wide, every server: everything except the Developer-only tools. Diagnostics, update status, database health and backups, genrebans and hardbans, lifting genrebans. Ignored by anti-nuke. Given with `/setup staff global` or `SUPREME_LEADER_IDS`.'],
+    [6, '🔭 Overseer', 'Bot-wide, every server: Bot Manager plus inspecting and authorizing servers, and letting a genrebanned person back into one server. Given with `/setup staff global`.'],
+    [5, '🛠️ Bot Manager', 'Bot-wide, every server: Head Admin everywhere plus bot status, diagnostics and announcements. Given with `/setup staff global`.'],
     [4, '🛡️ Head Admin', 'Server rank: anti-nuke, whitelist, control panel, backups and staff ranks. Given by linking a role with `/setup staff role`, or `/security admin` (owner). Discord\'s Administrator permission counts as Head Admin, except for actions that weaken protection.'],
     [3, '🔧 Admin', 'Server rank: lifting ordinary bans and accepting appeals, raid tools, automod, scam protection and logging. Given with `/setup staff role`; Discord\'s Administrator permission also works for unbans.'],
     [2, '🔨 Moderator', 'Server rank, or Discord\'s matching permission (Ban/Kick/Timeout Members, Manage Messages): bans, kicks, purges, denying appeals. Cannot lift bans.'],
@@ -87,11 +87,11 @@ export function commandsDoc(registry) {
 export function ranksDoc(registry) {
     const leaves = commandLeaves(registry).sort((a, b) => a.path.localeCompare(b.path));
     const out = ['# Ranks', '', 'Generated from the bot itself (`npm run docs`). Every rank can also use everything listed under the ranks below it.', '',
-        '- **Bot-wide ranks** (Developer, Supreme Leader, Overseer, Bot Manager) work in every server.',
-        '- **Server ranks** (Owner, Head Admin, Admin, Moderator, Helper) work only in the server they were given in.',
-        '- **Developer is the top bot-wide rank** (the bot owner and `DEVELOPER_IDS`). Developer operations are available as `/dev` and `/network` slash commands (`,…` aliases still work).',
-        '- **Every comma command requires an exact `DEVELOPER_IDS` entry.** `BOT_OWNER_ID` alone is not enough; add the owner ID to `DEVELOPER_IDS` if the owner should use comma commands. This also applies to commands that were previously available to other bot-wide ranks.',
-        '- **Unbans:** ordinary bans are lifted by Admins and server owners; Supreme Leaders can lift genrebans through ban-log controls (or an Overseer+ can grant a one-server exception); `,ungenreban` and `,unhardban` require an exact `DEVELOPER_IDS` entry.',
+        '- **Developer** has full control of the bot. **Supreme Leader, Overseer and Bot Manager** are bot ranks that work in every server.',
+        '- **Server Owner** (whoever owns the Discord server) and the server ranks (Head Admin, Admin, Moderator, Helper) work only in that server. A Server Owner outranks Supreme Leaders there, but bot-wide tools always need a bot rank.',
+        '- **Developer is the top rank** (the bot owner and `DEVELOPER_IDS`). Restarts, installing updates, restoring data, removing servers, bot-wide ranks and lifting hardbans are Developer only, so giving someone Supreme Leader or lower cannot break the bot.',
+        '- **Unbans:** ordinary bans are lifted by Admins and server owners; genrebans by a Supreme Leader or Developer (or a one-server exception from an Overseer+); hardbans only by a Developer.',
+        '- **Comma commands** (`,help`, `,restart`…) need an exact `DEVELOPER_IDS` entry; `BOT_OWNER_ID` alone is not enough.',
         '- **Anti-nuke** ignores only Developers, Supreme Leaders, the server owner and whitelisted people. Every other rank is still watched.',
         '- Check anyone with `/setup staff check user:@them`; see all ranks with `/setup staff list`.', ''];
     for (const [level, title, about] of LEVELS) {

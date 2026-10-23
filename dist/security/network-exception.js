@@ -2,7 +2,7 @@ import { Colors } from 'discord.js';
 import { AppError } from '../errors.js';
 import { dmTrusted } from '../bot/trusted-dm.js';
 import { developers } from '../bot/developers.js';
-import { explicitRank, RANKS } from '../bot/ranks.js';
+import { botRank, RANKS } from '../bot/ranks.js';
 import { confirmDanger } from '../ui/danger-ui.js';
 import { embed } from '../ui/ui.js';
 import { activeBan, addException, existingBan, recordId } from './network-ban.js';
@@ -18,7 +18,7 @@ export function canGrantException(store, guild, actor) {
     if (developers.has(actor.id))
         return true;
     // A bot-wide Vanguard rank; no server rank, server ownership or Discord permission counts.
-    return explicitRank(store, null, actor.id) >= RANKS.overseer;
+    return botRank(store, actor.id) >= RANKS.overseer;
 }
 export async function tellDevelopers(client, text) {
     await dmTrusted(client, { content: text.slice(0, 1900), allowedMentions: { parse: [] } });

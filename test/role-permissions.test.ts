@@ -296,6 +296,13 @@ test('the risky tools are Developer only: Supreme Leaders, Overseers and server 
         }
         for (const key of ['genreban', 'ungenreban', 'hardban', 'dev/diagnostics', 'dev/update', 'database/backup'])
             assert.equal(can(plainMember(SUPREME), key), true, `Supreme Leader can still use /${key}`);
+        // The server owner outranks Supreme Leaders in their server, but never gets bot-wide tools.
+        for (const key of [...risky, 'genreban', 'hardban', 'ungenreban', 'dev/diagnostics', 'dev/update', 'database/backup', 'authserver', 'autoreact/add'])
+            assert.equal(can(plainMember(OWNER), key), false, `Server Owner must not use /${key}`);
+        for (const key of ['security/admin', 'config-history/restore', 'antinuke/disable', 'trust/add'])
+            assert.equal(can(plainMember(OWNER), key), true, `Server Owner can use /${key}`);
+        for (const key of ['security/admin', 'config-history/restore'])
+            assert.equal(can(plainMember(SUPREME), key), false, `a Supreme Leader is below the Server Owner for /${key}`);
         config.developers.add(DEV);
         for (const key of risky) assert.equal(can(plainMember(DEV), key), true, `Developer can use /${key}`);
     } finally { config.developers.delete(DEV); config.supremeExtra.delete(SUPREME); store.close(); }

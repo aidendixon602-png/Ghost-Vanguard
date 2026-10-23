@@ -7,7 +7,7 @@ import { broadcast, broadcastTargets, clearPresenceOverride, inspectGuild, setPr
 import { presenceLines } from '../../security/protection-stats.js';
 import { spawnSync } from 'node:child_process';
 import { askLauncher, describeUpdate } from '../../bot/updater-link.js';
-import { DEVELOPER_ONLY_MESSAGE, explicitRank, RANKS } from '../../bot/ranks.js';
+import { DEVELOPER_ONLY_MESSAGE, botRank, RANKS } from '../../bot/ranks.js';
 import { globalAlertCard, globalAlertTarget, setGlobalAlertTarget } from '../../security/global-alert.js';
 import { RULES } from '../../core.js';
 
@@ -43,9 +43,9 @@ export default defineCommand(new SlashCommandBuilder().setName('dev').setDescrip
     const sub = i.options.getSubcommand();
     if (sub === 'update') {
         const op = (i.options.getString('action') ?? 'status') as 'status' | 'now';
-        // Updater: available as /dev update (`,update` alias remains).
-        if (op === 'now' && explicitRank(ctx.store, i.guildId, i.user.id, ctx.actor ?? null) < RANKS.developer)
-            throw new AppError('PERMISSION_ERROR', `${DEVELOPER_ONLY_MESSAGE}\nYou can still see the update status with \`,update\`.`);
+        // Anyone with /dev may look; installing a new version is for Developers (`,update` alias remains).
+        if (op === 'now' && botRank(ctx.store, i.user.id) < RANKS.developer)
+            throw new AppError('PERMISSION_ERROR', `${DEVELOPER_ONLY_MESSAGE}\nYou can still see the update status with \`/dev update\`.`);
         return describeUpdate(await askLauncher(op), op);
     }
     if (sub === 'alerts') {
