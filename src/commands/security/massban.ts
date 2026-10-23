@@ -3,6 +3,7 @@ import { Colors, PermissionFlagsBits, SlashCommandBuilder } from 'discord.js';
 import { defineCommand } from '../../bot/registry.js';
 import { AppError } from '../../errors.js';
 import { embed } from '../../ui/ui.js';
+import { isProtectedUser } from '../../bot/env-rules.js';
 import { confirmDanger } from '../../ui/danger-ui.js';
 import { staffReason } from '../../security/raidmode.js';
 import { developers } from '../../bot/developers.js';
@@ -33,7 +34,7 @@ export default defineCommand(new SlashCommandBuilder().setName('massban').setDes
     const me = await i.guild.members.fetchMe();
     const protectedIds = new Set([actor.id, me.id, i.guild.ownerId, config.ownerId]);
     const all = parseIds(i.options.getString('user_ids', true));
-    const ids = all.filter(id => !protectedIds.has(id) && !developers.has(id) && !ctx.security.trusted(i.guild, id));
+    const ids = all.filter(id => !protectedIds.has(id) && !developers.has(id) && !isProtectedUser(id) && !ctx.security.trusted(i.guild, id));
     const skipped = all.length - ids.length;
     if (!ids.length) throw new AppError('VALIDATION_ERROR', 'Every ID was protected (you, the owner, developers, Vanguard or whitelisted accounts).');
     const reason = (i.options.getString('reason') ?? NO_REASON), seconds = i.options.getInteger('delete_messages') ?? 86400;

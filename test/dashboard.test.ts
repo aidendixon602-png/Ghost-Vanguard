@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Store } from '../src/database/db.js';
 import { authorize } from './helpers.js';
+import { VERSION } from '../src/config.js';
 import { answer, tokenAccepted } from '../src/dashboard/router.js';
 import { overview, guilds, incidents, serverDetail, threats, tickets } from '../src/dashboard/data.js';
 import { recordThreat, recordThreatAction } from '../src/security/threat-board.js';
@@ -98,7 +99,7 @@ test('the overview counts servers, protection, threats, tickets and incidents', 
         seedTicketTypes(s, G);
         s.run("INSERT INTO ticket_records(guild_id,number,channel_id,user_id,type,subject,opened_at,last_activity) VALUES(?,?,?,?,?,?,?,?)", G, 1, 'c1', ATTACKER, 'Bug Report', 'x', Date.now(), Date.now());
         const data = overview(s);
-        assert.deepEqual([data.service, data.version], ['Ghost Vanguard', '3.0.0']);
+        assert.deepEqual([data.service, data.version], ['Ghost Vanguard', VERSION]);
         assert.deepEqual([data.totals.servers, data.totals.authorized, data.totals.protected], [1, 1, 1]);
         assert.deepEqual([data.totals.critical, data.totals.watch], [1, 0]);
         assert.equal(data.totals.tickets, 1);

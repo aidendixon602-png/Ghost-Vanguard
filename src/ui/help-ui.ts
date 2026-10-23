@@ -23,8 +23,9 @@ export const HELP_SECTIONS: { key: string; label: string; emoji: string; blurb: 
 /** Who can use a command, shown next to it in /help. */
 export function accessLabel(policy:Policy,key:string):string {
     // Developer tools that a bot-wide rank also unlocks (Bot Manager, Overseer) say so.
-    if(policy.developerOnly){const need=requiredRank(key);return need===undefined||need>RANKS.supreme?'Developer':`${RANK_LABEL[rankName(need)!]}+`;}
-    if(policy.access==='owner')return 'Owner';
+    if(policy.developerOnly){const need=requiredRank(key);return need===undefined||need>=RANKS.developer?'Developer':`${RANK_LABEL[rankName(need)!]}+`;}
+    if(policy.access==='owner')return 'Server Owner';
+    if(requiredRank(key)===RANKS.owner)return 'Server Owner';
     const need=requiredRank(key);
     const perms=policy.requiredPermissions.length?new PermissionsBitField(policy.requiredPermissions).toArray().map(p=>p.replace(/([a-z])([A-Z])/g,'$1 $2')).join(', '):'';
     const rank=need!==undefined?RANK_LABEL[rankName(need)!]:'';

@@ -18,7 +18,7 @@ test('whitelist check: owner, full bypass, role-based rules, warnings and quaran
         store.grant('g', 'person', 'trust:mass_ban', 'owner', 24);
         const staff = whitelistCheck(store, guild, 'person', ['staffrole'], false).toJSON();
         assert.match(staff.description!, /whitelisted for \*\*3\*\* rule/);
-        const ignored = staff.fields!.find(f => f.name === 'Anti-nuke ignores')!.value;
+        const ignored = staff.fields!.find(f => f.name === 'Not punished for (still alerted)')!.value;
         assert.match(ignored, /Role Invite\*\* · from <@&staffrole>, permanent/);
         assert.match(ignored, /\*\*Ban\*\* · until <t:\d+:f>/);
         assert.match(staff.description!, /Administrator\*\* or \*\*Manage Server\*\* still strips/);

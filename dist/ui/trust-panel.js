@@ -12,7 +12,7 @@ import { canManageOwnTrust, RULE_LABELS, scopeName, TRUST_PRESETS, trustListPage
  */
 /** Everything selectable, in display order. Index = bit in the saved mask. */
 export const ALLOW_OPTIONS = [
-    { value: 'all', label: '✅ Everything (full bypass)', description: 'Anti-nuke ignores them completely. Only for people you fully trust.' },
+    { value: 'all', label: '✅ Everything (full bypass)', description: 'Never punished (you still get alerted). Only for people you fully trust.' },
     ...Object.entries(TRUST_PRESETS).map(([key, p]) => ({ value: `preset:${key}`, label: `★ ${p.title}`, description: p.description.slice(0, 100) })),
     ...RULE_LABELS.filter(([key]) => RULES.some(r => r.key === key)).map(([value, label]) => ({ value, label })),
 ];

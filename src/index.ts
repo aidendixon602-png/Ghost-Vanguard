@@ -51,6 +51,8 @@ import { logBulkDelete, logDeletedMessage, logEditedMessage } from './features/m
 import { withdrawSharedBan } from './features/roblox-tools.js';
 import { forgetHeldBot, lockServerSettings, quarantineNewBot } from './features/antinuke-plus.js';
 import { activeBan, assertLocalUnban, enforceOnJoin, enforceOnUnban, existingBan, liftNetworkBan, networkDeps, recordId, sweepNetworkBans } from './security/network-ban.js';
+import { enforceProtectedRoles } from './security/protected-roles.js';
+import { enforceProtectedUsers } from './security/protected-users.js';
 import { handleBanLogInteraction, onBanAdd, onBanRemove, registerBanLogRenderer } from './audit/ban-log.js';
 import { reportBotError } from './audit/bot-errors.js';
 import { forgetGuildTickets, isTicketChannel, loadTicketChannels, markTicketActivity, runTicketMaintenance, ticketChannelGone } from './features/tickets.js';
@@ -273,6 +275,8 @@ client.on(Events.InteractionCreate, i => {
 
 client.on(Events.GuildAuditLogEntryCreate, (entry, guild) => {
     protectedTask('audit', guild.id, () => security.audit(entry, guild));
+    protectedTask('protected roles', guild.id, async () => { await enforceProtectedRoles(store, logs, entry, guild); });
+    protectedTask('protected users', guild.id, async () => { await enforceProtectedUsers(store, logs, entry, guild); });
     protectedTask('event log', guild.id, async () => recordAuditEvent(store, logs, entry, guild));
     protectedTask('webhook guard', guild.id, async () => reportWebhook(store, logs, entry, guild));
     protectedTask('settings lock', guild.id, () => lockServerSettings(store, logs, entry, guild, id => security.trusted(guild, id), (id, rule) => security.trustedFor(guild, id, rule)));

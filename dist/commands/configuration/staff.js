@@ -6,7 +6,7 @@ import { embed } from '../../ui/ui.js';
 import { activityReport, REPORT_DEFAULTS } from '../../features/schedules.js';
 import { setFeature } from '../../features/settings.js';
 import { developers } from '../../bot/developers.js';
-import { RANKS, RANK_LABEL, SERVER_LEVELS, rankName, rankOf, supremeLeaders, isSupreme } from '../../bot/ranks.js';
+import { botRank, RANKS, RANK_LABEL, SERVER_LEVELS, rankName, rankOf, supremeLeaders, isSupreme } from '../../bot/ranks.js';
 const label = (r) => r ? RANK_LABEL[rankName(r)] : 'No rank';
 export default defineCommand(new SlashCommandBuilder().setName('staff').setDescription('Vanguard staff ranks: who can use which commands')
     .addSubcommand(s => s.setName('role').setDescription('Link a Discord role to a server rank (Head Admin, Admin, Moderator, Helper)')
@@ -14,7 +14,7 @@ export default defineCommand(new SlashCommandBuilder().setName('staff').setDescr
     .addStringOption(o => o.setName('rank').setDescription('Rank for this role').setRequired(true).addChoices({ name: 'Head Admin', value: 'headadmin' }, { name: 'Admin', value: 'admin' }, { name: 'Moderator', value: 'moderator' }, { name: 'Helper', value: 'helper' }, { name: 'Remove rank', value: 'none' })))
     .addSubcommand(s => s.setName('global').setDescription('Developer: make someone Supreme Leader, Overseer or Bot Manager in every server')
     .addUserOption(o => o.setName('user').setDescription('User').setRequired(true))
-    .addStringOption(o => o.setName('rank').setDescription('Bot-wide rank').setRequired(true).addChoices({ name: 'Supreme Leader (everything except the Developer-only tools)', value: 'supreme' }, { name: 'Overseer', value: 'overseer' }, { name: 'Bot Manager', value: 'botmanager' }, { name: 'Remove rank', value: 'none' })))
+    .addStringOption(o => o.setName('rank').setDescription('Bot-wide rank').setRequired(true).addChoices({ name: 'Supreme Leader', value: 'supreme' }, { name: 'Overseer', value: 'overseer' }, { name: 'Bot Manager', value: 'botmanager' }, { name: 'Remove rank', value: 'none' })))
     .addSubcommand(s => s.setName('report').setDescription('Staff activity: actions per staff member')
     .addIntegerOption(o => o.setName('days').setDescription('How many days back (default 7)').setMinValue(1).setMaxValue(365))
     .addBooleanOption(o => o.setName('weekly').setDescription('Also turn the automatic weekly report on or off')))
@@ -50,13 +50,19 @@ export default defineCommand(new SlashCommandBuilder().setName('staff').setDescr
         ].join('\n');
     }
     if (sub === 'global') {
-        if (myRank < RANKS.developer)
+        const myBotRank = botRank(ctx.store, i.user.id);
+        if (myBotRank < RANKS.developer)
             throw new AppError('PERMISSION_ERROR', 'Only a Developer can give or remove bot-wide ranks.');
         const user = i.options.getUser('user', true), rank = i.options.getString('rank', true);
         if (user.bot)
             throw new AppError('VALIDATION_ERROR', 'Ranks are for people, not bots.');
         if (developers.has(user.id) || isSupreme(user.id))
             throw new AppError('VALIDATION_ERROR', `<@${user.id}> has their rank set in the bot settings (\`.env\`), so this command cannot change it.`);
+        // You can only give, change or remove bot-wide ranks below your own.
+        const theirs = ctx.store.db.prepare('SELECT level FROM bot_staff WHERE user_id=?').get(user.id)?.level;
+        for (const level of [rank, theirs].filter(l => l && l !== 'none'))
+            if (myBotRank <= RANKS[level])
+                throw new AppError('PERMISSION_ERROR', `Only someone above ${RANK_LABEL[level]} can give or remove that rank.`);
         if (rank === 'none')
             ctx.store.db.prepare('DELETE FROM bot_staff WHERE user_id=?').run(user.id);
         else

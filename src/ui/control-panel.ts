@@ -12,6 +12,7 @@ import { restoreRoles, savedRoles } from '../features/rejoin-roles.js';
 import { assertLocalUnban, existingBan } from '../security/network-ban.js';
 import { staffReason } from '../security/raidmode.js';
 import { clip, dangerous } from '../core.js';
+import { isProtectedUser } from '../bot/env-rules.js';
 import { caseId, getRecord, setStatus, publish } from '../audit/ban-log.js';
 
 /**
@@ -136,6 +137,7 @@ export function canStrip(guild: Pick<Guild, 'ownerId'>, actor: GuildMember, targ
     if (target.id === actor.id) return 'You cannot strip yourself.';
     if (target.id === guild.ownerId) return 'The server owner cannot be stripped.';
     if (target.id === botId || developers.has(target.id)) return 'Ghost Vanguard and its developers cannot be stripped.';
+    if (isProtectedUser(target.id) && !developers.has(actor.id)) return `<@${target.id}> is a protected user (set in the bot settings). Only a Developer can strip them.`;
     if (!target.manageable) return `<@${target.id}> has a role at or above Ghost Vanguard's highest role, so the bot cannot change their roles. Move the bot's role above theirs first.`;
     if (!isBoss(guild, actor.id) && actor.roles.highest.comparePositionTo(target.roles.highest) <= 0) return `<@${target.id}>'s highest role is equal to or above yours.`;
     return null;

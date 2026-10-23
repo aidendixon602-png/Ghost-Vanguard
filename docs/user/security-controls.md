@@ -12,17 +12,44 @@ The fixed 17-rule preset is loaded for authorized servers and survives restarts.
 4. **The punishment is always a strip.** Staff and admin roles are removed and saved, and the damage is reverted where possible (bans lifted, created channels/roles/webhooks deleted, granted permissions removed).
 5. The alert in the security log has an **Undo strip** button (owner or developer) and, after deletions, **Review restore**.
 
-## Who is not counted
+## Everyone is watched
 
-| Who | Covered for |
+Anti-nuke watches **everyone**. Nobody's actions are skipped, except Vanguard's own, which count against the staff member who asked for them.
+
+Some people are **never punished**. When they hit a limit, the alert, the global feed and the DM still go out as a blue **Anti-nuke Alert (not punished)** card, but nothing is stripped or undone:
+
+| Who | Not punished for |
 |---|---|
-| Server owner, developers, Supreme Leaders, Vanguard itself | Everything |
-| Full-bypass whitelist entries (user or role) | Everything |
-| Rule-specific whitelist entries | Only the chosen rules (presets: Basic moderation, Role manager, Channel manager, Administrator) |
-| Known verification bots (Bloxlink, RoVer, Carl-bot, Dyno, MEE6) and `/antinuke whitelist bots` | Ordinary member-role updates only |
-| Changes approved through `/role` | That single change |
+| Server owner, Developers | Everything |
+| Full whitelist entries (user or role) | Everything |
+| Rule-specific whitelist entries | Only the chosen rules |
 
-Granting **Administrator** or **Manage Server** is always checked unless the person has a full bypass. Role managers on the whitelist may hand out moderator-level roles. A role someone gives themselves never exempts that same action.
+Supreme Leaders and every other rank are punished like anyone else.
+
+Still not counted at all, because they are not attacks:
+
+| What | Why |
+|---|---|
+| Known verification bots (Bloxlink, RoVer, Carl-bot, Dyno, MEE6) and `/antinuke whitelist bots` giving ordinary roles | Verifying members; dangerous grants by them are still counted |
+| A change approved through `/role` | That single, already-checked change |
+
+## Alerts
+
+- **Security log:** every server gets its own alert card with Undo strip and Review restore buttons.
+- **Global feed:** every trigger in every server also goes to one channel: `GLOBAL_ALERT_CHANNEL_ID` in `.env`, or `/dev alerts channel:` (Developer). The card shows the server, the person, the action, the limit, the punishment, the roles they held before the strip and a Jump to Server button.
+- **DMs:** the same card is DMed to `TRUSTED_DM_IDS` (default: the bot owner). It is rate-limited to once per person per server every 5 minutes and 15 per 10 minutes. `/dev alerts dm:false` turns it off.
+
+## Settings locked in `.env`
+
+Nobody can change these from Discord. Restart after editing.
+
+| Setting | What it does |
+|---|---|
+| `ANTINUKE_LOCK=true` | Only Developers can turn anti-nuke off or change its extra layers. A server someone switched off is switched back on at every start |
+| `PROTECTED_USERS` | Staff can't ban, kick, time out, strip or take roles from these people, through Vanguard or by hand. Manual bans, timeouts and role removals are undone and you are alerted (kicks can't be undone). Anti-nuke still contains them if they set it off |
+| `PROTECTED_ROLES`, `PROTECTED_ROLE_ASSIGNERS` | Only the assigners and Developers may give these roles. Anyone else's grant is taken back and you are alerted |
+| `COMMAND_BLACKLIST` | Blocks specific people from specific commands in every server, e.g. `111…:mod ban\|network`. `*` blocks every command and button. The bot owner can never be blocked |
+| `GLOBAL_ALERT_CHANNEL_ID`, `GLOBAL_ALERT_WARNINGS` | The global alert feed channel, and whether first-time warnings go there too |
 
 ## Commands
 

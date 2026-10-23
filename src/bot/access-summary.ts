@@ -3,6 +3,7 @@ import { config } from '../config.js';
 import { style } from '../console-ui.js';
 import { supremeLeaders } from './ranks.js';
 import { trustedRecipients } from './trusted-dm.js';
+import { antinukeLocked, blacklistSize, envGlobalAlertChannel, protectedRoleAssigners, protectedRoles, protectedUsers } from './env-rules.js';
 
 /**
  * Printed at every start: exactly who holds bot-wide power, and where it comes from. Nothing is
@@ -26,5 +27,10 @@ export function accessSummary(store: Store): string[] {
         row('Supreme', ids(supreme)),
         row('Bot-wide', others.length ? others.map(o => `${o.id} (${o.level})`).join(', ') : style.dim('none')),
         row('Bot DMs to', ids(trustedRecipients())),
+        row('Blacklisted', blacklistSize() ? `${blacklistSize()} user(s) (COMMAND_BLACKLIST)` : style.dim('none')),
+        row('Prot. roles', protectedRoles().size ? `${protectedRoles().size} role(s); assigners: ${ids([...protectedRoleAssigners()])} + Developers` : style.dim('none')),
+        row('Prot. users', ids([...protectedUsers()])),
+        row('Anti-nuke', antinukeLocked() ? style.green('locked (ANTINUKE_LOCK): only Developers can turn it off') : style.dim('not locked (set ANTINUKE_LOCK=true)')),
+        row('Alert feed', envGlobalAlertChannel() ? `channel ${envGlobalAlertChannel()} (GLOBAL_ALERT_CHANNEL_ID)` : style.dim('set with /dev alerts or GLOBAL_ALERT_CHANNEL_ID')),
     ];
 }

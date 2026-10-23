@@ -1,4 +1,4 @@
-import { ActivityType, SlashCommandBuilder } from 'discord.js';
+import { ActivityType, ChannelType, PermissionFlagsBits, SlashCommandBuilder } from 'discord.js';
 import { config, VERSION } from '../../config.js';
 import { defineCommand } from '../../bot/registry.js';
 import { confirmDanger } from '../../ui/danger-ui.js';
@@ -7,7 +7,11 @@ import { broadcast, broadcastTargets, clearPresenceOverride, inspectGuild, setPr
 import { presenceLines } from '../../security/protection-stats.js';
 import { spawnSync } from 'node:child_process';
 import { askLauncher, describeUpdate } from '../../bot/updater-link.js';
-import { DEVELOPER_ONLY_MESSAGE, explicitRank, RANKS } from '../../bot/ranks.js';
+import { DEVELOPER_ONLY_MESSAGE, botRank, RANKS } from '../../bot/ranks.js';
+import { dmSetting, globalAlertCard, globalAlertTarget, setDmSetting, setGlobalAlertTarget } from '../../security/global-alert.js';
+import { trustedRecipients } from '../../bot/trusted-dm.js';
+import { envGlobalAlertChannel } from '../../bot/env-rules.js';
+import { RULES } from '../../core.js';
 /** Which GitHub commit is running, and whether automatic updates are on (no secrets shown). */
 function codeVersion() {
     const commit = spawnSync('git', ['rev-parse', '--short', 'HEAD'], { encoding: 'utf8' });
@@ -28,6 +32,11 @@ export default defineCommand(new SlashCommandBuilder().setName('dev').setDescrip
     .addIntegerOption(o => o.setName('minutes').setDescription('Return to the rotation after this many minutes (default: until reset)').setMinValue(1).setMaxValue(10080))
     .addStringOption(o => o.setName('presence').setDescription('Online indicator').addChoices({ name: 'Online', value: 'online' }, { name: 'Idle', value: 'idle' }, { name: 'Do not disturb', value: 'dnd' })))
     .addSubcommand(s => s.setName('status-reset').setDescription('Return to the normal rotating status'))
+    .addSubcommand(s => s.setName('alerts').setDescription('Developer: post every anti-nuke trigger from every server to one channel')
+    .addChannelOption(o => o.setName('channel').setDescription('Where the global alerts go (leave empty to see the current setup)').addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement))
+    .addBooleanOption(o => o.setName('warnings').setDescription('Also post first-time warnings, not just strips (default: no)'))
+    .addBooleanOption(o => o.setName('off').setDescription('Stop posting to the global channel'))
+    .addBooleanOption(o => o.setName('dm').setDescription('DM each strip to TRUSTED_DM_IDS too (default: on)')))
     .addSubcommand(s => s.setName('update').setDescription('Automatic GitHub updates: see the status, or install now (Developer)')
     .addStringOption(o => o.setName('action').setDescription('What to do (default: status)').addChoices({ name: 'Show status', value: 'status' }, { name: 'Check and install now', value: 'now' })))
     .addSubcommand(s => s.setName('sync').setDescription('Re-register commands globally and clear duplicate guild-scoped copies in this server')
@@ -35,10 +44,57 @@ export default defineCommand(new SlashCommandBuilder().setName('dev').setDescrip
     const sub = i.options.getSubcommand();
     if (sub === 'update') {
         const op = (i.options.getString('action') ?? 'status');
-        // Updater: available as /dev update (`,update` alias remains).
-        if (op === 'now' && explicitRank(ctx.store, i.guildId, i.user.id, ctx.actor ?? null) < RANKS.developer)
-            throw new AppError('PERMISSION_ERROR', `${DEVELOPER_ONLY_MESSAGE}\nYou can still see the update status with \`,update\`.`);
+        // Anyone with /dev may look; installing a new version is for Developers (`,update` alias remains).
+        if (op === 'now' && botRank(ctx.store, i.user.id) < RANKS.developer)
+            throw new AppError('PERMISSION_ERROR', `${DEVELOPER_ONLY_MESSAGE}\nYou can still see the update status with \`/dev update\`.`);
         return describeUpdate(await askLauncher(op), op);
+    }
+    if (sub === 'alerts') {
+        const current = globalAlertTarget(ctx.store, ctx.client);
+        const fixed = envGlobalAlertChannel();
+        const dm = i.options.getBoolean('dm');
+        const dmLine = () => { const d = dmSetting(ctx.store); const who = trustedRecipients().map(id => `<@${id}>`).join(' ') || 'nobody (set TRUSTED_DM_IDS)'; return `**DMs:** ${d.on ? `on, to ${who}${d.warnings ? ' (warnings too)' : ' (strips only)'}` : 'off'}`; };
+        if (dm !== null) {
+            setDmSetting(ctx.store, { on: dm, warnings: i.options.getBoolean('warnings') ?? dmSetting(ctx.store).warnings });
+            if (!i.options.getChannel('channel') && !i.options.getBoolean('off'))
+                return `Anti-nuke DMs are now **${dm ? 'on' : 'off'}**.\n${dmLine()}`;
+        }
+        if (fixed && (i.options.getBoolean('off') || i.options.getChannel('channel') || (dm === null && i.options.getBoolean('warnings') !== null)))
+            return `The global alert channel is fixed in the bot settings (\`GLOBAL_ALERT_CHANNEL_ID\` → <#${fixed}>), so it can only be changed in \`.env\`.${current ? '' : ' Vanguard cannot see that channel right now: check the ID and that the bot is in that server.'}\n${dmLine()}`;
+        if (i.options.getBoolean('off')) {
+            if (!current)
+                return 'Global anti-nuke alerts are already off.';
+            setGlobalAlertTarget(ctx.store, null);
+            return `Global anti-nuke alerts are **off**. They were going to <#${current.channelId}>. Each server's own security log is unchanged.`;
+        }
+        const channel = i.options.getChannel('channel');
+        const warnings = i.options.getBoolean('warnings');
+        if (!channel) {
+            if (!current)
+                return `**Global alert channel:** not set. Add one with \`/dev alerts channel:#channel\`: every anti-nuke trigger in every server is then also posted there.\n${dmLine()}`;
+            if (warnings !== null) {
+                setGlobalAlertTarget(ctx.store, { ...current, warnings, by: i.user.id, at: Date.now() });
+                return `Global anti-nuke alerts now ${warnings ? '**include**' : 'leave out'} first-time warnings. Channel: <#${current.channelId}>.`;
+            }
+            return `**Global anti-nuke alerts are on** in <#${current.channelId}> (\`${current.guildId}\`).\n**Warnings:** ${current.warnings ? 'posted too' : 'strips only'}\n${dmLine()}\n-# Set by <@${current.by}> <t:${Math.floor(current.at / 1000)}:R>. Change with \`/dev alerts channel:\`, stop with \`/dev alerts off:true\`.`;
+        }
+        const guild = i.guild;
+        const real = guild?.channels.cache.get(channel.id);
+        if (!guild || !real || !real.isTextBased())
+            throw new AppError('VALIDATION_ERROR', 'Pick a text channel in this server.');
+        if (!ctx.store.isAuthorized(guild.id))
+            throw new AppError('VALIDATION_ERROR', 'This server is not authorized for Midtown Vanguard, so alerts cannot be delivered here. Pick a channel in an authorized server.');
+        const me = guild.members.me;
+        const perms = me && 'permissionsFor' in real ? real.permissionsFor(me) : null;
+        if (!perms?.has([PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.EmbedLinks]))
+            throw new AppError('VALIDATION_ERROR', `Midtown Vanguard needs **View Channel**, **Send Messages** and **Embed Links** in <#${real.id}>.`);
+        const target = { guildId: guild.id, channelId: real.id, warnings: warnings ?? current?.warnings ?? false, by: i.user.id, at: Date.now() };
+        setGlobalAlertTarget(ctx.store, target);
+        const sample = globalAlertCard({ guild: { id: guild.id, name: guild.name }, actor: i.user.id, snapshot: { username: i.user.username, avatarUrl: i.user.displayAvatarURL(), bot: false, roles: ['Example role'] },
+            rule: RULES.find(r => r.key === 'timeout'), mode: 'enforce', incident: 0, failed: false, reverted: { completed: 5, failed: 0, skipped: 0 }, jumpUrl: `https://discord.com/channels/${guild.id}` });
+        sample.embed.setTitle('Anti-nuke Triggered (test)').setDescription('This is a test. Real alerts from every server will look like this.');
+        ctx.logs.push(guild.id, sample.embed, [sample.row], real.id);
+        return `**Global anti-nuke alerts are on.** Every anti-nuke trigger in every Midtown server will also be posted in <#${real.id}>${target.warnings ? ', including first-time warnings' : ' (strips only; add `warnings:true` to include first-time warnings)'}. A test alert is on its way there now.\n-# Keep this channel private: it lists people's roles across the network.`;
     }
     if (sub === 'inspect') {
         const id = i.options.getString('guild_id', true);

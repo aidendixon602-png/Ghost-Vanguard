@@ -217,7 +217,7 @@ export class Store {
             CREATE INDEX IF NOT EXISTS member_notes_user ON member_notes(guild_id, user_id);
             CREATE TABLE IF NOT EXISTS tempbans (guild_id TEXT NOT NULL REFERENCES guild_data(guild_id) ON DELETE CASCADE, user_id TEXT NOT NULL, until INTEGER NOT NULL, moderator_id TEXT NOT NULL, reason TEXT NOT NULL, case_number INTEGER, PRIMARY KEY(guild_id, user_id));
             CREATE TABLE IF NOT EXISTS staff_roles (guild_id TEXT NOT NULL REFERENCES guild_data(guild_id) ON DELETE CASCADE, role_id TEXT NOT NULL, level TEXT NOT NULL CHECK(level IN ('helper','moderator','admin','headadmin')), by_id TEXT, at INTEGER, PRIMARY KEY(guild_id, role_id));
-            CREATE TABLE IF NOT EXISTS bot_staff (user_id TEXT PRIMARY KEY, level TEXT NOT NULL CHECK(level IN ('botmanager','overseer','supreme')), by_id TEXT, at INTEGER);
+            CREATE TABLE IF NOT EXISTS bot_staff (user_id TEXT PRIMARY KEY, level TEXT NOT NULL CHECK(level IN ('botmanager','overseer','supreme','serverowner')), by_id TEXT, at INTEGER);
             CREATE TABLE IF NOT EXISTS newaccount_config (guild_id TEXT PRIMARY KEY REFERENCES guild_data(guild_id) ON DELETE CASCADE, enabled INTEGER NOT NULL DEFAULT 1, min_age_days INTEGER NOT NULL DEFAULT 7 CHECK(min_age_days BETWEEN 1 AND 90), action TEXT NOT NULL DEFAULT 'hold' CHECK(action IN ('hold','kick','alert')), by_id TEXT);
             CREATE TABLE IF NOT EXISTS raidmode (guild_id TEXT PRIMARY KEY REFERENCES guild_data(guild_id) ON DELETE CASCADE, enabled INTEGER NOT NULL DEFAULT 0, min_age_days INTEGER NOT NULL DEFAULT 7, action TEXT NOT NULL DEFAULT 'kick' CHECK(action IN ('kick','timeout')), until INTEGER, by_id TEXT, handled INTEGER NOT NULL DEFAULT 0);`);
         // 2.18: per-server feature settings (automod, welcome, appeals, duty...), ban appeals and duty shifts.
@@ -388,9 +388,9 @@ export class Store {
         this.db.exec(`CREATE TABLE IF NOT EXISTS left_roles (guild_id TEXT NOT NULL REFERENCES guild_data(guild_id) ON DELETE CASCADE, user_id TEXT NOT NULL, roles TEXT NOT NULL, left_at INTEGER NOT NULL, PRIMARY KEY(guild_id, user_id));`);
         this.db.exec(`CREATE TABLE IF NOT EXISTS verification_pending (guild_id TEXT NOT NULL REFERENCES guild_data(guild_id) ON DELETE CASCADE, user_id TEXT NOT NULL, roblox_id TEXT NOT NULL, roblox_name TEXT NOT NULL, code TEXT NOT NULL, created_at INTEGER NOT NULL, PRIMARY KEY(guild_id, user_id));`);
         this.db.exec(`CREATE TABLE IF NOT EXISTS autoreact_users (guild_id TEXT NOT NULL REFERENCES guild_data(guild_id) ON DELETE CASCADE, user_id TEXT NOT NULL, emoji TEXT NOT NULL, by_id TEXT NOT NULL, at INTEGER NOT NULL, PRIMARY KEY(guild_id, user_id));`);
-        // 2.16.3: Supreme Leader can be given by command, so bot_staff accepts 'supreme'. Rebuild older tables (no rows lost).
-        if (!String((this.db.prepare("SELECT sql FROM sqlite_master WHERE name='bot_staff'").get() as { sql?: string } | undefined)?.sql ?? '').includes("'supreme'"))
-            this.db.exec(`BEGIN; CREATE TABLE bot_staff_new (user_id TEXT PRIMARY KEY, level TEXT NOT NULL CHECK(level IN ('botmanager','overseer','supreme')), by_id TEXT, at INTEGER);
+        // 2.16.3 / 2.40: bot_staff accepts 'supreme' and 'serverowner' (both given by command). Rebuild older tables (no rows lost).
+        if (!String((this.db.prepare("SELECT sql FROM sqlite_master WHERE name='bot_staff'").get() as { sql?: string } | undefined)?.sql ?? '').includes("'serverowner'"))
+            this.db.exec(`BEGIN; CREATE TABLE bot_staff_new (user_id TEXT PRIMARY KEY, level TEXT NOT NULL CHECK(level IN ('botmanager','overseer','supreme','serverowner')), by_id TEXT, at INTEGER);
                 INSERT INTO bot_staff_new SELECT user_id,level,by_id,at FROM bot_staff; DROP TABLE bot_staff; ALTER TABLE bot_staff_new RENAME TO bot_staff; COMMIT;`);
         this.db.function('check_scope', (id: any) => {
             const current = this.active.getStore();

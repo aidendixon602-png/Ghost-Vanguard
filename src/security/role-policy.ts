@@ -2,6 +2,8 @@ import { PermissionFlagsBits, type Guild, type GuildMember, type Role } from 'di
 import type { Store } from '../database/db.js';
 import { developers } from '../bot/developers.js';
 import { explicitRank, hasAdministrator, RANKS } from '../bot/ranks.js';
+import { isProtectedRole } from '../bot/env-rules.js';
+import { canAssignProtected, PROTECTED_REFUSAL } from './protected-roles.js';
 
 /**
  * Who may give or take which role with /role.
@@ -56,6 +58,8 @@ export function decideRoleChange({ store, guild, actor, target, role, me, op }: 
     if (!target) return { ok: false, kind: 'member', reason: 'That user is not in this server (or Discord could not find them).' };
     const noop = op === 'add' && target.roles.cache.has(role.id) ? `<@${target.id}> already has <@&${role.id}>. Nothing was changed.`
         : op === 'remove' && !target.roles.cache.has(role.id) ? `<@${target.id}> does not have <@&${role.id}>. Nothing was changed.` : undefined;
+    // Protected roles (PROTECTED_ROLES in .env): only PROTECTED_ROLE_ASSIGNERS and Developers may give them.
+    if (op === 'add' && isProtectedRole(role.id) && !canAssignProtected(actor.id)) return { ok: false, kind: 'permission', reason: PROTECTED_REFUSAL(role.id) };
     if (developers.has(actor.id)) return { ok: true, as: 'developer', noop };
     if (actor.id === guild.ownerId) return { ok: true, as: 'owner', noop };
 

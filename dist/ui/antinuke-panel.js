@@ -140,7 +140,7 @@ export function trustListPage(ctx, guildId, user, requested = 1, expired = false
         const gone = g.role && guild && !guild.roles.cache.has(g.id) ? ` *(role deleted · ID ${g.id} · remove with \`/antinuke whitelist add\`)*` : '';
         return `${g.role ? '🛡️' : '👤'} <@${g.role ? '&' : ''}${g.id}>${gone} · **${scope}** · ${g.expires ? `${g.expires > now ? 'expires' : 'EXPIRED'} <t:${Math.floor(g.expires / 1000)}:R>` : 'until removed'} · set by <@${g.by}>`;
     });
-    const body = `${lines.join('\n') || 'Nobody is whitelisted.'}\n\n**All rules** = anti-nuke ignores them completely. A **preset** or **<Rule> only** = only those rules are skipped.\n-# Page ${page}/${pages} · ${all.length} entr${all.length === 1 ? 'y' : 'ies'} · updated <t:${Math.floor(now / 1000)}:T>`;
+    const body = `${lines.join('\n') || 'Nobody is whitelisted.'}\n\n**All rules** = never punished (you are still alerted). A **preset** or **<Rule> only** = not punished for those rules only.\n-# Page ${page}/${pages} · ${all.length} entr${all.length === 1 ? 'y' : 'ies'} · updated <t:${Math.floor(now / 1000)}:T>`;
     const id = (p) => `trustlist:${guildId}:${user}:${p}:${expired ? 1 : 0}`;
     return { embeds: [embed('Anti-nuke whitelist', body)], components: [new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(id(page - 1)).setLabel('< Prev').setStyle(ButtonStyle.Secondary).setDisabled(page <= 1), new ButtonBuilder().setCustomId(id(page) + ':r').setLabel('Refresh').setStyle(ButtonStyle.Primary), new ButtonBuilder().setCustomId(id(page + 1)).setLabel('Next >').setStyle(ButtonStyle.Secondary).setDisabled(page >= pages))], allowedMentions: { parse: [] } };
 }

@@ -65,7 +65,7 @@ Raids, lockdowns, automod, scam links and ping protection
 |---|---|---|
 | `/security status` | Show security health and configuration | Head Admin+ |
 | `/security config` | Set the security log channel and Roblox verification options | Head Admin+ |
-| `/security admin` | Server owner: add, remove or list security admins | Owner |
+| `/security admin` | Server owner: add, remove or list security admins | Server Owner |
 | `/security incidents` | View recent anti-nuke incidents | Head Admin+ |
 | `/security quarantine` | Contain a member and save their roles | Head Admin+ |
 | `/security release` | Restore a quarantined member’s saved roles | Owner or Head Admin |
@@ -124,18 +124,18 @@ Server setup: logs, staff ranks, welcome, config, permissions
 | Command | What it does | Who |
 |---|---|---|
 | `/setup history list` | Show recent setting changes and who made them | Head Admin+ |
-| `/setup history restore` | Server owner: undo a setting change by its number | Owner |
-| `/setup config provider` | Enable or disable a configured verification provider | Owner |
-| `/setup config permission-role` | Give a Discord role a Vanguard staff rank (Head Admin, Admin, Moderator, Helper) | Owner |
-| `/setup config command` | Turn one Vanguard command on/off or change its cooldown | Owner |
-| `/setup config feature` | Turn moderation, verification, AI or backups on/off | Owner |
-| `/setup config backups` | Configure scheduled server layout backups | Owner |
-| `/setup config workspace-setup` | Open the guided Workspace setup panel (channels, roles, sheet — no manual IDs) | Owner |
-| `/setup config workspace-publish` | Post or update the configured persistent panels | Owner |
-| `/setup config workspace-status` | Show Workspace setup status | Owner |
-| `/setup config workspace-enable` | Enable the validated Workspace integration | Owner |
-| `/setup config workspace-disable` | Disable Workspace and stop its reminders without deleting records | Owner |
-| `/setup config workspace-sync` | Preview and synchronize recognized staff members | Owner |
+| `/setup history restore` | Server owner: undo a setting change by its number | Server Owner |
+| `/setup config provider` | Enable or disable a configured verification provider | Server Owner |
+| `/setup config permission-role` | Give a Discord role a Vanguard staff rank (Head Admin, Admin, Moderator, Helper) | Server Owner |
+| `/setup config command` | Turn one Vanguard command on/off or change its cooldown | Server Owner |
+| `/setup config feature` | Turn moderation, verification, AI or backups on/off | Server Owner |
+| `/setup config backups` | Configure scheduled server layout backups | Server Owner |
+| `/setup config workspace-setup` | Open the guided Workspace setup panel (channels, roles, sheet — no manual IDs) | Server Owner |
+| `/setup config workspace-publish` | Post or update the configured persistent panels | Server Owner |
+| `/setup config workspace-status` | Show Workspace setup status | Server Owner |
+| `/setup config workspace-enable` | Enable the validated Workspace integration | Server Owner |
+| `/setup config workspace-disable` | Disable Workspace and stop its reminders without deleting records | Server Owner |
+| `/setup config workspace-sync` | Preview and synchronize recognized staff members | Server Owner |
 | `/setup logs setup` | Create or reuse #bans and #ghost-vanguard-logging, check access and send a test | Admin+ |
 | `/setup logs check` | Check both log channels and the bot permissions, then send a test embed | Admin+ |
 | `/setup logs exclude` | Stop (or start again) logging events from a channel | Admin+ |
@@ -148,9 +148,9 @@ Server setup: logs, staff ranks, welcome, config, permissions
 | `/setup panel` | Create or update the private control panel channel (buttons for staff) | Owner or Head Admin |
 | `/setup permissions list` | Browse the roles that hold Vanguard command access | Head Admin+ |
 | `/setup permissions discord` | Roles holding Administrator or Manage Roles, which can reorder the hierarchy | Head Admin+ |
-| `/setup staff role` | Link a Discord role to a server rank (Head Admin, Admin, Moderator, Helper) | Owner |
+| `/setup staff role` | Link a Discord role to a server rank (Head Admin, Admin, Moderator, Helper) | Server Owner |
 | `/setup staff global` | Developer: make someone Supreme Leader, Overseer or Bot Manager in every server | Developer |
-| `/setup staff report` | Staff activity: actions per staff member | Owner |
+| `/setup staff report` | Staff activity: actions per staff member | Server Owner |
 | `/setup staff list` | Show every rank in this server and bot-wide | Helper+ |
 | `/setup staff check` | Show someone's Vanguard rank here | Helper+ |
 | `/setup welcome setup` | Turn welcome messages on or off | Admin+ |
@@ -250,6 +250,7 @@ Bot developers: diagnostics, updates, servers and the database
 | `/dev broadcast` | Post an announcement to every authorized server's log channel | Bot Manager+ |
 | `/dev status` | Show a custom bot status instead of the rotation | Bot Manager+ |
 | `/dev status-reset` | Return to the normal rotating status | Bot Manager+ |
+| `/dev alerts` | Developer: post every anti-nuke trigger from every server to one channel | Developer |
 | `/dev update` | Automatic GitHub updates: see the status, or install now (Developer) | Supreme Leader+ |
 | `/dev sync` | Re-register commands globally and clear duplicate guild-scoped copies in this server | Supreme Leader+ |
 | `/dev server info` | Developer: show this server's authorization details | Bot Manager+ |
@@ -334,6 +335,7 @@ Every slash command above also works with a `,` prefix (e.g. `,dev status`). The
 `,database status` — Show database health, storage, backup and migration status
 `,database verify <backup>` — Recheck backup checksum and database integrity
 `,deauthserver DEAUTHORIZE` — Developer: remove this server's authorization and leave
+`,dev alerts [--channel <channel>] [--warnings] [--off] [--dm]` — Developer: post every anti-nuke trigger from every server to one channel
 `,dev broadcast <message> [--title <title>] [--confirm <confirm>]` — Post an announcement to every authorized server's log channel
 `,dev diagnostics` — Inspect runtime health without secrets
 `,dev inspect <guild_id>` — Read-only overview of any server Vanguard knows

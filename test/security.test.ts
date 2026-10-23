@@ -50,12 +50,16 @@ test('enforce mode writes evidence before containment and stores the result', as
     store.close();
 });
 
-test('owner, bot and explicitly trusted users are excluded from audit counting', async () => {
+test('everyone is watched: the owner and whitelisted people are alerted on but never punished; only Vanguard itself is skipped', async () => {
     const { store, security, guild, entry } = setup();
     store.grant('g', 'trusted', 'trust', 'owner');
-    for (const [n, id] of ['owner', 'bot', 'trusted'].entries())
-        await security.audit(entry(String(n), id), guild);
-    assert.equal(store.all('SELECT * FROM observations').length, 0);
+    let punished = 0; security.punish = async () => { punished++; return 'Removed 1 dangerous role(s).'; };
+    for (const id of ['owner', 'bot', 'trusted'])
+        for (const n of ['1', '2', '3', '4', '5']) await security.audit(entry(`${id}${n}`, id), guild);
+    assert.equal(store.all("SELECT * FROM observations WHERE actor_id='bot'").length, 0, 'Vanguard itself is not counted');
+    assert.deepEqual(store.all('SELECT actor_id,mode,result FROM incidents ORDER BY actor_id').map(r => [r.actor_id, r.mode]), [['owner', 'exempt'], ['trusted', 'exempt']]);
+    assert.match(store.get("SELECT result FROM incidents WHERE actor_id='owner'")!.result, /Not punished: the server owner/);
+    assert.equal(punished, 0);
     store.close();
 });
 
@@ -252,12 +256,15 @@ test('bans and kicks done through /moderation count against the moderator, not t
     store.close();
 });
 
-test('trusted moderators acting through the bot stay exempt', async () => {
+test('trusted moderators acting through the bot are watched (alert) but not punished', async () => {
     const { store, security, guild } = setup();
     store.grant('g', '323456789012345678', 'trust', 'owner');
+    let punished = 0; security.punish = async () => { punished++; return 'Removed 1 dangerous role(s).'; };
     for (const n of ['1', '2', '3', '4', '5'])
         await security.audit(auditEntry(n, AuditLogEvent.MemberBanAdd, { reason: '323456789012345678: cleanup' }, 'bot'), guild);
-    assert.equal(store.all('SELECT * FROM observations').length, 0);
+    assert.equal(store.all('SELECT * FROM observations').length, 5, 'counted against the moderator');
+    assert.deepEqual(store.all('SELECT actor_id,mode FROM incidents').map(r => [r.actor_id, r.mode]), [['323456789012345678', 'exempt']]);
+    assert.equal(punished, 0);
     store.close();
 });
 

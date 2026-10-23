@@ -23,10 +23,12 @@ export function accessLabel(policy, key) {
     // Developer tools that a bot-wide rank also unlocks (Bot Manager, Overseer) say so.
     if (policy.developerOnly) {
         const need = requiredRank(key);
-        return need === undefined || need > RANKS.supreme ? 'Developer' : `${RANK_LABEL[rankName(need)]}+`;
+        return need === undefined || need >= RANKS.developer ? 'Developer' : `${RANK_LABEL[rankName(need)]}+`;
     }
     if (policy.access === 'owner')
-        return 'Owner';
+        return 'Server Owner';
+    if (requiredRank(key) === RANKS.owner)
+        return 'Server Owner';
     const need = requiredRank(key);
     const perms = policy.requiredPermissions.length ? new PermissionsBitField(policy.requiredPermissions).toArray().map(p => p.replace(/([a-z])([A-Z])/g, '$1 $2')).join(', ') : '';
     const rank = need !== undefined ? RANK_LABEL[rankName(need)] : '';

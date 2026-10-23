@@ -67,10 +67,21 @@ test('/staff: you can only hand out ranks below your own; bot-wide ranks are Dev
     await assert.rejects(run(head, 'role', { rank: 'none', role: 'r-head' }), /above Head Admin/, 'cannot demote your own level');
     assert.match(await run(member('owner'), 'role', { rank: 'headadmin', role: 'other' }) as string, /Head Admin/, 'server owner can make Head Admins');
     await assert.rejects(run(member('a', ['r-admin']), 'role', { rank: 'helper', role: 'x' }), /Head Admins and above/);
-    await assert.rejects(run(member('owner'), 'global', { rank: 'overseer', user: { id: 'z', bot: false } }), /Only a Developer/);
+    await assert.rejects(run(member('owner'), 'global', { rank: 'overseer', user: { id: 'z', bot: false } }), /Only a Developer/, 'owning a server never unlocks bot-wide ranks');
     assert.match(await run(member(config.ownerId!), 'global', { rank: 'overseer', user: { id: 'z', bot: false } }) as string, /Overseer\*\* in every server/);
     assert.equal(rankOf(store, 'anywhere', 'z', null), RANKS.overseer);
+    // Server Owner = whoever owns the Discord server: above Supreme Leader there, but no bot-wide tools.
+    store.run("INSERT INTO bot_staff(user_id,level,by_id,at) VALUES('sl','supreme','x',0)");
+    assert.equal(rankOf(store, G, 'owner', member('owner')), RANKS.owner);
+    assert.ok(RANKS.developer > RANKS.owner && RANKS.owner > RANKS.supreme, 'Developer > Server Owner > Supreme Leader');
+    assert.ok(rankOf(store, G, 'owner', member('owner')) > rankOf(store, G, 'sl', member('sl')), 'the server owner outranks a Supreme Leader in their server');
+    assert.equal(rankOf(store, 'other', 'owner', member('owner', [], 'someone-else')), 0, 'only in the server they own');
+    for (const key of ['dev/diagnostics', 'genreban', 'database/backup', 'authserver', 'staff/global'])
+        assert.equal(rankOf(store, G, 'owner', member('owner'), key), 0, `owning a server never unlocks /${key}`);
+    assert.equal(rankOf(store, G, 'sl', member('sl'), 'genreban'), RANKS.supreme, 'bot ranks still count for bot-wide tools');
+    await assert.rejects(run(member('sl'), 'global', { rank: 'overseer', user: { id: 'y', bot: false } }), /Only a Developer/, 'Supreme Leaders cannot hand out bot-wide ranks');
     const list = await run(head, 'list', {}) as string;
+    assert.match(list, /Supreme Leader: .*<@sl>/); assert.match(list, /Server Owner: <@owner>/);
     for (const re of [/Overseer: <@z>/, /Head Admin: .*<@&r-head>/, /Head Admin: .*<@&other>/, /\nAdmin: .*<@&new-role>/, /Moderator: <@&r-mod>/, /Helper: <@&r-help>/]) assert.match(list, re);
     store.close();
 });

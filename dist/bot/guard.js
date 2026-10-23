@@ -4,7 +4,10 @@ import { config } from '../config.js';
 import { inviteUrl } from './invite.js';
 import { developers } from './developers.js';
 import { AppError } from '../errors.js';
-import { DEVELOPER_ONLY_MESSAGE, explicitRank, needsDeveloper, rankOf, requiredRank } from './ranks.js';
+import { aboveSupremeMessage, botRank, needsDeveloper, rankOf, RANKS, requiredRank } from './ranks.js';
+import { ANTINUKE_LOCK_KEYS, antinukeLocked } from './env-rules.js';
+const lockedKey = (key) => !!key && antinukeLocked() && ANTINUKE_LOCK_KEYS.has(key.replace(/\/$/, ''));
+export const ANTINUKE_LOCKED_MESSAGE = 'Anti-nuke is **locked** in the bot settings (`ANTINUKE_LOCK`), so it cannot be turned off or weakened from Discord. Only a Developer can do this.';
 const permissionNames = (permissions) => permissions.map(p => new PermissionsBitField(p).toArray().join(' ')).map(p => p.replace(/([a-z])([A-Z])/g, '$1 $2'));
 export class Guard {
     store;
@@ -25,8 +28,11 @@ export class Guard {
             return false;
         // Developer-only commands: the Developer rank is the only way in (no Discord permission, server role
         // or lower bot-wide rank).
+        // ANTINUKE_LOCK (.env): turning anti-nuke off or changing its layers is Developer-only.
+        if (lockedKey(rankKey ?? command))
+            return botRank(this.store, user) >= RANKS.developer && this.enabledHere(policy, guildId, command);
         if (needsDeveloper(rankKey ?? command))
-            return explicitRank(this.store, guildId, user, actor) >= requiredRank(rankKey ?? command) && this.enabledHere(policy, guildId, command);
+            return botRank(this.store, user) >= requiredRank(rankKey ?? command) && this.enabledHere(policy, guildId, command);
         // For ordinary slash policies, Developers (the bot owner and DEVELOPER_IDS) may use commands without
         // Administrator, Manage Roles or a server role. The comma handler separately requires DEVELOPER_IDS exactly.
         if (developers.has(user))
@@ -73,8 +79,10 @@ export class Guard {
         }
         // Interaction member contains current permission data; fetch only role data if not cached.
         const actor = refreshMember ? await i.guild.members.fetch({ user: i.user.id, force: true }) : i.member;
-        if (needsDeveloper(key) && explicitRank(this.store, i.guildId, i.user.id, actor) < requiredRank(key))
-            throw new AppError('PERMISSION_ERROR', DEVELOPER_ONLY_MESSAGE);
+        if (lockedKey(key) && botRank(this.store, i.user.id) < RANKS.developer)
+            throw new AppError('PERMISSION_ERROR', ANTINUKE_LOCKED_MESSAGE);
+        if (needsDeveloper(key) && botRank(this.store, i.user.id) < requiredRank(key))
+            throw new AppError('PERMISSION_ERROR', aboveSupremeMessage(key));
         if (policy.developerOnly && (requiredRank(key) ?? Infinity) > rankOf(this.store, i.guildId, i.user.id, actor, key))
             developers.require(i.user.id);
         if (!this.allowed(policy, i.guildId, i.user.id, actor, undefined, key))

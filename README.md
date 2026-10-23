@@ -9,7 +9,7 @@
 Anti-nuke and the threat board · Moderation and audit logging · Ticket desk · Live dashboard · Server recovery
 
 [![CI](https://github.com/aidendixon602-png/Ghost-Vanguard/actions/workflows/ci.yml/badge.svg)](https://github.com/aidendixon602-png/Ghost-Vanguard/actions/workflows/ci.yml)
-![Version](https://img.shields.io/badge/version-3.0.0-6d5ae6)
+![Version](https://img.shields.io/badge/version-3.1.0-6d5ae6)
 ![Tests](https://img.shields.io/badge/tests-545%20passing-2EA043)
 ![Node](https://img.shields.io/badge/node-24-339933?logo=node.js&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
@@ -79,10 +79,10 @@ Every command has a minimum rank, and each rank includes everything below it. Bo
 | Rank | Scope | Can do |
 |---|---|---|
 | **Developer** | All servers | The bot owner (`BOT_OWNER_ID`) and `DEVELOPER_IDS`. Developer operations include diagnostics, updates, database and server controls, global ranks and network bans; comma commands require an exact `DEVELOPER_IDS` entry, even for the bot owner |
+| **Server Owner** | Own server | Whoever owns the Discord server. Outranks Supreme Leaders there: Head Admin, plus security admins, undoing setting changes and undoing strips. Never gets bot-wide tools |
 | **Supreme Leader** | All servers | Everything below; can lift genrebans from ban-log controls. Developer comma commands remain restricted to exact `DEVELOPER_IDS` entries |
 | **Overseer** | All servers | Bot Manager, plus one-server genreban exceptions through `/mod unban` |
 | **Bot Manager** | All servers | Head Admin-level access in every server; this rank does not unlock comma commands |
-| **Server Owner** | Own server | Head Admin, plus security admins, undoing setting changes and undoing strips |
 | **Head Admin** | One server | Anti-nuke, whitelist, control panel, backups, staff ranks |
 | **Admin** | One server | Lifting ordinary bans, accepting appeals, raid tools, automod, scam protection, logging |
 | **Moderator** | One server | Bans, kicks, tempbans, purges, ban records, denying appeals |
@@ -98,7 +98,7 @@ Every command has a minimum rank, and each rank includes everything below it. Bo
 | Genreban | A Supreme Leader or Developer can lift it everywhere from ban-log controls; an Overseer or higher can let the person back into one server (`/mod unban`). The comma command `,ungenreban` requires an exact `DEVELOPER_IDS` entry |
 | Hardban | Developer only; `,unhardban` requires an exact `DEVELOPER_IDS` entry |
 
-Anti-nuke watches every rank except Developers, Supreme Leaders, server owners and whitelisted entries. The complete list of commands for each rank is in **[docs/ranks.md](docs/ranks.md)**.
+Anti-nuke watches **everyone**. Developers, server owners and whitelisted people are alerted on (security log, global feed and DM) but never punished; everyone else, Supreme Leaders included, is. The complete list of commands for each rank is in **[docs/ranks.md](docs/ranks.md)**.
 
 ## The threat board: defence and counter-attack
 
@@ -175,6 +175,11 @@ Copy [`.env.example`](.env.example) to `.env` and set at least:
 | `DASHBOARD_TOKEN` | Recommended | Require a token for the dashboard and its API when enabled. Without it the dashboard is open to anyone who can reach the port, so keep it on localhost |
 | `BOT_OWNER_ID` | Recommended | The bot owner: Developer rank for ordinary permission checks, and the default for `TRUSTED_DM_IDS`. Add this ID to `DEVELOPER_IDS` separately to use comma commands |
 | `SUPREME_LEADER_IDS` | No | Supreme Leaders: bot-wide rank below Developer; may lift genrebans from ban-log controls, but do not get comma commands. Nobody is built in; every start prints who has bot-wide access |
+| `ANTINUKE_LOCK` | Recommended | `true`: only Developers can turn anti-nuke off or weaken it; servers switched off come back on at start |
+| `PROTECTED_USERS` | No | People staff can never ban, kick, time out or de-role; manual attempts are undone and alerted |
+| `PROTECTED_ROLES`, `PROTECTED_ROLE_ASSIGNERS` | No | Roles only the listed people (and Developers) may give; anyone else's grant is taken back |
+| `COMMAND_BLACKLIST` | No | People blocked from specific commands, e.g. `111…:mod ban\|network;222…:*` |
+| `GLOBAL_ALERT_CHANNEL_ID` | No | One channel that receives every anti-nuke trigger from every server |
 | `TRUSTED_DM_IDS` | No | The only people the bot DMs about itself, including the daily database backup (default: `BOT_OWNER_ID`) |
 | `UPDATE_REPO`, `UPDATE_TOKEN` | No | Enable automatic updates (see below) |
 | `ROVER_API_KEY`, `BLOXLINK_API_KEY` | No | Roblox verification providers |
