@@ -1,5 +1,10 @@
 # Changelog
 
+## 3.1.1: security alerts DM the bot Developers
+- **Anti-nuke alerts, protected-role and protected-user alerts are now DMed to every bot Developer** (`BOT_OWNER_ID` and `DEVELOPER_IDS`) as well as `TRUSTED_DM_IDS`. Each person gets one DM even if they are on both lists, and the same rate limit applies.
+- Backup files and other bot DMs still go only to `TRUSTED_DM_IDS`.
+- `/dev alerts` shows exactly who gets the DMs.
+
 ## 3.1.0: stronger anti-nuke, alerts everywhere, and settings locked in .env
 - **Ranks:** Developer (the bot owner and `DEVELOPER_IDS`) has full control. **Server Owner** (whoever owns the Discord server) now outranks Supreme Leaders in their own server, but bot-wide tools (`/dev`, `/restart`, the database, network bans, server authorization, bot-wide ranks) only ever look at bot ranks. Giving bot-wide ranks is Developer only.
 - **Anti-nuke watches everyone.** The server owner, Developers and whitelisted people are no longer skipped: when they hit a limit you get a blue **Anti-nuke Alert (not punished)** card everywhere, but nothing is stripped or undone. Supreme Leaders and every other rank are punished like anyone else.

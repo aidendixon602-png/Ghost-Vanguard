@@ -9,7 +9,7 @@ import { spawnSync } from 'node:child_process';
 import { askLauncher, describeUpdate } from '../../bot/updater-link.js';
 import { DEVELOPER_ONLY_MESSAGE, botRank, RANKS } from '../../bot/ranks.js';
 import { dmSetting, globalAlertCard, globalAlertTarget, setDmSetting, setGlobalAlertTarget } from '../../security/global-alert.js';
-import { trustedRecipients } from '../../bot/trusted-dm.js';
+import { securityAlertRecipients } from '../../bot/trusted-dm.js';
 import { envGlobalAlertChannel } from '../../bot/env-rules.js';
 import { RULES } from '../../core.js';
 
@@ -38,7 +38,7 @@ export default defineCommand(new SlashCommandBuilder().setName('dev').setDescrip
         .addChannelOption(o => o.setName('channel').setDescription('Where the global alerts go (leave empty to see the current setup)').addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement))
         .addBooleanOption(o => o.setName('warnings').setDescription('Also post first-time warnings, not just strips (default: no)'))
         .addBooleanOption(o => o.setName('off').setDescription('Stop posting to the global channel'))
-        .addBooleanOption(o => o.setName('dm').setDescription('DM each strip to TRUSTED_DM_IDS too (default: on)')))
+        .addBooleanOption(o => o.setName('dm').setDescription('DM each strip to the bot Developers and TRUSTED_DM_IDS (default: on)')))
     .addSubcommand(s => s.setName('update').setDescription('Automatic GitHub updates: see the status, or install now (Developer)')
         .addStringOption(o => o.setName('action').setDescription('What to do (default: status)').addChoices({ name: 'Show status', value: 'status' }, { name: 'Check and install now', value: 'now' })))
     .addSubcommand(s => s.setName('sync').setDescription('Re-register commands globally and clear duplicate guild-scoped copies in this server')
@@ -55,7 +55,7 @@ export default defineCommand(new SlashCommandBuilder().setName('dev').setDescrip
         const current = globalAlertTarget(ctx.store, ctx.client);
         const fixed = envGlobalAlertChannel();
         const dm = i.options.getBoolean('dm');
-        const dmLine = () => { const d = dmSetting(ctx.store); const who = trustedRecipients().map(id => `<@${id}>`).join(' ') || 'nobody (set TRUSTED_DM_IDS)'; return `**DMs:** ${d.on ? `on, to ${who}${d.warnings ? ' (warnings too)' : ' (strips only)'}` : 'off'}`; };
+        const dmLine = () => { const d = dmSetting(ctx.store); const who = securityAlertRecipients().map(id => `<@${id}>`).join(' ') || 'nobody (set BOT_OWNER_ID or DEVELOPER_IDS)'; return `**DMs:** ${d.on ? `on, to ${who}${d.warnings ? ' (warnings too)' : ' (strips only)'}` : 'off'}`; };
         if (dm !== null) {
             setDmSetting(ctx.store, { on: dm, warnings: i.options.getBoolean('warnings') ?? dmSetting(ctx.store).warnings });
             if (!i.options.getChannel('channel') && !i.options.getBoolean('off')) return `Anti-nuke DMs are now **${dm ? 'on' : 'off'}**.\n${dmLine()}`;

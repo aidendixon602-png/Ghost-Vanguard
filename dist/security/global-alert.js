@@ -1,5 +1,5 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, Colors, EmbedBuilder } from 'discord.js';
-import { dmTrusted } from '../bot/trusted-dm.js';
+import { dmSecurityAlert } from '../bot/trusted-dm.js';
 import { envGlobalAlertChannel } from '../bot/env-rules.js';
 import { clip } from '../core.js';
 /**
@@ -125,5 +125,5 @@ export async function dmGlobalAlert(client, store, info, now = Date.now()) {
             if (until <= now)
                 recentDms.delete(k);
     const { embed, row } = globalAlertCard(info);
-    return dmTrusted(client, { embeds: [embed], components: [row] });
+    return dmSecurityAlert(client, { embeds: [embed], components: [row] });
 }

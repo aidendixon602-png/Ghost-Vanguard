@@ -9,7 +9,7 @@
 Anti-nuke and the threat board · Moderation and audit logging · Ticket desk · Live dashboard · Server recovery
 
 [![CI](https://github.com/aidendixon602-png/Ghost-Vanguard/actions/workflows/ci.yml/badge.svg)](https://github.com/aidendixon602-png/Ghost-Vanguard/actions/workflows/ci.yml)
-![Version](https://img.shields.io/badge/version-3.1.0-6d5ae6)
+![Version](https://img.shields.io/badge/version-3.1.1-6d5ae6)
 ![Tests](https://img.shields.io/badge/tests-545%20passing-2EA043)
 ![Node](https://img.shields.io/badge/node-24-339933?logo=node.js&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
@@ -180,7 +180,7 @@ Copy [`.env.example`](.env.example) to `.env` and set at least:
 | `PROTECTED_ROLES`, `PROTECTED_ROLE_ASSIGNERS` | No | Roles only the listed people (and Developers) may give; anyone else's grant is taken back |
 | `COMMAND_BLACKLIST` | No | People blocked from specific commands, e.g. `111…:mod ban\|network;222…:*` |
 | `GLOBAL_ALERT_CHANNEL_ID` | No | One channel that receives every anti-nuke trigger from every server |
-| `TRUSTED_DM_IDS` | No | The only people the bot DMs about itself, including the daily database backup (default: `BOT_OWNER_ID`) |
+| `TRUSTED_DM_IDS` | No | Who gets the daily database backup and other bot DMs (default: `BOT_OWNER_ID`). Security alerts also go to every Developer |
 | `UPDATE_REPO`, `UPDATE_TOKEN` | No | Enable automatic updates (see below) |
 | `ROVER_API_KEY`, `BLOXLINK_API_KEY` | No | Roblox verification providers |
 | `AI_ENABLED`, `OPENAI_API_KEY` | No | AI moderation and `/ask` |
