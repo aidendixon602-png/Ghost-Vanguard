@@ -7,6 +7,7 @@ import { validateArguments } from './registry.js';
 import { acknowledge, commandFailure, respond } from './responses.js';
 import { ReplyPanels } from './reply-panels.js';
 import { routeInteraction } from './command-tree.js';
+import { blockedBy } from './env-rules.js';
 export class Interactions {
     services;
     guard;
@@ -23,6 +24,9 @@ export class Interactions {
             return;
         if (this.seen.has(i.id))
             return;
+        // The command exactly as typed in Discord ("mod ban"), for COMMAND_BLACKLIST. Buttons and menus: null.
+        const shown = i.isChatInputCommand() || i.isAutocomplete()
+            ? [i.commandName, i.options.getSubcommandGroup(false), i.options.getSubcommand(false)].filter(Boolean).join(' ').toLowerCase() : null;
         // Grouped commands (/mod ban, /security automod links) run their original module.
         i = this.panels.wrap(routeInteraction(i));
         this.seen.set(i.id, Date.now());
@@ -32,6 +36,13 @@ export class Interactions {
         const start = Date.now();
         let name = 'unknown', path = '', policy, execute, privateReply = true;
         try {
+            // COMMAND_BLACKLIST (.env): checked before anything else, for every rank.
+            const blocked = blockedBy(i.user.id, shown);
+            if (blocked) {
+                if (i.isAutocomplete())
+                    return void await i.respond([]).catch(() => { });
+                throw new AppError('PERMISSION_ERROR', blocked === '*' ? 'You are blocked from using Midtown Vanguard.' : `You are blocked from using \`/${blocked}\`.`);
+            }
             const registry = this.services.registry;
             if (i.isCommand() || i.isAutocomplete()) {
                 name = i.commandName;

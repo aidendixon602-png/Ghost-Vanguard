@@ -385,3 +385,23 @@ test('the reorganized command list: the expected top-level commands and groups',
         for (const c of tree) assert.ok((c.options ?? []).length <= 25, `${c.name} fits Discord's 25-option limit`);
     } finally { store.close(); }
 });
+
+// ------------------------------------------------------------ PROTECTED_ROLES (.env)
+
+test('protected roles: only PROTECTED_ROLE_ASSIGNERS and Developers can give them through /role, not even the owner', () => {
+    const { store, p, decide } = setup();
+    const saved = [process.env.PROTECTED_ROLES, process.env.PROTECTED_ROLE_ASSIGNERS];
+    process.env.PROTECTED_ROLES = R.cosmetic.id; process.env.PROTECTED_ROLE_ASSIGNERS = MANAGER;
+    config.developers.add(DEV);
+    try {
+        const fresh = member(TARGET, []);
+        for (const actor of [p.owner, p.admin, p.mod]) {
+            const d = decide(actor, R.cosmetic, 'add', fresh);
+            assert.equal(d.ok, false, `${actor.id} may not give it`); assert.match((d as any).reason, /protected role/);
+        }
+        assert.equal(decide(p.manager, R.cosmetic, 'add', fresh).ok, true, 'an assigner can');
+        assert.equal(decide(p.dev, R.cosmetic, 'add', fresh).ok, true, 'a Developer can');
+        assert.equal(decide(p.owner, R.cosmetic, 'remove').ok, true, 'taking it away is not restricted');
+        assert.equal(decide(p.owner, R.adminRole, 'add', fresh).ok, true, 'other roles are unaffected');
+    } finally { process.env.PROTECTED_ROLES = saved[0] ?? ''; process.env.PROTECTED_ROLE_ASSIGNERS = saved[1] ?? ''; config.developers.delete(DEV); store.close(); }
+});
