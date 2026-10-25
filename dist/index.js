@@ -2,8 +2,6 @@ import { accessSummary } from './bot/access-summary.js';
 import { dmTrusted } from './bot/trusted-dm.js';
 import { onRejoin, saveLeftRoles } from './features/rejoin-roles.js';
 import { selfRestart } from './bot/updater-link.js';
-import { PrefixCommands } from './bot/prefix-commands.js';
-import { restorePrefixMessageDeletions } from './bot/prefix-cleanup.js';
 import { completeRestartNotice } from './bot/restart-notice.js';
 import { autoReact } from './features/autoreact.js';
 import { reconcileStartupMembers } from './security/startup-members.js';
@@ -55,7 +53,7 @@ import { enforceProtectedUsers } from './security/protected-users.js';
 import { handleBanLogInteraction, onBanAdd, onBanRemove, registerBanLogRenderer } from './audit/ban-log.js';
 import { reportBotError } from './audit/bot-errors.js';
 import { forgetGuildTickets, isTicketChannel, loadTicketChannels, markTicketActivity, runTicketMaintenance, ticketChannelGone } from './features/tickets.js';
-import { sweepThreats } from './security/threat-board.js';
+import { maintainThreats } from './security/threat-board.js';
 import { answer as dashboardAnswer } from './dashboard/router.js';
 import { handleTicketDm } from './ui/ticket-ui.js';
 import { recoveryEmbed } from './ui/notice.js';
@@ -124,10 +122,6 @@ const databaseBackups = new DatabaseBackups(store);
 const stats = new ProtectionStats(client, store, id => startupReady && lifecycle.isReady(id));
 const services = { stats, databaseBackups, client, store, security, snapshots, roblox, logs, lifecycle, registry, confirmations, ai: { inFlight: 0 } };
 const router = new Interactions(services);
-const prefixCommands = new PrefixCommands(services, router.queue);
-const restoredPrefixDeletions = restorePrefixMessageDeletions(client, store);
-if (restoredPrefixDeletions)
-    logEvent('prefix_message_deletions_restored', { count: restoredPrefixDeletions });
 let readyAt = 0, startupReady = false, shuttingDown = false;
 const timers = [];
 logs.canDeliver = id => startupReady && lifecycle.isReady(id);
@@ -154,7 +148,7 @@ function presence(soon = false) {
     stats.invalidate();
     if (!client.isReady() || Date.now() - lastPresence < (soon ? 15000 : 50000))
         return;
-    // A developer-set status (,dev status) replaces the rotation until it expires or is reset.
+    // A developer-set status (`/dev status`) replaces the rotation until it expires or is reset.
     const override = presenceOverride(store);
     const lines = override ? [override.text] : presenceLines(stats.get());
     client.user.setPresence({ activities: [{ name: 'Custom Status', type: ActivityType.Custom, state: lines[presenceIndex++ % lines.length] }], status: override?.mode ?? 'online' });
@@ -263,11 +257,6 @@ client.on(Events.GuildAuditLogEntryCreate, (entry, guild) => {
     protectedTask('settings lock', guild.id, () => lockServerSettings(store, logs, entry, guild, id => security.trusted(guild, id), (id, rule) => security.trustedFor(guild, id, rule)));
 });
 client.on(Events.MessageCreate, m => {
-    // Known comma commands are routed before moderation/anti-spam handlers. Unauthorized users are ignored silently.
-    if (prefixCommands.recognizes(m)) {
-        task('prefix command', prefixCommands.handle(m));
-        return;
-    }
     if (m.guild)
         protectedTask('scam scanning', m.guild.id, () => scam.process(m));
     if (m.guild)
@@ -422,15 +411,11 @@ timers.push(setInterval(() => { if (startupReady)
 timers.push(setInterval(() => task('network ban sweep', sweepNetworkBans(network)), 600000));
 timers.push(setInterval(() => { if (startupReady)
     task('ticket upkeep', runTicketMaintenance({ store, client, ready: id => startupReady && lifecycle.isReady(id) })); }, 600000));
-// The threat board: defence and counter-attack, balanced by planResponse and only inside ready servers.
+// Threat-score upkeep only. Containment and strikes are manual staff actions; no automatic cards are posted.
 timers.push(setInterval(() => {
     if (startupReady)
-        task('threat board', sweepThreats({
-            store, client, logs, ready: id => startupReady && lifecycle.isReady(id),
-            trusted: (guild, id) => security.trusted(guild, id),
-            contain: (guild, id, reason) => security.contain(guild, id),
-            isBanned: (guild, id) => guild.bans.fetch({ user: id, force: true }).then(() => true, () => false),
-            ban: (guild, id, reason) => guild.bans.create(id, { reason }).then(() => true),
+        task('threat board maintenance', maintainThreats({
+            store, client, ready: id => startupReady && lifecycle.isReady(id),
         }));
 }, 60000));
 timers.push(setInterval(() => task('inactive guild cleanup', databaseBackups.purgeInactive()), 3600000));

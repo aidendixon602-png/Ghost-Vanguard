@@ -98,13 +98,13 @@ footer{color:var(--muted);font-size:12.5px;text-align:center;padding:26px}
       <section><h2>🎫 Tickets <small id="ticket-note"></small></h2><div id="tickets"></div></section>
     </div>
     <div>
-      <section><h2>⚔️ Automatic actions <small>newest first</small></h2><div id="actions"></div></section>
+      <section><h2>🛠️ Staff actions <small>newest first</small></h2><div id="actions"></div></section>
       <section><h2>🚨 Recent incidents</h2><div id="incidents"></div></section>
       <section><h2>🛡️ Protection</h2><div id="protection" class="pad"></div></section>
     </div>
   </div>
 </main>
-<footer>Ghost Vanguard dashboard · reading the bot's own database · every automatic action is reversible with <code>/antinuke threats release</code></footer>
+<footer>Ghost Vanguard dashboard · reading the bot's own database · threat scores never enforce automatically · staff actions can be reversed with <code>/antinuke threats release</code></footer>
 <script>
 const TOKEN = ${tokenRequired ? `new URLSearchParams(location.search).get('token') || ''` : `''`};
 const q = p => p + (TOKEN ? (p.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(TOKEN) : '');
@@ -131,13 +131,13 @@ function renderBoard(data) {
   const rows = data.threats.map(t => '<tr><td><code>' + esc(t.userId) + '</code></td><td>' + level(t.level) + '</td><td>' + esc(t.score) + '</td>'
     + '<td>' + esc(t.lastRuleLabel) + '</td><td title="' + esc(when(t.lastSeen)) + '">' + esc(ago(t.lastSeen)) + '</td>'
     + '<td>' + esc(t.lastAction || '—') + '</td></tr>');
-  document.getElementById('board').innerHTML = table(['Member', 'Level', 'Points', 'What they did', 'Last seen', 'Bot action'], rows);
+  document.getElementById('board').innerHTML = table(['Member', 'Level', 'Points', 'What they did', 'Last seen', 'Last staff action'], rows);
 }
 
 function renderActions(data) {
   const items = data.actions.map(a => '<li><time>' + esc(ago(a.at)) + '</time><span><b>' + esc(a.action) + '</b> · <code>' + esc(a.userId) + '</code><br><span style="color:var(--muted)">'
     + esc(a.detail) + '</span></span></li>');
-  document.getElementById('actions').innerHTML = items.length ? '<ul class="feed">' + items.join('') + '</ul>' : '<div class="empty">No automatic action has been taken. The board is watching.</div>';
+  document.getElementById('actions').innerHTML = items.length ? '<ul class="feed">' + items.join('') + '</ul>' : '<div class="empty">No staff action has been recorded. The board is scoring.</div>';
 }
 
 function renderIncidents(rows) {

@@ -46,7 +46,7 @@ export default defineCommand(new SlashCommandBuilder().setName('dev').setDescrip
     const sub = i.options.getSubcommand();
     if (sub === 'update') {
         const op = (i.options.getString('action') ?? 'status') as 'status' | 'now';
-        // Anyone with /dev may look; installing a new version is for Developers (`,update` alias remains).
+        // Anyone with /dev may look; installing a new version is for Developers.
         if (op === 'now' && botRank(ctx.store, i.user.id) < RANKS.developer)
             throw new AppError('PERMISSION_ERROR', `${DEVELOPER_ONLY_MESSAGE}\nYou can still see the update status with \`/dev update\`.`);
         return describeUpdate(await askLauncher(op), op);
@@ -130,7 +130,7 @@ export default defineCommand(new SlashCommandBuilder().setName('dev').setDescrip
         const mode = (i.options.getString('presence') ?? 'online') as PresenceMode;
         const override = setPresenceOverride(ctx.store, text, mode, minutes);
         ctx.client.user?.setPresence({ activities: [{ name: 'Custom Status', type: ActivityType.Custom, state: text }], status: mode });
-        return `Status set to **${text}** (${mode})${override.until ? `, returning to the rotation <t:${Math.floor(override.until / 1000)}:R>` : ' until `,dev status-reset`'}. It survives restarts.`;
+        return `Status set to **${text}** (${mode})${override.until ? `, returning to the rotation <t:${Math.floor(override.until / 1000)}:R>` : ' until `/dev status-reset`'}. It survives restarts.`;
     }
 
     if (sub === 'status-reset') {

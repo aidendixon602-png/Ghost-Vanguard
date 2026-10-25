@@ -1,6 +1,6 @@
 # src — Ghost Vanguard source
 
-- **index.ts** — Creates `Client`, `Store`, `Security`, `Roblox`, `Snapshots`, wires `Interactions` + `PrefixCommands`, starts health/dashboard HTTP server and all timers.
+- **index.ts** — Creates `Client`, `Store`, `Security`, `Roblox`, `Snapshots`, wires `Interactions`, starts the health/dashboard HTTP server and all timers.
 - **config.ts** — Parses `.env` → typed `config` + `validateConfig()`. Secrets never logged (`src/errors.ts: redact()`).
 - **branding.ts** — Single source for `PRODUCT_NAME`, `DEFAULT_CHANNELS` (`bans`, `ghost-vanguard-logging`) and legacy names.
 - **core.ts / errors.ts / logging.ts / console-ui.ts** — Cross-cutting helpers.

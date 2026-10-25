@@ -3,13 +3,13 @@ import { defineCommand } from '../../bot/registry.js';
 import { AppError } from '../../errors.js';
 import { clip } from '../../core.js';
 import { embed } from '../../ui/ui.js';
-import { boardSummary, board, clearThreat, decayedScore, levelFor, levelLabel, planResponse, recordThreatAction, threatActions, threatEvents, threatFor, THREAT_POINTS } from '../../security/threat-board.js';
+import { boardSummary, board, clearThreat, decayedScore, levelFor, levelLabel, recordThreatAction, threatActions, threatEvents, threatFor, THREAT_POINTS } from '../../security/threat-board.js';
 import { rankOf, RANKS } from '../../bot/ranks.js';
 import { developers } from '../../bot/developers.js';
 /**
- * /antinuke threats — the information board of who may be attacking, what they did, and what the bot
- * already did about it. Read-only for staff up to Admin; acting on someone (contain, strike, release)
- * needs the Head Admin rank, because it can ban people.
+ * /antinuke threats — the information board of who may be attacking, what they did, and what staff
+ * have done about it. Read-only for staff up to Admin; acting on someone (strike or release) needs
+ * the Head Admin rank, because it can ban people. Scores never trigger automatic enforcement.
  */
 const watched = (ctx, guildId, userId) => threatFor(ctx.store, guildId, userId);
 function boardText(ctx, guildId) {
@@ -24,7 +24,8 @@ function boardText(ctx, guildId) {
     return [
         `**Threat board** — ${summary.total} watched · ${summary.critical} critical · ${summary.high} high · ${summary.watch} watch`,
         rows.join('\n'),
-        '-# Scoring: every anti-nuke incident, confirmed scam and mention-spam adds points. 25 = watch, 55 = contain, 85 = strike (automatic, in enforce mode).',
+        '-# Scoring: every anti-nuke incident, confirmed scam and mention-spam adds points. 25 = Watch, 55 = High, 85 = Critical.',
+        '-# Automatic containment, strikes and log posts are off. Staff review the board and choose any manual action.',
         '-# Scores halve each quiet day and drop off the board after a week.',
     ].join('\n');
 }
@@ -34,7 +35,7 @@ export default defineCommand(new SlashCommandBuilder().setName('threats').setDes
     .addUserOption(o => o.setName('member').setDescription('Who to look at').setRequired(true)))
     .addSubcommand(s => s.setName('clear').setDescription('Clear a member from the board (nothing else changes)')
     .addUserOption(o => o.setName('member').setDescription('Who to clear').setRequired(true)))
-    .addSubcommand(s => s.setName('release').setDescription('Undo an automatic strike: unban and clear the board entry')
+    .addSubcommand(s => s.setName('release').setDescription('Undo a strike: unban and clear the board entry')
     .addUserOption(o => o.setName('member').setDescription('Who to release').setRequired(true)))
     .addSubcommand(s => s.setName('strike').setDescription('Counter-attack now: strip, put their damage back and ban')
     .addUserOption(o => o.setName('member').setDescription('Who to strike').setRequired(true))
@@ -65,9 +66,8 @@ export default defineCommand(new SlashCommandBuilder().setName('threats').setDes
             `**On the board since:** <t:${Math.floor(row.first_at / 1000)}:R> · **Last incident:** <t:${Math.floor(row.last_at / 1000)}:R>`,
             `**Strikes taken:** ${row.strikes}${row.last_action ? ` · **Last action:** ${row.last_action}` : ''}`,
             `**What they did**`, events.join('\n') || '• Nothing recorded yet.',
-            `**What the bot did**`, actions.join('\n') || '• No automatic action has been taken.',
-            planResponse({ score, mode: ctx.store.settings(i.guildId).mode, protectionOn: !!ctx.store.settings(i.guildId).enabled,
-                trusted: false, isBot: member.user.bot, isOwner: member.id === guild.ownerId, lastActionAt: row.last_action_at }).why,
+            `**Staff action history**`, actions.join('\n') || '• No staff action has been recorded.',
+            '**Automatic response:** Off. This score never contains, strikes or posts an automatic log card. Review the evidence and use the manual controls if needed.',
         ].join('\n'), Colors.Orange);
         card.setThumbnail(member.displayAvatarURL());
         await i.editReply({ embeds: [card] });
@@ -96,7 +96,7 @@ export default defineCommand(new SlashCommandBuilder().setName('threats').setDes
         recordThreatAction(ctx.store, i.guildId, member.id, 'release', `Released by <@${i.user.id}>${unbanned ? ' (unbanned)' : ' (was not banned)'}${cleared ? '' : ' (nothing was on the board)'}`, i.user.id);
         return `🕊️ **${member.displayName} released.** ${unbanned ? 'Their ban is lifted and ' : ''}${cleared ? 'the board entry is cleared' : 'there was nothing on the board to clear'}. Their roles are not restored automatically — use \`/mod role restore\` or the control panel if you want them back.`;
     }
-    // strike: the same three steps the automatic counter-attack takes, started by a person instead.
+    // strike: an explicit staff action, never something the score starts by itself.
     const reason = i.options.getString('reason')?.trim() || 'Manual counter-attack from the threat board';
     const stripped = await ctx.security.contain(guild, member.id);
     const banned = await guild.bans.create(member.id, { reason: `Ghost Vanguard: ${clip(reason, 300)} (by ${i.user.tag})` }).then(() => true).catch(() => false);

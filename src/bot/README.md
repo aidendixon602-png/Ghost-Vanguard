@@ -5,4 +5,4 @@
 - **interactions.ts** — Acknowledge → guard check → queue → execute. Buttons/selects/modals/autocomplete all via `registry.components`.
 - **guard.ts / ranks.ts / lifecycle.ts** — Permission checks, rank resolution (`helper` → `developer`), authorization gating.
 - **command-sync.ts** — `syncCommands()` bulk PUTs global commands only when `normalizeCommands()` differs; `cleanLegacyGuildCommands()` one-time per-guild cleanup.
-- **prefix-*.ts** — Comma commands (`,restart`, `,genreban` …) require exact `DEVELOPER_IDS`, auto-delete after 10s via `prefix-cleanup.ts`.
+- **restart-request.ts / restart-notice.ts** — `/restart` authorization, launcher fallback and persistent completion notice; no message-prefix command path.

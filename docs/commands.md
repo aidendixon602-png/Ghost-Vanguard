@@ -1,6 +1,6 @@
 # Commands
 
-Generated from the bot itself (`npm run docs`). Type `/` in Discord and pick **Ghost Vanguard**; `/help` shows only slash commands you can use. Sensitive and admin slash replies are private; ordinary public utility replies stay public. Developer actions are available as `/dev` and `/network` slash commands (with `,` prefix aliases for compatibility). For the same list grouped by rank, see [ranks.md](ranks.md).
+Generated from the bot itself (`npm run docs`). Type `/` in Discord and pick **Ghost Vanguard**; `/help` shows only slash commands you can use. Sensitive and admin slash replies are private; ordinary public utility replies stay public. Developer actions are available as `/dev`, `/network` and `/restart` slash commands. For the same list grouped by rank, see [ranks.md](ranks.md).
 
 ## /antinuke
 
@@ -17,11 +17,11 @@ Anti-nuke: status, on/off, whitelist, incidents, quarantine and the threat board
 | `/antinuke incidents` | Show recent anti-nuke incidents | Head Admin+ |
 | `/antinuke quarantine` | Strip a member's roles and save them | Head Admin+ |
 | `/antinuke release` | Give a quarantined member their saved roles back | Owner or Head Admin |
-| `/antinuke threats list` | Show the threat board | Admin+ (Admin and above; the bot acts by itself above 25 points, always reversibly) |
-| `/antinuke threats view` | Show everything recorded about a member | Admin+ (Admin and above; shows every scored incident and automatic action) |
+| `/antinuke threats list` | Show the threat board | Admin+ (Admin and above; scores and levels are informational and never trigger automatic enforcement) |
+| `/antinuke threats view` | Show everything recorded about a member | Admin+ (Admin and above; shows every scored incident and staff action) |
 | `/antinuke threats clear` | Clear a member from the threat board | Owner or Head Admin (Head Admin and above; clears the board entry only, cases and bans stay) |
-| `/antinuke threats release` | Undo an automatic strike (unban and clear) | Owner or Head Admin (Head Admin and above; unbans if they were struck) |
-| `/antinuke threats strike` | Strip, revert their damage and ban a member now | Owner or Head Admin (Head Admin and above; the manual version of the automatic counter-attack) |
+| `/antinuke threats release` | Undo a strike (unban and clear) | Owner or Head Admin (Head Admin and above; unbans if they were struck) |
+| `/antinuke threats strike` | Strip, revert their damage and ban a member now | Owner or Head Admin (Head Admin and above; manually strips, records and bans) |
 | `/antinuke whitelist add` | Whitelist a user or role for some or all rules | Owner or Head Admin |
 | `/antinuke whitelist remove` | Take a user or role off the whitelist | Owner or Head Admin |
 | `/antinuke whitelist list` | Show the whitelist and when entries expire | Head Admin+ |
@@ -101,7 +101,7 @@ Moderation: ban, kick, timeout, warn, purge, cases, notes and appeals
 | `/mod cases search` | Search cases by member, staff, action, reason or date | Helper+ or Moderate Members |
 | `/mod cases recent` | Show the latest cases | Helper+ or Moderate Members |
 | `/mod ban` | Ban a user | Moderator+ or Ban Members |
-| `/mod unban` | Lift a ban (not genrebans or hardbans) | Admin+ or Administrator (ordinary bans only; an Overseer+ can grant a one-server genreban exception; Supreme Leaders can lift genrebans from the ban-log controls; `/network ungenreban`/`/network unhardban` (`,ungenreban`/`,unhardban` aliases) require an exact `DEVELOPER_IDS` entry) |
+| `/mod unban` | Lift a ban (not genrebans or hardbans) | Admin+ or Administrator (ordinary bans only; an Overseer+ can grant a one-server genreban exception; Supreme Leaders can lift genrebans from the ban-log controls; `/network ungenreban` is Supreme Leader+ and `/network unhardban` is Developer only) |
 | `/mod kick` | Kick a member | Moderator+ or Kick Members |
 | `/mod timeout` | Time out a member | Helper+ or Moderate Members (Helpers up to 60 minutes; Moderators longer) |
 | `/mod untimeout` | Remove a member's timeout | Moderator+ or Moderate Members |
@@ -324,42 +324,3 @@ Restart the bot · Developer
 | Command | What it does | Who |
 |---|---|---|
 | `/restart` | Restart the bot | Developer |
-
-## Comma aliases (compatibility)
-
-Every slash command above also works with a `,` prefix (e.g. `,dev status`). The legacy developer list below is kept for reference:
-
-**Developer comma commands** · only IDs listed in `DEVELOPER_IDS` (the bot owner is not an implicit exception)
-`,restart` — gracefully restart, then update this message with the actual downtime and readiness status.
-`,authserver` — Developer: authorize this server so Vanguard protects it
-`,autoreact add <user> [--emoji <emoji>]` — React to every message from a member (🐐 by default)
-`,autoreact list` — Members the bot auto-reacts to in this server
-`,autoreact remove <user>` — Stop auto-reacting to a member
-`,banserver [--guild_id <guild_id>] [--reason <reason>]` — Developer: ban a server from Vanguard
-`,database backup` — Create a verified database backup now
-`,database backups` — List recent database backups
-`,database restore-settings <attach file>` — Developer: put back lost settings from an old backup file; anything newer is kept
-`,database status` — Show database health, storage, backup and migration status
-`,database verify <backup>` — Recheck backup checksum and database integrity
-`,deauthserver DEAUTHORIZE` — Developer: remove this server's authorization and leave
-`,dev alerts [--channel <channel>] [--warnings] [--off] [--dm]` — Developer: post every anti-nuke trigger from every server to one channel
-`,dev broadcast <message> [--title <title>] [--confirm <confirm>]` — Post an announcement to every authorized server's log channel
-`,dev diagnostics` — Inspect runtime health without secrets
-`,dev inspect <guild_id>` — Read-only overview of any server Vanguard knows
-`,dev status <text> [--minutes <number>] [--presence online|idle|dnd]` — Show a custom bot status instead of the rotation
-`,dev status-reset` — Return to the normal rotating status
-`,dev sync [--guild_id <guild_id>]` — Re-register commands globally and clear duplicate guild-scoped copies in this server
-`,genreban <user> [--reason <reason>] [--evidence <evidence>] [attach file] [--delete_messages 0|3600|86400|604800]` — Developer: ban a user from every authorized server until ,ungenreban
-`,hardban <user> [--reason <reason>] [--evidence <evidence>] [attach file] [--delete_messages 0|3600|86400|604800]` — Developer: permanently ban a user from every authorized server until ,unhardban
-`,netexception list [--user_id <user_id>]` — Active genreban exceptions, newest first
-`,netexception revoke <number>` — Cancel an exception: the genreban applies in that server again
-`,restart` — Gracefully restart the bot and update this message with downtime
-`,serverauth` — Developer: show this server's authorization details
-`,servers [--page <number>]` — Developer: list every server Vanguard is authorized in
-`,staff global <user> supreme|overseer|botmanager|none` — Developer: make someone Supreme Leader, Overseer or Bot Manager in every server
-`,unbanserver <guild_id>` — Developer: remove a server ban
-`,ungenreban <user> [--reason <reason>]` — Developer: revoke a genreban and lift it in every authorized server
-`,unhardban <user> [--reason <reason>] [--unban]` — Developer: revoke a hardban and lift it in every authorized server
-`,update [status|now]` — Automatic GitHub updates: see the status, or install now (Developer)
-Use quotes for multiword values, `--option value` for optional arguments, and attach the backup file for `,database restore-settings`.
-Slash commands stay permission-checked; use `/help` for the non-developer command menu.

@@ -9,7 +9,7 @@ Every authorized server uses the same fixed 17-rule preset. New or unconfigured 
 | Channel Create | 6 in 120s | warns first, then strip + revert |
 | Channel Delete | 3 in 120s | strip |
 | Kick | 5 in 120s | strip |
-| Permission Grant (administrator, ban/kick members, manage channels/server/webhooks) | 1 in 60s | strip + revert, including the recipient |
+| Permission Grant (administrator, ban/kick members, manage channels/server/webhooks) | 1 in 60s | First event: revert + warn; repeat within an hour: strip + revert. Self-assigned Administrator or Manage Server: immediate strip + revert. Explicit whitelist entries are exempt |
 | Role Create | 8 in 120s | warns first, then strip + revert |
 | Role Delete | 5 in 120s | strip |
 | Role Invite | 8 in 60s | warns first, then strip + revert |

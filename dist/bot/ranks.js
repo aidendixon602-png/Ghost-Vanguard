@@ -125,7 +125,7 @@ export const COMMAND_RANK = {
     // Admin. The ticket desk is set up and configured by Admins; answering tickets only needs the
     // ticket staff role, which /ticket checks inside the command.
     'ticket-setup': 3, 'ticket-panel': 3, 'ticket-type': 3, 'ticket-settings': 3, 'ticket-stats': 3,
-    // Reading the threat board is for Admins (it names suspects and what the bot did); acting on it is Head Admin.
+    // Reading the threat board is for Admins (it names suspects and staff action history); acting on it is Head Admin.
     'threats': 3, 'threats/list': 3, 'threats/view': 3,
     'threats/strike': 4, 'threats/release': 4, 'threats/clear': 4,
     raidmode: 3, vgwelcome: 3, vgcommands: 0, lockdown: 3, unlock: 3, massban: 3, newaccounts: 3, scam: 3, logs: 3, antiping: 3, mention: 3, health: 3,
@@ -139,9 +139,9 @@ export const COMMAND_RANK = {
     authorizedservers: 5, serverauth: 5, 'dev/diagnostics': 5, 'dev/status': 5, 'dev/status-reset': 5, 'dev/broadcast': 5, 'staff/list': 1, 'staff/check': 1,
     // Overseer
     'dev/inspect': 6, authserver: 6,
-    // Bot developer tools: available as /dev slash commands (comma aliases remain).
+    // Bot developer tools: available as /dev slash commands.
     dev: 7, 'dev/update': 7, database: 7, autoreact: 7,
-    // Network-ban issuance/revocation: Developers use /network (`,genreban` aliases remain); Supreme Leaders may still lift genrebans from ban-log controls.
+    // Network-ban issuance/revocation: Developers use /network; Supreme Leaders may still lift genrebans from ban-log controls.
     genreban: 7, ungenreban: 7, hardban: 7, netexception: 7,
     // Developer only (the bot owner and DEVELOPER_IDS): anything that can take the bot down, rewrite its data or
     // reach every server at once. No Discord permission, server role or lower rank unlocks these.
@@ -151,7 +151,7 @@ export const COMMAND_RANK = {
 };
 /** Developer-only commands: nothing but the Developer rank unlocks them. */
 export const needsDeveloper = (key) => (requiredRank(key) ?? 0) >= RANKS.developer;
-export const DEVELOPER_ONLY_MESSAGE = 'Only a **Developer** (the bot owner, or someone in `DEVELOPER_IDS`) can do this. It affects the bot in every server (restarts, updates, the database, removing servers, bot-wide ranks or lifting hardbans). Comma commands (`,help`) need an exact `DEVELOPER_IDS` entry.';
+export const DEVELOPER_ONLY_MESSAGE = 'Only a **Developer** (the bot owner, or someone in `DEVELOPER_IDS`) can do this. It affects the bot in every server (restarts, updates, the database, removing servers, bot-wide ranks or lifting hardbans).';
 export const aboveSupremeMessage = (_key) => DEVELOPER_ONLY_MESSAGE;
 /** Who may lift a network ban everywhere: genreban = Supreme Leader or Developer, hardban = Developer only. */
 export function canLiftNetworkBan(store, userId, kind) {

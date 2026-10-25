@@ -19,7 +19,7 @@ export default defineCommand(new SlashCommandBuilder().setName('banserver').setD
             `Reason recorded: ${reason}`,
         ],
         label: 'Ban server',
-        reversal: '`,unbanserver <guild_id>` lifts the ban, but the bot has to be re-invited and re-authorized afterwards.',
+        reversal: '`/dev server unban` lifts the ban, but the bot has to be re-invited and re-authorized afterwards.',
         working: { title: `Banning ${name}`, detail: `\`${id}\`` },
         run: async (c, b) => {
             try {

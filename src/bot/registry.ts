@@ -4,7 +4,7 @@ import { dirname, extname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import type { Store } from '../database/db.js';
 import { AppError } from '../errors.js';
-import { isAdminRestricted, needsDeveloper, requiredRank } from './ranks.js';
+import { isAdminRestricted, requiredRank } from './ranks.js';
 import type { GuildLifecycle } from './lifecycle.js';
 import type { LogQueue } from '../logging.js';
 import type { Roblox } from '../integrations/roblox.js';
@@ -33,11 +33,6 @@ export const defaults: Policy = { responseKind: 'success', category: 'utility', 
     requiredPermissions: [], botPermissions: [], cooldown: 1500, ephemeralDefault: true, dmAllowed: false, guildOnly: true, access: 'member', deferral: 'defer' };
 
 const PRIVATE_CATEGORIES = new Set(['moderation', 'security', 'configuration', 'recovery', 'ticket', 'tickets']);
-
-/** Developer-only slash actions are dispatched only through the comma command handler. */
-export function isDeveloperPrefixOnly(policy: Pick<Policy, 'developerOnly'>, key?: string): boolean {
-    return policy.developerOnly || !!key && needsDeveloper(key);
-}
 
 /** Slash replies for staff/admin/sensitive actions are private; ordinary utility replies stay public. */
 export function isSensitiveSlashPolicy(policy: Policy, key: string): boolean {

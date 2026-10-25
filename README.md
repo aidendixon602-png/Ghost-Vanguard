@@ -10,16 +10,16 @@ Anti-nuke and the threat board · Moderation and audit logging · Ticket desk ·
 
 [![CI](https://github.com/aidendixon602-png/Ghost-Vanguard/actions/workflows/ci.yml/badge.svg)](https://github.com/aidendixon602-png/Ghost-Vanguard/actions/workflows/ci.yml)
 ![Version](https://img.shields.io/badge/version-3.2.1-6d5ae6)
-![Tests](https://img.shields.io/badge/tests-545%20passing-2EA043)
+![Tests](https://img.shields.io/badge/tests-562%20passing-2EA043)
 ![Node](https://img.shields.io/badge/node-24-339933?logo=node.js&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
 ![discord.js](https://img.shields.io/badge/discord.js-14-5865F2?logo=discord&logoColor=white)
 
-[Overview](#overview) · [Capabilities](#capabilities) · [The threat board](#the-threat-board-defence-and-counter-attack) · [Dashboard](#dashboard) · [Tickets](#ticket-desk) · [Workspace](#workspace) · [Getting started](#getting-started) · [Development](#development)
+[Overview](#overview) · [Capabilities](#capabilities) · [The threat board](#the-threat-board-scoring-and-staff-response) · [Dashboard](#dashboard) · [Tickets](#ticket-desk) · [Workspace](#workspace) · [Getting started](#getting-started) · [Development](#development)
 
 </div>
 
-> **v3.0.0 — the two bots are one.** The Midtown Desk ticket bot is now part of this codebase, midtown-desk is retired, and the product is called **Ghost Vanguard**. One Node.js process, one database, one set of ranks: **defence and counter-attack, balanced.**
+> **v3.0.0 — the two bots are one.** The Midtown Desk ticket bot is now part of this codebase, midtown-desk is retired, and the product is called **Ghost Vanguard**. One Node.js process, one database, one set of ranks: **automatic defence and staff-led response.**
 
 ---
 
@@ -27,7 +27,7 @@ Anti-nuke and the threat board · Moderation and audit logging · Ticket desk ·
 
 Ghost Vanguard protects a network of Discord servers from account takeovers, raids and staff abuse, gives staff one consistent toolset for moderation across every server, and runs the support desk those servers depend on. A single bot instance serves every authorized server. Settings, cases, tickets, threat scores and records are stored per server in SQLite, and every action that changes a server is confirmed, logged and attributable to a person.
 
-It is deliberately **balanced — yin and yang**. Defence reacts: anti-nuke strips an attacker and puts back what they broke. Offence answers: the threat board remembers repeat attackers and counter-attacks on its own, only when the score is high or critical, only in enforce mode, and always reversibly. Everything the bot does is visible in Discord and on the dashboard.
+Anti-nuke reacts immediately to enforce its rules, while the threat board remembers repeat offenders for staff review. Threat scores never contain or ban anyone by themselves and never create automatic "Threat board acted" posts. Staff retain manual threat-board controls, and ordinary anti-nuke enforcement remains independent.
 
 **Design principles**
 
@@ -35,18 +35,18 @@ It is deliberately **balanced — yin and yang**. Defence reacts: anti-nuke stri
 - **Least privilege.** Server ranks, bot-wide ranks and developer access are separate. Discord's Administrator permission never unlocks actions that weaken protection.
 - **Reversible by default.** Strips save roles first, bans are recorded with their reason, and layout changes can be restored from snapshots.
 - **Accurate logs.** Anything Discord does not confirm is shown as *Unavailable*, never guessed.
-- **Balanced.** Defence contains, offence counter-attacks, and both are governed by one readable rule set (`planResponse`) rather than ad-hoc thresholds.
+- **Staff-led response.** Threat scores provide evidence and triage; only staff can start threat-board strikes or releases.
 
 ## Capabilities
 
 ### Protection
 | Feature | Description |
 |---|---|
-| **Anti-nuke** | 17 rules covering mass bans and kicks, channel/role deletion, dangerous permission grants, bot additions, webhooks and server edits. New or unconfigured servers start in observe mode; enforcement requires a successful readiness check and an explicit confirmation. Everyday rules warn first, staff get a heads-up one step before any limit, and offenders are stripped with the damage reverted. False alarms are undone in one click. |
+| **Anti-nuke** | 17 rules covering mass bans and kicks, channel/role deletion, dangerous permission grants, bot additions, webhooks and server edits. New or unconfigured servers start in observe mode; enforcement requires a successful readiness check and explicit confirmation. Dangerous grants are reverted and warn first, except self-assigned Administrator or Manage Server, which always strips and reverts immediately. Explicit whitelist entries remain exempt. |
 | **Whitelist** | Per-user or per-role exemptions, either full or per rule, with optional expiry. Includes presets for common staff roles and built-in recognition of verification bots. |
 | **Raid response** | Raid mode, server-wide lockdown with exact restore, emergency mode, new-account holds, join-flood detection. |
 | **Content protection** | Automod (spam, links, invites, optional AI moderation), scam-link and scam-image detection, staff anti-ping. |
-| **Threat board** | Every confirmed incident scores the member behind it. Watch (25+) is staff's chance to step in first, High (55+) strips their access and puts the damage back, Critical (85+) counter-attacks and bans. Whitelisted people, the bot, the server owner and observe mode are never auto-actioned, everything is logged and reversible, and a quiet attacker cools off (scores halve daily, entries expire after a week). See [docs/user/threat-board.md](docs/user/threat-board.md). |
+| **Threat board** | Every confirmed incident scores the member behind it: Watch (25+), High (55+) and Critical (85+) are staff triage levels only. Automatic containment, strikes and "Threat board acted" posts are disabled. Scores still decay daily and expire after a quiet week; staff keep manual list, view, clear, release and strike controls. See [docs/user/threat-board.md](docs/user/threat-board.md). |
 
 ### Moderation
 | Feature | Description |
@@ -78,42 +78,42 @@ Every command has a minimum rank, and each rank includes everything below it. Bo
 
 | Rank | Scope | Can do |
 |---|---|---|
-| **Developer** | All servers | The bot owner (`BOT_OWNER_ID`) and `DEVELOPER_IDS`. Developer operations include diagnostics, updates, database and server controls, global ranks and network bans; comma commands require an exact `DEVELOPER_IDS` entry, even for the bot owner |
+| **Developer** | All servers | The bot owner (`BOT_OWNER_ID`) and `DEVELOPER_IDS`. Developer operations include diagnostics, updates, database and server controls, global ranks and network bans |
 | **Server Owner** | Own server | Whoever owns the Discord server. Outranks Supreme Leaders there: Head Admin, plus security admins, undoing setting changes and undoing strips. Never gets bot-wide tools |
-| **Supreme Leader** | All servers | Everything below; can lift genrebans from ban-log controls. Developer comma commands remain restricted to exact `DEVELOPER_IDS` entries |
+| **Supreme Leader** | All servers | Everything below; can lift genrebans from ban-log controls. Does not unlock Developer-only commands |
 | **Overseer** | All servers | Bot Manager, plus one-server genreban exceptions through `/mod unban` |
-| **Bot Manager** | All servers | Head Admin-level access in every server; this rank does not unlock comma commands |
+| **Bot Manager** | All servers | Head Admin-level access in every server; this rank does not unlock Developer-only commands |
 | **Head Admin** | One server | Anti-nuke, whitelist, control panel, backups, staff ranks |
 | **Admin** | One server | Lifting ordinary bans, accepting appeals, raid tools, automod, scam protection, logging |
 | **Moderator** | One server | Bans, kicks, tempbans, purges, ban records, denying appeals |
 | **Helper** | One server | Warnings, short timeouts, cases and notes |
 
-**Developer is the top bot-wide rank:** the bot owner (`BOT_OWNER_ID`) and IDs in `DEVELOPER_IDS`. Developer-only actions are hidden from the slash menu and handled as comma-prefix commands. Every comma command requires the exact user ID in `DEVELOPER_IDS`—`BOT_OWNER_ID` alone is not enough, so add the owner's ID there too. Use `/help` for available slash commands and `,help` for the Developer command list. Comma commands and the bot's replies are deleted after 60 seconds so they don't linger in public channels; set `COMMA_DELETE_SECONDS` (`0` keeps them). Sensitive and admin slash replies are private (ephemeral); ordinary public utility replies stay public.
+**Developer is the top bot-wide rank:** the bot owner (`BOT_OWNER_ID`) and IDs in `DEVELOPER_IDS`. Developer actions remain application commands under `/dev`, `/network` and `/restart`; `/help` lists the commands available to you. The existing `/restart` safeguard still requires an exact `DEVELOPER_IDS` entry. Sensitive and admin slash replies are private (ephemeral); ordinary public utility replies stay public.
 
 **Who can lift a ban**
 
 | Ban | Lifted by |
 |---|---|
 | Ordinary server ban | Admin rank, Discord Administrator or the server owner (`/mod unban`, ban-log buttons, accepting an appeal) |
-| Genreban | A Supreme Leader or Developer can lift it everywhere from ban-log controls; an Overseer or higher can let the person back into one server (`/mod unban`). The comma command `,ungenreban` requires an exact `DEVELOPER_IDS` entry |
-| Hardban | Developer only; `,unhardban` requires an exact `DEVELOPER_IDS` entry |
+| Genreban | A Supreme Leader or Developer can lift it everywhere from ban-log controls or `/network ungenreban`; an Overseer or higher can let the person back into one server (`/mod unban`) |
+| Hardban | Developer only, including `/network unhardban` |
 
-Anti-nuke watches **everyone**. Developers, server owners and whitelisted people are never punished; their incidents are recorded quietly (set `ALERT_EXEMPT=true` to be alerted). Everyone else, Supreme Leaders included, is punished. The complete list of commands for each rank is in **[docs/ranks.md](docs/ranks.md)**.
+Anti-nuke watches **everyone**. Developers, server owners and explicitly whitelisted people are never punished; their incidents are recorded quietly (set `ALERT_EXEMPT=true` to be alerted). Other dangerous permission grants warn and revert first, then strip on a repeat within an hour. Unwhitelisted self-assignment of **Administrator** or **Manage Server** always strips and reverts immediately. The complete list of commands for each rank is in **[docs/ranks.md](docs/ranks.md)**.
 
-## The threat board: defence and counter-attack
+## The threat board: scoring and staff response
 
-Anti-nuke answers an incident immediately; the threat board is the memory that decides whether the person behind it is a one-off mistake or a repeat attacker. It is the only part of the bot that counter-attacks, and it does so on a rule that is short enough to read:
+Anti-nuke answers an incident immediately; the threat board is the memory that helps staff distinguish a one-off mistake from a repeat attacker. Every level is informational:
 
-| Level | From | What the bot does by itself |
+| Level | From | What it means for staff |
 |---|---|---|
-| 🟢 Quiet | 0 | Nothing — shown on the board only |
-| 🟡 Watch | 25 | Nothing — staff's chance to step in first |
-| 🟠 High | 55 | Defence: strip their dangerous roles, put their damage back |
-| 🔴 Critical | 85 | Counter-attack: strip, restore, then ban |
+| 🟢 Quiet | 0 | Below the watch threshold |
+| 🟡 Watch | 25 | Review the recorded evidence |
+| 🟠 High | 55 | Higher-priority staff review |
+| 🔴 Critical | 85 | Highest-priority staff review |
 
-Never automatic: whitelisted people, the bot itself, the server owner, servers with protection off or unauthorized, observe mode, and anything inside a ten-minute cooldown. A quiet attacker cools off — scores halve once a day and entries expire a week after the last incident.
+**Automatic threat-board containment, strikes and server-log cards are disabled.** Scores never remove roles, ban members or post "Threat board acted" messages. This does not disable the separate anti-nuke rules or their own enforcement cards.
 
-`/antinuke threats list` shows the board, `view` shows one member's full history, and `clear`, `release` and `strike` (Head Admin and above) are how staff undo or force an action. Every automatic action is in the server's log channel too, and **all of them are reversible**. Full detail: [docs/user/threat-board.md](docs/user/threat-board.md).
+`/antinuke threats list` shows the board and `view` shows one member's history. `clear`, `release` and `strike` remain manual Head Admin+ controls. Scores halve once a day and entries expire a week after the last incident. Full detail: [docs/user/threat-board.md](docs/user/threat-board.md).
 
 ## Dashboard
 
@@ -144,10 +144,9 @@ Commands are grouped by job, one top-level command each. Every command in Discor
 | `/recovery` | Snapshots, backups, layout copy |
 | `/info` | Users, roles, server, bot, latency |
 | `/roblox` | Verification, lookups, blacklist, group binds |
-| `/dev`, `/network`, `/restart` | Bot staff: diagnostics, updates, alerts, servers, database, network bans |
-| `,` commands | Developer operations: restart, updates, diagnostics, database, server authorization, global ranks and network bans. Every comma command requires an exact `DEVELOPER_IDS` entry, including for the bot owner |
+| `/dev`, `/network`, `/restart` | Bot staff: diagnostics, updates, alerts, servers, database, network bans and restart |
 
-`/help` in Discord lists only the slash commands available to you; `,help` lists Developer comma commands for authorized IDs. Sensitive/admin slash replies are ephemeral; ordinary public utility replies stay public. The full reference is in **[docs/commands.md](docs/commands.md)**.
+`/help` in Discord lists only the application commands available to you. Sensitive/admin slash replies are ephemeral; ordinary public utility replies stay public. The full reference is in **[docs/commands.md](docs/commands.md)**.
 
 ## Workspace
 
@@ -171,13 +170,12 @@ Copy [`.env.example`](.env.example) to `.env` and set at least:
 |---|---|---|
 | `DISCORD_TOKEN` | Yes | Bot token from the Discord Developer Portal |
 | `DISCORD_CLIENT_ID` | Yes | Application ID |
-| `DEVELOPER_IDS` | Yes | Comma-separated Discord user IDs with Developer access. Required for every comma command, including when the user is `BOT_OWNER_ID` |
+| `DEVELOPER_IDS` | Yes | Comma-separated Discord user IDs with Developer access to protected application commands |
 | `DATABASE_PATH` | No | SQLite database location (default `./data/vanguard.db`) |
 | `DASHBOARD_ENABLED` | No | Set to `false` to disable the built-in dashboard while keeping `/healthz` available (default: enabled) |
 | `DASHBOARD_TOKEN` | Recommended | Require a token for the dashboard and its API when enabled. Without it the dashboard is open to anyone who can reach the port, so keep it on localhost |
-| `BOT_OWNER_ID` | Recommended | The bot owner: Developer rank for ordinary permission checks, and the default for `TRUSTED_DM_IDS`. Add this ID to `DEVELOPER_IDS` separately to use comma commands |
-| `SUPREME_LEADER_IDS` | No | Supreme Leaders: bot-wide rank below Developer; may lift genrebans from ban-log controls, but do not get comma commands. Nobody is built in; every start prints who has bot-wide access |
-| `COMMA_DELETE_SECONDS` | No | How long comma commands and their replies stay before being deleted (default `60`; `0` keeps them) |
+| `BOT_OWNER_ID` | Recommended | The bot owner: Developer rank for ordinary permission checks, and the default for `TRUSTED_DM_IDS`. `/restart` separately requires an exact `DEVELOPER_IDS` entry |
+| `SUPREME_LEADER_IDS` | No | Supreme Leaders: bot-wide rank below Developer; may lift genrebans from ban-log controls, but do not get Developer-only commands. Nobody is built in; every start prints who has bot-wide access |
 | `ALERT_EXEMPT` | No | `true`: also alert when the owner, Developers or whitelisted people hit a limit (default: recorded quietly) |
 | `ANTINUKE_LOCK` | Recommended | `true`: only Developers can turn anti-nuke off or weaken it; servers switched off come back on at start |
 | `PROTECTED_USERS` | No | People staff can never ban, kick, time out or de-role; manual attempts are undone and alerted |
@@ -220,11 +218,11 @@ push to main → CI (typecheck, build, tests, secret scan) → launcher installs
 - Only commits that passed CI are installed.
 - A version that stops within two minutes of installing is rolled back automatically and skipped.
 - `.env` and `data/` are never modified.
-- Developers check update status or install now with `,update status` or `,update now`; restart from a server with `,restart`. These comma commands require an exact `DEVELOPER_IDS` entry (including for the bot owner). Prefix commands require Message Content Intent enabled in the Discord Developer Portal, and `MESSAGE_CONTENT_ENABLED` must not be set to `false`.
+- Developers check update status or install now with `/dev update`; restart from a server with `/restart`. The existing `/restart` safeguard requires an exact `DEVELOPER_IDS` entry.
 
 ### Backups
 
-- **Database:** verified backups every hour, kept on a rolling schedule in `data/database-backups`, plus a daily compressed copy sent by DM only to `TRUSTED_DM_IDS` (default: the bot owner). Lost settings can be merged back from any backup with `,database restore-settings` (exact `DEVELOPER_IDS` membership required).
+- **Database:** verified backups every hour, kept on a rolling schedule in `data/database-backups`, plus a daily compressed copy sent by DM only to `TRUSTED_DM_IDS` (default: the bot owner). Lost settings can be merged back from any backup with `/dev database restore-settings`.
 - **Server layout:** snapshots and scheduled backups with `/recovery`.
 
 ### Running more than one copy
@@ -263,7 +261,7 @@ src/
   errors.ts        AppError, redact(), logEvent()
   core.ts          helpers: clip, dangerous(), RULES, KeyedQueue
   logging.ts       LogQueue — per-guild outbox with backoff
-  bot/             registry, command-tree, interactions, guard, ranks, prefix-commands
+  bot/             registry, command-tree, interactions, guard, ranks, restart requests
   commands/        68 slash commands in 8 groups → grouped tree in bot/command-tree.ts
   security/        anti-nuke engine, threat-board, scam, lockdown, readiness
   audit/           ban-log, event-log, log-setup, downtime, redaction
@@ -296,7 +294,7 @@ dist/              compiled output — committed for Wispbyte hosts
 | [commands.md](docs/commands.md) | Every command and its required rank |
 | [ranks.md](docs/ranks.md) | Every rank and the commands it unlocks |
 | [security-controls.md](docs/user/security-controls.md) | How anti-nuke decides, warns, strips and reverts |
-| [threat-board.md](docs/user/threat-board.md) | Scoring, levels, the counter-attack and how to reverse it |
+| [threat-board.md](docs/user/threat-board.md) | Scoring, staff triage and manual threat-board controls |
 | [dashboard.md](docs/user/dashboard.md) | Running, securing and reading the dashboard |
 | [antinuke-locked.md](docs/user/antinuke-locked.md) | The 17 rules and their limits |
 | [recovery.md](docs/user/recovery.md) | Snapshots, backups and restores |

@@ -136,9 +136,8 @@ const perms = (...bits: bigint[]) => new PermissionsBitField(bits.reduce((all, b
 const auditEntry = (id: string, action: number, extra: Record<string, unknown> = {}, actor = 'attacker') => ({ id, executorId: actor, action, createdTimestamp: Date.now(), targetId: 'target', ...extra }) as unknown as GuildAuditLogsEntry;
 const incidentsFor = (store: Store, rule: string) => store.all('SELECT * FROM incidents WHERE guild_id=? AND rule=?', 'g', rule);
 
-test('a single dangerous permission grant to a role is an incident, and enforce mode undoes it', async () => {
+test('a single dangerous permission grant to a role warns and is undone in enforce mode', async () => {
     const { store, security, guild, logs } = setup('enforce');
-    security.contain = async () => 'contained.';
     let setTo: bigint | undefined;
     const send = BigInt(PermissionFlagsBits.SendMessages), admin = BigInt(PermissionFlagsBits.Administrator);
     const role = { id: 'r1', name: 'Helpers', managed: false, editable: true, permissions: perms(admin, send), setPermissions: async (bits: bigint) => {
@@ -148,7 +147,8 @@ test('a single dangerous permission grant to a role is an incident, and enforce 
     await security.audit(auditEntry('e1', AuditLogEvent.RoleUpdate, { targetId: 'r1', changes: [{ key: 'permissions', old: String(send), new: String(admin | send) }] }), guild);
     const [incident] = incidentsFor(store, 'dangerous_grant');
     assert.ok(incident, 'one grant is enough');
-    assert.match(incident.result, /^contained\. \[completed\] Removed the newly granted permissions from role Helpers\. Reverts: 1 completed, 0 failed, 0 skipped\.$/);
+    assert.equal(incident.mode, 'warn');
+    assert.match(incident.result, /^Warning: no roles were removed\..*\[completed\] Removed the newly granted permissions from role Helpers\. Reverts: 1 completed, 0 failed, 0 skipped\.$/);
     assert.equal(setTo, send, 'only the newly granted permission is removed');
     assert.equal(logs.length, 1);
     store.close();

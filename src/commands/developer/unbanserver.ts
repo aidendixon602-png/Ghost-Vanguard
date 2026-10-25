@@ -12,11 +12,11 @@ export default defineCommand(new SlashCommandBuilder().setName('unbanserver').se
         summary: `**${name}**\n\`${id}\``,
         consequences: [
             'The server may invite Vanguard again.',
-            'It stays deauthorized until a developer runs `,authserver` inside it.',
+            'It stays deauthorized until a developer runs `/dev server authorize` inside it.',
             'No protection is enabled by this alone.',
         ],
         label: 'Remove ban',
-        reversal: '`,banserver` re-applies the ban at any time.',
+        reversal: '`/dev server ban` re-applies the ban at any time.',
         working: { title: `Removing the ban on ${name}`, detail: `\`${id}\`` },
         run: async (c, b) => {
             try {

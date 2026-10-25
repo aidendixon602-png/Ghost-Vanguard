@@ -21,7 +21,7 @@ test('whitelist check: owner, full bypass, role-based rules, warnings and quaran
         const ignored = staff.fields!.find(f => f.name === 'Not punished for (still alerted)')!.value;
         assert.match(ignored, /Role Invite\*\* · from <@&staffrole>, permanent/);
         assert.match(ignored, /\*\*Ban\*\* · until <t:\d+:f>/);
-        assert.match(staff.description!, /Administrator\*\* or \*\*Manage Server\*\* still strips/);
+        assert.match(staff.description!, /Administrator\*\* or \*\*Manage Server\*\* is checked; self-assigning either strips immediately/);
 
         store.run('INSERT INTO incidents(guild_id,actor_id,rule,at,mode,result) VALUES(?,?,?,?,?,?)', 'g', 'person', 'timeout', Date.now(), 'warn', 'Warning');
         store.run('INSERT INTO backups(guild_id,user_id,roles,at,active) VALUES(?,?,?,?,1)', 'g', 'person', '[]', Date.now());

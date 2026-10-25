@@ -27,20 +27,23 @@ test('the global card shows the server, the person, the limit, the punishment an
         roles: { cache: new Collection<string, any>([['g', { id: 'g', name: '@everyone', position: 0 }], ['a', { id: 'a', name: 'Low', position: 1 }], ['b', { id: 'b', name: 'simisear', position: 7 }]]) } } as any);
     assert.deepEqual(snap.roles, ['simisear', 'Low'], 'highest first, no @everyone');
     const { embed, row } = globalAlertCard({ guild: { id: '845541092136058920', name: 'The Midtown Genre' }, actor: '1445847653891178626', snapshot: snap,
-        rule: timeout, mode: 'enforce', incident: 12, failed: false, reverted: null, jumpUrl: 'https://discord.com/channels/845541092136058920' });
+        rule: timeout, mode: 'enforce', incident: 12, failed: false, reverted: { completed: 2, failed: 1, skipped: 3 }, jumpUrl: 'https://discord.com/channels/845541092136058920' });
     const e = embed.toJSON(), f = Object.fromEntries(e.fields!.map(x => [x.name, x.value]));
     assert.equal(e.title, 'Anti-nuke Triggered');
-    assert.match(f.Guild!, /The Midtown Genre[\s\S]*845541092136058920/);
-    assert.match(f.User!, /ham6600y[\s\S]*1445847653891178626/);
-    assert.equal(f.Bot, 'No');
-    assert.equal(f['Triggered Action'], timeout.title);
+    assert.equal(e.author!.name, 'Ghost Vanguard • Anti-nuke');
+    assert.match(e.description!, /Incident #12/);
+    assert.match(f.Server!, /The Midtown Genre[\s\S]*845541092136058920/);
+    assert.match(f.Actor!, /ham6600y[\s\S]*1445847653891178626/);
+    assert.equal(f.Account, 'User');
+    assert.equal(f.Trigger, timeout.title);
     assert.equal(f.Threshold, `${timeout.count} in ${timeout.seconds}s`);
-    assert.equal(f.Punishment, 'Strip');
-    assert.equal(f['Highest Role'], 'simisear');
-    assert.equal(f['Roles Held'], 'simisear, Low');
-    assert.match(e.footer!.text, /Global anti-nuke alert · Incident #12/);
+    assert.equal(f.Status, 'Enforcement applied');
+    assert.match(f.Response!, /Strip/);
+    assert.match(f['Role history']!, /Highest role:\*\* simisear[\s\S]*Held before response:\*\* simisear, Low/);
+    assert.match(f.Rollback!, /2 completed[\s\S]*1 failed[\s\S]*3 skipped/);
+    assert.match(e.footer!.text, /Ghost Vanguard security network • Incident #12/);
     const button: any = row.toJSON().components[0];
-    assert.equal(button.label, 'Jump to Server'); assert.equal(button.url, 'https://discord.com/channels/845541092136058920');
+    assert.equal(button.label, 'Open server log'); assert.equal(button.url, 'https://discord.com/channels/845541092136058920');
 });
 
 test('a real trigger is posted to the global channel with the roles held before the strip; warnings only when switched on', async () => {
@@ -63,9 +66,9 @@ test('a real trigger is posted to the global channel with the roles held before 
         const global = pushes.filter(p => p.channel === 'feed');
         assert.equal(global.length, 1);
         const f = Object.fromEntries(global[0]!.embed.toJSON().fields.map((x: any) => [x.name, x.value]));
-        assert.equal(f.Punishment, 'Strip');
-        assert.equal(f['Roles Held'], 'Executive Co-Owner, Staff', 'roles captured before the strip');
-        assert.match(f.Guild, /The Midtown Genre/);
+        assert.match(f.Response, /Strip/);
+        assert.match(f['Role history'], /Executive Co-Owner, Staff/, 'roles captured before the strip');
+        assert.match(f.Server, /The Midtown Genre/);
         assert.equal(global[0]!.rows[0].toJSON().components[0].url, 'https://discord.com/channels/g/log', 'jumps to the server\'s security log');
 
         setGlobalAlertTarget(store, { guildId: 'g', channelId: 'feed', warnings: true, by: 'dev', at: Date.now() });
@@ -96,7 +99,7 @@ test('every strip is DMed to the bot Developers and TRUSTED_DM_IDS with the same
         const card = sent[0]!.payload.embeds[0].toJSON();
         assert.equal(card.title, 'Anti-nuke Triggered');
         assert.match(JSON.stringify(card.fields), /Central Bank of West Midtown/);
-        assert.equal(sent[0]!.payload.components[0].toJSON().components[0].label, 'Jump to Server');
+        assert.equal(sent[0]!.payload.components[0].toJSON().components[0].label, 'Open server log');
         assert.equal(await dmGlobalAlert(client, store, info('a'), 2000), 0, 'same person and server: once per 5 minutes');
         assert.equal(await dmGlobalAlert(client, store, info('w', 'warn'), 3000), 0, 'warnings are not DMed by default');
         for (let n = 0; n < DM_WINDOW_MAX + 5; n++) await dmGlobalAlert(client, store, info(`x${n}`), 4000 + n);
@@ -114,5 +117,5 @@ test('exempt people get a blue "not punished" card in the log, the global feed a
     assert.equal(card.fields!.find(f => f.name === 'Punishment')!.value, 'None (the server owner)');
     const g = globalAlertCard({ guild: { id: 'g', name: 'G' }, actor: 'owner', snapshot: { username: 'o', avatarUrl: null, bot: false, roles: [] }, rule: timeout, mode: 'exempt', exemptReason: 'a Developer', incident: 4, failed: false, jumpUrl: 'https://discord.com/channels/g' }).embed.toJSON();
     assert.equal(g.title, 'Anti-nuke Alert (not punished)');
-    assert.equal(g.fields!.find(f => f.name === 'Punishment')!.value, 'None (a Developer)');
+    assert.equal(g.fields!.find(f => f.name === 'Response')!.value, 'No punishment or rollback (a Developer).');
 });

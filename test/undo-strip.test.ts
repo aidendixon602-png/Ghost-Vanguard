@@ -23,7 +23,9 @@ test('a strip that removed roles gets an Undo strip button; other punishments do
         const guild: any = { id: 'g', ownerId: 'owner', client: { user: { id: 'vanguard' } }, roles: { cache: new Collection() }, members: { cache: new Collection(), fetch: async () => null } };
         security.punish = async () => 'Removed 2 dangerous role(s). No dangerous guild permissions remain.';
         security.revert = async () => 'Removed the newly granted permissions from role x.';
-        await security.audit({ id: 'a', executorId: 'actor', targetId: 'role', action: AuditLogEvent.RoleUpdate, createdTimestamp: Date.now(), changes: [{ key: 'permissions', old: '0', new: String(PermissionFlagsBits.Administrator) }] } as any, guild);
+        const grant = (id: string) => security.audit({ id, executorId: 'actor', targetId: 'role', action: AuditLogEvent.RoleUpdate, createdTimestamp: Date.now(), changes: [{ key: 'permissions', old: '0', new: String(PermissionFlagsBits.Administrator) }] } as any, guild);
+        await grant('a');
+        await grant('a2'); // A repeated dangerous grant inside an hour is stripped.
         const ids = pushed.at(-1)!.rows.flatMap((r: any) => r.toJSON().components.map((c: any) => c.custom_id));
         assert.ok(ids.some((id: string) => /^incident:undo:\d+$/.test(id)), 'Undo strip offered');
         security.punish = async () => 'Banned the executor.';

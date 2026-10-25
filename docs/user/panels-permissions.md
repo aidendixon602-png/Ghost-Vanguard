@@ -14,11 +14,9 @@ and need to be dismissed in Discord. Cleanup failures do not prevent the new rep
 Categories separate anti-nuke, security/trust, moderation, backups/recovery, logs/history,
 server setup, Roblox verification and general information. It includes every allowed
 command/subcommand without a text attachment. Categories and pages are recalculated
-on each click so revoked access and disabled commands disappear. Existing non-developer slash
-commands and their shortcuts remain available. Developer-only actions are hidden from the slash menu and use
-comma-prefix commands; every comma command requires an exact ID in `DEVELOPER_IDS`, including
-for the bot owner. Sensitive and administrator slash replies are ephemeral; ordinary public
-utility replies stay public.
+on each click so revoked access and disabled commands disappear. All commands use Discord's application-command interface. Developer actions remain guarded by their configured ranks;
+`/restart` additionally requires an exact `DEVELOPER_IDS` entry. Sensitive and administrator slash replies are ephemeral;
+ordinary public utility replies stay public.
 
 Permission checks retain this structure:
 
@@ -28,7 +26,7 @@ Permission checks retain this structure:
 | Moderation | Exact native permission for the chosen action; bot permissions and target hierarchy also checked |
 | Anti-nuke, trust, recovery controls | Server owner, configured developer, explicit admin grant or configured admin role |
 | Owner settings | Server owner or configured developer |
-| Developer commands | Comma-prefix only; the exact user ID must be in `DEVELOPER_IDS` (`BOT_OWNER_ID` alone does not qualify) |
+| Developer commands | Application commands guarded by Developer rank; `/restart` also requires an exact `DEVELOPER_IDS` entry |
 | Confirmation buttons | Same user/server; fresh checks of the original command policy, authorization, feature settings and bot permissions |
 
 Administrator permission alone does not grant Vanguard's internal security access and

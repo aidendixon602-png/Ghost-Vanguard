@@ -23,16 +23,16 @@ export function whitelistCheck(store, guild, userId, roleIds, isBot, now = Date.
         else if (viaRole)
             skips.push(`✅ **${rule.title}** · from <@&${viaRole}>, ${when(live(`trust_role:${rule.key}`, viaRole).expires)}`);
         else
-            checked.push(`• **${rule.title}**: ${rule.count} in ${rule.seconds}s → ${rule.punishment ?? 'strip'}${WARN_FIRST.has(rule.key) && !isBot ? ' (warns first)' : ''}`);
+            checked.push(`• **${rule.title}**: ${rule.count} in ${rule.seconds}s → ${rule.punishment ?? 'strip'}${(rule.key === 'dangerous_grant' || WARN_FIRST.has(rule.key) && !isBot) ? ' (warns first)' : ''}`);
     }
     const roleManager = skips.some(s => s.includes('**Role Invite**')) || skips.some(s => s.includes('**Role Update**'));
     const notes = [];
     if (isBot && (store.get("SELECT 1 FROM grants WHERE guild_id=? AND user_id=? AND kind='bot'", guild.id, userId) || (userId in KNOWN_ROLE_BOTS && !store.get("SELECT 1 FROM grants WHERE guild_id=? AND user_id=? AND kind='bot_denied'", guild.id, userId))))
         notes.push(`🤖 Verification bot${KNOWN_ROLE_BOTS[userId] ? ` (${KNOWN_ROLE_BOTS[userId]})` : ''}: giving ordinary roles is never counted.`);
     if (isBot)
-        notes.push('🤖 Bots get no warnings: anything over a limit is punished straight away.');
+        notes.push('🤖 Bots get no warnings for everyday rules. Dangerous permission grants warn first, except self-assigned Administrator or Manage Server.');
     if (roleManager)
-        notes.push('🎭 They can hand out moderator-level roles (Ban, Kick, Manage Channels, Webhooks). Giving **Administrator** or **Manage Server** still strips them.');
+        notes.push('🎭 They can hand out moderator-level roles (Ban, Kick, Manage Channels, Webhooks). Giving **Administrator** or **Manage Server** is checked; self-assigning either strips immediately.');
     const warned = store.get("SELECT at FROM incidents WHERE guild_id=? AND actor_id=? AND mode='warn' AND at>? ORDER BY at DESC LIMIT 1", guild.id, userId, now - WARNING_MEMORY_MS);
     if (warned)
         notes.push(`⚠️ **Warned <t:${Math.floor(Number(warned.at) / 1000)}:R>.** Their next offence before <t:${Math.floor((Number(warned.at) + WARNING_MEMORY_MS) / 1000)}:t> is punished without another warning.`);

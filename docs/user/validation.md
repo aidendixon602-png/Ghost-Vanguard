@@ -11,7 +11,7 @@ npm run doctor
 
 ## Last recorded run
 
-Command-system and restart-flow work (2026-10-18): using Node 24, the build/typecheck and command/rank documentation generation passed; the full suite passed **545 tests, 0 failures**. `dist/` was regenerated from `src/`. The outer system npm is Node 20 and prints engine warnings, but build, docs and tests ran under Node 24.
+Slash-only command dispatch, dangerous-grant policy and staff-led threat-board work (2026-10-25): using Node 24.22.1, build/typecheck and command/rank documentation generation passed; the full suite passed **562 tests, 0 failures**. `dist/` was regenerated from `src/`. No live Discord deployment was performed.
 
 ## Not covered
 
@@ -21,7 +21,7 @@ Automated tests use mock Discord guilds and temporary SQLite databases. No live 
 - Live API behavior and Discord's final role-hierarchy normalization
 - `Setup.ps1` and `Start.cmd`, which need Windows
 - The PowerShell updater, which was payload-verified and simulated against both supplied releases but requires Windows for execution
-- Discord credentials and the Wispbyte host. After deploying, try `,genreban` and `,ungenreban` on a disposable test account from a user whose exact ID is listed in `DEVELOPER_IDS`.
+- Discord credentials and the Wispbyte host. After deploying, try `/network genreban` and `/network ungenreban` on a disposable test account with an authorized Developer.
 
 ## References
 

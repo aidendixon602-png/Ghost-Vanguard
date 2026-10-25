@@ -1,6 +1,6 @@
 /**
  * Automatic reactions: developers pick members (per server) whose messages the bot reacts to,
- * 🐐 by default. Managed with ,autoreact add | remove | list.
+ * 🐐 by default. Managed with `/dev autoreact add`, `remove` and `list`.
  */
 export const DEFAULT_EMOJI = '🐐';
 export const MAX_PER_SERVER = 50;

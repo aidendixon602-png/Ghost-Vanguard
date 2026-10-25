@@ -21,7 +21,7 @@ export const DESCRIPTIONS: Record<string, string> = {
     "/antinuke threats list": "Show the threat board",
     "/antinuke threats view": "Show everything recorded about a member",
     "/antinuke threats clear": "Clear a member from the threat board",
-    "/antinuke threats release": "Undo an automatic strike (unban and clear)",
+    "/antinuke threats release": "Undo a strike (unban and clear)",
     "/antinuke threats strike": "Strip, revert their damage and ban a member now",
     "/automod status": "Show what automod is doing here",
     "/automod spam": "Set limits for mass pings, repeats and message bursts",

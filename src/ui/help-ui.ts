@@ -5,7 +5,7 @@ import { ActionRowBuilder, ButtonBuilder, ButtonStyle, PermissionsBitField, Stri
 import { isAdminRestricted, RANK_LABEL, rankName, requiredRank } from '../bot/ranks.js';
 import type { Policy } from '../bot/registry.js';
 import { Guard } from '../bot/guard.js';
-import { defaults, isDeveloperPrefixOnly, type CommandContext, type Registry } from '../bot/registry.js';
+import { defaults, type CommandContext, type Registry } from '../bot/registry.js';
 import { AppError } from '../errors.js';
 import { embed } from './ui.js';
 
@@ -48,7 +48,6 @@ export function helpCategories(ctx:CommandContext,guild:string,user:string) {
         if(RETIRED.includes(name))continue;
         const add=(description:string,path='',policy=def.metadata)=>{
             const key=path?`${name}/${path.replaceAll(' ','/')}`:name;
-            if(isDeveloperPrefixOnly(policy,key))return;
             if(!guard.allowed(policy,guild,user,ctx.actor,name,key))return;
             const command=(def.data.type??1)===1?displayPath(name,path):`${name} · context menu`;
             const category=sectionOf(command,def.metadata.category);

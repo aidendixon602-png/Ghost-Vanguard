@@ -4,7 +4,7 @@
 - **[Commands](commands.md)** — every slash command and required rank
 - **[Ranks](ranks.md)** — every rank and what it unlocks
 - **[Security Controls](user/security-controls.md)** — how anti-nuke decides, warns, strips and reverts
-- **[Threat Board](user/threat-board.md)** — scoring, levels, counter-attack and reversibility
+- **[Threat Board](user/threat-board.md)** — scoring, staff triage, manual controls and reversibility
 - **[Dashboard](user/dashboard.md)** — running, securing and reading the dashboard
 - **[Anti-Nuke Locked Rules](user/antinuke-locked.md)** — the 17 rules and limits
 - **[Recovery](user/recovery.md)** — snapshots, backups and restores
