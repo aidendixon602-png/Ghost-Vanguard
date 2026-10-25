@@ -14,14 +14,14 @@ import { isProtectedUser } from '../bot/env-rules.js';
 /**
  * Developer bans that reach every server Ghost Vanguard protects.
  *
- * - A genreban (,genreban) bans the user in every authorized server and keeps them out:
+ * - A genreban (`/network genreban`) bans the user in every authorized server and keeps them out:
  *   while it is active, the bot bans them again if they join, or are found as a member,
- *   in any authorized server. Lifted with ,ungenreban.
- * - A hardban (,hardban) is stricter: the user must stay banned everywhere. If anyone
+ *   in any authorized server. Lifted with `/network ungenreban`.
+ * - A hardban (`/network hardban`) is stricter: the user must stay banned everywhere. If anyone
  *   unbans them, they join, or a periodic check finds them unbanned, the bot bans them
- *   again. Lifted only with ,unhardban (Developer).
+ *   again. Lifted only with `/network unhardban` (Developer).
  *
- * Both are developer-only, stored in network_bans (never deleted, so revoked bans keep
+ * Records are stored in network_bans (never deleted, so revoked bans keep
  * their history) with one row per server outcome in network_ban_results. Only servers
  * that are authorized and fully initialized are touched. Every ban the bot places
  * starts its audit-log reason with a tag naming its type, so each unban command only
@@ -262,10 +262,15 @@ async function currentBan(guild: Guild, userId: string): Promise<{ reason: strin
 
 type Why = 'issued' | 'unbanned' | 'joined' | 'sweep';
 
+const LIFT_AUTHORITY: Record<NetworkKind, string> = {
+    genreban: 'A Supreme Leader or Developer',
+    hardban: 'Only a Developer',
+};
+
 const WHY_NOTE: Record<Exclude<Why, 'issued'>, (kind: NetworkKind) => string> = {
-    unbanned: kind => `Someone unbanned this user, but they have an active ${kind}, so the bot banned them again. Only a Ghost Vanguard developer can lift it, with ,un${kind}.`,
-    joined: kind => `This user joined, but they have an active ${kind}, so the bot banned them. Only a Ghost Vanguard developer can lift it, with ,un${kind}.`,
-    sweep: kind => `This user has an active ${kind} and was found unbanned here, so the bot banned them. Only a Ghost Vanguard developer can lift it, with ,un${kind}.`,
+    unbanned: kind => `Someone unbanned this user, but they have an active ${kind}, so the bot banned them again. ${LIFT_AUTHORITY[kind]} can lift it with /network un${kind}.`,
+    joined: kind => `This user joined, but they have an active ${kind}, so the bot banned them. ${LIFT_AUTHORITY[kind]} can lift it with /network un${kind}.`,
+    sweep: kind => `This user has an active ${kind} and was found unbanned here, so the bot banned them. ${LIFT_AUTHORITY[kind]} can lift it with /network un${kind}.`,
 };
 
 /**
@@ -312,8 +317,8 @@ export async function banIn(deps: NetworkDeps, guild: Guild, ban: NetworkBan, wh
                 ban.evidence_file ? `**Evidence file:** ${ban.evidence_file}` : '',
                 why === 'issued'
                     ? ban.kind === 'hardban'
-                        ? 'This user is banned from every server Ghost Vanguard protects and is re-banned if unbanned. Only a Developer can lift it, with ,unhardban.'
-                        : 'This user is banned from every server Ghost Vanguard protects and is banned again if they join. Only a developer can lift it, with ,ungenreban.'
+                        ? 'This user is banned from every server Ghost Vanguard protects and is re-banned if unbanned. Only a Developer can lift it with `/network unhardban`.'
+                        : 'This user is banned from every server Ghost Vanguard protects and is banned again if they join. Only a Supreme Leader or Developer can lift it with `/network ungenreban`.'
                     : WHY_NOTE[why](ban.kind),
             ].filter(Boolean).join('\n'), Colors.DarkRed));
             return { ...base, outcome: 'success', reason: member ? 'Banned (they were a member).' : 'Banned by user ID (they were not a member).' } as ServerResult;
@@ -381,7 +386,7 @@ export async function notifyBannedUser(client: Client, ban: NetworkBan, servers:
                 `**Reason:** ${clip(ban.reason, 1000)}`,
                 `**Record:** ${recordId(ban)}`,
                 '',
-                `Server staff cannot lift this ban. Only a Ghost Vanguard developer can, with ,un${ban.kind}.`,
+                `Server staff cannot lift this ban. ${LIFT_AUTHORITY[ban.kind]} can lift it with /network un${ban.kind}.`,
             ].join('\n'), Colors.DarkRed)],
             allowedMentions: { parse: [] },
         });
@@ -580,19 +585,19 @@ export async function assertLocalUnban(store: Store, guild: Guild, userId: strin
     const network = activeBan(store, 'hardban', userId) ?? activeBan(store, 'genreban', userId);
     if (network) {
         const authority = network.kind === 'hardban'
-            ? 'Only a Developer can lift it with ,unhardban.'
-            : 'A Supreme Leader or Developer can lift it from the ban-log controls; ,ungenreban requires an exact DEVELOPER_IDS entry.';
+            ? 'Only a Developer can lift it with `/network unhardban`.'
+            : 'A Supreme Leader or Developer can lift it from the ban-log controls or with `/network ungenreban`.';
         throw new AppError('PERMISSION_ERROR', `This user has an active ${network.kind}, **${recordId(network)}**, placed by a Ghost Vanguard developer. Server staff cannot lift it. ${authority}${network.kind === 'hardban' ? ' Unbanning them by hand is undone immediately.' : ' If they were unbanned by hand they would be banned again on joining.'}`);
     }
     const ban = existing === undefined ? await existingBan(guild, userId) : existing;
     const type = banTypeFromReason(ban?.reason);
     if (type !== 'local')
-        throw new AppError('PERMISSION_ERROR', `This server ban was placed by a Ghost Vanguard ${type}. Local unbans only lift local bans; a developer can lift it with \`,un${type}\`.`);
+        throw new AppError('PERMISSION_ERROR', `This server ban was placed by a Ghost Vanguard ${type}. Local unbans only lift local bans; a developer can lift it with \`/network un${type}\`.`);
 }
 
 /**
  * A developer lifts a genreban/hardban from the ban log: revoke it, then unban everywhere it
- * placed a ban. Same effect as ,unhardban or ,ungenreban.
+ * placed a ban. Same effect as `/network unhardban` or `/network ungenreban`.
  */
 export async function liftNetworkBan(deps: NetworkDeps, userId: string, by: { id: string; tag?: string }, reason: string) {
     const ban = activeBan(deps.store, 'hardban', userId) ?? activeBan(deps.store, 'genreban', userId);

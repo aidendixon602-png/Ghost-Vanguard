@@ -33,7 +33,7 @@ export default defineCommand(new SlashCommandBuilder().setName('database').setDe
                 'A database backup is made first, so this can be rolled back with `npm run database:restore`.',
             ],
             label: `Restore ${preview.total} setting(s)`,
-            reversal: 'Restore the backup made just before this (`,database backups` lists it).',
+            reversal: 'Restore the backup made just before this (`/dev database backups` lists it).',
             run: async () => {
                 const safety = await backups.create('manual');
                 const src = readBackup(bytes);

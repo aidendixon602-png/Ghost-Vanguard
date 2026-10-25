@@ -1,8 +1,9 @@
-# The threat board: who may be attacking, and the counter-attack
+# The threat board: scoring and staff response
 
-Ghost Vanguard is balanced on purpose: **defence reacts, offence answers**. Anti-nuke contains an
-incident the moment it happens; the threat board is the memory that decides whether the person behind
-it is a one-off mistake or a repeat attacker, and it is the only thing that counter-attacks.
+Ghost Vanguard's threat board is a per-server incident memory for staff. Anti-nuke responds to its
+own triggers independently; the board records scores and evidence so staff can distinguish a one-off
+mistake from a repeat attacker. **Threat scores never automatically contain, strike or post a
+"Threat board acted" card.** Staff keep the manual controls below.
 
 Everything the board knows is per server and lives in three tables (`threat_scores`, `threat_events`,
 `threat_actions`). Nothing is guessed: a score comes from incidents the bot itself confirmed.
@@ -23,24 +24,16 @@ Every confirmed incident adds points to that member's score in that server.
 | Changed channels or roles | 5 |
 | Anything the board does not recognise | 5 |
 
-| Level | From | What the bot does by itself |
+| Level | From | Staff triage meaning |
 |---|---|---|
-| 🟢 Quiet | 0 | Nothing. The board shows them. |
-| 🟡 Watch | 25 | Nothing. Staff can step in first — this is the intended way to use a Watch entry. |
-| 🟠 High | 55 | **Defence:** strip their dangerous roles and put back what the incident broke. |
-| 🔴 Critical | 85 | **Counter-attack:** the strip and the restore, then ban them. |
+| 🟢 Quiet | 0 | Below the watch threshold |
+| 🟡 Watch | 25 | Review the recorded evidence |
+| 🟠 High | 55 | Higher-priority review |
+| 🔴 Critical | 85 | Highest-priority review |
 
-## What is never touched
-
-The board does not act against, and does not count as an attacker:
-
-- anyone on the anti-nuke **whitelist**, and anything Discord actually recorded as **trusted**;
-- the **bot itself** and the **server owner**;
-- anyone in a server where anti-nuke is **off**, the server is **unauthorized**, or the protection mode
-  is **observe** — then the board only records and displays, which is what observe mode is for;
-- someone already actioned in the last **ten minutes**: one action per attacker per cooldown, so a
-  raid cannot be answered with a loop of actions;
-- someone already banned at a High level (their access is stripped instead, and the restore runs).
+These levels do not start enforcement. In particular, High does not automatically strip and Critical
+does not automatically ban. No automatic threat-board action is recorded and no automatic board card
+is sent to the server log. Manual staff actions are still recorded in `threat_actions`.
 
 ## Cooling down
 
@@ -53,19 +46,18 @@ events behind a cleared entry are kept as evidence.
 
 | Command | Rank | What it does |
 |---|---|---|
-| `/antinuke threats list` | Admin | The board: everyone above Watch, with their score, level and what was already done |
-| `/antinuke threats view member:` | Admin | One member in full: every incident, every automatic action and the current plan |
+| `/antinuke threats list` | Admin | The board, scores, levels and previous staff actions |
+| `/antinuke threats view member:` | Admin | One member's incident and staff-action history |
 | `/antinuke threats clear member:` | Head Admin | Clears the board entry. No ban or role is changed |
-| `/antinuke threats release member:` | Head Admin | Undoes an automatic strike: unbans them and clears the entry, with the reason recorded |
-| `/antinuke threats strike member: [reason]` | Head Admin | Counter-attacks now, regardless of level: strip, restore, ban |
+| `/antinuke threats release member:` | Head Admin | Manually unbans them and clears the entry, with the reason recorded |
+| `/antinuke threats strike member: [reason]` | Head Admin | Manually strips, records a case and bans, regardless of level |
 
-Every automatic action appears in three places at once: the board itself, the server's log channel,
-and the audit trail for the case — with what decided it. **Every action is reversible:** lifting the
-ban (`/mod unban` or `/antinuke threats release`) plus clearing the entry puts the member back where
-they were, and the roles the strip removed are saved first, so `/antinuke restore` can return them.
+Staff actions remain reversible: lifting a ban (`/mod unban` or `/antinuke threats release`) plus
+clearing the entry puts the member back where they were. Roles removed by a strip are saved first,
+so the normal role-restoration controls can return them.
 
 ## Timing
 
-The board is swept **once a minute** for every ready server. It also runs immediately after
-anti-nuke incidents, confirmed scams and mention-protection hits, because those are the events that
-produce points. The dashboard shows the same board live.
+A once-a-minute maintenance pass in each ready server only decays old scores and expires inactive
+entries. It has no containment, ban or logging dependency. Scoring continues from anti-nuke
+incidents, confirmed scams and mention-protection hits, and the dashboard shows the same board.

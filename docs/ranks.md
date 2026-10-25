@@ -6,7 +6,6 @@ Generated from the bot itself (`npm run docs`). Every rank can also use everythi
 - **Server Owner** (whoever owns the Discord server) and the server ranks (Head Admin, Admin, Moderator, Helper) work only in that server. A Server Owner outranks Supreme Leaders there, but bot-wide tools always need a bot rank.
 - **Developer is the top rank** (the bot owner and `DEVELOPER_IDS`). Restarts, installing updates, restoring data, removing servers, bot-wide ranks and lifting hardbans are Developer only, so giving someone Supreme Leader or lower cannot break the bot.
 - **Unbans:** ordinary bans are lifted by Admins and server owners; genrebans by a Supreme Leader or Developer (or a one-server exception from an Overseer+); hardbans only by a Developer.
-- **Comma commands** (`,help`, `,restart`…) need an exact `DEVELOPER_IDS` entry; `BOT_OWNER_ID` alone is not enough.
 - **Anti-nuke watches everyone.** Developers, server owners and whitelisted people are never punished (recorded quietly; `ALERT_EXEMPT=true` alerts on them too); every other rank, Supreme Leaders included, is punished.
 - Check anyone with `/setup staff check user:@them`; see all ranks with `/setup staff list`.
 
@@ -80,8 +79,8 @@ Server rank: anti-nuke, whitelist, control panel, backups and staff ranks. Given
 - `/antinuke settings`: Turn the extra protection layers on or off
 - `/antinuke status`: See whether anti-nuke is on, its rules and the whitelist
 - `/antinuke threats clear`: Clear a member from the threat board _(Head Admin and above; clears the board entry only, cases and bans stay)_
-- `/antinuke threats release`: Undo an automatic strike (unban and clear) _(Head Admin and above; unbans if they were struck)_
-- `/antinuke threats strike`: Strip, revert their damage and ban a member now _(Head Admin and above; the manual version of the automatic counter-attack)_
+- `/antinuke threats release`: Undo a strike (unban and clear) _(Head Admin and above; unbans if they were struck)_
+- `/antinuke threats strike`: Strip, revert their damage and ban a member now _(Head Admin and above; manually strips, records and bans)_
 - `/antinuke whitelist add`: Whitelist a user or role for some or all rules
 - `/antinuke whitelist bots`: Let a verification bot give roles without tripping anti-nuke
 - `/antinuke whitelist check`: See what anti-nuke allows someone and what would strip them
@@ -131,8 +130,8 @@ Server rank: anti-nuke, whitelist, control panel, backups and staff ranks. Given
 Server rank: lifting ordinary bans and accepting appeals, raid tools, automod, scam protection and logging. Given with `/setup staff role`; Discord's Administrator permission also works for unbans.
 
 - `/antinuke scan`: Scan for risky roles, roles above the bot and admin bots
-- `/antinuke threats list`: Show the threat board _(Admin and above; the bot acts by itself above 25 points, always reversibly)_
-- `/antinuke threats view`: Show everything recorded about a member _(Admin and above; shows every scored incident and automatic action)_
+- `/antinuke threats list`: Show the threat board _(Admin and above; scores and levels are informational and never trigger automatic enforcement)_
+- `/antinuke threats view`: Show everything recorded about a member _(Admin and above; shows every scored incident and staff action)_
 - `/automod ai`: Turn AI moderation of text and images on or off
 - `/automod ai-ignore`: Pick channels or content that AI moderation skips
 - `/automod allow-server`: Allow, or stop allowing, invites to a partner server
@@ -161,7 +160,7 @@ Server rank: lifting ordinary bans and accepting appeals, raid tools, automod, s
 - `/automod spam`: Set limits for mass pings, repeats and message bursts
 - `/automod status`: Show what automod is doing here
 - `/mod massban`: Ban up to 200 user IDs at once _(must also be on the anti-nuke whitelist)_
-- `/mod unban`: Lift a ban (not genrebans or hardbans) _(ordinary bans only; an Overseer+ can grant a one-server genreban exception; Supreme Leaders can lift genrebans from the ban-log controls; `/network ungenreban`/`/network unhardban` (`,ungenreban`/`,unhardban` aliases) require an exact `DEVELOPER_IDS` entry)_
+- `/mod unban`: Lift a ban (not genrebans or hardbans) _(ordinary bans only; an Overseer+ can grant a one-server genreban exception; Supreme Leaders can lift genrebans from the ban-log controls; `/network ungenreban` is Supreme Leader+ and `/network unhardban` is Developer only)_
 - `/raid emergency panel`: Post Emergency and All clear buttons here
 - `/raid emergency start`: Lock down, pause invites, turn on raid mode, ping Admins
 - `/raid emergency status`: Show whether emergency mode is on

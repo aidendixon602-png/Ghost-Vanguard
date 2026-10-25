@@ -5,8 +5,8 @@ import { clip } from '../core.js';
 /**
  * Global anti-nuke feed: every anti-nuke trigger in any Midtown server is also posted to one channel
  * chosen by a Developer (`/dev alerts`), so the whole network can be watched from one place.
- * Each card shows the server, the person, what they did, the limit, the punishment and the roles
- * they held at that moment (captured before any strip), with a Jump to Server button.
+ * Each branded card shows the incident, response status, rollback and the roles held before any
+ * strip, with an Open server log button. The same card is used for the global feed and DMs.
  */
 const KEY = 'global_antinuke_alert';
 /**
@@ -55,20 +55,41 @@ const cap = (s) => s[0].toUpperCase() + s.slice(1);
 export function globalAlertCard(info) {
     const punishment = cap(info.rule.punishment ?? 'strip');
     const warn = info.mode === 'warn', exempt = info.mode === 'exempt', watch = info.mode !== 'enforce' && !warn && !exempt;
+    const status = exempt ? 'Exempt · not punished'
+        : warn ? 'Warning issued'
+            : watch ? 'Observed only'
+                : info.failed ? 'Response incomplete' : 'Enforcement applied';
+    const response = exempt ? `No punishment or rollback (${info.exemptReason ?? 'exempt'}).`
+        : warn ? `${info.rule.revert ? 'Change rolled back; no roles removed.' : 'Warning only; no roles removed.'} A repeat within an hour: **${punishment}**.`
+            : watch ? `No action taken in observe mode. Enforcement would use **${punishment}**.`
+                : info.failed ? `**${punishment}** failed or is incomplete. Check Vanguard's permissions and role position.`
+                    : `**${punishment}** applied.`;
+    const rollback = exempt ? 'Not run — this actor is explicitly exempt.'
+        : watch ? 'Not run in observe mode.'
+            : !info.rule.revert ? 'No automatic rollback is configured for this trigger.'
+                : info.reverted ? [
+                    `✅ ${info.reverted.completed} completed`,
+                    `❌ ${info.reverted.failed} failed`,
+                    `⏭️ ${info.reverted.skipped} skipped`,
+                ].join(' · ') : 'No rollback details were recorded.';
+    const roles = info.snapshot.roles.length ? info.snapshot.roles.join(', ') : 'None recorded';
+    const actorName = info.snapshot.username ? clip(info.snapshot.username, 100) : 'Unknown user';
     const e = new EmbedBuilder()
         .setColor(exempt ? Colors.Blurple : warn ? Colors.Yellow : watch ? Colors.Orange : info.failed ? Colors.DarkOrange : Colors.Red)
+        .setAuthor({ name: 'Ghost Vanguard • Anti-nuke' })
         .setTitle(warn ? 'Anti-nuke Warning' : exempt ? 'Anti-nuke Alert (not punished)' : 'Anti-nuke Triggered')
-        .addFields({ name: 'Guild', value: `**${clip(info.guild.name, 200)}**\n\`${info.guild.id}\``, inline: true }, { name: 'User', value: `${info.snapshot.username ? clip(info.snapshot.username, 100) : 'Unknown'}\n(\`${info.actor}\`)`, inline: true }, { name: 'Bot', value: info.snapshot.bot === null ? 'Unknown' : info.snapshot.bot ? 'Yes' : 'No', inline: true }, { name: 'Triggered Action', value: info.rule.title, inline: true }, { name: 'Threshold', value: `${info.rule.count} in ${info.rule.seconds}s`, inline: true }, { name: 'Punishment', value: exempt ? `None (${info.exemptReason ?? 'exempt'})` : warn ? `Warning (next time: ${punishment})` : watch ? `None (watch-only mode; would be ${punishment})` : info.failed ? `${punishment} (failed: check role order)` : punishment, inline: true }, { name: 'Highest Role', value: clip(info.snapshot.roles[0] ?? 'None', 200), inline: false }, { name: 'Roles Held', value: clip(info.snapshot.roles.join(', ') || 'None', 1024), inline: false });
-    if (info.reverted && info.mode === 'enforce') {
-        const { completed, failed, skipped } = info.reverted;
-        e.addFields({ name: 'Changes Reverted', value: [`${completed} undone`, failed && `${failed} failed`, skipped && `${skipped} skipped`].filter(Boolean).join(' · '), inline: false });
-    }
+        .setDescription([
+        `**Incident #${info.incident}** · ${status}`,
+        `**${clip(info.guild.name, 200)}**`,
+        `${actorName} triggered **${info.rule.title}**.`,
+    ].join('\n'))
+        .addFields({ name: 'Server', value: `**${clip(info.guild.name, 200)}**\n\`${info.guild.id}\``, inline: true }, { name: 'Actor', value: `${actorName}\n\`${info.actor}\``, inline: true }, { name: 'Account', value: info.snapshot.bot === null ? 'Unknown' : info.snapshot.bot ? 'Bot' : 'User', inline: true }, { name: 'Trigger', value: info.rule.title, inline: true }, { name: 'Threshold', value: `${info.rule.count} in ${info.rule.seconds}s`, inline: true }, { name: 'Status', value: status, inline: true }, { name: 'Response', value: clip(response, 1024), inline: false }, { name: 'Role history', value: clip(`**Highest role:** ${info.snapshot.roles[0] ?? 'None recorded'}\n**Held before response:** ${roles}`, 1024), inline: false }, { name: 'Rollback', value: clip(rollback, 1024), inline: false });
     if (info.whitelistNote && !exempt)
         e.addFields({ name: 'Whitelist', value: clip(info.whitelistNote, 1024), inline: false });
-    if (info.snapshot.username)
-        e.setAuthor({ name: clip(info.snapshot.username, 200), iconURL: /^https:\/\//.test(info.snapshot.avatarUrl ?? '') ? info.snapshot.avatarUrl : undefined });
-    e.setFooter({ text: `Global anti-nuke alert · Incident #${info.incident}` }).setTimestamp();
-    const row = new ActionRowBuilder().addComponents(new ButtonBuilder().setStyle(ButtonStyle.Link).setLabel('Jump to Server').setURL(info.jumpUrl));
+    if (/^https:\/\//.test(info.snapshot.avatarUrl ?? ''))
+        e.setThumbnail(info.snapshot.avatarUrl);
+    e.setFooter({ text: `Ghost Vanguard security network • Incident #${info.incident}` }).setTimestamp();
+    const row = new ActionRowBuilder().addComponents(new ButtonBuilder().setStyle(ButtonStyle.Link).setLabel('Open server log').setURL(info.jumpUrl));
     return { embed: e, row };
 }
 /** Queue the card for the global channel (durable: it survives restarts and retries). Warnings only when switched on. */

@@ -6,7 +6,7 @@ import { antinukeLocked, blacklistSize, envGlobalAlertChannel, protectedRoleAssi
 /**
  * Printed at every start: exactly who holds bot-wide power, and where it comes from. Nothing is
  * built in: Developers (the top rank) are BOT_OWNER_ID and DEVELOPER_IDS; Supreme Leaders come from
- * SUPREME_LEADER_IDS and `/setup staff global`. Comma-prefix access is stricter and lists only DEVELOPER_IDS.
+ * SUPREME_LEADER_IDS and `/setup staff global`. The separately restricted `/restart` command also checks exact DEVELOPER_IDS membership.
  * An unexpected ID here is the first sign of trouble.
  */
 export function accessSummary(store) {
@@ -21,7 +21,7 @@ export function accessSummary(store) {
         `  ${style.bold('Access')} ${style.dim('(check these are all people you trust)')}`,
         row('Owner', config.ownerId || style.yellow('not set: set BOT_OWNER_ID')),
         row('Developers', ids(developers)),
-        row('Comma IDs', ids([...config.developers])),
+        row('Developer IDs', ids([...config.developers])),
         row('Supreme', ids(supreme)),
         row('Bot-wide', others.length ? others.map(o => `${o.id} (${o.level})`).join(', ') : style.dim('none')),
         row('Bot DMs to', ids(trustedRecipients())),

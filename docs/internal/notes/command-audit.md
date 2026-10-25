@@ -1,6 +1,6 @@
 # Command audit
 
-> Historical review of the earlier slash-command layout. For current command names and access rules, use [commands.md](../commands.md) and [ranks.md](../ranks.md). Developer-only actions now use comma-prefix commands and require an exact `DEVELOPER_IDS` entry.
+> Historical review of the earlier slash-command layout. For current command names and access rules, use [commands.md](../commands.md) and [ranks.md](../ranks.md). Developer-only actions use application commands with their configured rank checks; `/restart` retains its exact `DEVELOPER_IDS` safeguard.
 
 Scope: all nine original top-level slash commands, all 29 original subcommands, and the original restore-confirmation button. No original context commands, select menus, modals or autocomplete handlers existed. Those interaction types are now supported by the common fail-closed registry/guard contract and tested with registered mock handlers.
 

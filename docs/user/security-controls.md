@@ -7,8 +7,10 @@ The fixed 17-rule preset is loaded for authorized servers and survives restarts.
 1. Every audit-log action is counted against the person responsible. Actions made through Vanguard on behalf of a staff member, such as `/mod ban`, count against that staff member.
 2. **One step before a limit**, a blue *heads-up* is posted to the security log. Nothing is done to the person.
 3. **At the limit:**
-   - *Everyday rules* (role and channel edits, role grants, server edits, timeouts, webhooks) **warn first**. The change is undone, a yellow *Anti-nuke Warning* is posted and the person is DMed. Hitting any of these rules again within an hour gets the punishment.
-   - *All other rules*, and any bot, are punished straight away.
+   - *Everyday rules* (role and channel edits, role grants, server edits, timeouts, webhooks) **warn first** for people. The change is undone, a yellow *Anti-nuke Warning* is posted and the person is DMed. Hitting any of these rules again within an hour gets the punishment.
+   - *Dangerous permission grants* are also **reverted and warned on the first event**. Another dangerous grant by the same actor within an hour strips and reverts. This first warning applies to bots too.
+   - **Self-assigned Administrator or Manage Server is the strict exception:** an unwhitelisted actor is stripped and the grant is reverted immediately, even on the first event. An explicit full or rule-specific anti-nuke whitelist remains exempt.
+   - *All other rules*, and bots hitting everyday rules, are punished straight away.
 4. **The punishment is always a strip.** Staff and admin roles are removed and saved, and the damage is reverted where possible (bans lifted, created channels/roles/webhooks deleted, granted permissions removed).
 5. The alert in the security log has an **Undo strip** button (owner or developer) and, after deletions, **Review restore**.
 
@@ -36,7 +38,7 @@ Still not counted at all, because they are not attacks:
 ## Alerts
 
 - **Security log:** every server gets its own alert card with Undo strip and Review restore buttons.
-- **Global feed:** every trigger in every server also goes to one channel: `GLOBAL_ALERT_CHANNEL_ID` in `.env`, or `/dev alerts channel:` (Developer). The card shows the server, the person, the action, the limit, the punishment, the roles they held before the strip and a Jump to Server button.
+- **Global feed:** every trigger in every server also goes to one channel: `GLOBAL_ALERT_CHANNEL_ID` in `.env`, or `/dev alerts channel:` (Developer). The branded card shows the incident number, server, actor, trigger, status, response, role history and rollback details, with an **Open server log** button.
 - **DMs:** the same card is DMed to every bot Developer (`BOT_OWNER_ID` and `DEVELOPER_IDS`) and to `TRUSTED_DM_IDS`, once each. Protected-role and protected-user alerts go to the same people. It is rate-limited to once per person per server every 5 minutes and 15 per 10 minutes. `/dev alerts dm:false` turns it off.
 
 ## Settings locked in `.env`

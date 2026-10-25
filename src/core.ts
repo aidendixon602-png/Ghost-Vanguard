@@ -67,8 +67,9 @@ export const RULES: Rule[] = [
 
 /**
  * Everyday rules: the first time someone hits one, the change is undone and they get a warning instead of
- * being stripped. Hitting any of them again within WARNING_MEMORY_MS gets the normal punishment. Bans, kicks,
- * deletes, bot adds, webhooks, dangerous permission grants, prunes and AutoMod stay instant, and bots never get a warning.
+ * being stripped. Hitting any of them again within WARNING_MEMORY_MS gets the normal punishment. Other
+ * dangerous permission grants also warn first, except self-assigned Administrator or Manage Server,
+ * which always strips and reverts immediately. Other bots' offences do not get a warning.
  */
 /**
  * Well-known verification and role bots. They give ordinary roles all day (verified, level and reaction roles),

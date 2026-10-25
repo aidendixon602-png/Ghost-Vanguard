@@ -60,4 +60,4 @@ and `X-Robots-Tag: noindex`.
 
 The page re-reads the API every **15 seconds**, and one dropdown picks the server. The colours are the
 product's own: violet `#6d5ae6` for structure, teal `#2aa5a0` for defence, red `#e0483f` for the
-counter-attack. Automatic actions are always shown in red so they are impossible to miss.
+staff response. Staff threat-board actions are shown in red so they are impossible to miss.

@@ -1,3 +1,10 @@
+## Unreleased: application commands only, staff-led threat board and clearer alerts
+
+- Removed comma-prefix command dispatch, parsing, aliases, cleanup jobs and their configuration. Slash/application commands and their permissions remain, including `/restart`.
+- Threat scores and history remain, but automatic threat-board containment, strikes and "Threat board acted" posts are disabled. The minute timer only decays/expires scores; manual staff controls remain.
+- Dangerous permission grants are reverted with a first warning and strip on a repeat within an hour. Unwhitelisted self-assignment of Administrator or Manage Server still strips and reverts immediately; explicit whitelist entries remain exempt.
+- The shared global/DM anti-nuke card now has Ghost Vanguard branding, incident/status/response fields, role history, rollback details and an **Open server log** button. DM delivery policy is unchanged.
+
 # Changelog
 
 ## 3.2.1: whitelisted people stay quiet

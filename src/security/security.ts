@@ -69,6 +69,13 @@ function escalationBits(entry: GuildAuditLogsEntry, guild: Guild): bigint {
     return memberEscalation(entry, guild).bits;
 }
 
+/** Self-granting Administrator or Manage Server is never downgraded to a first warning. */
+function isSelfAdminAssignment(entry: GuildAuditLogsEntry, guild: Guild, actor: string): boolean {
+    return entry.action === AuditLogEvent.MemberRoleUpdate
+        && entry.targetId === actor
+        && (escalationBits(entry, guild) & ALWAYS_STRICT) !== 0n;
+}
+
 /**
  * Who an audit entry should be counted against. Bans and kicks done through /mod are
  * executed by the bot, which is otherwise exempt, but the bot records the moderator's ID at the
@@ -188,14 +195,19 @@ export class Security {
         if (this.store.get("SELECT 1 FROM incidents WHERE guild_id=? AND actor_id=? AND rule=? AND at>? AND mode<>'warn'", guild.id, actor, rule.key, now - active.seconds * 1000))
             return;
         if (exempt) return this.alertExempt(guild, actor, active, count, exempt, entry.targetId ?? null, s.logChannelId);
-        // Everyday rules warn first (people, not bots); a second offence within the hour gets the real punishment.
-        const warnOnly = s.mode === 'enforce' && WARN_FIRST.has(rule.key)
-            && !this.store.get("SELECT 1 FROM incidents WHERE guild_id=? AND actor_id=? AND mode='warn' AND at>?", guild.id, actor, now - WARNING_MEMORY_MS)
-            && !(await memberOrNull(guild, actor).catch(() => null))?.user?.bot;
+        // Most dangerous grants are reverted with a warning first; a repeat within an hour strips.
+        // Self-assigning Administrator or Manage Server remains an immediate strip-and-revert.
+        const immediateSelfAdmin = rule.key === 'dangerous_grant' && isSelfAdminAssignment(entry, guild, actor);
+        const canWarn = rule.key === 'dangerous_grant' ? !immediateSelfAdmin : WARN_FIRST.has(rule.key);
+        const recentWarning = rule.key === 'dangerous_grant'
+            ? this.store.get("SELECT 1 FROM incidents WHERE guild_id=? AND actor_id=? AND rule='dangerous_grant' AND mode='warn' AND at>?", guild.id, actor, now - WARNING_MEMORY_MS)
+            : this.store.get("SELECT 1 FROM incidents WHERE guild_id=? AND actor_id=? AND mode='warn' AND at>?", guild.id, actor, now - WARNING_MEMORY_MS);
+        const warnOnly = s.mode === 'enforce' && canWarn && !recentWarning
+            && (rule.key === 'dangerous_grant' || !(await memberOrNull(guild, actor).catch(() => null))?.user?.bot);
         // Write evidence before trying any Discord mutation.
         const incident = this.store.incident(guild.id, actor, rule.key, warnOnly ? 'warn' : s.mode, 'Pending');
         // Every scored incident lands on the threat board, so one record feeds both halves:
-        // the defence that already happens here and the counter-attack the board decides on.
+        // the defence that happens here and the staff-led review the board supports.
         noteThreat(this.store, guild.id, actor, rule.key, `Anti-nuke ${active.title} (incident #${incident})`);
         // Who they were and which roles they held before anything is removed (for the global alert feed).
         const snapshot = snapshotMember(await memberOrNull(guild, actor).catch(() => null));
@@ -297,7 +309,7 @@ export class Security {
             const member = await memberOrNull(guild, actor);
             if (!member || member.user?.bot) return false;
             await member.send({ embeds: [embed('⚠️ Anti-nuke warning', [
-                `In **${guild.name ?? 'the server'}**, you triggered anti-nuke (**${what}**) by doing it too many times too quickly, so the change was undone.`,
+                `In **${guild.name ?? 'the server'}**, you triggered anti-nuke (**${what}**), so the change was undone.`,
                 '',
                 '**Nothing else happened this time.** If it happens again within the next hour, your staff roles will be removed.',
                 'If this is part of your job, ask the server owner to add you with `/antinuke whitelist add`.',

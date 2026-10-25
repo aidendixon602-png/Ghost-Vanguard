@@ -2,14 +2,10 @@ import { readdir } from 'node:fs/promises';
 import { dirname, extname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { AppError } from '../errors.js';
-import { isAdminRestricted, needsDeveloper, requiredRank } from './ranks.js';
+import { isAdminRestricted, requiredRank } from './ranks.js';
 export const defaults = { responseKind: 'success', category: 'utility', developerOnly: false, requiresAuthorization: true,
     requiredPermissions: [], botPermissions: [], cooldown: 1500, ephemeralDefault: true, dmAllowed: false, guildOnly: true, access: 'member', deferral: 'defer' };
 const PRIVATE_CATEGORIES = new Set(['moderation', 'security', 'configuration', 'recovery', 'ticket', 'tickets']);
-/** Developer-only slash actions are dispatched only through the comma command handler. */
-export function isDeveloperPrefixOnly(policy, key) {
-    return policy.developerOnly || !!key && needsDeveloper(key);
-}
 /** Slash replies for staff/admin/sensitive actions are private; ordinary utility replies stay public. */
 export function isSensitiveSlashPolicy(policy, key) {
     return policy.developerOnly

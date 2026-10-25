@@ -1,5 +1,5 @@
 import { CommandInteractionOptionResolver, type Interaction } from 'discord.js';
-import { isDeveloperPrefixOnly, type Definition, type Policy, type Registry } from './registry.js';
+import { type Definition, type Policy, type Registry } from './registry.js';
 import { describe } from './command-descriptions.js';
 import { RANK_LABEL, RANKS, rankName, requiredRank } from './ranks.js';
 
@@ -14,8 +14,7 @@ import { RANK_LABEL, RANKS, rankName, requiredRank } from './ranks.js';
  *   /setup      logs, staff ranks, welcome, config, permissions, control panel
  *   /ticket  /recovery  /info  /roblox  /role  /dev  /network  (+ /help /verify /ask /restart)
  *
- * Developer actions (/dev and /network) are now slash commands requiring DEVELOPER_IDS / developer rank.
- * Comma-prefix aliases (`,help`, `,restart`, etc.) remain for backward compatibility but slash is primary.
+ * Developer actions (/dev and /network) are slash commands requiring the configured developer rank.
  * Grouped entries are re-shaped (commandName, subcommand, options) so their original modules run
  * as if they had been called directly. Permissions, ranks, cooldowns and on/off switches keep using the
  * original names.
@@ -155,7 +154,7 @@ function applyDescriptions(command: any, index: Map<string, { key: string; polic
     return command;
 }
 
-/** The command list sent to Discord — slash is primary, comma aliases remain for compatibility. */
+/** The application-command list sent to Discord. */
 export function treeJson(registry: Registry) {
     const index = shownIndex(registry);
     return buildTree(registry).map(c => applyDescriptions(structuredClone(c), index));
@@ -189,7 +188,7 @@ function buildTree(registry: Registry) {
         const def = registry.commands.get(`1:${name}`);
         if (def) out.push({ ...json(def), options: slashOptions(def, json(def).options ?? []) });
     }
-    // Anything not placed in the tree (a newly added command) still shows up on its own, unless it's developer-only.
+    // Anything not placed in the tree (a newly added command) still shows up on its own.
     const placed = new Set([...UMBRELLAS.flatMap(u => u.entries.map(e => e.child)), ...STANDALONE, ...RETIRED]);
     for (const def of registry.commands.values()) {
         const data = json(def);

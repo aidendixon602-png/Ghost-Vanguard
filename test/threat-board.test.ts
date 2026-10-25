@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { Store } from '../src/database/db.js';
 import { authorize } from './helpers.js';
 import {
-    ACTION_COOLDOWN_MS, DECAY_AFTER_MS, THREAT_TTL_MS, board, boardSummary, clearThreat, decayedScore, decayThreats, levelFor,
-    planResponse, pointsFor, recordThreat, recordThreatAction, sweepThreats, threatActions, threatEvents, threatFor,
+    DECAY_AFTER_MS, THREAT_TTL_MS, board, boardSummary, clearThreat, decayedScore, decayThreats, levelFor,
+    maintainThreats, pointsFor, recordThreat, recordThreatAction, threatActions, threatEvents, threatFor,
 } from '../src/security/threat-board.js';
 
 const G = '123456789012345678', ATTACKER = '111111111111111111', OWNER = '1277709272041394187', BOT = '999999999999999999';
@@ -64,84 +64,20 @@ test('quiet attackers cool off: scores halve every day and fall off the board af
     } finally { s.close(); }
 });
 
-test('the balance: nothing automatic in observe mode, for trusted people, the owner or the bot', () => {
-    const base = { score: 120, mode: 'enforce' as const, protectionOn: true, trusted: false, isBot: false, isOwner: false, lastActionAt: null };
-    assert.equal(planResponse(base).action, 'strike');
-    assert.match(planResponse({ ...base, mode: 'observe' }).why, /observe mode/);
-    assert.equal(planResponse({ ...base, mode: 'observe' }).action, 'none');
-    assert.match(planResponse({ ...base, protectionOn: false }).why, /Protection is off/);
-    assert.match(planResponse({ ...base, trusted: true }).why, /whitelist/);
-    assert.match(planResponse({ ...base, isOwner: true }).why, /server owner/);
-    assert.match(planResponse({ ...base, isBot: true }).why, /never acts against itself/);
-    assert.equal(planResponse({ ...base, score: 60 }).action, 'contain');
-    assert.equal(planResponse({ ...base, score: 30 }).action, 'watch');
-    assert.equal(planResponse({ ...base, score: 10 }).action, 'none');
-    assert.match(planResponse({ ...base, score: 90, alreadyBanned: true }).why, /already banned/);
-    assert.equal(planResponse({ ...base, score: 90, alreadyBanned: true }).action, 'contain', 'never bans twice');
-    assert.match(planResponse({ ...base, lastActionAt: Date.now() - 1000 }).why, /last 10 minutes/);
-    assert.equal(planResponse({ ...base, lastActionAt: Date.now() - ACTION_COOLDOWN_MS - 1 }).action, 'strike', 'the cooldown expires');
-});
-
-test('the sweep contains a high scorer, strikes a critical one and only logs a warning to others', async () => {
+test('periodic maintenance decays scores without any enforcement or log-card path', async () => {
     const s = store();
     try {
-        s.save(s.settings(G));
-        s.run("UPDATE guild_config SET enabled=1, mode='enforce' WHERE guild_id=?", G);
-        recordThreat(s, G, '211111111111111111', 'mass_kick', 'x');       // 30 → watch
-        recordThreat(s, G, '222222222222222222', 'mass_ban', 'x');        // 40 → watch… pushed to contain below
-        recordThreat(s, G, '222222222222222222', 'mass_kick', 'x');       // 70 → high → contain
-        recordThreat(s, G, '333333333333333333', 'mass_ban', 'x');
-        recordThreat(s, G, '333333333333333333', 'dangerous_grant', 'x'); // 75 → high
-        recordThreat(s, G, '333333333333333333', 'bot_add', 'x');         // 110 → critical → strike
-        const contained: string[] = [], banned: string[] = [], lines: any[] = [];
-        const guild: any = { id: G, ownerId: OWNER, members: { fetch: async ({ user }: any) => ({ id: user, user: { bot: false } }) }, bans: { fetch: async () => { throw new Error('not banned'); } } };
-        const logs: any = { push: (guildId: string, payload: any) => lines.push(payload) };
-        const result = await sweepThreats({
-            store: s, client: { guilds: { cache: new Map([[G, guild]]) }, user: { id: BOT } } as any, logs,
-            ready: () => true, trusted: () => false,
-            contain: async (_g, id) => { contained.push(id); return `Removed 3 dangerous roles from ${id}.`; },
-            isBanned: async () => false,
-            ban: async (_g, id) => { banned.push(id); return true; },
+        recordThreat(s, G, ATTACKER, 'mass_ban', 'x', 0);
+        const guild = { id: G };
+        const result = await maintainThreats({
+            store: s,
+            client: { guilds: { cache: new Map([[G, guild]]) } } as any,
+            ready: () => true,
+            now: () => DECAY_AFTER_MS * 2,
         });
-        assert.equal(result.watch, 1);
-        assert.deepEqual(contained.sort(), ['222222222222222222', '333333333333333333']);
-        assert.deepEqual(banned, ['333333333333333333'], 'only the critical score is counter-attacked');
-        assert.equal(s.threatFor === undefined, true);
-        assert.equal(threatFor(s, G, '333333333333333333')!.strikes, 1);
-        assert.equal(threatFor(s, G, '333333333333333333')!.last_action, 'strike');
-        assert.equal(threatActions(s, G).length, 2, 'both actions are on the record');
-        assert.equal(lines.length, 2, 'both actions are in the server log');
-        const strikeLine = lines.map(l => String(l.data.description)).find(text => text.includes('333333333333333333'))!;
-        assert.match(strikeLine, /Counter-attack:\*\* banned/);
-        assert.match(strikeLine, /Critical/);
-    } finally { s.close(); }
-});
-
-test('an automatic action is never repeated inside its cooldown, and never on a whitelisted person', async () => {
-    const s = store();
-    try {
-        s.save(s.settings(G));
-        s.run("UPDATE guild_config SET enabled=1, mode='enforce' WHERE guild_id=?", G);
-        recordThreat(s, G, ATTACKER, 'mass_ban', 'x');
-        recordThreat(s, G, ATTACKER, 'mass_ban', 'x');
-        recordThreat(s, G, ATTACKER, 'mass_ban', 'x');   // 120 → critical
-        const contained: string[] = [];
-        const deps: any = {
-            store: s, client: { guilds: { cache: new Map([[G, { id: G, ownerId: OWNER, members: { fetch: async () => ({ user: { bot: false } }) }, bans: { fetch: async () => { throw new Error('no'); } } }]]) }, user: { id: BOT } },
-            logs: { push: () => undefined }, ready: () => true, trusted: (_g: any, id: string) => id === ATTACKER,
-            contain: async (_g: any, id: string) => { contained.push(id); return 'Removed 1 dangerous role.'; },
-            isBanned: async () => false, ban: async () => true,
-        };
-        const first = await sweepThreats(deps);
-        assert.equal(first.contained + first.struck, 0, 'a whitelisted member is never touched');
-        deps.trusted = () => false;
-        await sweepThreats(deps);
-        assert.equal(contained.length, 1);
-        await sweepThreats(deps);
-        assert.equal(contained.length, 1, 'the 10-minute cooldown holds');
-        s.run('UPDATE threat_scores SET last_action_at=? WHERE guild_id=?', Date.now() - ACTION_COOLDOWN_MS - 1, G);
-        await sweepThreats(deps);
-        assert.equal(contained.length, 2, 'after the cooldown the board may act again');
+        assert.deepEqual(result, { guilds: 1, changed: 1, expired: 0 });
+        assert.equal(threatFor(s, G, ATTACKER)!.score, 10, 'scoring and decay continue');
+        assert.equal(threatActions(s, G).length, 0, 'maintenance records no contain or strike action');
     } finally { s.close(); }
 });
 
@@ -182,23 +118,19 @@ test('one server’s board is never another server’s, and the summary counts t
     } finally { s.close(); }
 });
 
-test('a sweep in a server that is not ready does nothing at all', async () => {
+test('maintenance in a server that is not ready does nothing at all', async () => {
     const s = store();
     try {
-        s.save(s.settings(G));
-        s.run("UPDATE guild_config SET enabled=1, mode='enforce' WHERE guild_id=?", G);
-        recordThreat(s, G, ATTACKER, 'mass_ban', 'x');
-        recordThreat(s, G, ATTACKER, 'mass_ban', 'x');
-        recordThreat(s, G, ATTACKER, 'mass_ban', 'x');
-        let contained = 0;
-        const result = await sweepThreats({
-            store: s, client: { guilds: { cache: new Map([[G, { id: G, ownerId: OWNER, members: { fetch: async () => null } }]]) } } as any,
-            logs: { push: () => undefined }, ready: () => false,
-            contain: async () => { contained++; return ''; }, isBanned: async () => false,
+        const now = Date.now();
+        recordThreat(s, G, ATTACKER, 'mass_ban', 'x', now);
+        const result = await maintainThreats({
+            store: s,
+            client: { guilds: { cache: new Map([[G, { id: G }]]) } } as any,
+            ready: () => false,
+            now: () => now + DECAY_AFTER_MS * 2,
         });
-        assert.equal(contained, 0);
-        assert.equal(result.reviewed, 0);
-        assert.equal(threatFor(s, G, ATTACKER)!.score, 120, 'nothing was even written while the server is not ready');
+        assert.deepEqual(result, { guilds: 0, changed: 0, expired: 0 });
+        assert.equal(threatFor(s, G, ATTACKER)!.score, 40, 'nothing was written while the server is not ready');
     } finally { s.close(); }
 });
 

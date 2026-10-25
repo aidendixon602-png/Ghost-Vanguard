@@ -116,14 +116,12 @@ export class Store {
       CREATE TABLE IF NOT EXISTS leases (name TEXT PRIMARY KEY, owner TEXT, until INTEGER);
       CREATE TABLE IF NOT EXISTS restart_notices (
         id INTEGER PRIMARY KEY CHECK(id=1), channel_id TEXT NOT NULL, message_id TEXT NOT NULL, requested_at INTEGER NOT NULL);
-      CREATE TABLE IF NOT EXISTS prefix_message_cleanup (
-        id TEXT PRIMARY KEY, channel_id TEXT NOT NULL, message_id TEXT NOT NULL, delete_at INTEGER NOT NULL);
       CREATE TABLE IF NOT EXISTS guild_authorization (
         guild_id TEXT PRIMARY KEY, name TEXT NOT NULL, state TEXT NOT NULL CHECK(state IN ('PENDING_AUTHORIZATION','AUTHORIZED','DEAUTHORIZED','EXPIRED','BANNED')),
         joined_at INTEGER NOT NULL, deadline INTEGER, authorized_by TEXT, authorized_at INTEGER,
         removed_by TEXT, removed_at INTEGER, version TEXT, config_version INTEGER, generation INTEGER NOT NULL DEFAULT 0);
       CREATE TABLE IF NOT EXISTS server_bans (guild_id TEXT PRIMARY KEY, name TEXT NOT NULL, reason TEXT NOT NULL, banned_by TEXT NOT NULL, at INTEGER NOT NULL);
-      -- Developer bans across every authorized server (,genreban and ,hardban). Rows are never deleted:
+      -- Developer bans across every authorized server (/network genreban and /network hardban). Rows are never deleted:
       -- a revoked ban keeps who revoked it and why. At most one active ban per user and type.
       CREATE TABLE IF NOT EXISTS network_bans (
         id INTEGER PRIMARY KEY AUTOINCREMENT, kind TEXT NOT NULL CHECK(kind IN ('genreban','hardban')),
@@ -282,7 +280,7 @@ export class Store {
                 guild_id TEXT NOT NULL REFERENCES guild_data(guild_id) ON DELETE CASCADE, user_id TEXT NOT NULL,
                 reason TEXT, by_id TEXT NOT NULL, at INTEGER NOT NULL, PRIMARY KEY(guild_id, user_id));`);
         // 3.0 threat board: one row per person under suspicion, the incidents that put them there,
-        // and every automatic action the bot has taken. Nothing here is hidden from staff.
+        // and every threat-board action taken by staff. Nothing here is hidden from staff.
         this.db.exec(`CREATE TABLE IF NOT EXISTS threat_scores (
                 guild_id TEXT NOT NULL REFERENCES guild_data(guild_id) ON DELETE CASCADE, user_id TEXT NOT NULL,
                 score INTEGER NOT NULL DEFAULT 0, level TEXT NOT NULL DEFAULT 'quiet' CHECK(level IN ('quiet','watch','high','critical')),
@@ -505,7 +503,7 @@ export class Store {
     assertAuthorized(guildId: string) {
         const active = this.active.getStore();
         if (!this.isAuthorized(guildId) || active && (active.guild !== guildId || active.generation !== this.authorization(guildId)?.generation))
-            throw new AppError('AUTHORIZATION_ERROR', 'This server requires developer authorization with ,authserver.');
+            throw new AppError('AUTHORIZATION_ERROR', 'This server requires developer authorization with /dev server authorize.');
     }
 
     withAuthorized<T>(guildId: string, fn: () => Promise<T>): Promise<T> {
@@ -513,7 +511,7 @@ export class Store {
         if (current)
             this.assertAuthorized(current.guild);
         if (!this.isAuthorized(guildId))
-            throw new AppError('AUTHORIZATION_ERROR', 'This server requires developer authorization with ,authserver.');
+            throw new AppError('AUTHORIZATION_ERROR', 'This server requires developer authorization with /dev server authorize.');
         return this.active.run({ guild: guildId, generation: this.authorization(guildId)!.generation }, fn);
     }
 

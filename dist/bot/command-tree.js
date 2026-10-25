@@ -139,7 +139,7 @@ function applyDescriptions(command, index) {
         command.description = menuDescription(`/${command.name}`, command.description, index);
     return command;
 }
-/** The command list sent to Discord — slash is primary, comma aliases remain for compatibility. */
+/** The application-command list sent to Discord. */
 export function treeJson(registry) {
     const index = shownIndex(registry);
     return buildTree(registry).map(c => applyDescriptions(structuredClone(c), index));
@@ -179,7 +179,7 @@ function buildTree(registry) {
         if (def)
             out.push({ ...json(def), options: slashOptions(def, json(def).options ?? []) });
     }
-    // Anything not placed in the tree (a newly added command) still shows up on its own, unless it's developer-only.
+    // Anything not placed in the tree (a newly added command) still shows up on its own.
     const placed = new Set([...UMBRELLAS.flatMap(u => u.entries.map(e => e.child)), ...STANDALONE, ...RETIRED]);
     for (const def of registry.commands.values()) {
         const data = json(def);

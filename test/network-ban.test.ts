@@ -460,7 +460,7 @@ test('/unhardban and /ungenreban only revoke their own type and keep the record'
     let f = commandRun([a.guild], TARGET, { reason: 'appeal' });
     const hard = newBan(f.store, 'hardban');
     await revokeCommand('genreban').execute(f.ctx, f.i);
-    assert.match(String(f.replies.at(-1).embeds[0].data.description), /active hardban.*?,unhardban/s, 'genreban points to comma-only hardban revocation');
+    assert.ok(String(f.replies.at(-1).embeds[0].data.description).includes('active hardban') && String(f.replies.at(-1).embeds[0].data.description).includes('/network unhardban'), 'genreban points to slash hardban revocation');
     assert.ok(activeBan(f.store, 'hardban', TARGET), '/ungenreban did not touch the hardban');
     await revokeCommand('hardban').execute(f.ctx, f.i);
     assert.match(title(f.replies.at(-1)), /^✅ Unhardban HB-00001 succeeded/);
@@ -594,7 +594,7 @@ test('/moderation unban lifts local bans only, and never a genreban or hardban',
     f = moderation('unban', { bans: { [TARGET]: `${TAG.hardban} HB-00001 ${DEV}: raiding` } });
     await moderationCommand.execute(f.ctx, f.i);
     assert.match(title(f.replies.at(-1)), /not allowed/);
-    assert.match(String(f.replies.at(-1).embeds[0].data.description), /,unhardban/);
+    assert.ok(String(f.replies.at(-1).embeds[0].data.description).includes('/network unhardban'));
     assert.deepEqual(f.calls.unbanned, []);
     f.store.close();
 
@@ -630,7 +630,7 @@ test('/moderation unban lifts local bans only, and never a genreban or hardban',
     newBan(f.store, 'genreban'); newBan(f.store, 'hardban');
     f.store.grant('g', 'mod', 'admin', 'owner');
     await moderationCommand.execute(f.ctx, f.i);
-    assert.match(String(f.replies.at(-1).embeds[0].data.description), /,unhardban/);
+    assert.ok(String(f.replies.at(-1).embeds[0].data.description).includes('/network unhardban'));
     assert.deepEqual(f.calls.unbanned, []);
     f.store.close();
 
