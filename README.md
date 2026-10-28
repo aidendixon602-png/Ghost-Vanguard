@@ -9,7 +9,7 @@
 Anti-nuke and the threat board · Moderation and audit logging · Ticket desk · Live dashboard · Server recovery
 
 [![CI](https://github.com/aidendixon602-png/Ghost-Vanguard/actions/workflows/ci.yml/badge.svg)](https://github.com/aidendixon602-png/Ghost-Vanguard/actions/workflows/ci.yml)
-![Version](https://img.shields.io/badge/version-3.2.1-6d5ae6)
+![Version](https://img.shields.io/badge/version-3.2.2-6d5ae6)
 ![Tests](https://img.shields.io/badge/tests-562%20passing-2EA043)
 ![Node](https://img.shields.io/badge/node-24-339933?logo=node.js&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
