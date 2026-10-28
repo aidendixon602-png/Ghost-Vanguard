@@ -18,7 +18,6 @@
     "database:drop-csb": "node scripts/ops/drop-csb-tables.mjs",
     "scam:setup": "node scripts/ops/scam-setup.mjs",
     "docs": "node --import tsx scripts/docs/generate.ts",
-    "jobs": "node job-finder/serve.mjs",
     "dashboard": "node dist/dashboard/server.js",
     "dashboard:demo": "node --import tsx scripts/ops/dashboard-demo.mjs"
   },
