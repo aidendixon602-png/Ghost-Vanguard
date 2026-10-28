@@ -23,10 +23,17 @@ function memberEscalation(entry, guild) {
         return { roles: [], bits: 0n };
     const added = (changesOf(entry).find(c => c.key === '$add')?.new ?? []).map(r => r.id);
     const member = entry.targetId ? guild.members?.cache?.get(entry.targetId) : undefined;
+    // The server owner already has every permission, so nothing they are given is new.
+    if (member && entry.targetId === guild.ownerId)
+        return { roles: [], bits: 0n };
     let before = 0n;
     for (const [id, role] of member?.roles?.cache ?? [])
         if (!added.includes(String(id)))
             before |= toBigInt(role?.permissions?.bitfield ?? guild.roles?.cache?.get(String(id))?.permissions?.bitfield);
+    // Administrator already includes every permission: another role with Administrator (or Ban, Manage Roles...)
+    // gives someone who has it nothing new, so it is not an escalation.
+    if (before & PermissionFlagsBits.Administrator)
+        return { roles: [], bits: 0n };
     let bits = 0n;
     const roles = [];
     for (const id of added) {
@@ -135,7 +142,9 @@ export class Security {
                 return;
             // Owner, Developers and whitelisted people are watched too, but never punished.
             const exempt = this.exemptReason(guild, actor, newlyAssigned);
-            if (entry.action === AuditLogEvent.MemberRoleUpdate && entry.targetId && entry.targetId !== actor)
+            // Load the member's current roles (also when they gave the role to themselves), so a role grant is
+            // compared with what they already had and only genuinely new permissions count.
+            if (entry.action === AuditLogEvent.MemberRoleUpdate && entry.targetId)
                 await memberOrNull(guild, entry.targetId).catch(() => null);
             for (const { rule, eventId } of this.rulesFor(entry, guild, actor, newlyAssigned))
                 // A role the actor just gave themselves cannot exempt that same action.

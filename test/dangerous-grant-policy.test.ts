@@ -91,3 +91,23 @@ test('explicit anti-nuke whitelist entries remain an exception to self-admin enf
         } finally { f.store.close(); }
     }
 });
+
+test('giving yourself an Administrator role when you already have Administrator does not trigger anti-nuke', async () => {
+    const f = fixture();
+    try {
+        // Their current roles are only known after the bot loads them (the member was not cached).
+        f.guild.members.cache.delete(ACTOR);
+        const member: any = { id: ACTOR, user: { bot: false, username: 'actor' }, send: async () => undefined,
+            roles: { cache: new Collection<string, any>([['admin', { id: 'admin', permissions: { bitfield: PermissionFlagsBits.Administrator } }], ['privileged', { id: 'privileged' }]]) } };
+        f.guild.members.fetch = async () => { f.guild.members.cache.set(ACTOR, member); return member; };
+        addPrivilegedRole(f, PermissionFlagsBits.Administrator | PermissionFlagsBits.BanMembers | PermissionFlagsBits.ManageRoles);
+        await f.security.audit(selfAssignment(PermissionFlagsBits.Administrator), f.guild);
+        assert.equal(f.store.all("SELECT * FROM observations WHERE rule='dangerous_grant'").length, 0, 'nothing new was gained');
+        assert.equal(f.calls.punished, 0);
+
+        // Without Administrator already, the same self-grant is still caught.
+        member.roles.cache.delete('admin');
+        await f.security.audit({ ...selfAssignment(PermissionFlagsBits.Administrator), id: 'self-again' }, f.guild);
+        assert.equal(f.store.all("SELECT * FROM observations WHERE rule='dangerous_grant'").length, 1, 'a real escalation still counts');
+    } finally { f.store.close(); }
+});

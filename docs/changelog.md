@@ -1,3 +1,8 @@
+## 3.2.2: no false alarm for giving yourself Administrator when you already have it
+- **Giving yourself (or someone else) a role with Administrator no longer sets off anti-nuke if you already have Administrator.** Administrator already includes every permission, so nothing new is gained. The same goes for the server owner.
+- **Fixed:** when someone gave a role to *themselves*, their current roles weren't loaded first, so anything they already had could look new. Their roles are now always checked before deciding.
+- Someone who did **not** already have Administrator is still caught as before.
+
 ## Unreleased: application commands only, staff-led threat board and clearer alerts
 
 - Removed comma-prefix command dispatch, parsing, aliases, cleanup jobs and their configuration. Slash/application commands and their permissions remain, including `/restart`.
