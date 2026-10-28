@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Modesto Job Finder — 95355 · No-Car Friendly</title>
+<meta name="description" content="Find, save and track entry-level jobs near Modesto, CA 95355. Built from the Stanislaus County Workforce job-search resources. No car? Remote, walkable and bus-friendly jobs first.">
+<link rel="stylesheet" href="styles.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧭</text></svg>">
+</head>
+<body>
+<header class="topbar">
+  <div class="wrap topbar-in">
+    <div class="brand"><span class="logo" aria-hidden="true">🧭</span>
+      <div><strong>Modesto Job Finder</strong><small>95355 · Stanislaus County Workforce resources</small></div>
+    </div>
+    <nav class="nav" aria-label="Main">
+      <a href="#find">Find jobs</a><a href="#tracker">My tracker</a><a href="#sites">Job sites</a><a href="#plan">Weekly plan</a>
+    </nav>
+    <button id="printBtn" class="btn btn-ghost" type="button">🖨 Print plan</button>
+  </div>
+</header>
+
+<div class="hero">
+  <div class="wrap">
+    <p class="eyebrow">📍 MODESTO, CA 95355 · NO CAR? START HERE</p>
+    <h1>Jobs you can actually<br>get to — and a tracker<br>to manage every application.</h1>
+    <p class="lede">Pick a job type, click a trusted site from the Stanislaus Workforce list, apply, then save it here. Everything is stored <b>privately in your browser</b> on this device — no account, no sign-up.</p>
+    <div class="hero-stats" id="heroStats" aria-live="polite"></div>
+  </div>
+</div>
+
+<main class="wrap">
+
+  <!-- ── Recommendation ─────────────────────────────── -->
+  <section class="card rec" aria-labelledby="recH">
+    <div>
+      <h2 id="recH">✅ Recommended for you: no car</h2>
+      <p>Because you don't have a car, this program is set up to put these <b>first</b>:</p>
+      <ol class="rec-list">
+        <li><b>Remote jobs</b> — work from home, no travel at all.</li>
+        <li><b>Jobs in 95355 / east Modesto</b> — close enough to walk, bike, or take a short bus ride.</li>
+        <li><b>Bus-friendly jobs in Modesto &amp; Ceres</b> — check the ride before you apply.</li>
+      </ol>
+      <p class="muted">Jobs in Turlock, Riverbank, Oakdale, Salida and Stockton are still listed, but tagged <span class="tag tag-car">🚗 Usually needs a car</span> so you don't waste time. Always tap <b>“🚌 Check bus route”</b> on a saved job before applying.</p>
+      <p class="links-row">
+        <a class="chip-link" target="_blank" rel="noopener" href="https://www.stanrta.org/">🚌 StanRTA — Modesto bus routes &amp; fares</a>
+        <a class="chip-link" target="_blank" rel="noopener" href="https://www.google.com/maps/dir/95355/Modesto,+CA/?travelmode=transit">🗺 Plan a bus trip (Google Maps)</a>
+        <a class="chip-link" target="_blank" rel="noopener" href="https://www.stanworkforce.com/">🤝 Stanislaus Workforce — free local help</a>
+      </p>
+    </div>
+    <div class="rec-box">
+      <label for="transportSel"><b>How will you get to work?</b></label>
+      <select id="transportSel">
+        <option value="no-car" selected>No car — remote / walk / bus only (recommended)</option>
+        <option value="bus">Bus is fine anywhere in Modesto</option>
+        <option value="walk">Walking / bike only — very close</option>
+        <option value="car">I have a car / ride — anywhere within 25 miles</option>
+      </select>
+      <p class="muted" id="radiusNote"></p>
+      <label for="typeSel"><b>Work type</b></label>
+      <select id="typeSel">
+        <option value="">Any type</option><option>Full-time</option><option>Part-time</option>
+        <option>Remote</option><option>Temporary</option>
+      </select>
+    </div>
+  </section>
+
+  <!-- ── Find ───────────────────────────────────────── -->
+  <section id="find" class="card" aria-labelledby="findH">
+    <h2 id="findH">1 · Pick a job, then click a site to apply</h2>
+    <p class="muted">Step 1: choose what you're looking for (or type your own). Step 2: click any site — it opens already filled in with that job + <b>Modesto, CA 95355</b>. Step 3: after you apply, tap <b>＋ Track</b> so you don't lose it.</p>
+
+    <label class="field"><span>What job are you looking for?</span>
+      <input id="queryInput" type="text" value="entry level" placeholder="e.g. warehouse, cashier, customer service remote" autocomplete="off">
+    </label>
+
+    <div class="chips" id="roleChips" role="group" aria-label="Popular entry-level jobs near 95355"></div>
+
+    <div class="board-head">
+      <h3>Apply on these sites <span class="muted" id="boardFor"></span></h3>
+      <input id="siteSearch" type="search" placeholder="Filter sites… e.g. government, remote" aria-label="Filter job sites">
+    </div>
+    <div id="boards" class="boards"></div>
+    <p class="muted small">💡 Tip from the Stanislaus Workforce guide: employers post on <b>their own website first</b> because it's free — so don't skip the “Direct employers” sites below. For Google Jobs, the button already types <i>“job title + jobs near Modesto, CA 95355”</i> for you.</p>
+  </section>
+
+  <!-- ── Tracker ────────────────────────────────────── -->
+  <section id="tracker" class="card" aria-labelledby="trackH">
+    <div class="row-between wrap-row">
+      <div><h2 id="trackH">2 · My application tracker</h2><p class="muted">Save every job in one place. Move it along as things happen: Saved → Applied → Interview → Offer.</p></div>
+      <div class="btn-row">
+        <button id="addJobBtn" class="btn btn-primary" type="button">＋ Add a job</button>
+        <button id="demoBtn" class="btn" type="button">Load example</button>
+      </div>
+    </div>
+
+    <div class="stats" id="stats"></div>
+
+    <form id="jobForm" class="job-form hidden">
+      <h3 id="formTitle">Add a job</h3>
+      <input type="hidden" id="fId">
+      <div class="grid2">
+        <label>Job title *<input id="fTitle" required placeholder="e.g. Store Associate"></label>
+        <label>Company<input id="fCompany" placeholder="e.g. Save Mart"></label>
+        <label>Location<input id="fLocation" placeholder="e.g. Modesto, CA 95355"></label>
+        <label>Pay<input id="fPay" placeholder="e.g. $17/hr"></label>
+        <label>How you'd get there
+          <select id="fTransport"><option value="remote">🏠 Remote</option><option value="walk">🚶 Walk / bike</option><option value="bus" selected>🚌 Bus-friendly</option><option value="car">🚗 Needs a car</option></select></label>
+        <label>Distance (miles)<input id="fDistance" type="number" min="0" step="0.1" placeholder="e.g. 2.5"></label>
+        <label>Status
+          <select id="fStage"><option>Saved</option><option>Applied</option><option>Interview</option><option>Offer</option><option>Rejected</option><option>Archived</option></select></label>
+        <label>Priority
+          <select id="fPriority"><option>Normal</option><option>High</option><option>Low</option></select></label>
+        <label>Date applied<input id="fApplied" type="date"></label>
+        <label>Follow up on<input id="fFollow" type="date"></label>
+      </div>
+      <label>Link to the job posting<input id="fUrl" type="url" placeholder="https://… (paste it from the site where you applied)"></label>
+      <label>Notes<textarea id="fNotes" rows="3" placeholder="Who you talked to, shift times, what to bring, bus route…"></textarea></label>
+      <div class="btn-row"><button class="btn btn-primary" type="submit">Save job</button><button class="btn" type="button" id="cancelForm">Cancel</button></div>
+    </form>
+
+    <div class="tracker-tools">
+      <input id="jobSearch" type="search" placeholder="Search my jobs…" aria-label="Search saved jobs">
+      <select id="stageFilter" aria-label="Filter by status"><option value="">All statuses</option><option>Saved</option><option>Applied</option><option>Interview</option><option>Offer</option><option>Rejected</option><option>Archived</option></select>
+      <select id="transportFilter" aria-label="Filter by transport"><option value="">Any transport</option><option value="remote">🏠 Remote</option><option value="walk">🚶 Walk / bike</option><option value="bus">🚌 Bus</option><option value="car">🚗 Needs car</option></select>
+      <div class="btn-row">
+        <button id="exportCsv" class="btn btn-small" type="button">⬇ CSV</button>
+        <button id="exportJson" class="btn btn-small" type="button">⬇ Backup</button>
+        <label class="btn btn-small file-btn">⬆ Restore<input id="importJson" type="file" accept="application/json" hidden></label>
+      </div>
+    </div>
+
+    <div id="jobList" class="job-list"></div>
+    <p id="emptyState" class="empty hidden">No jobs saved yet. Pick a job above, click a site to apply, then tap <b>＋ Track</b> — or use <b>＋ Add a job</b>.<br><button class="btn btn-primary" type="button" onclick="document.getElementById('addJobBtn').click()">＋ Add your first job</button></p>
+  </section>
+
+  <!-- ── Sites from the PDF ─────────────────────────── -->
+  <section id="sites" class="card" aria-labelledby="sitesH">
+    <h2 id="sitesH">3 · Every site from the Stanislaus Workforce guide</h2>
+    <p class="muted">The full list from <a target="_blank" rel="noopener" href="https://stanworkforce.com/media/zonmxzhn/job-search-website-resources.pdf">Job Search Website Resources (PDF)</a>, organized so it's usable. The buttons in section 1 above search the main ones for you automatically; this is the complete directory, including specialty, veteran and retiree sites.</p>
+    <div id="siteDirectory"></div>
+  </section>
+
+  <!-- ── Weekly plan ────────────────────────────────── -->
+  <section id="plan" class="card" aria-labelledby="planH">
+    <h2 id="planH">4 · Your weekly plan (no car edition)</h2>
+    <p class="muted">A simple routine that works. Check things off — your checkmarks are saved on this device. Use 🖨 Print plan at the top for a paper copy.</p>
+    <div id="planList" class="plan-list"></div>
+    <button id="resetPlan" class="btn btn-small" type="button">↺ Start a new week (clear checkmarks)</button>
+  </section>
+
+  <section class="card help-card">
+    <h2>Need free help in person?</h2>
+    <p><b>Stanislaus County Workforce Development</b> — free job-search help, workshops, resume help and computers to apply on.<br>
+    🌐 <a target="_blank" rel="noopener" href="https://www.stanworkforce.com/">stanworkforce.com</a> · Start with <b>CalJOBS</b> (<a target="_blank" rel="noopener" href="https://www.caljobs.ca.gov/">caljobs.ca.gov</a>) — California's free official job site, and many local employers require it.</p>
+    <p class="muted small">Safety: a real employer never asks you to pay, buy gift cards, or cash a check to get a job. Apply only on the official sites linked here, and never send your Social Security number until you've verified the employer.</p>
+  </section>
+</main>
+
+<footer class="wrap foot">
+  <p>Modesto Job Finder · Built from the Stanislaus County Workforce “Job Search Website Resources” guide · Your data never leaves this browser (saved with localStorage). Job listings live on the linked sites — this program organizes your search, it doesn't post jobs.</p>
+</footer>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+<script src="app.js"></script>
+</body>
+</html>
