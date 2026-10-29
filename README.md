@@ -44,9 +44,9 @@ Anti-nuke reacts immediately to enforce its rules, while the threat board rememb
 ### Protection
 | Feature | Description |
 |---|---|
-| **Anti-nuke** | 17 rules covering mass bans and kicks, channel/role deletion, dangerous permission grants, bot additions, webhooks and server edits. New or unconfigured servers start in observe mode; enforcement requires a successful readiness check and explicit confirmation. Dangerous grants are reverted and warn first, except self-assigned Administrator or Manage Server, which always strips and reverts immediately. Explicit whitelist entries remain exempt. |
+| **Anti-nuke** | 19 rules covering mass bans, unbans and kicks, channel/role deletion, emoji and sticker wipes, dangerous permission grants, bot additions, webhooks and server edits. New or unconfigured servers start in observe mode; enforcement requires a successful readiness check and explicit confirmation. Dangerous grants are reverted and warn first, except self-assigned Administrator or Manage Server, which always strips and reverts immediately. Explicit whitelist entries remain exempt. |
 | **Whitelist** | Per-user or per-role exemptions, either full or per rule, with optional expiry. Includes presets for common staff roles and built-in recognition of verification bots. |
-| **Raid response** | Raid mode, server-wide lockdown with exact restore, emergency mode, new-account holds, join-flood detection. |
+| **Raid response** | Raid mode, server-wide lockdown with exact restore, emergency mode, new-account holds, join-flood detection. A join flood switches raid mode on, sweeps the accounts that made it up and raises the verification level until it ends (join gate); lookalike-name waves are caught whatever their account age; the same message from several new accounts (a message wave) is deleted and its senders handled. |
 | **Content protection** | Automod (spam, links, invites, optional AI moderation), scam-link and scam-image detection, staff anti-ping. |
 | **Threat board** | Every confirmed incident scores the member behind it: Watch (25+), High (55+) and Critical (85+) are staff triage levels only. Automatic containment, strikes and "Threat board acted" posts are disabled. Scores still decay daily and expire after a quiet week; staff keep manual list, view, clear, release and strike controls. See [docs/user/threat-board.md](docs/user/threat-board.md). |
 
@@ -298,7 +298,7 @@ dist/              compiled output — committed for Wispbyte hosts
 | [security-controls.md](docs/user/security-controls.md) | How anti-nuke decides, warns, strips and reverts |
 | [threat-board.md](docs/user/threat-board.md) | Scoring, staff triage and manual threat-board controls |
 | [dashboard.md](docs/user/dashboard.md) | Running, securing and reading the dashboard |
-| [antinuke-locked.md](docs/user/antinuke-locked.md) | The 17 rules and their limits |
+| [antinuke-locked.md](docs/user/antinuke-locked.md) | The 19 rules and their limits |
 | [recovery.md](docs/user/recovery.md) | Snapshots, backups and restores |
 | [server-lifecycle.md](docs/user/server-lifecycle.md) | Invites, authorization and removal |
 | [hosting.md](docs/user/hosting.md) | Hosting, persistence and the health endpoint |

@@ -20,6 +20,36 @@ export function setRaidMode(store, guild, enabled, by, options = {}) {
         ON CONFLICT(guild_id) DO UPDATE SET enabled=excluded.enabled,min_age_days=excluded.min_age_days,action=excluded.action,until=excluded.until,by_id=excluded.by_id,handled=CASE WHEN excluded.enabled=1 THEN 0 ELSE raidmode.handled END`, guild, Number(enabled), options.minAgeDays ?? current.minAgeDays, options.action ?? current.action, until, by);
     return raidState(store, guild);
 }
+/** While raid mode is on, a joiner whose name matches this many other recent joiners is handled whatever its age. */
+export const LOOKALIKE_WINDOW_MS = 10 * 60 * 1000;
+export const LOOKALIKE_MATCHES = 2;
+// ---- names (lookalike waves) ----
+/** A name's pattern: lower case, letters only, numbers and separators dropped ("Raider_01" and "raider.02" match). */
+export function nameKey(name) {
+    const key = String(name ?? '').normalize('NFKD').toLowerCase().replace(/[^a-z]/g, '');
+    return key.length >= 3 ? key : null;
+}
+const joins = new Map();
+/** Remember a join (for lookalike checks). */
+export function rememberJoin(guildId, member, now = Date.now()) {
+    const key = nameKey(member.user.username);
+    const list = (joins.get(guildId) ?? []).filter(j => now - j.at < LOOKALIKE_WINDOW_MS && j.id !== member.id);
+    if (key)
+        list.push({ key, id: member.id, at: now });
+    joins.set(guildId, list.slice(-500));
+}
+/** How many other recent joiners share this member's name pattern. */
+export function lookalikes(guildId, member, now = Date.now()) {
+    const key = nameKey(member.user.username);
+    if (!key)
+        return 0;
+    return (joins.get(guildId) ?? []).filter(j => j.id !== member.id && j.key === key && now - j.at < LOOKALIKE_WINDOW_MS).length;
+}
+export function forgetJoins(guildId) {
+    joins.delete(guildId);
+}
+/** Members already handled for this raid (a wave sweep and the join itself can both reach the same person). */
+const handledRecently = new Map();
 /** Summaries are batched so a 500-account raid does not flood the security log. */
 const pending = new Map();
 /**
@@ -27,13 +57,27 @@ const pending = new Map();
  * timed out. Bots are left to anti-nuke's Bot Add rule; trusted accounts are never touched.
  */
 export async function handleRaidJoin(store, logs, member, trusted, now = Date.now()) {
+    if (!member.user.bot)
+        rememberJoin(member.guild.id, member, now);
     const state = raidState(store, member.guild.id, now);
     if (!state.enabled || member.user.bot || trusted(member.id))
         return 'ignored';
-    const ageDays = (now - member.user.createdTimestamp) / DAY;
-    if (ageDays >= state.minAgeDays)
+    // The same join reached twice (a wave sweep and the join event): handled once. A rejoin is a new join.
+    const seenKey = member.joinedTimestamp ? `${member.guild.id}:${member.id}:${member.joinedTimestamp}` : null;
+    if (seenKey && now - (handledRecently.get(seenKey) ?? 0) < 60000)
         return 'ignored';
-    const reason = `Ghost Vanguard raid mode: account ${Math.floor(ageDays)} day(s) old (minimum ${state.minAgeDays})`;
+    const ageDays = (now - member.user.createdTimestamp) / DAY;
+    const alike = lookalikes(member.guild.id, member, now);
+    if (ageDays >= state.minAgeDays && alike < LOOKALIKE_MATCHES)
+        return 'ignored';
+    if (seenKey)
+        handledRecently.set(seenKey, now);
+    for (const [k, at] of handledRecently)
+        if (now - at > 60000)
+            handledRecently.delete(k);
+    const reason = ageDays < state.minAgeDays
+        ? `Ghost Vanguard raid mode: account ${Math.floor(ageDays)} day(s) old (minimum ${state.minAgeDays})`
+        : `Ghost Vanguard raid mode: name matches ${alike} other account(s) that just joined`;
     let result = 'failed';
     try {
         if (state.action === 'kick' && member.kickable) {
@@ -57,7 +101,7 @@ export async function handleRaidJoin(store, logs, member, trusted, now = Date.no
         }, 30000) };
     entry.timer.unref?.();
     entry.count++;
-    entry.names.push(`<@${member.id}> (${member.user.tag}) · ${Math.floor(ageDays)}d old · ${result}`);
+    entry.names.push(`<@${member.id}> (${member.user.tag}) · ${ageDays < state.minAgeDays ? `${Math.floor(ageDays)}d old` : `lookalike of ${alike}`} · ${result}`);
     pending.set(key, entry);
     logEvent('raidmode_join', { guildId: member.guild.id, userId: member.id, result });
     return result;

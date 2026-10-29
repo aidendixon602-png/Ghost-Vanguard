@@ -1,6 +1,6 @@
 # Default anti-nuke preset
 
-The current fixed 17-rule preset, including limits, punishments and reversals, is documented in [antinuke-locked.md](antinuke-locked.md). Thresholds and actions cannot be customized; legacy saved rule overrides are cleared when the preset is applied.
+The current fixed 19-rule preset, including limits, punishments and reversals, is documented in [antinuke-locked.md](antinuke-locked.md). Thresholds and actions cannot be customized; legacy saved rule overrides are cleared when the preset is applied.
 
 ## Observe-first lifecycle
 

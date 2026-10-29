@@ -18,18 +18,18 @@ export function statusPanel(ctx, guild, user) {
  * use "all rules" or pick them one by one.
  */
 export const TRUST_PRESETS = {
-    moderation: { title: 'Basic moderation', description: 'bans, kicks and timeouts', rules: ['mass_ban', 'mass_kick', 'timeout'] },
+    moderation: { title: 'Basic moderation', description: 'bans, unbans, kicks and timeouts', rules: ['mass_ban', 'mass_unban', 'mass_kick', 'timeout'] },
     roles: { title: 'Role manager', description: 'give roles (including moderator roles), create, edit and delete roles', rules: ['role_grant', 'role_create', 'role_update', 'role_delete'] },
     channels: { title: 'Channel manager', description: 'create, edit and delete channels and webhooks', rules: ['channel_create', 'channel_update', 'channel_delete', 'webhook_change'] },
     administrator: { title: 'Administrator', description: 'everything incl. promoting mods; not Administrator grants, bots or prunes',
-        rules: ['mass_ban', 'mass_kick', 'timeout', 'role_grant', 'role_create', 'role_update', 'role_delete', 'channel_create', 'channel_update', 'channel_delete', 'webhook_change', 'guild_update', 'automod_tamper'] },
+        rules: ['mass_ban', 'mass_unban', 'mass_kick', 'timeout', 'role_grant', 'role_create', 'role_update', 'role_delete', 'channel_create', 'channel_update', 'channel_delete', 'webhook_change', 'guild_update', 'automod_tamper', 'emoji_delete'] },
 };
 /** Single rules, grouped by area and ordered from everyday to dangerous. Join flood is not a person's action, so it is not listed. */
 export const RULE_LABELS = [
-    ['mass_ban', 'Moderation · Ban members'], ['mass_kick', 'Moderation · Kick members'], ['timeout', 'Moderation · Time out members'],
+    ['mass_ban', 'Moderation · Ban members'], ['mass_unban', 'Moderation · Unban members'], ['mass_kick', 'Moderation · Kick members'], ['timeout', 'Moderation · Time out members'],
     ['role_grant', 'Roles · Give roles to people'], ['role_create', 'Roles · Create roles'], ['role_update', 'Roles · Edit roles'], ['role_delete', 'Roles · Delete roles'],
     ['channel_create', 'Channels · Create channels'], ['channel_update', 'Channels · Edit channels and permissions'], ['channel_delete', 'Channels · Delete channels'], ['webhook_change', 'Channels · Webhooks'],
-    ['guild_update', 'Server · Edit server settings'], ['automod_tamper', 'Server · Turn off or delete AutoMod'],
+    ['guild_update', 'Server · Edit server settings'], ['automod_tamper', 'Server · Turn off or delete AutoMod'], ['emoji_delete', 'Server · Delete emojis and stickers'],
     ['bot_add', '⚠ Danger · Add bots'], ['dangerous_grant', '⚠ Danger · Give dangerous permissions'], ['member_prune', '⚠ Danger · Prune members'],
 ];
 const friendly = (key) => RULE_LABELS.find(([k]) => k === key)?.[1].replace(/^.*· /, '') ?? RULES.find(r => r.key === key)?.title ?? key;

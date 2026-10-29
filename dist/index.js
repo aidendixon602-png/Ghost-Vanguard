@@ -47,7 +47,7 @@ import { aiModerate } from './features/ai-moderation.js';
 import { reportWebhook } from './features/webhooks.js';
 import { logBulkDelete, logDeletedMessage, logEditedMessage } from './features/message-logs.js';
 import { withdrawSharedBan } from './features/roblox-tools.js';
-import { forgetHeldBot, lockServerSettings, quarantineNewBot } from './features/antinuke-plus.js';
+import { forgetHeldBot, lockServerSettings, plusConfig, quarantineNewBot } from './features/antinuke-plus.js';
 import { activeBan, assertLocalUnban, enforceOnJoin, enforceOnUnban, existingBan, liftNetworkBan, networkDeps, recordId, sweepNetworkBans } from './security/network-ban.js';
 import { enforceProtectedRoles } from './security/protected-roles.js';
 import { enforceProtectedUsers } from './security/protected-users.js';
@@ -61,6 +61,7 @@ import { recoveryEmbed } from './ui/notice.js';
 import { warnEmptyDatabase } from './features/bot-health.js';
 import { fromMessage, isHandoff, sameEmoji } from './bot/text-commands.js';
 import { isTrustedBot } from './bot/trusted-bots.js';
+import { forgetGuild, processMessageWave, restoreGates } from './security/raid-waves.js';
 const errors = validateConfig();
 if (errors.length) {
     console.error(`\n${style.red('✖ Ghost Vanguard cannot start.')} Fix these settings in .env:\n${errors.map(e => `  • ${e}`).join('\n')}\n`);
@@ -289,6 +290,8 @@ client.on(Events.MessageCreate, m => {
         protectedTask('scam scanning', m.guild.id, () => scam.process(m));
     if (m.guild)
         protectedTask('automod', m.guild.id, () => processAutomod(store, logs, m, id => security.trusted(m.guild, id)));
+    if (m.inGuild() && plusConfig(store, m.guildId).messageWaves !== false)
+        protectedTask('message waves', m.guildId, async () => { await processMessageWave({ store, logs, trusted: id => security.trusted(m.guild, id) }, m); });
     if (m.guild)
         protectedTask('ai moderation', m.guild.id, () => aiModerate(store, logs, m, id => security.trusted(m.guild, id)));
     if (m.guild)
@@ -381,6 +384,7 @@ client.on(Events.GuildCreate, guild => {
 });
 client.on(Events.GuildDelete, guild => {
     lifecycle.departed(guild.id);
+    forgetGuild(guild.id);
     presence(true);
 });
 client.on(Events.Error, error => logEvent('discord_error', failure(error)));
@@ -418,6 +422,7 @@ server.listen(config.port, config.host, () => {
 });
 timers.push(setInterval(() => task('logs', logs.flush()), 2000));
 timers.push(setInterval(() => task('temporary bans', sweepTempbans(store, logs, client, id => lifecycle.isReady(id))), 60000));
+timers.push(setInterval(() => task('join gates', restoreGates(store, logs, client, id => lifecycle.isReady(id))), 60000));
 timers.push(setInterval(() => task('verification refresh', roblox.refresh(client, id => lifecycle.isReady(id))), 60000));
 timers.push(setInterval(presence, 60000));
 timers.push(setInterval(() => {

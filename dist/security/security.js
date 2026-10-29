@@ -3,7 +3,6 @@ import { ActionRowBuilder, AuditLogEvent, PermissionFlagsBits, ButtonBuilder, Bu
 import { dangerous, escalationAdded, KeyedQueue, overrideRule, ruleFor, RULES, WARN_FIRST, WARNING_MEMORY_MS, KNOWN_ROLE_BOTS } from '../core.js';
 import { developers } from '../bot/developers.js';
 import { isTrustedBot, TRUSTED_BOTS } from '../bot/trusted-bots.js';
-import { autoRaid } from '../features/antinuke-plus.js';
 import { AppError } from '../errors.js';
 import { noteThreat } from './threat-board.js';
 import { embed, memberOrNull } from '../ui/ui.js';
@@ -11,6 +10,8 @@ import { incidentCard } from '../ui/incident-card.js';
 import { alertExempt } from '../bot/env-rules.js';
 import { scopeName } from '../ui/antinuke-panel.js';
 import { dmGlobalAlert, sendGlobalAlert, snapshotMember } from './global-alert.js';
+import { recentJoiners, switchOnRaid } from './raid-waves.js';
+import { handleRaidJoin, raidState } from './raidmode.js';
 /** How far back an incident alert looks for channels and roles the actor deleted. */
 const DELETION_LOOKBACK_MS = 10 * 60 * 1000;
 const ruleByKey = (key) => RULES.find(r => r.key === key);
@@ -358,6 +359,12 @@ export class Security {
             await guild.bans.remove(id, 'Ghost Vanguard: revert anti-nuke bans');
             return 'Removed ban for ' + id + '.';
         }
+        if (rule.key === 'mass_unban') {
+            if (id === guild.ownerId || this.trusted(guild, id))
+                return 'The unbanned user is trusted; left unbanned.';
+            await guild.bans.create(id, { reason: 'Ghost Vanguard: revert mass unban' });
+            return 'Banned ' + id + ' again.';
+        }
         if (rule.key === 'bot_add') {
             if (this.trusted(guild, id))
                 return 'Added bot is trusted; kept it.';
@@ -476,7 +483,20 @@ export class Security {
             const count = this.store.count(member.guild.id, 'joins', rule.key, now - rule.seconds * 1000);
             if (count < rule.count || this.store.get('SELECT 1 FROM incidents WHERE guild_id=? AND actor_id=? AND rule=? AND at>?', member.guild.id, 'joins', rule.key, now - rule.seconds * 1000))
                 return;
-            const raid = autoRaid(this.store, member.guild.id, now);
+            const wasOn = raidState(this.store, member.guild.id, now).enabled;
+            let raid = await switchOnRaid(this.store, this.logs, member.guild, now, 'join flood');
+            // Raid mode starts after the flood has joined: sweep the accounts that made it up too.
+            if (!wasOn && raidState(this.store, member.guild.id, now).enabled) {
+                const trusted = (id) => this.trusted(member.guild, id);
+                let swept = 0;
+                for (const joiner of recentJoiners(member.guild, rule.seconds * 2000, now)) {
+                    const result = await handleRaidJoin(this.store, this.logs, joiner, trusted, now).catch(() => 'failed');
+                    if (result === 'kicked' || result === 'timed out')
+                        swept++;
+                }
+                if (swept)
+                    raid += `\nSwept **${swept}** account(s) from the wave that triggered it.`;
+            }
             const id = this.store.incident(member.guild.id, 'joins', rule.key, s.mode, `Join flood. ${raid}`);
             this.logs.push(member.guild.id, embed(`Incident #${id} · Join flood`, `${count} joins in ${rule.seconds}s.\n${raid}`, Colors.Orange));
         });

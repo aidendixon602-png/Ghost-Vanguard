@@ -22,8 +22,8 @@ test('all modular commands serialize with unique names and no duplicate trust al
         assert.deepEqual(c.contexts, [0]);
 });
 
-test('seventeen rules, all audit action mappings unambiguous', () => {
-    assert.equal(RULES.length, 17);
+test('nineteen rules, all audit action mappings unambiguous', () => {
+    assert.equal(RULES.length, 19);
     assert.equal(new Set(RULES.map(r => r.key)).size, RULES.length);
     const actions = RULES.flatMap(r => r.actions);
     assert.equal(new Set(actions).size, actions.length);
@@ -33,6 +33,9 @@ test('seventeen rules, all audit action mappings unambiguous', () => {
     assert.equal(ruleFor(AuditLogEvent.IntegrationDelete), undefined);
     assert.equal(ruleFor(AuditLogEvent.MemberPrune)?.key, 'member_prune');
     assert.equal(ruleFor(AuditLogEvent.AutoModerationRuleDelete)?.key, 'automod_tamper');
+    assert.equal(ruleFor(AuditLogEvent.MemberBanRemove)?.key, 'mass_unban');
+    assert.equal(ruleFor(AuditLogEvent.EmojiDelete)?.key, 'emoji_delete');
+    assert.equal(ruleFor(AuditLogEvent.StickerDelete)?.key, 'emoji_delete');
 });
 
 test('the preset is fixed: shared limits, per-rule overrides and toggles never change a rule', () => {

@@ -296,7 +296,7 @@ test('trust panel: save replaces what they had, presets expand, Everything wins,
  const logs:any[]=[];const ctx:any={store,actor:{id:'owner',guild:{ownerId:'owner'},roles:{cache:new Collection()}},logs:{push:(_g:any,e:any)=>logs.push(e)}};
  const T='444444444444444444';
  assert.deepEqual(kindsFor(['all','mass_ban'],false),['trust']);
- assert.deepEqual(kindsFor(['preset:moderation','mass_ban'],true).sort(),['trust_role:mass_ban','trust_role:mass_kick','trust_role:timeout']);
+ assert.deepEqual(kindsFor(['preset:moderation','mass_ban'],true).sort(),['trust_role:mass_ban','trust_role:mass_kick','trust_role:mass_unban','trust_role:timeout']);
  saveTrust(ctx,'g',T,false,['all'],0);assert.equal(store.hasGrant('g',T,'trust'),true);
  saveTrust(ctx,'g',T,false,['preset:moderation','role_grant'],24);
  assert.equal(store.hasGrant('g',T,'trust'),false,'saving replaces the old full bypass');

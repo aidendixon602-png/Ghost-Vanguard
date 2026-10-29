@@ -8,7 +8,7 @@ import { developers } from '../bot/developers.js';
 import { isTrustedBot } from '../bot/trusted-bots.js';
 import { raidState, setRaidMode } from '../security/raidmode.js';
 import { getFeature } from './settings.js';
-export const PLUS_DEFAULTS = { raidAuto: true, raidAutoHours: 1, settingsLock: true, botQuarantine: true };
+export const PLUS_DEFAULTS = { raidAuto: true, raidAutoHours: 1, settingsLock: true, botQuarantine: true, joinGate: true, messageWaves: true };
 export const plusConfig = (store, guild) => getFeature(store, guild, 'antinukeplus', PLUS_DEFAULTS);
 const DANGEROUS_MASK = DANGEROUS.reduce((all, bit) => all | BigInt(bit), 0n);
 // ---- Raid auto-trigger ----

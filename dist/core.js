@@ -43,6 +43,10 @@ export const RULES = [
     { key: 'member_prune', title: 'Member Prune', count: 1, seconds: 60, actions: [AuditLogEvent.MemberPrune], singleEvent: true },
     { key: 'automod_tamper', title: 'AutoMod', count: 1, seconds: 60, actions: [AuditLogEvent.AutoModerationRuleDelete], singleEvent: true },
     { key: 'join_flood', title: 'Join Flood', count: 12, seconds: 15, actions: [] },
+    // Unbanning a batch of banned raiders or nukers lets them straight back in: caught and banned again.
+    { key: 'mass_unban', title: 'Unban', count: 5, seconds: 60, punishment: 'strip', revert: true, actions: [AuditLogEvent.MemberBanRemove] },
+    // Emoji and sticker wipes are a common last step of a nuke and can't be put back exactly, so they're stopped early.
+    { key: 'emoji_delete', title: 'Emoji Delete', count: 5, seconds: 60, punishment: 'strip', revert: false, actions: [AuditLogEvent.EmojiDelete, AuditLogEvent.StickerDelete] },
 ];
 /**
  * Everyday rules: the first time someone hits one, the change is undone and they get a warning instead of
