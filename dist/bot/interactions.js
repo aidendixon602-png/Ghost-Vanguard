@@ -28,7 +28,8 @@ export class Interactions {
         const shown = i.isChatInputCommand() || i.isAutocomplete()
             ? [i.commandName, i.options.getSubcommandGroup(false), i.options.getSubcommand(false)].filter(Boolean).join(' ').toLowerCase() : null;
         // Grouped commands (/mod ban, /automod links) run their original module.
-        i = this.panels.wrap(routeInteraction(i));
+        // A `,gv` text command answers in the channel and keeps every answer; only real interactions use reply panels.
+        i = i.isTextCommand ? routeInteraction(i) : this.panels.wrap(routeInteraction(i));
         this.seen.set(i.id, Date.now());
         for (const [id, at] of this.seen)
             if (at < Date.now() - 900000)

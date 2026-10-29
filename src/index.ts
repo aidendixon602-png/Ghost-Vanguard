@@ -59,6 +59,8 @@ import { answer as dashboardAnswer } from './dashboard/router.js';
 import { handleTicketDm } from './ui/ticket-ui.js';
 import { recoveryEmbed } from './ui/notice.js';
 import { warnEmptyDatabase } from './features/bot-health.js';
+import { fromMessage, isHandoff, sameEmoji } from './bot/text-commands.js';
+import { isTrustedBot } from './bot/trusted-bots.js';
 
 const errors = validateConfig();
 
@@ -82,7 +84,8 @@ const offlineSince = lastSeen(store);
 // Tickets left mid-close by a crash are usable again, and open ticket channels are known in memory.
 loadTicketChannels(store);
 
-const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers, GatewayIntentBits.GuildModeration, GatewayIntentBits.GuildMessages, ...(config.messageContentEnabled ? [GatewayIntentBits.MessageContent] : [])], partials: [Partials.Message, Partials.GuildMember],
+// Message reactions: Veil Utilities hands `,gv` commands over by reacting to them (see bot/text-commands.ts).
+const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers, GatewayIntentBits.GuildModeration, GatewayIntentBits.GuildMessages, GatewayIntentBits.GuildMessageReactions, ...(config.messageContentEnabled ? [GatewayIntentBits.MessageContent] : [])], partials: [Partials.Message, Partials.GuildMember, Partials.Reaction, Partials.User],
     rest: { rejectOnRateLimit: rejectRecoveryWait },
     allowedMentions: { parse: [], repliedUser: false } });
 
@@ -211,7 +214,9 @@ client.once(Events.ClientReady, async (c) => {
         for (const row of store.all('SELECT guild_id,name FROM guild_data WHERE active=1'))
             if (!client.guilds.cache.has(row.guild_id))
                 store.markGuild(row.guild_id, row.name, false);
-        const commandsUpdated = await syncCommands(client.rest, config.clientId, treeJson(registry));
+        // No slash commands: every command is typed with Veil Utilities' prefix (`,gv …`). Syncing an empty list
+        // removes the old slash commands from Discord; the command code itself stays and runs from `,gv`.
+        const commandsUpdated = await syncCommands(client.rest, config.clientId, []);
         for (const guild of client.guilds.cache.values())
             if (['AUTHORIZED', 'PENDING_AUTHORIZATION'].includes(store.authorization(guild.id)?.state))
                 await cleanLegacyGuildCommands(client.rest, config.clientId, guild.id, store);
@@ -265,6 +270,25 @@ client.on(Events.InteractionCreate, i => {
             } }));
     }
     task('interaction', router.handle(i));
+});
+
+// `,gv …`: Veil Utilities reacts 🛡️ to a member's command message to hand it over; Vanguard runs it.
+const handedOver = new Set<string>();
+client.on(Events.MessageReactionAdd, (reaction, user) => {
+    if (!reaction.message.guildId || !isTrustedBot(user.id) || !sameEmoji(reaction.emoji.name)) return;
+    task('text command', (async () => {
+        const message = reaction.message.partial ? await reaction.message.fetch().catch(() => null) : reaction.message;
+        if (!message?.inGuild() || handedOver.has(message.id) || !isHandoff(user.id, reaction.emoji.name, message)) return;
+        handedOver.add(message.id);
+        if (handedOver.size > 5000) handedOver.delete(handedOver.values().next().value!);
+        if (!startupReady || !lifecycle.isReady(message.guildId))
+            return void await message.reply({ content: 'Ghost Vanguard is still starting up. Try again in a moment.', allowedMentions: { parse: [] } }).catch(() => null);
+        try {
+            await router.handle(await fromMessage(message, treeJson(registry)) as any);
+        } catch (error) {
+            await message.reply({ embeds: [embed('✕ Command not understood', error instanceof Error ? error.message : 'Try `,gv help`.', Colors.Red)], allowedMentions: { parse: [] } }).catch(() => null);
+        }
+    })());
 });
 
 client.on(Events.GuildAuditLogEntryCreate, (entry, guild) => {

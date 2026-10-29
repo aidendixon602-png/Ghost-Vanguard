@@ -23,6 +23,8 @@ Anti-nuke and the threat board · Moderation and audit logging · Ticket desk ·
 
 ---
 
+> **Commands are typed with Veil Utilities' prefix.** Ghost Vanguard has no slash commands: every command is `,gv` followed by what used to come after the slash (`/raid mode on` → `,gv raid mode on`, `/antinuke whitelist add` → `,gv antinuke whitelist add @user`). Veil Utilities hands the message over (it reacts 🛡️) and Ghost Vanguard runs it with the same ranks, permissions and confirmations. `,gv help` lists everything. See `src/bot/text-commands.ts`.
+
 ## Overview
 
 Ghost Vanguard protects a network of Discord servers from account takeovers, raids and staff abuse, gives staff one consistent toolset for moderation across every server, and runs the support desk those servers depend on. A single bot instance serves every authorized server. Settings, cases, tickets, threat scores and records are stored per server in SQLite, and every action that changes a server is confirmed, logged and attributable to a person.
