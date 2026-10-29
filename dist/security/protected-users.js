@@ -1,5 +1,6 @@
 import { AuditLogEvent, Colors } from 'discord.js';
 import { developers } from '../bot/developers.js';
+import { isTrustedBot } from '../bot/trusted-bots.js';
 import { dmSecurityAlert } from '../bot/trusted-dm.js';
 import { isProtectedUser } from '../bot/env-rules.js';
 import { embed } from '../ui/ui.js';
@@ -15,7 +16,7 @@ export async function enforceProtectedUsers(store, logs, entry, guild) {
     if (!target || !isProtectedUser(target))
         return null;
     const actor = responsibleActor(entry, guild);
-    if (!actor || actor === target || actor === guild.client.user?.id || developers.has(actor))
+    if (!actor || actor === target || actor === guild.client.user?.id || isTrustedBot(actor) || developers.has(actor))
         return null;
     let what, outcome;
     const changes = (entry.changes ?? []);

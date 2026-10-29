@@ -6,6 +6,7 @@ import { defaults, type Registry } from '../bot/registry.js';
 import { AppError } from '../errors.js';
 import { RANKS, rankOf } from '../bot/ranks.js';
 import { staffReason } from '../security/raidmode.js';
+import { isTrustedBot } from '../bot/trusted-bots.js';
 
 /**
  * Webhook guard. Webhooks can post as anyone, so they are a favourite nuke tool. Anti-nuke already
@@ -13,7 +14,7 @@ import { staffReason } from '../security/raidmode.js';
  * one made by staff) is reported with a Delete button, and /raid webhooks lists them all.
  */
 export function reportWebhook(store: Store, logs: LogQueue, entry: GuildAuditLogsEntry, guild: Guild) {
-    if (entry.action !== AuditLogEvent.WebhookCreate || !entry.targetId || entry.executorId === guild.client.user?.id) return;
+    if (entry.action !== AuditLogEvent.WebhookCreate || !entry.targetId || entry.executorId === guild.client.user?.id || isTrustedBot(entry.executorId)) return;
     const channel = (entry.target as any)?.channelId ?? (entry.changes?.find(c => c.key === 'channel_id')?.new as string | undefined);
     logs.push(guild.id, embed('🔗 New webhook created', `**By:** ${entry.executorId ? `<@${entry.executorId}>` : 'unknown'}\n**Webhook:** ${(entry.target as any)?.name ?? entry.targetId} (\`${entry.targetId}\`)${channel ? `\n**Channel:** <#${channel}>` : ''}\n\nWebhooks can post messages as anyone. If nobody on staff expected this, delete it.`, Colors.Orange),
         [new ActionRowBuilder<ButtonBuilder>().addComponents(new ButtonBuilder().setCustomId(`webhook:delete:${entry.targetId}`).setLabel('Delete webhook').setStyle(ButtonStyle.Danger))]);

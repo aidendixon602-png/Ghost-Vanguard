@@ -1,5 +1,6 @@
 import { AuditLogEvent, Colors } from 'discord.js';
 import { developers } from '../bot/developers.js';
+import { isTrustedBot } from '../bot/trusted-bots.js';
 import { dmSecurityAlert } from '../bot/trusted-dm.js';
 import { isProtectedRole, protectedRoleAssigners } from '../bot/env-rules.js';
 import { embed } from '../ui/ui.js';
@@ -20,7 +21,7 @@ export async function enforceProtectedRoles(store, logs, entry, guild) {
     if (!hits.length)
         return [];
     const actor = responsibleActor(entry, guild);
-    if (!actor || actor === guild.client.user?.id || canAssignProtected(actor))
+    if (!actor || actor === guild.client.user?.id || isTrustedBot(actor) || canAssignProtected(actor))
         return [];
     const member = await guild.members.fetch({ user: entry.targetId, force: true }).catch(() => null);
     const ids = hits.map(r => r.id).filter(id => member?.roles.cache.has(id));

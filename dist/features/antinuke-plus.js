@@ -5,6 +5,7 @@ import { defaults } from '../bot/registry.js';
 import { AppError, logEvent } from '../errors.js';
 import { RANKS, rankOf, isSupreme } from '../bot/ranks.js';
 import { developers } from '../bot/developers.js';
+import { isTrustedBot } from '../bot/trusted-bots.js';
 import { raidState, setRaidMode } from '../security/raidmode.js';
 import { getFeature } from './settings.js';
 export const PLUS_DEFAULTS = { raidAuto: true, raidAutoHours: 1, settingsLock: true, botQuarantine: true };
@@ -146,7 +147,7 @@ function readHeld(value) {
 }
 const permNames = (bits) => new PermissionsBitField(bits).toArray().join(', ') || 'none';
 export async function quarantineNewBot(store, logs, member) {
-    if (!member.user.bot || !plusConfig(store, member.guild.id).botQuarantine)
+    if (!member.user.bot || isTrustedBot(member.id) || !plusConfig(store, member.guild.id).botQuarantine)
         return;
     const s = store.settings(member.guild.id);
     if (!s.enabled || s.mode !== 'enforce')
