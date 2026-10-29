@@ -59,7 +59,7 @@ import { answer as dashboardAnswer } from './dashboard/router.js';
 import { handleTicketDm } from './ui/ticket-ui.js';
 import { recoveryEmbed } from './ui/notice.js';
 import { warnEmptyDatabase } from './features/bot-health.js';
-import { fromMessage, HANDOFF_EMOJI, isHandoff } from './bot/text-commands.js';
+import { fromMessage, isHandoff, sameEmoji } from './bot/text-commands.js';
 import { isTrustedBot } from './bot/trusted-bots.js';
 const errors = validateConfig();
 if (errors.length) {
@@ -257,7 +257,7 @@ client.on(Events.InteractionCreate, i => {
 // `,gv …`: Veil Utilities reacts 🛡️ to a member's command message to hand it over; Vanguard runs it.
 const handedOver = new Set();
 client.on(Events.MessageReactionAdd, (reaction, user) => {
-    if (!reaction.message.guildId || !isTrustedBot(user.id) || reaction.emoji.name !== HANDOFF_EMOJI)
+    if (!reaction.message.guildId || !isTrustedBot(user.id) || !sameEmoji(reaction.emoji.name))
         return;
     task('text command', (async () => {
         const message = reaction.message.partial ? await reaction.message.fetch().catch(() => null) : reaction.message;

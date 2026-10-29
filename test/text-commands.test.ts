@@ -76,6 +76,7 @@ const msg = (o: any = {}) => ({ createdTimestamp: Date.now(), editedTimestamp: n
 
 test('only Veil\'s own 🛡️ on a fresh, unedited ,gv message hands it over', () => {
     assert.ok(isHandoff(VEIL, HANDOFF_EMOJI, msg()));
+    assert.ok(isHandoff(VEIL, '\u{1F6E1}', msg()), 'the shield without its variation selector counts too');
     assert.ok(!isHandoff(USER, HANDOFF_EMOJI, msg()), 'a member reacting the same emoji does nothing');
     assert.ok(!isHandoff(VEIL, '👍', msg()));
     assert.ok(!isHandoff(VEIL, HANDOFF_EMOJI, msg({ editedTimestamp: Date.now() })), 'edited after Veil saw it: refused');

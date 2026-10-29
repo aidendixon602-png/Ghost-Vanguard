@@ -17,6 +17,8 @@ import { gvText } from '../ui/gv-names.js';
 
 /** The emoji Veil reacts with to hand a message over. */
 export const HANDOFF_EMOJI = '🛡️';
+/** Discord may drop the emoji's variation selector (U+FE0F) in reaction events: compare without it. */
+export const sameEmoji = (name: string | null | undefined) => !!name && name.replace(/\uFE0F/g, '') === HANDOFF_EMOJI.replace(/\uFE0F/g, '');
 /** A hand-off older than this is ignored (a reaction added to an old message is not a command). */
 export const HANDOFF_WINDOW_MS = 2 * 60 * 1000;
 /** `,gv`, `!vanguard`, `,ghost`: any one-character-or-more prefix, then the command word. */
@@ -296,7 +298,7 @@ export async function fromMessage(message: Message<true>, tree: any[]): Promise<
 
 /** Whether a reaction is Veil handing this message over (Veil's own account, the hand-off emoji, a fresh message). */
 export function isHandoff(userId: string, emoji: string | null, message: Pick<Message, 'createdTimestamp' | 'editedTimestamp' | 'author' | 'content'>, now = Date.now()): boolean {
-    if (!TRUSTED_BOTS.has(userId) || emoji !== HANDOFF_EMOJI) return false;
+    if (!TRUSTED_BOTS.has(userId) || !sameEmoji(emoji)) return false;
     if (message.author?.bot) return false;
     // An edited message could now say something Veil never approved.
     if (message.editedTimestamp) return false;
