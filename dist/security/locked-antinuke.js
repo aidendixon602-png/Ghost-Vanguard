@@ -5,7 +5,7 @@ import { logEvent } from '../errors.js';
 import { readiness } from './readiness.js';
 import { antinukeLocked } from '../bot/env-rules.js';
 /**
- * The anti-nuke preset is fixed: the 17 rules in RULES, their limits, punishments and reverts.
+ * The anti-nuke preset is fixed: the rules in RULES, their limits, punishments and reverts.
  * New servers start in observe mode. Enforcement requires the readiness check and an explicit
  * `/antinuke enable`; a staff "off" choice is stored separately and survives restarts.
  */

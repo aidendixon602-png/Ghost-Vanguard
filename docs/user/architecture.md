@@ -9,7 +9,7 @@
 | `src/commands/` | One module per slash command, in 8 category folders → grouped into 12 global `/` commands |
 | `src/config.ts` + `src/branding.ts` | Env parsing / product name & channel defaults (single source) |
 | `src/database/` | SQLite Store (`node:sqlite`), 42 tables, versioned migrations, verified scheduled backups |
-| `src/security/` | Anti-nuke engine (17 rules), threat board (25/55/85), scam, lockdown, raid mode, readiness |
+| `src/security/` | Anti-nuke engine (19 rules), threat board (25/55/85), scam, lockdown, raid mode, readiness |
 | `src/audit/` | Ban log, event log, log channel setup, redaction, downtime |
 | `src/dashboard/` | No-build HTML + JSON API (pure function of Store), served beside `/healthz` |
 | `src/recovery/` | Snapshots, recovery engine, operation locks, rate-limit handling |

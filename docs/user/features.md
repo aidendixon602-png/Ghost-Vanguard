@@ -4,7 +4,7 @@
 
 | Area | How it works |
 |---|---|
-| Anti-nuke rules | Fixed 17-rule preset (see docs/antinuke-locked.md). New or unconfigured authorized servers start in observe mode; `/antinuke enable` requires readiness and explicit confirmation. Existing enforcement is readiness-gated on startup; staff opt-outs persist. Limits, punishments and reverts cannot be changed. |
+| Anti-nuke rules | Fixed 19-rule preset (see docs/antinuke-locked.md). New or unconfigured authorized servers start in observe mode; `/antinuke enable` requires readiness and explicit confirmation. Existing enforcement is readiness-gated on startup; staff opt-outs persist. Limits, punishments and reverts cannot be changed. |
 | Snapshot catalog | `/recovery snapshot view` pages through every saved snapshot and backup, including legacy and superseded ones. `/recovery snapshot delete` needs a user- and guild-bound, expiring confirmation. |
 | Manual backup | `/recovery backup create` captures supported layout and settings; `/recovery backup restore` uses the common confirmed flow. |
 | Cross-server copy | `/recovery copylayout destination_id:` copies from the current server. Both must be authorized and ready, and you need Vanguard security access in both. |

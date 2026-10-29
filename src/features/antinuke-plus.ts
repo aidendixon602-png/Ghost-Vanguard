@@ -12,7 +12,7 @@ import { raidState, setRaidMode } from '../security/raidmode.js';
 import { getFeature } from './settings.js';
 
 /**
- * Extra anti-nuke layers on top of the 17-rule preset:
+ * Extra anti-nuke layers on top of the rule preset:
  *  - Raid auto-trigger: a join flood switches raid mode on by itself (for an hour by default).
  *  - Server settings lock: changes to the server name, icon, banner, verification level, content
  *    filter, notification default and system/rules channels by anyone who is not whitelisted are
@@ -21,8 +21,8 @@ import { getFeature } from './settings.js';
  *    owner or a Supreme Leader/Developer, has those permissions removed until a Head Admin approves.
  *  - Permission audit: who can do damage, at a glance.
  */
-export interface PlusConfig { raidAuto: boolean; raidAutoHours: number; settingsLock: boolean; botQuarantine: boolean }
-export const PLUS_DEFAULTS: PlusConfig = { raidAuto: true, raidAutoHours: 1, settingsLock: true, botQuarantine: true };
+export interface PlusConfig { raidAuto: boolean; raidAutoHours: number; settingsLock: boolean; botQuarantine: boolean; joinGate?: boolean; messageWaves?: boolean }
+export const PLUS_DEFAULTS: PlusConfig = { raidAuto: true, raidAutoHours: 1, settingsLock: true, botQuarantine: true, joinGate: true, messageWaves: true };
 export const plusConfig = (store: Store, guild: string) => getFeature(store, guild, 'antinukeplus', PLUS_DEFAULTS);
 const DANGEROUS_MASK = DANGEROUS.reduce((all, bit) => all | BigInt(bit), 0n);
 
