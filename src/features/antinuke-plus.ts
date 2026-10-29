@@ -7,6 +7,7 @@ import { defaults, type Registry } from '../bot/registry.js';
 import { AppError, logEvent } from '../errors.js';
 import { RANKS, rankOf, isSupreme } from '../bot/ranks.js';
 import { developers } from '../bot/developers.js';
+import { isTrustedBot } from '../bot/trusted-bots.js';
 import { raidState, setRaidMode } from '../security/raidmode.js';
 import { getFeature } from './settings.js';
 
@@ -136,7 +137,7 @@ function readHeld(value: unknown): HeldBot {
 const permNames = (bits: bigint) => new PermissionsBitField(bits).toArray().join(', ') || 'none';
 
 export async function quarantineNewBot(store: Store, logs: LogQueue, member: GuildMember) {
-    if (!member.user.bot || !plusConfig(store, member.guild.id).botQuarantine) return;
+    if (!member.user.bot || isTrustedBot(member.id) || !plusConfig(store, member.guild.id).botQuarantine) return;
     const s = store.settings(member.guild.id);
     if (!s.enabled || s.mode !== 'enforce') return;
     // The bot's own role is sometimes created a moment after it joins.

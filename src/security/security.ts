@@ -3,6 +3,7 @@ import { ActionRowBuilder, AuditLogEvent, PermissionFlagsBits, ButtonBuilder, Bu
 import { dangerous, escalationAdded, KeyedQueue, overrideRule, ruleFor, RULES, WARN_FIRST, WARNING_MEMORY_MS, KNOWN_ROLE_BOTS, type Rule } from '../core.js';
 import type { Store } from '../database/db.js';
 import { developers } from '../bot/developers.js';
+import { isTrustedBot, TRUSTED_BOTS } from '../bot/trusted-bots.js';
 import { autoRaid } from '../features/antinuke-plus.js';
 import { AppError } from '../errors.js';
 import type { LogQueue } from '../logging.js';
@@ -104,7 +105,7 @@ export class Security {
     constructor(readonly store: Store, readonly logs: LogQueue) { }
 
     trusted(guild: Guild, id: string, ignoreRoles: string[] = []): boolean {
-        return id === guild.ownerId || id === guild.client.user?.id || developers.has(id) || this.store.hasGrant(guild.id, id, 'trust') || [...(guild.members?.cache?.get(id)?.roles.cache.keys() ?? [])].some(role => !ignoreRoles.includes(role) && this.store.hasGrant(guild.id, role, 'trust_role'));
+        return id === guild.ownerId || id === guild.client.user?.id || developers.has(id) || isTrustedBot(id) || this.store.hasGrant(guild.id, id, 'trust') || [...(guild.members?.cache?.get(id)?.roles.cache.keys() ?? [])].some(role => !ignoreRoles.includes(role) && this.store.hasGrant(guild.id, role, 'trust_role'));
     }
 
     /**
@@ -114,6 +115,7 @@ export class Security {
     exemptReason(guild: Guild, id: string, ignoreRoles: string[] = []): string | null {
         if (id === guild.ownerId) return 'the server owner';
         if (developers.has(id)) return 'a Developer';
+        if (isTrustedBot(id)) return `a trusted bot (${TRUSTED_BOTS.get(id)})`;
         if (this.store.hasGrant(guild.id, id, 'trust')) return 'on the full whitelist';
         if ([...(guild.members?.cache?.get(id)?.roles.cache.keys() ?? [])].some(role => !ignoreRoles.includes(role) && this.store.hasGrant(guild.id, role, 'trust_role'))) return 'whitelisted by role';
         return null;
@@ -132,8 +134,9 @@ export class Security {
             const actor = responsibleActor(entry, guild);
             if (actor && this.store.get("SELECT 1 FROM grants WHERE guild_id=? AND (kind='trust_role' OR kind LIKE 'trust_role:%') AND (expires IS NULL OR expires>?)", guild.id, Date.now())) await memberOrNull(guild, actor).catch(() => null);
             const newlyAssigned = entry.action === AuditLogEvent.MemberRoleUpdate && entry.targetId === actor ? (changesOf(entry).find(c=>c.key==='$add')?.new ?? []).map((r:{id:string})=>r.id) : [];
-            // Everyone is watched except Vanguard itself (its own actions are attributed to the staff member behind them).
-            if (!s.authorized || !actor || actor === guild.client.user?.id)
+            // Everyone is watched except Vanguard itself (its own actions are attributed to the staff member behind them)
+            // and the network's other trusted bots, whose actions are their own business (see bot/trusted-bots.ts).
+            if (!s.authorized || !actor || actor === guild.client.user?.id || isTrustedBot(actor))
                 return;
             // Owner, Developers and whitelisted people are watched too, but never punished.
             const exempt = this.exemptReason(guild, actor, newlyAssigned);
