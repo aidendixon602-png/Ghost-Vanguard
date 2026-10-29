@@ -11,3 +11,17 @@ export const TRUSTED_BOTS: ReadonlyMap<string, string> = new Map([
 ]);
 
 export const isTrustedBot = (id: string | null | undefined): boolean => !!id && TRUSTED_BOTS.has(id);
+
+/**
+ * People no part of Vanguard ever acts against, in any server: no moderation command can target them (not even a
+ * Developer's), anti-nuke never counts, contains or punishes them, and automod, scam protection, raid mode and
+ * network bans leave them alone. Kept in the code on purpose, like the trusted bots above.
+ */
+export const WHITELISTED_PEOPLE: ReadonlyMap<string, string> = new Map([
+    ['843909457616044092', 'thesimisear'],
+]);
+
+export const isWhitelistedPerson = (id: string | null | undefined): boolean => !!id && WHITELISTED_PEOPLE.has(id);
+
+/** The refusal shown when someone tries to moderate a whitelisted person. */
+export const whitelistedMessage = (id: string) => `<@${id}> is whitelisted on Ghost Vanguard, so it won't take any action against them.`;

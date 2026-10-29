@@ -60,7 +60,7 @@ import { handleTicketDm } from './ui/ticket-ui.js';
 import { recoveryEmbed } from './ui/notice.js';
 import { warnEmptyDatabase } from './features/bot-health.js';
 import { fromMessage, isHandoff, sameEmoji } from './bot/text-commands.js';
-import { isTrustedBot } from './bot/trusted-bots.js';
+import { isTrustedBot, isWhitelistedPerson } from './bot/trusted-bots.js';
 import { forgetGuild, processMessageWave, restoreGates } from './security/raid-waves.js';
 const errors = validateConfig();
 if (errors.length) {
@@ -336,7 +336,7 @@ client.on(Events.GuildMemberAdd, member => {
     stats.invalidate();
     protectedTask('event log', member.guild.id, async () => recordMemberEvent(store, logs, member, true));
     // Someone with an active genreban or hardban is banned straight away; nothing else runs for them.
-    if (activeBan(store, 'hardban', member.id) ?? activeBan(store, 'genreban', member.id)) {
+    if (!isWhitelistedPerson(member.id) && (activeBan(store, 'hardban', member.id) ?? activeBan(store, 'genreban', member.id))) {
         protectedTask('network ban', member.guild.id, () => enforceOnJoin(network, member.guild, member.id));
         return;
     }

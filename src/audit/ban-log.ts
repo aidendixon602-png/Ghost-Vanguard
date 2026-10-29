@@ -12,6 +12,7 @@ import { activeBan, recordId, TAG, type NetworkBan, type NetworkKind } from '../
 type NetworkCover = Pick<NetworkBan, 'id' | 'kind' | 'reason' | 'moderator_id' | 'evidence' | 'evidence_file'>;
 import { logChannels } from './log-setup.js';
 import { redact } from './redact.js';
+import { isWhitelistedPerson, whitelistedMessage } from '../bot/trusted-bots.js';
 
 /**
  * The ban log: one record per ban in the server's #bans channel, numbered per server (BAN-0001).
@@ -409,6 +410,9 @@ export async function handleBanLogInteraction(i: ButtonInteraction<'cached'> | M
             return i.reply({ flags: MessageFlags.Ephemeral, embeds: [card(record, { title: `🔓 Unban ${name}?`, color: Colors.Blurple,
                 fields: [reasonField(record), { name: 'What happens', value: '• They can rejoin this server\n• This ban record is updated, not deleted' }],
                 footer: LOCAL_FOOTER })], components: [confirmRow(id, 'unban')] });
+        }
+        if (action === 'reban' || action === 'rebanform' || action === 'creban') {
+            if (isWhitelistedPerson(record.user_id)) return reply(whitelistedMessage(record.user_id));
         }
         if (action === 'reban') {
             if (live) return reply(`${label} is already banned.`);

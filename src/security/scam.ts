@@ -8,6 +8,7 @@ import type { LogQueue } from '../logging.js';
 import { noteThreat } from './threat-board.js';
 import { fingerprint, imageMatch, blockedDomain, suspiciousText, downloadImage, digest, MAX_IMAGE_BYTES, MAX_IMAGE_PIXELS, type Fingerprint } from './scam-matching.js';
 import { shouldPost } from '../audit/notices.js';
+import { isWhitelistedPerson } from '../bot/trusted-bots.js';
 
 type ImageInput = { id: string; url: string; size: number; width?: number | null; height?: number | null };
 const MAX_IMAGE_SCANS = 2, MAX_IMAGE_WAITERS = 25, FINGERPRINT_CACHE = 500;
@@ -169,7 +170,7 @@ export class ScamProtection {
         if (next) next(); else this.imageScans--;
     }
     async process(input: Message | PartialMessage) {
-        if (!input.guild || input.author?.bot || input.webhookId || !scamConfig(this.store, input.guild.id).enabled || excluded(this.store, input.guild.id, input.channelId, input.channel.isThread() ? input.channel.parentId : null)) return;
+        if (!input.guild || input.author?.bot || input.webhookId || isWhitelistedPerson(input.author?.id) || !scamConfig(this.store, input.guild.id).enabled || excluded(this.store, input.guild.id, input.channelId, input.channel.isThread() ? input.channel.parentId : null)) return;
         // Cached messages are already current; skip ones with nothing scannable without any API call.
         if (!input.partial) {
             const { text, images } = this.contents(input);
@@ -186,7 +187,7 @@ export class ScamProtection {
         if (!active()) return;
         // Partial (uncached) messages are fetched; cached create/update events already carry current content.
         const message = input.partial ? await input.fetch().catch(() => null) : input;
-        if (!message || message.author.bot || message.webhookId || !active()) return;
+        if (!message || message.author.bot || message.webhookId || isWhitelistedPerson(message.author.id) || !active()) return;
         // Administrators and anti-nuke trust are not exemptions. Owner/bot/developers cannot be auto-banned.
         const { text, images } = this.contents(message);
         const originalEdit = message.editedTimestamp, originalContent = message.content, originalAttachments = [...message.attachments.keys()].join();
@@ -216,7 +217,7 @@ export class ScamProtection {
             if (!active()) return;
             const member = await guild.members.fetch({ user: message.author.id, force: true }).catch(() => null);
             if (!active()) return;
-            if (message.author.id === guild.ownerId || message.author.id === config.ownerId || config.developers.has(message.author.id) || message.author.id === guild.client.user?.id)
+            if (message.author.id === guild.ownerId || message.author.id === config.ownerId || config.developers.has(message.author.id) || message.author.id === guild.client.user?.id || isWhitelistedPerson(message.author.id))
                 outcome.push('Ban skipped: protected owner/developer/bot.');
             else if (!member) {
                 // The sender already left; a ban by ID still stops them returning.

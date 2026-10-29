@@ -3,6 +3,7 @@ import { PRODUCT_NAME } from '../branding.js';
 import { clip } from '../core.js';
 import { isProtectedUser } from '../bot/env-rules.js';
 import { developers } from '../bot/developers.js';
+import { isWhitelistedPerson, whitelistedMessage } from '../bot/trusted-bots.js';
 import { AppError } from '../errors.js';
 export function embed(title, description, color = Colors.Blurple) {
     return new EmbedBuilder().setColor(color).setTitle(title).setDescription(clip(description, 3900))
@@ -10,6 +11,8 @@ export function embed(title, description, color = Colors.Blurple) {
 }
 /** PROTECTED_USERS (.env): only Developers may moderate them. */
 export function assertNotProtectedUser(targetId, actorId) {
+    if (isWhitelistedPerson(targetId))
+        throw new AppError('PERMISSION_ERROR', whitelistedMessage(targetId));
     if (isProtectedUser(targetId) && !developers.has(actorId))
         throw new AppError('PERMISSION_ERROR', `<@${targetId}> is a protected user (set in the bot settings). Only a Developer can ban, kick, time out or change their roles.`);
 }

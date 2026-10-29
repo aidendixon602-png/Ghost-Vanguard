@@ -8,6 +8,7 @@ import { AppError, logEvent } from '../errors.js';
 import { BOT_BELOW_TARGET, classify, MISSING_BAN_PERMISSION } from '../ui/progress.js';
 import { embed } from '../ui/ui.js';
 import { isProtectedUser } from '../bot/env-rules.js';
+import { isWhitelistedPerson, whitelistedMessage } from '../bot/trusted-bots.js';
 export const TAG = {
     genreban: '[Vanguard genreban]',
     hardban: '[Vanguard hardban]',
@@ -91,6 +92,8 @@ export function assertTargetable(client, userId, actorId) {
         throw new AppError('VALIDATION_ERROR', 'You cannot ban yourself.');
     if (userId === client.user?.id)
         throw new AppError('VALIDATION_ERROR', 'Ghost Vanguard cannot ban itself.');
+    if (isWhitelistedPerson(userId))
+        throw new AppError('VALIDATION_ERROR', whitelistedMessage(userId));
     if (developers.has(userId) || isSupreme(userId) || userId === config.ownerId)
         throw new AppError('VALIDATION_ERROR', 'That user is a Ghost Vanguard developer or Supreme Leader, and cannot be network-banned.');
     if (isProtectedUser(userId) && !developers.has(actorId))
@@ -178,64 +181,36 @@ const WHY_NOTE = {
     joined: kind => `This user joined, but they have an active ${kind}, so the bot banned them. ${LIFT_AUTHORITY[kind]} can lift it with /network un${kind}.`,
     sweep: kind => `This user has an active ${kind} and was found unbanned here, so the bot banned them. ${LIFT_AUTHORITY[kind]} can lift it with /network un${kind}.`,
 };
+export function networkBanLogEmbed(guild, ban, why) {
+    const recId = recordId(ban);
+    const issued = why === 'issued';
+    const lifts = ban.kind === 'hardban' ? 'Only a Developer can lift it.' : 'Only a Developer or Supreme Leader can lift it.';
+    const e = new EmbedBuilder()
+        .setColor(Colors.DarkRed)
+        .setTitle(`${KIND_NAME[ban.kind]} ${issued ? 'applied' : 're-applied'} · ${recId}`)
+        .addFields({ name: 'Server', value: `${guild.name}\n(\`${guild.id}\`)`, inline: true }, { name: 'User', value: `<@${ban.user_id}>${ban.username ? ` ${ban.username}` : ''}\n\`${ban.user_id}\``, inline: true }, { name: 'By', value: `<@${ban.moderator_id}>`, inline: true }, { name: 'Reason', value: clip(ban.reason || 'No reason given', 1024) });
+    if (ban.evidence)
+        e.addFields({ name: 'Evidence', value: clip(ban.evidence, 1024) });
+    if (ban.evidence_file)
+        e.addFields({ name: 'Evidence file', value: `\`${clip(ban.evidence_file, 256)}\`` });
+    e.addFields({ name: issued ? 'Scope' : 'Why again', value: issued
+            ? `${ban.kind === 'hardban' ? 'Banned in every protected server and re-banned if unbanned.' : 'Banned in every protected server and banned again if they rejoin.'} ${lifts}`
+            : WHY_NOTE[why](ban.kind) });
+    return e.setFooter({ text: recId }).setTimestamp();
+}
+export function networkUnbanLogEmbed(guild, ban, reason, actorId) {
+    const recId = recordId(ban);
+    return new EmbedBuilder()
+        .setColor(Colors.Green)
+        .setTitle(`${KIND_NAME[ban.kind]} lifted · ${recId}`)
+        .addFields({ name: 'Server', value: `${guild.name}\n(\`${guild.id}\`)`, inline: true }, { name: 'User', value: `<@${ban.user_id}>${ban.username ? ` ${ban.username}` : ''}\n\`${ban.user_id}\``, inline: true }, { name: 'Lifted by', value: `<@${actorId}>`, inline: true }, { name: 'Reason', value: clip(reason || 'No reason given', 1024) }, { name: 'Scope', value: 'Lifted in every protected server. A ban this server placed itself still applies.' })
+        .setFooter({ text: recId })
+        .setTimestamp();
+}
 /**
  * Bans one user in one server for a network ban and reports what happened. Records
  * the outcome against the ban. Never throws.
  */
-export function networkBanLogEmbed(guild, ban, why) {
-    const isIssued = why === 'issued';
-    const kindTitle = KIND_NAME[ban.kind];
-    const recId = recordId(ban);
-    const title = isIssued ? `${kindTitle} applied · ${recId}` : `${kindTitle} re-applied · ${recId}`;
-    const color = 0xB10F2E; // Midtown Crimson
-    const e = new EmbedBuilder()
-        .setColor(color)
-        .setAuthor({
-        name: 'Ghost Vanguard • Network Ban Enforcement',
-        iconURL: guild.client?.user?.displayAvatarURL?.() ?? undefined,
-    })
-        .setTitle(`🛡️ ${title}`)
-        .addFields({ name: 'Server', value: `${guild.name}\n(\`${guild.id}\`)`, inline: true }, { name: 'Target User', value: `<@${ban.user_id}> ${ban.username ? `(${ban.username}) ` : ''}\n\`${ban.user_id}\``, inline: true }, { name: 'Authorized By', value: `<@${ban.moderator_id}>\n\`Ghost Vanguard Developer\``, inline: true }, { name: 'Reason', value: `>>> ${clip(ban.reason || 'No reason given', 1024)}` });
-    if (ban.evidence) {
-        e.addFields({ name: 'Evidence', value: `>>> ${clip(ban.evidence, 1024)}` });
-    }
-    if (ban.evidence_file) {
-        e.addFields({ name: 'Evidence File', value: `\`${clip(ban.evidence_file, 256)}\`` });
-    }
-    const networkPolicy = isIssued
-        ? ban.kind === 'hardban'
-            ? '> 🌐 **Network Hardban Policy**\n> This user is permanently banned from every server Ghost Vanguard protects and is re-banned if unbanned.\n-# Only a Developer can lift it.'
-            : '> 🌐 **Network Genreban Policy**\n> This user is banned from every server Ghost Vanguard protects and is banned again if they join.\n-# Only a Developer or Supreme Leader can lift it.'
-        : `> ⚠️ **Network Enforcement**\n> ${WHY_NOTE[why](ban.kind)}`;
-    e.addFields({ name: 'Network Scope', value: networkPolicy });
-    e.setFooter({
-        text: `Ghost Vanguard • Network Protocol • ${recId}`,
-        iconURL: guild.iconURL?.() ?? undefined,
-    }).setTimestamp();
-    return e;
-}
-export function networkUnbanLogEmbed(guild, ban, reason, actorId) {
-    const kindTitle = KIND_NAME[ban.kind];
-    const recId = recordId(ban);
-    const color = 0x43B581; // Midtown Emerald Mint
-    const e = new EmbedBuilder()
-        .setColor(color)
-        .setAuthor({
-        name: 'Ghost Vanguard • Network Ban Enforcement',
-        iconURL: guild.client?.user?.displayAvatarURL?.() ?? undefined,
-    })
-        .setTitle(`🔓 ${kindTitle} lifted · ${recId}`)
-        .addFields({ name: 'Server', value: `${guild.name}\n(\`${guild.id}\`)`, inline: true }, { name: 'Target User', value: `<@${ban.user_id}> ${ban.username ? `(${ban.username}) ` : ''}\n\`${ban.user_id}\``, inline: true }, { name: 'Lifted By', value: `<@${actorId}>\n\`Ghost Vanguard Developer\``, inline: true }, { name: 'Reason', value: `>>> ${clip(reason || 'No reason given', 1024)}` }, {
-        name: 'Network Status',
-        value: '> 🕊️ **Network Ban Cleared**\n> The global network ban was lifted across all protected servers.\n-# The user may rejoin unless a local server ban applies.',
-    })
-        .setFooter({
-        text: `Ghost Vanguard • Network Protocol • ${recId}`,
-        iconURL: guild.iconURL?.() ?? undefined,
-    })
-        .setTimestamp();
-    return e;
-}
 export async function banIn(deps, guild, ban, why, deleteMessageSeconds = 0) {
     const base = { guildId: guild.id, name: guild.name };
     const userId = ban.user_id;
@@ -411,14 +386,14 @@ async function enforce(deps, guild, ban, why) {
 }
 /** Someone joined an authorized server: ban them if they have an active hardban or genreban. */
 export async function enforceOnJoin(deps, guild, userId) {
-    if (!deps.isReady(guild.id))
+    if (!deps.isReady(guild.id) || isWhitelistedPerson(userId))
         return false;
     const ban = activeBan(deps.store, 'hardban', userId) ?? activeBan(deps.store, 'genreban', userId);
     return ban ? enforce(deps, guild, ban, 'joined') : false;
 }
 /** Someone was unbanned: a hardban is re-applied immediately. */
 export async function enforceOnUnban(deps, guild, userId) {
-    if (!deps.isReady(guild.id))
+    if (!deps.isReady(guild.id) || isWhitelistedPerson(userId))
         return false;
     const ban = activeBan(deps.store, 'hardban', userId);
     return ban ? enforce(deps, guild, ban, 'unbanned') : false;
@@ -439,8 +414,8 @@ export async function sweepNetworkBans(deps) {
     sweeping = true;
     let applied = 0;
     try {
-        const hard = listActive(deps.store, 'hardban');
-        const gen = listActive(deps.store, 'genreban').filter(g => !hard.some(h => h.user_id === g.user_id));
+        const hard = listActive(deps.store, 'hardban').filter(h => !isWhitelistedPerson(h.user_id));
+        const gen = listActive(deps.store, 'genreban').filter(g => !hard.some(h => h.user_id === g.user_id) && !isWhitelistedPerson(g.user_id));
         if (!hard.length && !gen.length)
             return 0;
         for (const guild of targetServers(deps)) {
