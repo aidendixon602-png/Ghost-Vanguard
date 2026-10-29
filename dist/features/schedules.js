@@ -40,7 +40,7 @@ async function runLockSchedule(d, guild, now) {
         setFeature(d.store, guild.id, 'lockschedule', LOCK_SCHEDULE_DEFAULTS, { lockedBySchedule: false });
     }
 }
-export const REPORT_DEFAULTS = { enabled: true, lastAt: 0 };
+export const REPORT_DEFAULTS = { enabled: false, lastAt: 0 };
 const WEEK = 7 * 24 * 3600000;
 /** Cases per staff member over the last `days`. */
 export function activityReport(store, guild, botId, days = 7, now = Date.now()) {
@@ -63,18 +63,9 @@ export function activityReport(store, guild, botId, days = 7, now = Date.now()) 
     const botActions = Number(store.get('SELECT COUNT(*) AS n FROM cases WHERE guild_id=? AND at>=? AND moderator_id=?', guild, since, botId)?.n ?? 0);
     return `${lines.join('\n') || 'No staff actions in this period.'}${botActions ? `\n\n🤖 Vanguard took **${botActions}** automatic action${botActions === 1 ? '' : 's'}.` : ''}`;
 }
-async function runWeeklyReport(d, guild, now) {
-    const c = getFeature(d.store, guild.id, 'report', REPORT_DEFAULTS);
-    if (!c.enabled)
-        return;
-    if (!c.lastAt) {
-        setFeature(d.store, guild.id, 'report', REPORT_DEFAULTS, { lastAt: now });
-        return;
-    } // first report a week from now
-    if (now - c.lastAt < WEEK)
-        return;
-    setFeature(d.store, guild.id, 'report', REPORT_DEFAULTS, { lastAt: now });
-    d.logs.push(guild.id, embed('📊 Weekly staff activity', `<t:${Math.floor((now - WEEK) / 1000)}:d> → <t:${Math.floor(now / 1000)}:d>\n\n${activityReport(d.store, guild.id, d.client.user.id, 7, now)}\n\n-# Turn off with \`/setup staff report weekly:false\`.`, Colors.Blurple));
+async function runWeeklyReport(_d, _guild, _now) {
+    // Automated weekly staff activity reports completely removed
+    return;
 }
 export async function runSchedules(d, now = Date.now()) {
     for (const guild of d.client.guilds.cache.values()) {
@@ -82,7 +73,6 @@ export async function runSchedules(d, now = Date.now()) {
             continue;
         await d.store.withAuthorized(guild.id, async () => {
             await runLockSchedule(d, guild, now).catch(() => { });
-            await runWeeklyReport(d, guild, now).catch(() => { });
         }).catch(() => { });
     }
 }

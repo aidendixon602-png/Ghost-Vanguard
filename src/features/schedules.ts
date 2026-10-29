@@ -54,7 +54,7 @@ async function runLockSchedule(d: ScheduleDeps, guild: Guild, now: number) {
 }
 
 export interface ReportConfig { enabled: boolean; lastAt: number }
-export const REPORT_DEFAULTS: ReportConfig = { enabled: true, lastAt: 0 };
+export const REPORT_DEFAULTS: ReportConfig = { enabled: false, lastAt: 0 };
 const WEEK = 7 * 24 * 3600000;
 
 /** Cases per staff member over the last `days`. */
@@ -76,13 +76,9 @@ export function activityReport(store: Store, guild: string, botId: string, days 
     return `${lines.join('\n') || 'No staff actions in this period.'}${botActions ? `\n\n🤖 Vanguard took **${botActions}** automatic action${botActions === 1 ? '' : 's'}.` : ''}`;
 }
 
-async function runWeeklyReport(d: ScheduleDeps, guild: Guild, now: number) {
-    const c = getFeature(d.store, guild.id, 'report', REPORT_DEFAULTS);
-    if (!c.enabled) return;
-    if (!c.lastAt) { setFeature(d.store, guild.id, 'report', REPORT_DEFAULTS, { lastAt: now }); return; } // first report a week from now
-    if (now - c.lastAt < WEEK) return;
-    setFeature(d.store, guild.id, 'report', REPORT_DEFAULTS, { lastAt: now });
-    d.logs.push(guild.id, embed('📊 Weekly staff activity', `<t:${Math.floor((now - WEEK) / 1000)}:d> → <t:${Math.floor(now / 1000)}:d>\n\n${activityReport(d.store, guild.id, d.client.user!.id, 7, now)}\n\n-# Turn off with \`/setup staff report weekly:false\`.`, Colors.Blurple));
+async function runWeeklyReport(_d: ScheduleDeps, _guild: Guild, _now: number) {
+    // Automated weekly staff activity reports completely removed
+    return;
 }
 
 export async function runSchedules(d: ScheduleDeps, now = Date.now()) {
@@ -90,7 +86,6 @@ export async function runSchedules(d: ScheduleDeps, now = Date.now()) {
         if (!d.ready(guild.id)) continue;
         await d.store.withAuthorized(guild.id, async () => {
             await runLockSchedule(d, guild, now).catch(() => { });
-            await runWeeklyReport(d, guild, now).catch(() => { });
         }).catch(() => { });
     }
 }
