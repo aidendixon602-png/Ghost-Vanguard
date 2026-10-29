@@ -277,22 +277,22 @@ const who = (id, role) => {
         return 'Unavailable (could not be verified)';
     if (role === 'automatic')
         return `Ghost Vanguard (automatic)`;
-    return `<@${id}> (\`${id}\`)`;
+    return `<@${id}> ( ${id} )`;
 };
 const moderatorHeading = (r) => r.moderator_role === 'via-bot' ? 'Moderator (via bot)' : 'Banned By';
 const ts = (ms, style = 'f') => `<t:${Math.floor(ms / 1000)}:${style}>`;
 export function renderRecord(r) {
     const banned = r.status === 'banned';
     const statusWord = banned ? 'Banned' : r.status === 'expired' ? 'Ban expired' : 'Unbanned';
-    const e = new EmbedBuilder().setColor(banned ? Colors.Red : Colors.Green)
-        .setAuthor({ name: `${r.username ?? r.user_id} - ${statusWord}`, iconURL: r.avatar_url ?? undefined })
-        .setFooter({ text: `User ID: ${r.user_id} • ${caseId(r)}${r.network_record ? ` • ${r.network_record}` : ''}` });
+    const e = new EmbedBuilder().setColor(banned ? 0xB10F2E : 0x43B581)
+        .setAuthor({ name: `• ${r.username ?? r.user_id} - ${statusWord}`, iconURL: r.avatar_url ?? undefined })
+        .setFooter({ text: `User ID: ${r.user_id}${r.network_record ? ` • ${r.network_record}` : ''}` });
     if (r.banned_at)
         e.setTimestamp(r.banned_at);
     const fields = [
-        { name: 'User', value: `<@${r.user_id}> (\`${r.user_id}\`)`, inline: true },
+        { name: 'User', value: `<@${r.user_id}>\n( ${r.user_id} )`, inline: true },
         { name: r.banned_at ? moderatorHeading(r) : 'Banned By', value: r.banned_at ? who(r.moderator_id, r.moderator_role) : 'Unavailable (banned before ban logging started)', inline: true },
-        { name: 'Reason', value: clip(r.reason || (r.banned_at ? 'No reason provided' : 'Unavailable'), 1024) },
+        { name: 'Reason', value: clip(r.reason || (r.banned_at ? 'No reason given' : 'Unavailable'), 1024) },
     ];
     if (r.evidence)
         fields.push({ name: 'Evidence', value: clip(r.evidence, 1024) });
@@ -308,7 +308,7 @@ export function renderRecord(r) {
         fields.push({ name: 'Banned', value: ts(r.banned_at), inline: true });
     if (r.status_at) {
         const action = r.status === 'banned' ? 'Rebanned' : r.status === 'expired' ? 'Expired' : 'Unbanned';
-        fields.push({ name: 'Status', value: clip(`**${action}** by ${who(r.status_by, r.status_by_role)} · ${ts(r.status_at)}${r.status_reason ? `\n**Reason:** ${r.status_reason}` : ''}`, 1024) });
+        fields.push({ name: 'Status', value: clip(`${action} by ${who(r.status_by, r.status_by_role)} · ${ts(r.status_at)}${r.status_reason ? `\n**Reason:** ${r.status_reason}` : ''}`, 1024) });
     }
     const history = JSON.parse(r.history || '[]');
     if (history.length > 2)
@@ -327,7 +327,7 @@ const KIND_TITLE = { genreban: 'Genreban', hardban: 'Hardban', tempban: 'Tempora
 function card(r, o) {
     const e = new EmbedBuilder().setColor(o.color).setTitle(o.title)
         .setAuthor({ name: r.username ?? r.user_id, iconURL: r.avatar_url ?? undefined })
-        .addFields({ name: 'User', value: `<@${r.user_id}>\n\`${r.user_id}\``, inline: true }, { name: 'Case', value: caseId(r), inline: true }, { name: 'Ban', value: o.ban ?? KIND_TITLE[r.kind] ?? 'Ban', inline: true }, ...(o.fields ?? []));
+        .addFields({ name: 'User', value: `<@${r.user_id}>\n\`${r.user_id}\``, inline: true }, { name: 'Ban', value: o.ban ?? KIND_TITLE[r.kind] ?? 'Ban', inline: true }, ...(o.fields ?? []));
     if (o.footer)
         e.setFooter({ text: o.footer });
     return e;
@@ -364,7 +364,7 @@ export async function handleBanLogInteraction(i, deps) {
         const live = await bannedNow(i.guild, record.user_id);
         if (live === null)
             return reply('Discord could not confirm whether they are banned right now (Vanguard may be missing Ban Members). Nothing was changed.');
-        const label = `**${record.username ?? record.user_id}** (\`${record.user_id}\`) · ${caseId(record)}`;
+        const label = `**${record.username ?? record.user_id}** (\`${record.user_id}\`)`;
         // The record and Discord disagree (an event was missed): fix the record first, without guessing who did it.
         if (live !== (record.status === 'banned')) {
             const fixed = setStatus(store, record, live ? 'banned' : 'unbanned', null, 'unverified', 'Status corrected from Discord: the change was made while it was not being tracked.');
@@ -391,7 +391,7 @@ export async function handleBanLogInteraction(i, deps) {
                 return reply(`${label} is already banned.`);
             if (!i.isButton())
                 return;
-            return i.showModal(new ModalBuilder().setCustomId(`${REF}:rebanform:${id}`).setTitle(`Reban ${caseId(record)}`).addComponents(new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('reason').setLabel('Reason for the reban (required)')
+            return i.showModal(new ModalBuilder().setCustomId(`${REF}:rebanform:${id}`).setTitle(`Reban ${clip(record.username ?? record.user_id, 35)}`).addComponents(new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('reason').setLabel('Reason for the reban (required)')
                 .setStyle(TextInputStyle.Paragraph).setRequired(true).setMinLength(3).setMaxLength(450))));
         }
         if (action === 'rebanform' && i.isModalSubmit()) {
@@ -406,7 +406,7 @@ export async function handleBanLogInteraction(i, deps) {
             if (!live)
                 return i.update({ content: `${label} is not banned any more. Nothing was changed.`, embeds: [], components: [] });
             if (net && deps.network) {
-                const reason = `Lifted from the ban log (${caseId(record)})`;
+                const reason = 'Lifted from the ban log';
                 await i.update({ embeds: [card(record, { title: `⏳ Unbanning ${record.username ?? record.user_id} everywhere…`, color: Colors.Blurple, ban: `${KIND_TITLE[net.kind]} · ${net.record}` })], components: [] });
                 // Is this server's ban the network ban itself, or the server's own ban that it covers?
                 const own = !TAG[net.kind] || !(await i.guild.bans.fetch({ user: record.user_id, force: true }).catch(() => null))?.reason?.startsWith(TAG[net.kind]);
@@ -428,7 +428,7 @@ export async function handleBanLogInteraction(i, deps) {
             catch (error) {
                 return i.update({ content: error instanceof Error ? error.message : 'This ban cannot be lifted here.', embeds: [], components: [] });
             }
-            const reason = `Unbanned from the ban log (${caseId(record)})`;
+            const reason = 'Unbanned from the ban log';
             await i.guild.members.unban(record.user_id, clip(`${i.user.id}: ${reason}`, 500));
             const updated = setStatus(store, record, 'unbanned', i.user.id, 'via-bot', reason);
             publish(store, logs, updated, false);
@@ -445,7 +445,7 @@ export async function handleBanLogInteraction(i, deps) {
             // Update the record first so the ban event that follows does not start a second record.
             const updated = setStatus(store, record, 'banned', i.user.id, 'via-bot', reason);
             try {
-                await i.guild.members.ban(record.user_id, { reason: clip(`${i.user.id}: Reban (${caseId(record)}): ${reason}`, 500) });
+                await i.guild.members.ban(record.user_id, { reason: clip(`${i.user.id}: Reban: ${reason}`, 500) });
             }
             catch (error) {
                 const reverted = setStatus(store, updated, 'unbanned', null, 'unverified', `Reban by <@${i.user.id}> failed: ${error instanceof Error ? error.message : 'unknown error'}`);

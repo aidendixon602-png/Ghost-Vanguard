@@ -2,26 +2,26 @@ import { EmbedBuilder, Colors, PermissionFlagsBits, SlashCommandBuilder } from '
 import { defineCommand } from '../../bot/registry.js';
 import { AppError } from '../../errors.js';
 import { clip } from '../../core.js';
-import { caseId, renderRecord, type BanRecord } from '../../audit/ban-log.js';
+import { renderRecord, type BanRecord } from '../../audit/ban-log.js';
 import { activeBan, recordId } from '../../security/network-ban.js';
 
 /**
  * /mod bans: look things up in the ban log without scrolling #bans.
  *   lookup  every ban record for a user here, plus any active genreban/hardban
- *   case    one record by its case ID (BAN-0005 or 5), with a link to the message
+ *   case    one record by its record ID, with a link to the message
  *   recent  the latest records
  *   stats   the last 30 days: bans, unbans, types and who banned most
  */
 const STATUS: Record<string, string> = { banned: '🔴 Banned', unbanned: '🟢 Unbanned', expired: '🟢 Expired' };
 const TYPE: Record<string, string> = { ban: 'Ban', manual: 'Ban', tempban: 'Tempban', softban: 'Softban', genreban: 'Genreban', hardban: 'Hardban', automatic: 'Automatic' };
 const link = (r: BanRecord) => r.channel_id && r.message_id ? ` · [view](https://discord.com/channels/${r.guild_id}/${r.channel_id}/${r.message_id})` : '';
-const line = (r: BanRecord) => `**${caseId(r)}** · ${STATUS[r.status] ?? r.status} · ${TYPE[r.kind] ?? r.kind}${r.network_record ? ` ${r.network_record}` : ''} · <t:${Math.floor((r.banned_at || r.status_at || 0) / 1000)}:d>${link(r)}\n-# ${clip(r.reason || 'No reason provided', 120)}`;
+const line = (r: BanRecord) => `${STATUS[r.status] ?? r.status} · ${TYPE[r.kind] ?? r.kind}${r.network_record ? ` ${r.network_record}` : ''} · <t:${Math.floor((r.banned_at || r.status_at || 0) / 1000)}:d>${link(r)}\n-# ${clip(r.reason || 'No reason provided', 120)}`;
 
-export default defineCommand(new SlashCommandBuilder().setName('bans').setDescription('Search the ban log: a user, a case ID, recent bans or stats')
+export default defineCommand(new SlashCommandBuilder().setName('bans').setDescription('Search the ban log: a user, recent bans or stats')
     .addSubcommand(s => s.setName('lookup').setDescription("A user's ban records in this server")
         .addUserOption(o => o.setName('user').setDescription('User (or paste their ID)').setRequired(true)))
-    .addSubcommand(s => s.setName('case').setDescription('Show one ban record by case ID')
-        .addStringOption(o => o.setName('id').setDescription('Case ID, e.g. BAN-0005 or 5').setRequired(true).setMaxLength(12)))
+    .addSubcommand(s => s.setName('case').setDescription('Show one ban record by record ID')
+        .addStringOption(o => o.setName('id').setDescription('Ban record ID or number, e.g. 5').setRequired(true).setMaxLength(12)))
     .addSubcommand(s => s.setName('recent').setDescription('The latest ban records in this server'))
     .addSubcommand(s => s.setName('stats').setDescription('Bans and unbans in the last 30 days')),
 { category: 'moderation', responseKind: 'info', requiredPermissions: [PermissionFlagsBits.BanMembers], cooldown: 3000 }, async (ctx, i) => {
@@ -29,9 +29,9 @@ export default defineCommand(new SlashCommandBuilder().setName('bans').setDescri
     const all = (sql: string, ...args: (string | number)[]) => ctx.store.all(sql, guild, ...args) as unknown as BanRecord[];
     if (sub === 'case') {
         const n = Number(/^\s*(?:BAN-?)?0*(\d{1,6})\s*$/i.exec(i.options.getString('id', true))?.[1]);
-        if (!n) throw new AppError('VALIDATION_ERROR', 'Use a case ID like BAN-0005 or just 5.');
-        const r = all('SELECT * FROM ban_records WHERE guild_id=? AND number=?', n)[0];
-        if (!r) throw new AppError('VALIDATION_ERROR', `There is no ${`BAN-${String(n).padStart(4, '0')}`} in this server.`);
+        if (!n) throw new AppError('VALIDATION_ERROR', 'Use a record ID or number, e.g. 5.');
+        const r = all('SELECT * FROM ban_records WHERE guild_id=? AND (number=? OR id=?)', n, n)[0];
+        if (!r) throw new AppError('VALIDATION_ERROR', `There is no ban record #${n} in this server.`);
         await i.editReply({ content: link(r) ? `Posted in <#${r.channel_id}>${link(r)}` : undefined, embeds: renderRecord(r).embeds, allowedMentions: { parse: [] } });
         return;
     }

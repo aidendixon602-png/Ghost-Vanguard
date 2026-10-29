@@ -13,7 +13,7 @@ import { assertLocalUnban, existingBan } from '../security/network-ban.js';
 import { staffReason } from '../security/raidmode.js';
 import { clip, dangerous } from '../core.js';
 import { isProtectedUser } from '../bot/env-rules.js';
-import { caseId, getRecord, setStatus, publish } from '../audit/ban-log.js';
+import { getRecord, setStatus, publish } from '../audit/ban-log.js';
 
 /**
  * The control panel: a private #vanguard-control channel with one panel message whose buttons
@@ -155,7 +155,7 @@ export function revertibles(store: Store, guildId: string, now = Date.now()): Re
         out.push({ value: `inc:${r.id}`, label: `Undo anti-nuke strip · incident #${r.id}`, description: `Gives ${r.actor_id} their roles back · ${new Date(Number(r.at)).toUTCString().slice(5, 22)} UTC` });
     }
     for (const r of store.all("SELECT * FROM ban_records WHERE guild_id=? AND status='banned' AND banned_at>? AND kind NOT IN ('genreban','hardban') AND moderator_role IN ('via-bot','automatic') ORDER BY banned_at DESC LIMIT 10", guildId, now - WEEK))
-        out.push({ value: `ban:${r.id}`, label: `Unban · ${caseId(r as any)} · ${clip(String(r.username ?? r.user_id), 40)}`, description: clip(`${r.reason ?? 'No reason given'}`, 100) });
+        out.push({ value: `ban:${r.id}`, label: `Unban · ${clip(String(r.username ?? r.user_id), 40)}`, description: clip(`${r.reason ?? 'No reason given'}`, 100) });
     return out.slice(0, 25);
 }
 
@@ -296,7 +296,7 @@ export function registerControlPanel(registry: Registry) {
                     const record = getRecord(ctx.store, guild.id, id);
                     if (!record || record.status !== 'banned') throw new AppError('VALIDATION_ERROR', 'That ban is no longer active.');
                     await confirmDanger(ctx, i, {
-                        title: `Unban ${record.username ?? record.user_id}`, summary: `Lift ban **${caseId(record)}** for <@${record.user_id}>.\n**Reason it was made:** ${clip(record.reason ?? 'No reason given', 300)}`,
+                        title: `Unban ${record.username ?? record.user_id}`, summary: `Lift ban for <@${record.user_id}>.\n**Reason it was made:** ${clip(record.reason ?? 'No reason given', 300)}`,
                         consequences: ['They can rejoin with an invite.', 'Genrebans and hardbans can never be lifted here.', 'Logged with your name, and the ban record in #bans is updated.'],
                         label: 'Unban', reversal: 'Ban them again with `/mod ban`.',
                         run: async (c: any) => {
@@ -308,10 +308,10 @@ export function registerControlPanel(registry: Registry) {
                                 return 'They were already unbanned on Discord, so the record was corrected.';
                             }
                             await assertLocalUnban(c.store, guild, fresh.user_id, existing);
-                            await guild.members.unban(fresh.user_id, staffReason(actorId, `control panel: revert ${caseId(fresh)}`));
-                            recordPanelAction(c.store, c.logs, guild.id, actorId, fresh.user_id, 'Revert · unban', `${caseId(fresh)} lifted.`);
+                            await guild.members.unban(fresh.user_id, staffReason(actorId, 'control panel: revert unban'));
+                            recordPanelAction(c.store, c.logs, guild.id, actorId, fresh.user_id, 'Revert · unban', `Unbanned <@${fresh.user_id}>.`);
                             await afterAction(c, guild);
-                            return `↩️ **Unbanned <@${fresh.user_id}>** (${caseId(fresh)}).`;
+                            return `↩️ **Unbanned <@${fresh.user_id}>**.`;
                         },
                     });
                     return;

@@ -11,7 +11,7 @@ import { config } from '../../config.js';
 import { BOT_BELOW_TARGET, classify, finish } from '../../ui/progress.js';
 import { liveProgress, summaryEmbed, type NetworkView } from '../../ui/network-ui.js';
 import { banTypeFromReason, type ServerResult } from '../../security/network-ban.js';
-import { caseId, recordExistingBan } from '../../audit/ban-log.js';
+import { recordExistingBan } from '../../audit/ban-log.js';
 
 export function parseIds(text: string): string[] {
     const ids = [...new Set(text.split(/[\s,;]+/).map(s => s.replace(/[<@!>]/g, '')).filter(Boolean))];
@@ -60,7 +60,7 @@ export default defineCommand(new SlashCommandBuilder().setName('massban').setDes
                     else {
                         c.store.recordCase(b.guildId, id, c.actor!.id, 'massban', reason, { username: member?.user?.tag ?? null });
                         const { record } = recordExistingBan(c.store, c.logs, b.guildId, { id, tag: member?.user?.tag ?? null }, c.actor!.id, reason, null);
-                        results.push(row('already', `Already banned; reason added to ${caseId(record)}.`));
+                        results.push(row('already', 'Already banned; reason added to their ban record.'));
                     }
                 }
                 else if (member && !member.bannable) results.push(row('hierarchy', BOT_BELOW_TARGET));

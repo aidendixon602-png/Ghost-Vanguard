@@ -78,12 +78,12 @@ test('a ban made with a Vanguard command is recorded once, like the example, wit
         assert.equal(posted.embeds[0].author.name, 'urloffy - Banned');
         assert.equal(posted.embeds[0].author.icon_url, 'https://cdn.discordapp.com/avatar.png');
         const f = fieldsOf(posted);
-        assert.equal(f.User, `<@${USER}> (\`${USER}\`)`);
-        assert.equal(f['Moderator (via bot)'], `<@${STAFF}> (\`${STAFF}\`)`);
+        assert.equal(f.User, `<@${USER}>\n( ${USER} )`);
+        assert.equal(f['Moderator (via bot)'], `<@${STAFF}> ( ${STAFF} )`);
         assert.equal(f.Reason, 'faking payments for free roles');
         assert.equal(f.Evidence, 'https://imgur.com/proof');
         assert.equal(f.Duration, 'Permanent');
-        assert.match(posted.embeds[0].footer.text, /User ID: 400000000000000001 • BAN-0001/);
+        assert.match(posted.embeds[0].footer.text, new RegExp(`User ID: ${USER}`));
         assert.deepEqual(buttons(posted), [{ label: 'Unban', disabled: false, style: 3 }, { label: 'Reban', disabled: true, style: 4 }], 'Unban only while banned; Reban is red');
         assert.equal(posted.nonce, `mv1`, 'each post carries a nonce so a retry cannot double-post');
         assert.equal(getRecord(w.store, G, record!.id)!.message_id, 'm1', 'the message is remembered for later updates');
@@ -283,7 +283,7 @@ test('Reban needs a reason, confirms, records the developer, and never starts a 
         await run(w, confirm);
         assert.equal(confirm.replies[0].embeds[0].data.title, '🔨 urloffy rebanned');
         assert.ok(w.bans.has(USER));
-        assert.match(w.bans.get(USER)!, new RegExp(`^${DEV}: Reban \\(BAN-0001\\): came back and raided again`));
+        assert.match(w.bans.get(USER)!, new RegExp(`^${DEV}: Reban: came back and raided again`));
         // Discord's ban event for the reban: the open record already covers it.
         assert.equal(await w.store.withAuthorized(G, () => onBanAdd(w.store, w.logs, w.guild, w.user)), null);
         const updated = getRecord(w.store, G, record.id)!;
@@ -362,7 +362,7 @@ test('a normal ban that gets a hardban on top: the same record is upgraded, and 
         assert.deepEqual([r.kind, r.network_record, r.number], ['hardban', 'HB-00005', 1], 'same case ID, now showing the hardban');
         const f = fieldsOf(renderRecord(r));
         assert.match(f['Approved by'], /HB-00005/); assert.equal(f.Type, 'Hardban'); assert.equal(f.Evidence, 'ticket 9');
-        assert.match(renderRecord(r).embeds[0].footer.text, /BAN-0001 • HB-00005/);
+        assert.match(renderRecord(r).embeds[0].footer.text, /HB-00005/);
         assert.equal(f.Reason, 'raid', 'the original reason is kept');
         await w.store.withAuthorized(G, async () => uncoverNetwork(w.store, w.logs, G, USER, ban, DEV));
         r = getRecord(w.store, G, record.id)!;

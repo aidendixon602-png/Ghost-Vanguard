@@ -6,7 +6,7 @@ import { RANKS, rankOf } from '../bot/ranks.js';
 import { sendBanNotice } from '../features/appeals.js';
 import { escalateWarnings } from '../features/warn-points.js';
 import { assertLocalUnban, banTypeFromReason, existingBan } from './network-ban.js';
-import { caseId, recordExistingBan } from '../audit/ban-log.js';
+import { recordExistingBan } from '../audit/ban-log.js';
 export async function moderate(i, store, logs, actor) {
     const me = await i.guild.members.fetchMe();
     const sub = i.options.getSubcommand();
@@ -102,7 +102,7 @@ export async function moderate(i, store, logs, actor) {
     if (alreadyBanned) {
         const user = i.options.getUser('user', true);
         const { record, isNew } = recordExistingBan(store, logs, i.guildId, { id: targetId, tag: user.tag, username: user.username, avatar: user.displayAvatarURL?.() ?? null }, actor.id, reason, i.options.getString('evidence'));
-        note = [`They were **already banned** on Discord, so the ban itself did not change. Your reason${i.options.getString('evidence') ? ' and evidence were' : ' was'} ${isNew ? 'used to start' : 'added to'} their ban record **${caseId(record)}** in #bans.`, note].filter(Boolean).join('\n');
+        note = [`They were **already banned** on Discord, so the ban itself did not change. Your reason${i.options.getString('evidence') ? ' and evidence were' : ' was'} ${isNew ? 'used to start' : 'added to'} their ban record in #bans.`, note].filter(Boolean).join('\n');
     }
     // Warning points: enough warnings trigger an automatic timeout, kick or ban.
     // Only members can be escalated (a ban on someone already gone needs a Moderator's own decision).

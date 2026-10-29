@@ -8,7 +8,7 @@ import { confirmDanger } from '../../ui/danger-ui.js';
 import { staffReason } from '../../security/raidmode.js';
 import { banTypeFromReason, existingBan } from '../../security/network-ban.js';
 import { classify, finish, outcomeEmbed } from '../../ui/progress.js';
-import { caseId, recordExistingBan } from '../../audit/ban-log.js';
+import { recordExistingBan } from '../../audit/ban-log.js';
 const DURATIONS = [['1 hour', 1], ['6 hours', 6], ['12 hours', 12], ['1 day', 24], ['3 days', 72], ['7 days', 168], ['14 days', 336], ['30 days', 720]];
 export default defineCommand(new SlashCommandBuilder().setName('tempban').setDescription('Ban a user for a set time; Vanguard lifts the ban automatically')
     .addUserOption(o => o.setName('user').setDescription('User').setRequired(true))
@@ -48,7 +48,7 @@ export default defineCommand(new SlashCommandBuilder().setName('tempban').setDes
                 let extra = '';
                 if (existing) {
                     const { record } = recordExistingBan(c.store, c.logs, b.guildId, { id: user.id, tag: user.tag, username: user.username, avatar: user.displayAvatarURL?.() ?? null }, c.actor.id, reason, evidence, Date.now(), { kind: 'tempban', duration: label, expiresAt: until });
-                    extra = `\nThey were **already banned**, so instead of a new ban their existing ban now **ends automatically** <t:${Math.floor(until / 1000)}:R>. Ban record **${caseId(record)}** was updated.`;
+                    extra = `\nThey were **already banned**, so instead of a new ban their existing ban now **ends automatically** <t:${Math.floor(until / 1000)}:R>. Their ban record in #bans was updated.`;
                 }
                 return finish(b, outcomeEmbed(`Tempban succeeded: ${user.username}`, { outcome: 'success', reason: `Case #${number}: **${user.tag}** (\`${user.id}\`) banned until <t:${Math.floor(until / 1000)}:f>.\n**Moderator:** <@${c.actor.id}> · **Reason:** ${reason}${extra}` }));
             }

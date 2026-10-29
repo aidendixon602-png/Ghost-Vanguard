@@ -1,5 +1,5 @@
 import { coverWithNetwork, uncoverNetwork } from '../audit/ban-log.js';
-import { Colors, PermissionFlagsBits } from 'discord.js';
+import { Colors, EmbedBuilder, PermissionFlagsBits } from 'discord.js';
 import { developers } from '../bot/developers.js';
 import { isSupreme } from '../bot/ranks.js';
 import { config } from '../config.js';
@@ -182,6 +182,60 @@ const WHY_NOTE = {
  * Bans one user in one server for a network ban and reports what happened. Records
  * the outcome against the ban. Never throws.
  */
+export function networkBanLogEmbed(guild, ban, why) {
+    const isIssued = why === 'issued';
+    const kindTitle = KIND_NAME[ban.kind];
+    const recId = recordId(ban);
+    const title = isIssued ? `${kindTitle} applied · ${recId}` : `${kindTitle} re-applied · ${recId}`;
+    const color = 0xB10F2E; // Midtown Crimson
+    const e = new EmbedBuilder()
+        .setColor(color)
+        .setAuthor({
+        name: 'Ghost Vanguard • Network Ban Enforcement',
+        iconURL: guild.client.user?.displayAvatarURL() ?? undefined,
+    })
+        .setTitle(`🛡️ ${title}`)
+        .addFields({ name: 'Server', value: `${guild.name}\n(\`${guild.id}\`)`, inline: true }, { name: 'Target User', value: `<@${ban.user_id}> ${ban.username ? `(${ban.username}) ` : ''}\n\`${ban.user_id}\``, inline: true }, { name: 'Authorized By', value: `<@${ban.moderator_id}>\n\`Ghost Vanguard Developer\``, inline: true }, { name: 'Reason', value: `>>> ${clip(ban.reason || 'No reason given', 1024)}` });
+    if (ban.evidence) {
+        e.addFields({ name: 'Evidence', value: `>>> ${clip(ban.evidence, 1024)}` });
+    }
+    if (ban.evidence_file) {
+        e.addFields({ name: 'Evidence File', value: `\`${clip(ban.evidence_file, 256)}\`` });
+    }
+    const networkPolicy = isIssued
+        ? ban.kind === 'hardban'
+            ? '> 🌐 **Network Hardban Policy**\n> This user is permanently banned from every server Ghost Vanguard protects and is re-banned if unbanned.\n-# Only a Developer can lift it, with `,unhardban`.'
+            : '> 🌐 **Network Genreban Policy**\n> This user is banned from every server Ghost Vanguard protects and is banned again if they join.\n-# Only a Developer or Supreme Leader can lift it, with `,ungenreban`.'
+        : `> ⚠️ **Network Enforcement**\n> ${WHY_NOTE[why](ban.kind)}`;
+    e.addFields({ name: 'Network Scope', value: networkPolicy });
+    e.setFooter({
+        text: `Ghost Vanguard • Network Protocol • ${recId}`,
+        iconURL: guild.iconURL() ?? undefined,
+    }).setTimestamp();
+    return e;
+}
+export function networkUnbanLogEmbed(guild, ban, reason, actorId) {
+    const kindTitle = KIND_NAME[ban.kind];
+    const recId = recordId(ban);
+    const color = 0x43B581; // Midtown Emerald Mint
+    const e = new EmbedBuilder()
+        .setColor(color)
+        .setAuthor({
+        name: 'Ghost Vanguard • Network Ban Enforcement',
+        iconURL: guild.client.user?.displayAvatarURL() ?? undefined,
+    })
+        .setTitle(`🔓 ${kindTitle} lifted · ${recId}`)
+        .addFields({ name: 'Server', value: `${guild.name}\n(\`${guild.id}\`)`, inline: true }, { name: 'Target User', value: `<@${ban.user_id}> ${ban.username ? `(${ban.username}) ` : ''}\n\`${ban.user_id}\``, inline: true }, { name: 'Lifted By', value: `<@${actorId}>\n\`Ghost Vanguard Developer\``, inline: true }, { name: 'Reason', value: `>>> ${clip(reason || 'No reason given', 1024)}` }, {
+        name: 'Network Status',
+        value: '> 🕊️ **Network Ban Cleared**\n> The global network ban was lifted across all protected servers.\n-# The user may rejoin unless a local server ban applies.',
+    })
+        .setFooter({
+        text: `Ghost Vanguard • Network Protocol • ${recId}`,
+        iconURL: guild.iconURL() ?? undefined,
+    })
+        .setTimestamp();
+    return e;
+}
 export async function banIn(deps, guild, ban, why, deleteMessageSeconds = 0) {
     const base = { guildId: guild.id, name: guild.name };
     const userId = ban.user_id;
@@ -213,19 +267,7 @@ export async function banIn(deps, guild, ban, why, deleteMessageSeconds = 0) {
             }
             await guild.members.ban(userId, { reason: clip(`${TAG[ban.kind]} ${recordId(ban)} ${ban.moderator_id}: ${ban.reason}`, 500), deleteMessageSeconds: why === 'issued' ? deleteMessageSeconds : 0 });
             deps.store.recordCase(guild.id, userId, ban.moderator_id, ban.kind, `${recordId(ban)}: ${ban.reason}`, { username: ban.username, evidence: ban.evidence });
-            deps.logs.push(guild.id, embed(why === 'issued' ? `${KIND_NAME[ban.kind]} applied · ${recordId(ban)}` : `${KIND_NAME[ban.kind]} re-applied · ${recordId(ban)}`, [
-                `**Server:** ${guild.name} (\`${guild.id}\`)`,
-                `**User:** <@${userId}> ${ban.username ? `(${ban.username}) ` : ''}\`${userId}\``,
-                `**By:** Ghost Vanguard developer <@${ban.moderator_id}>`,
-                `**Reason:** ${ban.reason}`,
-                ban.evidence ? `**Evidence:** ${clip(ban.evidence, 500)}` : '',
-                ban.evidence_file ? `**Evidence file:** ${ban.evidence_file}` : '',
-                why === 'issued'
-                    ? ban.kind === 'hardban'
-                        ? 'This user is banned from every server Ghost Vanguard protects and is re-banned if unbanned. Only a Developer can lift it with `/network unhardban`.'
-                        : 'This user is banned from every server Ghost Vanguard protects and is banned again if they join. Only a Supreme Leader or Developer can lift it with `/network ungenreban`.'
-                    : WHY_NOTE[why](ban.kind),
-            ].filter(Boolean).join('\n'), Colors.DarkRed));
+            deps.logs.push(guild.id, networkBanLogEmbed(guild, ban, why));
             return { ...base, outcome: 'success', reason: member ? 'Banned (they were a member).' : 'Banned by user ID (they were not a member).' };
         });
     }
@@ -255,7 +297,7 @@ export async function unbanIn(deps, guild, ban, reason, actorId) {
             }
             await guild.members.unban(ban.user_id, clip(`${actorId}: un${ban.kind} ${recordId(ban)}: ${reason}`, 500));
             deps.store.recordCase(guild.id, ban.user_id, actorId, `un${ban.kind}`, `${recordId(ban)}: ${reason}`, { username: ban.username });
-            deps.logs.push(guild.id, embed(`${KIND_NAME[ban.kind]} lifted · ${recordId(ban)}`, `**Server:** ${guild.name} (\`${guild.id}\`)\n**User:** <@${ban.user_id}> \`${ban.user_id}\`\n**By:** Ghost Vanguard developer <@${actorId}>\n**Reason:** ${reason}`, Colors.Green));
+            deps.logs.push(guild.id, networkUnbanLogEmbed(guild, ban, reason, actorId));
             return { ...base, outcome: 'success', reason: 'Unbanned.' };
         });
     }
