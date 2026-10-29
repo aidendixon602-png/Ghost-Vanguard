@@ -75,7 +75,7 @@ test('a ban made with a Vanguard command is recorded once, like the example, wit
         await w.logs.flush();
         assert.equal(w.sent.length, 1, 'posted to #bans exactly once');
         const posted = w.sent[0];
-        assert.equal(posted.embeds[0].author.name, 'urloffy - Banned');
+        assert.equal(posted.embeds[0].author.name, '• urloffy - Banned');
         assert.equal(posted.embeds[0].author.icon_url, 'https://cdn.discordapp.com/avatar.png');
         const f = fieldsOf(posted);
         assert.equal(f.User, `<@${USER}>\n( ${USER} )`);
@@ -95,7 +95,7 @@ test('a ban done directly in Discord is credited to the verified person; with no
     try {
         await w.discordBan(MANUAL, 'alt account');
         const f = fieldsOf(renderRecord(latestRecord(w.store, G, USER)!));
-        assert.equal(f['Banned By'], `<@${MANUAL}> (\`${MANUAL}\`)`);
+        assert.equal(f['Banned By'], `<@${MANUAL}> ( ${MANUAL} )`);
         assert.equal(f.Reason, 'alt account');
     } finally { w.store.close(); }
     const blind = world({ auditAccess: false });
@@ -129,9 +129,9 @@ test('tempbans show duration and expiry; when they expire the same record is upd
         assert.equal(w.sent.length, 1, 'no second post');
         assert.equal(w.edits.length, 1, 'the original message was edited');
         f = fieldsOf(w.edits[0].p);
-        assert.match(f.Status, /Expired\*\* by Ghost Vanguard \(automatic\)/);
+        assert.match(f.Status, /Expired by Ghost Vanguard \(automatic\)/);
         assert.equal(f.Reason, 'spam', 'the original ban details are kept');
-        assert.equal(w.edits[0].p.embeds[0].author.name, 'urloffy - Ban expired');
+        assert.equal(w.edits[0].p.embeds[0].author.name, '• urloffy - Ban expired');
     } finally { w.store.close(); }
 });
 
@@ -144,7 +144,7 @@ test('genrebans and hardbans show the developer approval and evidence', async ()
         assert.equal(f.Type, 'Genreban');
         assert.equal(f.Evidence, 'ticket 42');
         assert.match(f['Approved by'], new RegExp(`<@${DEV}> \\(developer\\) · GB-0000${ban.id}`));
-        assert.equal(f['Moderator (via bot)'], `<@${DEV}> (\`${DEV}\`)`);
+        assert.equal(f['Moderator (via bot)'], `<@${DEV}> ( ${DEV} )`);
     } finally { w.store.close(); }
 });
 
@@ -155,7 +155,7 @@ test('an unban of a ban that predates the ban log is still recorded, with the un
         await w.discordUnban(MANUAL, 'appeal accepted');
         const f = fieldsOf(renderRecord(latestRecord(w.store, G, USER)!));
         assert.equal(f['Banned By'], 'Unavailable (banned before ban logging started)');
-        assert.match(f.Status, new RegExp(`Unbanned\\*\\* by <@${MANUAL}>`));
+        assert.match(f.Status, new RegExp(`^Unbanned by <@${MANUAL}>`));
         assert.match(f.Status, /appeal accepted/);
     } finally { w.store.close(); }
 });
@@ -260,7 +260,7 @@ test('Unban asks to confirm, re-checks the real ban, then updates the original r
         await w.logs.flush();
         const edited = w.edits.at(-1)!.p;
         assert.deepEqual(buttons(edited).map((b: any) => b.disabled), [true, false], 'now only Reban is enabled');
-        assert.match(fieldsOf(edited).Status, new RegExp(`Unbanned\\*\\* by <@${DEV}>`));
+        assert.match(fieldsOf(edited).Status, new RegExp(`^Unbanned by <@${DEV}>`));
     } finally { config.developers.delete(DEV); w.store.close(); }
 });
 

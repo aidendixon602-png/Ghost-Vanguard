@@ -103,7 +103,7 @@ function network(guilds: any[], store = new Store(':memory:')) {
             users: { fetch: async (id: string) => { if (users[id]) return users[id]; throw { code: 10013 }; } },
         } as any,
         store,
-        logs: { push: (guildId: string, e: any) => void logged.push(`${guildId}:${e.data.title}\n${e.data.description}`) } as any,
+        logs: { push: (guildId: string, e: any) => void logged.push(`${guildId}:${e.data.title}\n${e.data.description}\n${(e.data.fields ?? []).map((f: any) => `${f.name}: ${f.value}`).join('\n')}`) } as any,
         isReady: () => true,
     };
     return { deps, store, logged, dms };
@@ -221,8 +221,8 @@ test('a genreban reports each server clearly and records every outcome', async (
     const covered = store.readGuild(staff.guild.id, () => store.get('SELECT * FROM ban_records WHERE guild_id=? AND user_id=?', staff.guild.id, TARGET))!;
     assert.deepEqual([covered.kind, covered.network_record, covered.status], ['genreban', 'GB-00001', 'banned'], 'its ban record now shows the genreban');
     assert.equal(logged.length, 2, 'only servers that actually banned are told');
-    assert.match(logged[0]!, /\*\*Server:\*\* Alpha \(`100000000000000001`\)/, 'each log names its server and server ID');
-    assert.match(logged[1]!, /\*\*Server:\*\* Bravo \(`100000000000000002`\)/);
+    assert.match(logged[0]!, /Server: Alpha\n\(`100000000000000001`\)/, 'each log names its server and server ID');
+    assert.match(logged[1]!, /Server: Bravo\n\(`100000000000000002`\)/);
     assert.equal(serverResults(store, ban.id).length, 8, 'every server\'s outcome is saved with the record');
     const caseRow = store.readGuild(ok.guild.id, () => store.get('SELECT * FROM cases WHERE guild_id=? AND user_id=?', ok.guild.id, TARGET))!;
     assert.equal(caseRow.username, 'raider');
