@@ -1,4 +1,5 @@
 import { config } from '../config.js';
+import { gvText } from '../ui/gv-names.js';
 /**
  * The only people the bot ever DMs about the bot itself: database backup files, "back online",
  * backup failures, empty-database warnings and genreban exceptions. Set with TRUSTED_DM_IDS;
@@ -11,7 +12,7 @@ export async function dmTrusted(client, payload) {
     let sent = 0;
     for (const id of trustedRecipients()) {
         const user = await client.users.fetch(id).catch(() => null);
-        if (user && await user.send(payload).then(() => true, () => false))
+        if (user && await user.send(gvText(payload)).then(() => true, () => false))
             sent++;
     }
     return sent;
@@ -28,7 +29,7 @@ export async function dmSecurityAlert(client, payload) {
     let sent = 0;
     for (const id of securityAlertRecipients()) {
         const user = await client.users.fetch(id).catch(() => null);
-        if (user && await user.send(payload).then(() => true, () => false))
+        if (user && await user.send(gvText(payload)).then(() => true, () => false))
             sent++;
     }
     return sent;
