@@ -35,8 +35,8 @@ test('/mod bans: lookup, case, recent and stats read the ban log', async () => {
     try {
         const lookup = await run(store, 'lookup', { user: { id: U1, tag: 'one', username: 'one', displayAvatarURL: () => 'https://a/b.png' } });
         assert.match(lookup, /Hardban HB-00002/); assert.match(lookup, /Unbanned/);
-        assert.match(await run(store, 'case', { id: 'ban-0002' }), /two • Banned/);
-        assert.match(await run(store, 'case', { id: '2' }), /two • Banned/);
+        assert.match(await run(store, 'case', { id: 'ban-0002' }), /• two - Banned/);
+        assert.match(await run(store, 'case', { id: '2' }), /• two - Banned/);
         await assert.rejects(run(store, 'case', { id: '99' }), /no ban record #99/);
         await assert.rejects(run(store, 'case', { id: 'abc' }), /record ID or number/);
         const recent = await run(store, 'recent');

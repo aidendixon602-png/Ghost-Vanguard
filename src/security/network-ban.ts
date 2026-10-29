@@ -288,7 +288,7 @@ export function networkBanLogEmbed(guild: Guild, ban: NetworkBan, why: Why): Emb
         .setColor(color)
         .setAuthor({
             name: 'Ghost Vanguard • Network Ban Enforcement',
-            iconURL: guild.client.user?.displayAvatarURL() ?? undefined,
+            iconURL: guild.client?.user?.displayAvatarURL?.() ?? undefined,
         })
         .setTitle(`🛡️ ${title}`)
         .addFields(
@@ -308,15 +308,15 @@ export function networkBanLogEmbed(guild: Guild, ban: NetworkBan, why: Why): Emb
 
     const networkPolicy = isIssued
         ? ban.kind === 'hardban'
-            ? '> 🌐 **Network Hardban Policy**\n> This user is permanently banned from every server Ghost Vanguard protects and is re-banned if unbanned.\n-# Only a Developer can lift it, with `,unhardban`.'
-            : '> 🌐 **Network Genreban Policy**\n> This user is banned from every server Ghost Vanguard protects and is banned again if they join.\n-# Only a Developer or Supreme Leader can lift it, with `,ungenreban`.'
+            ? '> 🌐 **Network Hardban Policy**\n> This user is permanently banned from every server Ghost Vanguard protects and is re-banned if unbanned.\n-# Only a Developer can lift it.'
+            : '> 🌐 **Network Genreban Policy**\n> This user is banned from every server Ghost Vanguard protects and is banned again if they join.\n-# Only a Developer or Supreme Leader can lift it.'
         : `> ⚠️ **Network Enforcement**\n> ${WHY_NOTE[why](ban.kind)}`;
 
     e.addFields({ name: 'Network Scope', value: networkPolicy });
 
     e.setFooter({
         text: `Ghost Vanguard • Network Protocol • ${recId}`,
-        iconURL: guild.iconURL() ?? undefined,
+        iconURL: guild.iconURL?.() ?? undefined,
     }).setTimestamp();
 
     return e;
@@ -331,7 +331,7 @@ export function networkUnbanLogEmbed(guild: Guild, ban: NetworkBan, reason: stri
         .setColor(color)
         .setAuthor({
             name: 'Ghost Vanguard • Network Ban Enforcement',
-            iconURL: guild.client.user?.displayAvatarURL() ?? undefined,
+            iconURL: guild.client?.user?.displayAvatarURL?.() ?? undefined,
         })
         .setTitle(`🔓 ${kindTitle} lifted · ${recId}`)
         .addFields(
@@ -346,7 +346,7 @@ export function networkUnbanLogEmbed(guild: Guild, ban: NetworkBan, reason: stri
         )
         .setFooter({
             text: `Ghost Vanguard • Network Protocol • ${recId}`,
-            iconURL: guild.iconURL() ?? undefined,
+            iconURL: guild.iconURL?.() ?? undefined,
         })
         .setTimestamp();
 
@@ -384,7 +384,8 @@ export async function banIn(deps: NetworkDeps, guild: Guild, ban: NetworkBan, wh
             }
             await guild.members.ban(userId, { reason: clip(`${TAG[ban.kind]} ${recordId(ban)} ${ban.moderator_id}: ${ban.reason}`, 500), deleteMessageSeconds: why === 'issued' ? deleteMessageSeconds : 0 });
             deps.store.recordCase(guild.id, userId, ban.moderator_id, ban.kind, `${recordId(ban)}: ${ban.reason}`, { username: ban.username, evidence: ban.evidence });
-            deps.logs.push(guild.id, networkBanLogEmbed(guild, ban, why));
+            // The ban already happened: a log card that can't be built must never turn it into a "failed" result.
+            try { deps.logs.push(guild.id, networkBanLogEmbed(guild, ban, why)); } catch { /* the ban already happened */ }
             return { ...base, outcome: 'success', reason: member ? 'Banned (they were a member).' : 'Banned by user ID (they were not a member).' } as ServerResult;
         });
     } catch (error) {
@@ -414,7 +415,7 @@ export async function unbanIn(deps: NetworkDeps, guild: Guild, ban: NetworkBan, 
             }
             await guild.members.unban(ban.user_id, clip(`${actorId}: un${ban.kind} ${recordId(ban)}: ${reason}`, 500));
             deps.store.recordCase(guild.id, ban.user_id, actorId, `un${ban.kind}`, `${recordId(ban)}: ${reason}`, { username: ban.username });
-            deps.logs.push(guild.id, networkUnbanLogEmbed(guild, ban, reason, actorId));
+            try { deps.logs.push(guild.id, networkUnbanLogEmbed(guild, ban, reason, actorId)); } catch { /* the unban already happened */ }
             return { ...base, outcome: 'success', reason: 'Unbanned.' } as ServerResult;
         });
     } catch (error) {
