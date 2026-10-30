@@ -112,7 +112,12 @@ test('developers keep developer commands; server permissions never grant them', 
         assert.equal(can(member(DEV, 0n), 'dev/diagnostics'), true);
         assert.equal(can(member(DEV, 0n), 'autoreact/add'), true);
         assert.equal(can(member('777777777777777777', PermissionFlagsBits.Administrator), 'dev/diagnostics'), false);
-        assert.equal(can(member(config.ownerId, 0n), 'staff/global'), true, 'the bot owner (a Developer) keeps bot-wide rank management');
+        // BOT_OWNER_ID is whoever the deployment set: nothing is built in, so set it for this check.
+        const previousOwner = config.ownerId;
+        config.ownerId = '333333333333333333';
+        try {
+            assert.equal(can(member(config.ownerId, 0n), 'staff/global'), true, 'the bot owner (a Developer) keeps bot-wide rank management');
+        } finally { config.ownerId = previousOwner; }
     } finally { config.developers.delete(DEV); }
     store.close();
 });

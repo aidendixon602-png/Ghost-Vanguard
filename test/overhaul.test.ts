@@ -18,6 +18,9 @@ import { previewHistory, registerHistory } from '../src/ui/config-history.js';
 import { authorize } from './helpers.js';
 
 const user = '1277709272041394187';
+// Bot information shows the deployment's own owner, so set BOT_OWNER_ID rather than relying on a default.
+config.ownerId = user;
+config.ownerUsername = 'web_w2z';
 
 test('old JSON configuration migrates without data loss with verified pre-migration backup', () => {
     const dir = mkdtempSync(join(tmpdir(), 'vanguard-migration-')), path = join(dir, 'bot.db');

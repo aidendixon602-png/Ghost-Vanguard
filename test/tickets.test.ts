@@ -10,9 +10,12 @@ import {
     loadTicketChannels, markTicketActivity, ticketById,
 } from '../src/features/tickets.js';
 import { buildTranscript } from '../src/features/ticket-transcript.js';
+import { config } from '../src/config.js';
 
 const G = '123456789012345678', G2 = '223456789012345678', USER = '111111111111111111', STAFF = '333333333333333333';
 const BOT = '999999999999999999', OWNER = '1277709272041394187', STAFF_ROLE = '444444444444444444';
+// BOT_OWNER_ID has no built-in value: set it for the rank checks below.
+config.ownerId = OWNER;
 const store = (guild = G) => { const s = new Store(':memory:'); authorize(s, guild); return s; };
 
 /** A server with just enough of discord.js to create a ticket channel and send messages. */

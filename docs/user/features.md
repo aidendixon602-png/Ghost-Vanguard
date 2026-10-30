@@ -89,9 +89,9 @@ The script checks the metadata, checksum and integrity, refuses to run while the
 | `SNAPSHOT_ACTION_DELAY_MS` | `0` | Gap between restore actions. See [recovery.md](recovery.md#optional-pacing). |
 | `HEALTH_HOST`, `HEALTH_PORT` | `127.0.0.1`, `7475` | Health endpoint. |
 | `ROVER_API_KEY`, `BLOXLINK_API_KEY` | empty | Optional Roblox providers. Without them, existing verification roles are preserved. |
-| `AI_ENABLED`, `OPENAI_API_KEY`, `OPENAI_MODEL` | `AI_ENABLED=false` | Optional `/ask` assistant. Enabling it requires `OPENAI_API_KEY`. |
+| `AI_ENABLED`, `OPENAI_API_KEY`, `OPENAI_MODEL` | `AI_ENABLED=false` | Optional `/ask` assistant. Enabling it requires `OPENAI_API_KEY` and an explicit `OPENAI_MODEL`; there is no built-in model name. |
 | `LOG_FORMAT`, `LOG_LEVEL` | `pretty`, `info` | `json` is available for log ingestion. |
-| `BOT_OWNER_ID`, `BOT_OWNER_USERNAME` | built-in fallback | Owner shown in `/info bot`. |
+| `BOT_OWNER_ID`, `BOT_OWNER_USERNAME` | empty | The bot owner and the default `TRUSTED_DM_IDS`. Nothing is built in: leave it empty and no account holds the owner rank or receives the daily database backup. |
 
 ## Limits worth knowing
 
