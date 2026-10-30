@@ -1,5 +1,5 @@
 import { Colors, PermissionFlagsBits, SlashCommandBuilder } from 'discord.js';
-import { RULES } from '../../core.js';
+import { overrideRule, RULES } from '../../core.js';
 import { AppError } from '../../errors.js';
 import { defineCommand, type CommandContext } from '../../bot/registry.js';
 import { confirmDanger } from '../../ui/danger-ui.js';
@@ -10,6 +10,13 @@ import { statusPanel } from '../../ui/antinuke-panel.js';
 
 export default defineCommand(new SlashCommandBuilder().setName('antinuke').setDescription('Anti-nuke status, readiness, enforcement and exceptions')
     .addSubcommand(s => s.setName('status').setDescription('Is anti-nuke observing or enforcing? Review rules and whitelist'))
+    .addSubcommand(s => s.setName('rule').setDescription('Tune one rule threshold or turn it on/off')
+        .addStringOption(o => o.setName('rule').setDescription('Rule to configure').setRequired(true).addChoices(...RULES.map(r => ({ name: r.title, value: r.key }))))
+        .addBooleanOption(o => o.setName('enabled').setDescription('Enable or disable this rule'))
+        .addIntegerOption(o => o.setName('threshold').setDescription('Events before the rule triggers').setMinValue(1).setMaxValue(100))
+        .addIntegerOption(o => o.setName('window_seconds').setDescription('Counting window in seconds').setMinValue(1).setMaxValue(300)))
+    .addSubcommand(s => s.setName('reset').setDescription('Restore one rule to its default threshold and state')
+        .addStringOption(o => o.setName('rule').setDescription('Rule to reset').setRequired(true).addChoices(...RULES.map(r => ({ name: r.title, value: r.key })))))
     .addSubcommand(s => s.setName('enable').setDescription('Enable enforcement after readiness check and confirmation'))
     .addSubcommand(s => s.setName('disable').setDescription('Turn anti-nuke off (stays off after restarts)'))
     .addSubcommand(s => s.setName('check').setDescription('Check Vanguard\'s permissions and role position')), { category: 'antinuke', cooldown: 1500, access: 'security' }, async (ctx: CommandContext, i) => {
@@ -23,6 +30,34 @@ export default defineCommand(new SlashCommandBuilder().setName('antinuke').setDe
         await i.guild.members.fetchMe().catch(() => null);
         if (s.logChannelId) await i.guild.channels.fetch(s.logChannelId).catch(() => null);
         return readiness(i.guild, s.logChannelId, ctx.store).text;
+    }
+    if (sub === 'rule') {
+        const key = i.options.getString('rule', true);
+        const base = RULES.find(r => r.key === key);
+        if (!base) throw new AppError('VALIDATION_ERROR', 'Choose a rule from the list.');
+        const threshold = i.options.getInteger('threshold');
+        const seconds = i.options.getInteger('window_seconds');
+        const enabled = i.options.getBoolean('enabled');
+        const active = overrideRule(base, s.rules, s.ruleDefaults);
+        if (threshold === null && seconds === null && enabled === null)
+            return `**${base.title}** · ${active.enabled === false ? 'disabled' : 'enabled'} · **${active.count} events in ${active.seconds}s** → ${active.punishment ?? 'alert'}${active.revert ? ' · safe revert supported' : ''}.\nUse /antinuke rule to tune it; omitted settings stay unchanged.`;
+        s.rules[key] = {
+            count: threshold ?? active.count,
+            seconds: seconds ?? active.seconds,
+            ...(enabled === null ? active.enabled === undefined ? {} : { enabled: active.enabled } : { enabled }),
+        };
+        ctx.store.save(s, i.user.id);
+        ctx.logs.push(i.guildId, embed('Anti-nuke rule updated', `By <@${i.user.id}> · **${base.title}** · ${s.rules[key]!.enabled === false ? 'disabled' : 'enabled'} · ${s.rules[key]!.count} in ${s.rules[key]!.seconds}s`, Colors.Orange));
+        return `Saved **${base.title}**: **${s.rules[key]!.enabled === false ? 'off' : 'on'}**, threshold **${s.rules[key]!.count} in ${s.rules[key]!.seconds}s**. High-confidence takeover rules still use their normal immediate response; routine rules warn on a first threshold hit and only escalate if the same rule repeats within an hour.`;
+    }
+    if (sub === 'reset') {
+        const key = i.options.getString('rule', true);
+        const base = RULES.find(r => r.key === key);
+        if (!base) throw new AppError('VALIDATION_ERROR', 'Choose a rule from the list.');
+        delete s.rules[key];
+        ctx.store.save(s, i.user.id);
+        ctx.logs.push(i.guildId, embed('Anti-nuke rule reset', `By <@${i.user.id}> · **${base.title}** restored to the shipped default.`, Colors.Green));
+        return `**${base.title}** is restored to its default: enabled, **${base.count} in ${base.seconds}s**.`;
     }
     if (sub === 'enable') {
         if (!s.logChannelId)
@@ -43,7 +78,7 @@ export default defineCommand(new SlashCommandBuilder().setName('antinuke').setDe
             && JSON.stringify([...state.bypassed].sort()) === JSON.stringify(expectedBypassed);
         await confirmDanger(ctx, i, {
             title: 'Enable anti-nuke enforcement',
-            summary: `**${i.guild?.name ?? 'This server'}** will switch from ${currentMode} mode to the fixed ${RULES.length}-rule enforce preset.`,
+            summary: `**${i.guild?.name ?? 'This server'}** will switch from ${currentMode} mode to its configured anti-nuke rules.`,
             consequences: [
                 'The bot will automatically strip, remove, or revert actions when a rule triggers; this can affect staff who are not exempt.',
                 'A baseline snapshot is saved immediately before enforcement is enabled.',
@@ -88,9 +123,10 @@ export default defineCommand(new SlashCommandBuilder().setName('antinuke').setDe
                 c.store.setKickBots(b.guildId, false);
                 c.store.save(settings, b.user.id);
                 setAntinukeChoice(c.store, b.guildId, true);
-                c.logs.push(b.guildId, embed('Anti-nuke enabled', `By <@${b.user.id}> · baseline #${snapshot} · default preset · enforce mode`, Colors.Green));
+                const activeRules = RULES.filter(rule => overrideRule(rule, settings.rules, settings.ruleDefaults).enabled !== false).length;
+                c.logs.push(b.guildId, embed('Anti-nuke enabled', `By <@${b.user.id}> · baseline #${snapshot} · ${activeRules}/${RULES.length} rules · enforce mode`, Colors.Green));
                 return [
-                    `The default preset is now running: ${RULES.length} rules in **enforce** mode. Baseline snapshot **#${snapshot}** saved. Review with /antinuke status and manage exceptions with /antinuke whitelist.`,
+                    `Anti-nuke is now enforcing **${activeRules}/${RULES.length} enabled rules** with this server's saved thresholds. Baseline snapshot **#${snapshot}** saved. Review with /antinuke status, tune rules with /antinuke rule, and manage exceptions with /antinuke whitelist.`,
                     live.text,
                     live.above.length ? `-# Roles above Vanguard cannot be contained. Move Vanguard's role higher in Server Settings → Roles to protect them.` : '',
                 ].filter(Boolean).join('\n');
@@ -122,5 +158,5 @@ export default defineCommand(new SlashCommandBuilder().setName('antinuke').setDe
         });
         return;
     }
-    throw new AppError('VALIDATION_ERROR', 'Anti-nuke rules are fixed. Use /antinuke enable or /antinuke disable to switch protection, and /antinuke whitelist for exceptions.');
+    throw new AppError('VALIDATION_ERROR', 'Unknown anti-nuke action. Use /antinuke status, rule or reset to manage rules, enable/disable to switch protection, and whitelist for exceptions.');
 }, { subcommands: { enable: { botPermissions: [PermissionFlagsBits.ViewAuditLog, PermissionFlagsBits.ManageRoles] } } });

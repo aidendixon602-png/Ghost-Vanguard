@@ -1,6 +1,6 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, EmbedBuilder, Colors, GatewayIntentBits } from 'discord.js';
 import { VERSION, config } from '../config.js';
-import { RULES } from '../core.js';
+import { overrideRule, RULES } from '../core.js';
 import { ProtectionStats } from '../security/protection-stats.js';
 import type { CommandContext } from '../bot/registry.js';
 
@@ -30,7 +30,7 @@ export function serverInfo(ctx: CommandContext, guild: any, user: string, reques
     ] : page === 2 ? [
         ['Verification level', String(guild.verificationLevel)], ['Preferred locale', guild.preferredLocale], ['AFK channel', channel(guild.afkChannelId)], ['AFK timeout', `${guild.afkTimeout} seconds`], ['Rules channel', channel(guild.rulesChannelId)], ['System channel', channel(guild.systemChannelId)], ['Community', guild.features.includes('COMMUNITY') ? 'Enabled' : 'Disabled'], ['Explicit content filter', String(guild.explicitContentFilter)]
     ] : [
-        ['Vanguard joined', timestamp(guild.members.me?.joinedTimestamp)], ['Authorization', auth?.state ?? 'Pending initialization'], ['Authorization deadline', auth?.state === 'PENDING_AUTHORIZATION' ? timestamp(auth.deadline) : 'Not pending'], ['Authorized by', auth?.authorized_by ? `<@${auth.authorized_by}>` : 'Not authorized'], ['Authorized at', timestamp(auth?.authorized_at)], ['Anti-Nuke', s.authorized && s.enabled ? s.mode : 'Disabled'], ['Enabled rules', String(s.authorized && s.enabled ? RULES.length : 0)], ['Latest snapshot', timestamp(latest?.at)], ['Saved snapshots / backups', String(total)], ['Vanguard version', VERSION]
+        ['Vanguard joined', timestamp(guild.members.me?.joinedTimestamp)], ['Authorization', auth?.state ?? 'Pending initialization'], ['Authorization deadline', auth?.state === 'PENDING_AUTHORIZATION' ? timestamp(auth.deadline) : 'Not pending'], ['Authorized by', auth?.authorized_by ? `<@${auth.authorized_by}>` : 'Not authorized'], ['Authorized at', timestamp(auth?.authorized_at)], ['Anti-Nuke', s.authorized && s.enabled ? s.mode : 'Disabled'], ['Enabled rules', String(s.authorized && s.enabled ? RULES.filter(rule => overrideRule(rule, s.rules, s.ruleDefaults).enabled !== false).length : 0)], ['Latest snapshot', timestamp(latest?.at)], ['Saved snapshots / backups', String(total)], ['Vanguard version', VERSION]
     ];
     embed.addFields(fields.map(([name, value]) => ({ name, value: String(value ?? 'Unavailable').slice(0, 1024), inline: true })));
     return { embeds: [embed], components: [new ActionRowBuilder<ButtonBuilder>().addComponents(new ButtonBuilder().setCustomId(`serverinfo:${user}:${page - 1}`).setLabel('Previous').setStyle(ButtonStyle.Secondary).setDisabled(page === 0), new ButtonBuilder().setCustomId(`serverinfo:${user}:${page + 1}`).setLabel('Next').setStyle(ButtonStyle.Secondary).setDisabled(page === 3))], allowedMentions: { parse: [] as never[] } };

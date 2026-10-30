@@ -76,6 +76,8 @@ Server rank: anti-nuke, whitelist, control panel, backups and staff ranks. Given
 - `/antinuke incidents`: Show recent anti-nuke incidents
 - `/antinuke quarantine`: Strip a member's roles and save them
 - `/antinuke release`: Give a quarantined member their saved roles back
+- `/antinuke reset`: Restore one rule to its default threshold and state
+- `/antinuke rule`: Tune one rule threshold or turn it on/off
 - `/antinuke settings`: Turn the extra protection layers on or off
 - `/antinuke status`: See whether anti-nuke is on, its rules and the whitelist
 - `/antinuke threats clear`: Clear a member from the threat board _(Head Admin and above; clears the board entry only, cases and bans stay)_

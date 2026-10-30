@@ -379,7 +379,7 @@ test('the reorganized command list: the expected top-level commands and groups',
             ['setup', 'panel', 'types', 'settings', 'stats', 'claim', 'unclaim', 'transfer', 'priority', 'close', 'closerequest', 'add', 'remove', 'rename', 'history', 'block', 'unblock', 'blocked']);
         assert.deepEqual(ticket.options.find((o: any) => o.name === 'types').options.map((o: any) => o.name), ['add', 'edit', 'remove', 'list', 'reset']);
         const subs = (name: string) => tree.find(c => c.name === name)!.options.map((o: any) => o.name);
-        assert.deepEqual(subs('antinuke'), ['status', 'enable', 'disable', 'check', 'scan', 'settings', 'whitelist', 'incidents', 'quarantine', 'release', 'threats']);
+        assert.deepEqual(subs('antinuke'), ['status', 'rule', 'reset', 'enable', 'disable', 'check', 'scan', 'settings', 'whitelist', 'incidents', 'quarantine', 'release', 'threats']);
         assert.deepEqual(subs('raid'), ['lockdown', 'unlock', 'health', 'webhooks', 'mode', 'emergency', 'newaccounts']);
         assert.deepEqual(subs('automod').slice(-2), ['scam', 'antiping']);
         assert.deepEqual(subs('setup').slice(0, 4), ['panel', 'status', 'security', 'security-admins']);

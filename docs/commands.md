@@ -11,6 +11,8 @@ Anti-nuke: status, on/off, whitelist, incidents, quarantine and the threat board
 | `/antinuke scan` | Scan for risky roles, roles above the bot and admin bots | Admin+ |
 | `/antinuke settings` | Turn the extra protection layers on or off | Owner or Head Admin |
 | `/antinuke status` | See whether anti-nuke is on, its rules and the whitelist | Head Admin+ |
+| `/antinuke rule` | Tune one rule threshold or turn it on/off | Head Admin+ |
+| `/antinuke reset` | Restore one rule to its default threshold and state | Head Admin+ |
 | `/antinuke enable` | Turn anti-nuke enforcement on (runs a readiness check first) | Head Admin+ |
 | `/antinuke disable` | Turn anti-nuke off (stays off after restarts) | Owner or Head Admin |
 | `/antinuke check` | Check the bot's permissions and role position | Head Admin+ |

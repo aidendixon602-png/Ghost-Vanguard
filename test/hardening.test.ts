@@ -62,7 +62,7 @@ test('PROTECTED_USERS: a ban, timeout or role removal done by hand is undone and
     } finally { config.developers.delete(DEV); }
 }));
 
-test('ANTINUKE_LOCK: only Developers can turn anti-nuke off or change its layers; without the lock owners still can', async () => {
+test('ANTINUKE_LOCK: only Developers can disable anti-nuke or weaken rules; without the lock owners retain access', async () => {
     const store = new Store(':memory:'); authorize(store, 'g');
     const registry = new Registry();
     await registry.load(new URL('../src/commands', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'));
@@ -78,8 +78,11 @@ test('ANTINUKE_LOCK: only Developers can turn anti-nuke off or change its layers
         await withEnv({ ANTINUKE_LOCK: '' }, () => { assert.equal(can(OWNER, 'antinuke', 'disable'), true, 'unlocked: the owner can'); });
         await withEnv({ ANTINUKE_LOCK: 'true' }, () => {
             assert.equal(can(OWNER, 'antinuke', 'disable'), false, 'locked: not even the owner');
-            assert.equal(can(OWNER, 'antinuke-plus', 'settings'), false);
+            assert.equal(can(OWNER, 'antinuke', 'rule'), false, 'locked: an owner cannot weaken a rule');
+            assert.equal(can(OWNER, 'antinuke', 'reset'), false, 'locked: reset can loosen a custom threshold');
             assert.equal(can(DEV, 'antinuke', 'disable'), true, 'Developers can');
+            assert.equal(can(DEV, 'antinuke', 'rule'), true, 'Developers can tune rules');
+            assert.equal(can(DEV, 'antinuke', 'reset'), true, 'Developers can restore defaults');
             assert.equal(can(OWNER, 'antinuke', 'enable'), true, 'turning it on is never locked');
         });
     } finally { config.developers.delete(DEV); store.close(); }

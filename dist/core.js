@@ -49,10 +49,11 @@ export const RULES = [
     { key: 'emoji_delete', title: 'Emoji Delete', count: 5, seconds: 60, punishment: 'strip', revert: false, actions: [AuditLogEvent.EmojiDelete, AuditLogEvent.StickerDelete] },
 ];
 /**
- * Everyday rules: the first time someone hits one, the change is undone and they get a warning instead of
- * being stripped. Hitting any of them again within WARNING_MEMORY_MS gets the normal punishment. Other
- * dangerous permission grants also warn first, except self-assigned Administrator or Manage Server,
- * which always strips and reverts immediately. Other bots' offences do not get a warning.
+ * Routine or ambiguous actions: first threshold hit alerts and warns without containment; the change is
+ * reverted only where the rule supports a safe revert. A repeat of the same rule within WARNING_MEMORY_MS
+ * gets the normal response. Dangerous permission grants have their own first-warning path, except
+ * self-assigned Administrator or Manage Server, which always strips and reverts immediately. Bots do not
+ * get warnings for these routine rules.
  */
 /**
  * Well-known verification and role bots. They give ordinary roles all day (verified, level and reaction roles),
@@ -68,16 +69,23 @@ export const KNOWN_ROLE_BOTS = {
 };
 /** What is recorded when a moderator leaves the (optional) reason empty. */
 export const NO_REASON = 'No reason given';
-export const WARN_FIRST = new Set(['role_grant', 'role_create', 'role_update', 'channel_create', 'channel_update', 'guild_update', 'timeout', 'webhook_change']);
+// Routine or ambiguous staff actions get a first-hit warning rather than immediate containment.
+// High-confidence takeover signals (bot additions, dangerous grants, mass unbans, member prunes)
+// remain immediate; server owners can tune rule limits per guild.
+export const WARN_FIRST = new Set(['mass_ban', 'mass_kick', 'channel_create', 'channel_delete', 'channel_update', 'role_grant', 'role_create', 'role_delete', 'role_update', 'guild_update', 'timeout', 'webhook_change', 'automod_tamper', 'emoji_delete']);
 export const WARNING_MEMORY_MS = 60 * 60 * 1000;
 export function ruleFor(action) {
     return RULES.find(r => r.actions.includes(action));
 }
 export function overrideRule(rule, custom, defaults) {
-    // The preset is locked: saved custom limits, shared defaults and per-rule toggles are ignored.
-    void custom;
-    void defaults;
-    return { ...rule };
+    const saved = custom[rule.key];
+    return {
+        ...rule,
+        ...(defaults && !rule.singleEvent ? { count: defaults.count, seconds: defaults.seconds } : {}),
+        ...(saved?.count !== undefined ? { count: saved.count } : {}),
+        ...(saved?.seconds !== undefined ? { seconds: saved.seconds } : {}),
+        ...(saved?.enabled === false ? { enabled: false } : saved?.enabled === true ? { enabled: true } : {}),
+    };
 }
 export function decideLinks(results) {
     const ids = new Set(results.flatMap(r => r.kind === 'found' ? [r.id] : []));

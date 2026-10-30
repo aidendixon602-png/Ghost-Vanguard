@@ -1,17 +1,17 @@
 # Anti-nuke controls
 
-The fixed 19-rule preset is loaded for authorized servers and survives restarts. New or unconfigured servers begin in **observe** mode: incidents are recorded, but no members are stripped and no changes are automatically reverted. Run `/setup logs setup`, then `/antinuke check`; when required bot permissions and an accessible security-log channel are ready, `/antinuke enable` shows a confirmation, saves a baseline, and rechecks readiness before switching to **enforce**. Roles at or above Vanguard are shown as hierarchy warnings because their members cannot be contained. Existing enforce-mode servers stay enforced only while readiness passes at startup; missing readiness switches them to observe, and fixing it does not silently resume enforcement. A staff opt-out remains off across restarts. The complete limits are listed in [antinuke-locked.md](antinuke-locked.md), and `/antinuke status` shows the live values.
+The 19-rule baseline loads for authorized servers and survives restarts. Each server can customize a rule's threshold and time window or disable that rule with `/antinuke rule`; `/antinuke reset` restores the shipped default. New or unconfigured servers begin in **observe** mode: incidents are recorded, but no members are stripped and no changes are automatically reverted. Run `/setup logs setup`, then `/antinuke check`; when required bot permissions and an accessible security-log channel are ready, `/antinuke enable` shows a confirmation, saves a baseline, and rechecks readiness before switching to **enforce**. Roles at or above Vanguard are shown as hierarchy warnings because their members cannot be contained. Existing enforce-mode servers stay enforced only while readiness passes at startup; missing readiness switches them to observe, and fixing it does not silently resume enforcement. A staff opt-out remains off across restarts. The shipped defaults are listed in [antinuke-locked.md](antinuke-locked.md), and `/antinuke status` shows live per-server values.
 
 ## How a rule fires
 
 1. Every audit-log action is counted against the person responsible. Actions made through Vanguard on behalf of a staff member, such as `/mod ban`, count against that staff member.
 2. **One step before a limit**, a blue *heads-up* is posted to the security log. Nothing is done to the person.
 3. **At the limit:**
-   - *Everyday rules* (role and channel edits, role grants, server edits, timeouts, webhooks) **warn first** for people. The change is undone, a yellow *Anti-nuke Warning* is posted and the person is DMed. Hitting any of these rules again within an hour gets the punishment.
-   - *Dangerous permission grants* are also **reverted and warned on the first event**. Another dangerous grant by the same actor within an hour strips and reverts. This first warning applies to bots too.
-   - **Self-assigned Administrator or Manage Server is the strict exception:** an unwhitelisted actor is stripped and the grant is reverted immediately, even on the first event. An explicit full or rule-specific anti-nuke whitelist remains exempt.
-   - *All other rules*, and bots hitting everyday rules, are punished straight away.
-4. **The punishment is always a strip.** Staff and admin roles are removed and saved, and the damage is reverted where possible (bans lifted, created channels/roles/webhooks deleted, granted permissions removed).
+   - Routine or ambiguous actions (including mass bans/kicks, channel or role changes/deletions, AutoMod edits and emoji/sticker deletion) warn human actors on the first hit. The bot removes no roles; it attempts a safe revert only when that rule supports one. The alert reports the result. Repeating that same rule within an hour gets the rule's normal response.
+   - A warning for one rule does not escalate an unrelated rule. This avoids punishing normal staff work because of an earlier, different action.
+   - High-confidence takeover signals (adding a bot, mass unbanning, member pruning and dangerous permission grants) retain stronger defaults. Dangerous grants warn first except self-assigned Administrator or Manage Server, which are stripped and reverted immediately. A repeat dangerous grant within an hour strips and reverts; bots receive the warning path for dangerous grants.
+   - Bots do not get first-hit warnings for routine rules; their normal configured response applies.
+4. When a rule's normal response is a strip, staff and admin roles are removed and saved, and damage is reverted only where the rule has a supported revert handler. Rule limits can be customized per server, so review the current values with `/antinuke status`.
 5. The alert in the security log has an **Undo strip** button (owner or developer) and, after deletions, **Review restore**.
 
 ## Everyone is watched
@@ -57,7 +57,9 @@ Nobody can change these from Discord. Restart after editing.
 
 | Command | What it does |
 |---|---|
-| `/antinuke status` | Rules, limits, whitelist and state, with Refresh, Incidents and Whitelist buttons |
+| `/antinuke status` | Effective rules, per-server limits, whitelist and state, with Refresh, Incidents and Whitelist buttons |
+| `/antinuke rule rule:<rule> [threshold] [window_seconds] [enabled]` | View or tune one rule. Omitted settings stay unchanged; thresholds are 1–100 and windows are 1–300 seconds. |
+| `/antinuke reset rule:<rule>` | Restore one rule's shipped threshold and enabled state. |
 | `/antinuke enable` | After readiness passes, review a confirmation; it saves a baseline and enables enforce mode. Hierarchy warnings are shown and rechecked. |
 | `/antinuke disable` | Turn protection off with confirmation; the staff opt-out stays off after restarts |
 | `/antinuke check` | Vanguard's permissions, log-channel access and role position |

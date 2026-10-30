@@ -1,5 +1,5 @@
 import { ChannelType, Colors, PermissionFlagsBits, SlashCommandBuilder } from 'discord.js';
-import { clip, dangerous, RULES } from '../../core.js';
+import { clip, dangerous, overrideRule, RULES } from '../../core.js';
 import { AppError } from '../../errors.js';
 import { defineCommand, type CommandContext } from '../../bot/registry.js';
 import { checkTarget, embed, REQUIRED_PERMISSIONS } from '../../ui/ui.js';
@@ -28,7 +28,7 @@ export default defineCommand(new SlashCommandBuilder().setName('security').setDe
         const me = await i.guild.members.fetchMe();
         const missing = REQUIRED_PERMISSIONS.filter(p => !me.permissions.has(p)).map(p => new (me.permissions.constructor as typeof import('discord.js').PermissionsBitField)(p).toArray()[0]);
         const last = ctx.store.get('SELECT number,at FROM snapshots WHERE guild_id=? ORDER BY id DESC LIMIT 1', i.guildId);
-        return `**Authorized:** ${s.authorized}\n**Anti-nuke:** ${s.enabled ? 'enabled' : 'disabled'} · ${s.mode}\n**Rules:** ${RULES.length}\n**Logs:** ${s.logChannelId ? `<#${s.logChannelId}>` : 'not set'}\n**Verified role:** ${s.verifiedRoleId ? `<@&${s.verifiedRoleId}>` : 'not set'}\n**Quarantine role:** ${s.quarantineRoleId ? `<@&${s.quarantineRoleId}>` : 'not set'}\n**Roblox minimum age:** ${s.minAge} days\n**Unlink revocation:** ${s.revokeOnUnlink}\n**Latest snapshot:** ${last ? `#${last.number} · <t:${Math.floor(last.at / 1000)}:R>` : 'none'}\n**Bot permissions missing:** ${missing.join(', ') || 'none'}\n**Failed log deliveries:** ${ctx.store.get('SELECT COUNT(*) AS n FROM outbox WHERE guild_id=? AND attempts>=8', i.guildId)?.n ?? 0}\n**Role order:** place the bot above every role/member it must manage. Owner and higher roles cannot be contained.`;
+        return `**Authorized:** ${s.authorized}\n**Anti-nuke:** ${s.enabled ? 'enabled' : 'disabled'} · ${s.mode}\n**Rules:** ${RULES.filter(rule => overrideRule(rule, s.rules, s.ruleDefaults).enabled !== false).length}/${RULES.length} enabled\n**Logs:** ${s.logChannelId ? `<#${s.logChannelId}>` : 'not set'}\n**Verified role:** ${s.verifiedRoleId ? `<@&${s.verifiedRoleId}>` : 'not set'}\n**Quarantine role:** ${s.quarantineRoleId ? `<@&${s.quarantineRoleId}>` : 'not set'}\n**Roblox minimum age:** ${s.minAge} days\n**Unlink revocation:** ${s.revokeOnUnlink}\n**Latest snapshot:** ${last ? `#${last.number} · <t:${Math.floor(last.at / 1000)}:R>` : 'none'}\n**Bot permissions missing:** ${missing.join(', ') || 'none'}\n**Failed log deliveries:** ${ctx.store.get('SELECT COUNT(*) AS n FROM outbox WHERE guild_id=? AND attempts>=8', i.guildId)?.n ?? 0}\n**Role order:** place the bot above every role/member it must manage. Owner and higher roles cannot be contained.`;
     }
     if (sub === 'config') {
         const me = await i.guild.members.fetchMe();

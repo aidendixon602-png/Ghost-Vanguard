@@ -330,11 +330,11 @@ test('All is first and expands to every supported component', () => {
     assert.throws(() => selectComponents(['unknown']));
 });
 
-test('the anti-nuke command offers only on/off, status and checks — no rule editing', async () => {
+test('the anti-nuke command exposes status, readiness, rule tuning, reset and on/off controls', async () => {
     const registry = new Registry();
     await registry.load();
     const names = (registry.commands.get('1:antinuke')!.data.options as any[]).map(o => o.name).sort();
-    assert.deepEqual(names, ['check', 'disable', 'enable', 'status']);
+    assert.deepEqual(names, ['check', 'disable', 'enable', 'reset', 'rule', 'status']);
 });
 
 test('layout copy remaps source objects and repeated copies reuse destination mappings', async () => {
@@ -490,14 +490,15 @@ test('restored role creation and editing use the current colors API and preserve
     f.store.close();
 });
 
-test('obsolete server and rule-editing commands are retired while current information remains', async () => {
+test('obsolete server and dedicated rule-editing commands are retired while in-command tuning remains', async () => {
     const registry = new Registry();
     await registry.load();
     assert.equal(registry.commands.has('1:server'), false);
     assert.ok(registry.commands.has('1:server-info'));
     assert.ok(registry.commands.has('1:bot-info'));
     const antinuke = registry.commands.get('1:antinuke')!.data;
-    assert.equal(antinuke.options?.some((s: any) => s.name === 'rule'), false);
+    assert.equal(antinuke.options?.some((s: any) => s.name === 'rule'), true);
+    assert.equal(antinuke.options?.some((s: any) => s.name === 'reset'), true);
     assert.equal(registry.commands.has('1:antinuke-rule'), false);
 });
 

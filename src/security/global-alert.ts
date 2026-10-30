@@ -77,7 +77,7 @@ export function globalAlertCard(info: GlobalAlertInfo) {
             : watch ? 'Observed only'
                 : info.failed ? 'Response incomplete' : 'Enforcement applied';
     const response = exempt ? `No punishment or rollback (${info.exemptReason ?? 'exempt'}).`
-        : warn ? `${info.rule.revert ? 'Change rolled back; no roles removed.' : 'Warning only; no roles removed.'} A repeat within an hour: **${punishment}**.`
+        : warn ? `${info.rule.revert ? 'A safe revert was attempted; no roles removed.' : 'Warning only; no roles removed.'} A repeat of the same rule within an hour: **${punishment}**.`
             : watch ? `No action taken in observe mode. Enforcement would use **${punishment}**.`
                 : info.failed ? `**${punishment}** failed or is incomplete. Check Vanguard's permissions and role position.`
                     : `**${punishment}** applied.`;

@@ -38,11 +38,13 @@ test('nineteen rules, all audit action mappings unambiguous', () => {
     assert.equal(ruleFor(AuditLogEvent.StickerDelete)?.key, 'emoji_delete');
 });
 
-test('the preset is fixed: shared limits, per-rule overrides and toggles never change a rule', () => {
-    for (const rule of RULES) {
-        const changed = overrideRule(rule, { [rule.key]: { count: 99, seconds: 300, enabled: false } as any }, { count: 50, seconds: 5 });
-        assert.deepEqual(changed, rule);
-    }
+test('per-rule settings override shared defaults without mutating the shipped rules', () => {
+    const rule = RULES.find(r => r.key === 'mass_ban')!;
+    const changed = overrideRule(rule, { mass_ban: { count: 9, seconds: 90, enabled: false } }, { count: 50, seconds: 5 });
+    assert.deepEqual([changed.count, changed.seconds, changed.enabled], [9, 90, false]);
+    assert.deepEqual([rule.count, rule.seconds, rule.enabled], [5, 60, undefined]);
+    const inherited = overrideRule(rule, {}, { count: 7, seconds: 120 });
+    assert.deepEqual([inherited.count, inherited.seconds], [7, 120]);
 });
 
 test('escalationAdded reports only newly granted escalation permissions', () => {
@@ -54,12 +56,14 @@ test('escalationAdded reports only newly granted escalation permissions', () => 
     assert.equal(escalationAdded('0', 'not a number'), 0n);
 });
 
-test('rule overrides do not mutate defaults', () => {
+test('rule overrides do not mutate the shipped defaults', () => {
     const r = RULES[0]!;
     const copy = overrideRule(r, { mass_ban: { count: 1, seconds: 5 } });
     assert.notEqual(copy, r);
-    assert.equal(copy.count, r.count);
+    assert.equal(copy.count, 1);
+    assert.equal(copy.seconds, 5);
     assert.equal(r.count, 5);
+    assert.equal(r.seconds, 60);
 });
 
 test('verification provider disagreement blocks a link', () => {

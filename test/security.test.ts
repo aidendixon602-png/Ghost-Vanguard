@@ -35,18 +35,23 @@ test('observe mode records incident at threshold without calling containment', a
     store.close();
 });
 
-test('enforce mode writes evidence before containment and stores the result', async () => {
+test('mass-ban enforcement warns and reverts first, then writes evidence before containment on a repeat', async () => {
     const { store, security, guild, entry } = setup('enforce');
     let calls = 0;
     security.punish = async () => {
         calls++;
-        assert.equal(store.all('SELECT * FROM incidents').length, 1);
+        assert.equal(store.all('SELECT * FROM incidents').length, 2);
         return 'contained';
     };
     for (const id of ['1', '2', '3', '4', '5'])
         await security.audit(entry(id), guild);
-    assert.equal(calls, 1);
-    assert.match(store.get('SELECT result FROM incidents')?.result, /^contained/);
+    assert.equal(calls, 0, 'first mass-ban limit warns instead of stripping');
+    assert.equal(store.get('SELECT mode FROM incidents')?.mode, 'warn');
+    store.run('DELETE FROM observations');
+    for (const id of ['6', '7', '8', '9', '10'])
+        await security.audit(entry(id), guild);
+    assert.equal(calls, 1, 'same-rule repeat escalates');
+    assert.match(store.get('SELECT result FROM incidents WHERE mode=\'enforce\'')?.result, /^contained/);
     store.close();
 });
 
