@@ -5,6 +5,16 @@ import { guildSummary, guilds, incidents, overview, tickets, threats } from './d
 const json = (value, status = 200) => ({ status, type: 'application/json; charset=utf-8', body: JSON.stringify(value), cache: 'no-store' });
 const text = (body, status = 200, type = 'text/plain; charset=utf-8') => ({ status, type, body, cache: 'no-store' });
 export const normaliseToken = (value) => (value ?? '').trim() || undefined;
+/**
+ * Sent with every dashboard response. The page is read-only and can carry its token in `?token=`, so:
+ * never framed (it reaches every server's data), never MIME-sniffed, and never sent as a Referer to
+ * anything else the page might reach.
+ */
+export const DASHBOARD_HEADERS = {
+    'X-Frame-Options': 'DENY',
+    'X-Content-Type-Options': 'nosniff',
+    'Referrer-Policy': 'no-referrer',
+};
 /** Does this request carry the token? Accepts ?token=, a bearer header, or a cookie set by the page. */
 export function tokenAccepted(request, token) {
     if (!token)

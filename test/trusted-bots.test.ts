@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { AuditLogEvent, Collection, PermissionFlagsBits } from 'discord.js';
 import { Store } from '../src/database/db.js';
 import { Security } from '../src/security/security.js';
-import { isTrustedBot, TRUSTED_BOTS } from '../src/bot/trusted-bots.js';
+import { isTrustedBot, TRUSTED_BOTS, trustedBotReport } from '../src/bot/trusted-bots.js';
 import { quarantineNewBot } from '../src/features/antinuke-plus.js';
 import { reportWebhook } from '../src/features/webhooks.js';
 import { authorize } from './helpers.js';
@@ -35,6 +35,22 @@ test('Veil Utilities is a built-in trusted bot', () => {
     assert.equal(TRUSTED_BOTS.get(VEIL), 'Veil Utilities');
     assert.ok(isTrustedBot(VEIL));
     assert.ok(!isTrustedBot(STRANGER) && !isTrustedBot(null) && !isTrustedBot(undefined));
+});
+
+test('startup names each trusted account and flags an ID that is not a bot or cannot be fetched', async () => {
+    // These IDs are exempt from anti-nuke everywhere and are the only accounts whose reaction hands a `,gv`
+    // command over, so a stale ID must be visible at startup instead of failing silently.
+    const fake = (users: Record<string, any>) => ({ users: { fetch: async (id: string) => { if (!(id in users)) throw new Error('Unknown User'); return users[id]; } } }) as any;
+    const good = await trustedBotReport(fake({ [VEIL]: { id: VEIL, bot: true, username: 'veilutilities' } }));
+    assert.equal(good.length, 1);
+    assert.match(good[0]!, /Veil Utilities: @veilutilities \(1563480035493417021\)/);
+
+    const notABot = await trustedBotReport(fake({ [VEIL]: { id: VEIL, bot: false, username: 'someone' } }));
+    assert.match(notABot[0]!, /that account is a user, not a bot/);
+
+    const missing = await trustedBotReport(fake({}));
+    assert.match(missing[0]!, /could not be fetched/);
+    assert.match(missing[0]!, /Veil Utilities' application ID/);
 });
 
 test('anti-nuke trusts Veil Utilities in every server and leaves its actions alone', async () => {

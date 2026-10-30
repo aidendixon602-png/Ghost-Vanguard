@@ -55,12 +55,12 @@ import { handleBanLogInteraction, onBanAdd, onBanRemove, registerBanLogRenderer 
 import { reportBotError } from './audit/bot-errors.js';
 import { forgetGuildTickets, isTicketChannel, loadTicketChannels, markTicketActivity, runTicketMaintenance, ticketChannelGone } from './features/tickets.js';
 import { maintainThreats } from './security/threat-board.js';
-import { answer as dashboardAnswer } from './dashboard/router.js';
+import { answer as dashboardAnswer, DASHBOARD_HEADERS } from './dashboard/router.js';
 import { handleTicketDm } from './ui/ticket-ui.js';
 import { recoveryEmbed } from './ui/notice.js';
 import { warnEmptyDatabase } from './features/bot-health.js';
 import { fromMessage, isHandoff, sameEmoji } from './bot/text-commands.js';
-import { isTrustedBot, isWhitelistedPerson } from './bot/trusted-bots.js';
+import { isTrustedBot, isWhitelistedPerson, trustedBotReport } from './bot/trusted-bots.js';
 import { forgetGuild, processMessageWave, restoreGates } from './security/raid-waves.js';
 const errors = validateConfig();
 if (errors.length) {
@@ -216,6 +216,20 @@ client.once(Events.ClientReady, async (c) => {
             console.log(closingRule());
         }
         endStartupSummary();
+        // `,gv` is the only command surface and every command arrives as message text: without the intent
+        // each one is silently ignored while Veil still shows its 🛡️ hand-off, so say so at every start.
+        if (!config.messageContentEnabled) {
+            const why = 'MESSAGE_CONTENT_ENABLED=false, so `,gv` commands cannot be read and no command will run. Turn on Message Content Intent in the Developer Portal, then set MESSAGE_CONTENT_ENABLED=true.';
+            logEvent('text_commands_unavailable', { reason: why });
+            if (config.logFormat !== 'json')
+                console.warn(`  ${style.red('⚠')} ${why}`);
+        }
+        task('trusted bots', trustedBotReport(client).then(lines => {
+            logEvent('trusted_bots', { lines });
+            if (config.logFormat !== 'json')
+                for (const line of lines)
+                    console.log(`  ${style.dim('•')} ${line}`);
+        }));
         // A missing notice or slow Discord fetch should not hold up the rest of startup.
         task('restart notice completion', completeRestartNotice(client, store, Date.now(), client.guilds.cache.size, registry.commands.size));
         markSeen(store);
@@ -394,7 +408,7 @@ const server = createServer((req, res) => {
     // /healthz is the liveness probe uptime monitors use; everything else is the dashboard.
     if ((req.url ?? '').split('?')[0] !== '/healthz') {
         const result = dashboardAnswer(store, req, { token: config.dashboardToken, enabled: config.dashboardEnabled });
-        res.writeHead(result.status, { 'Content-Type': result.type, 'Cache-Control': result.cache, 'X-Robots-Tag': 'noindex' });
+        res.writeHead(result.status, { 'Content-Type': result.type, 'Cache-Control': result.cache, 'X-Robots-Tag': 'noindex', ...DASHBOARD_HEADERS });
         res.end(req.method === 'HEAD' ? undefined : result.encoding === 'base64' ? Buffer.from(result.body, 'base64') : result.body);
         return;
     }

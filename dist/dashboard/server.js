@@ -1,7 +1,7 @@
 import { createServer } from 'node:http';
 import { config } from '../config.js';
 import { Store } from '../database/db.js';
-import { answer } from './router.js';
+import { answer, DASHBOARD_HEADERS } from './router.js';
 export function parseOptions(args = process.argv.slice(2), env = process.env) {
     const value = (flag) => {
         const index = args.indexOf(flag);
@@ -17,7 +17,7 @@ export function parseOptions(args = process.argv.slice(2), env = process.env) {
 export function startDashboard(options, database = new Store(options.dbPath)) {
     const server = createServer((request, response) => {
         const result = answer(database, request, { token: options.token });
-        response.writeHead(result.status, { 'Content-Type': result.type, 'Cache-Control': result.cache, 'X-Robots-Tag': 'noindex' });
+        response.writeHead(result.status, { 'Content-Type': result.type, 'Cache-Control': result.cache, 'X-Robots-Tag': 'noindex', ...DASHBOARD_HEADERS });
         const payload = result.encoding === 'base64' ? Buffer.from(result.body, 'base64') : result.body;
         response.end(request.method === 'HEAD' ? undefined : payload);
     });
