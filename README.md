@@ -23,7 +23,7 @@ Anti-nuke and the threat board · Moderation and audit logging · Ticket desk ·
 
 ---
 
-> **Commands are typed with Veil Utilities' prefix.** Ghost Vanguard has no slash commands: every command is `,gv` followed by what used to come after the slash (`/raid mode on` → `,gv raid mode on`, `/antinuke whitelist add` → `,gv antinuke whitelist add @user`). Veil Utilities hands the message over (it reacts 🛡️) and Ghost Vanguard runs it with the same ranks, permissions and confirmations. `,gv help` lists everything. See `src/bot/text-commands.ts`.
+> **Commands are typed, not slashed.** Ghost Vanguard has no slash commands: every command is `,gv` followed by what used to come after the slash (`/raid mode on` → `,gv raid mode on`, `/antinuke whitelist add` → `,gv antinuke whitelist add @user`). Vanguard reads the message itself and runs it with the same ranks, permissions and confirmations, so it needs no other bot to be online. Veil Utilities still reacts 🛡️ to `,gv` while both bots run, and that hand-off is accepted as a fallback, but one message is only ever run once. `,gv help` lists everything. See `src/bot/text-commands.ts`.
 
 ## Overview
 
