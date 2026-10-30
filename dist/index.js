@@ -55,12 +55,12 @@ import { handleBanLogInteraction, onBanAdd, onBanRemove, registerBanLogRenderer 
 import { reportBotError } from './audit/bot-errors.js';
 import { forgetGuildTickets, isTicketChannel, loadTicketChannels, markTicketActivity, runTicketMaintenance, ticketChannelGone } from './features/tickets.js';
 import { maintainThreats } from './security/threat-board.js';
-import { answer as dashboardAnswer } from './dashboard/router.js';
+import { answer as dashboardAnswer, DASHBOARD_HEADERS } from './dashboard/router.js';
 import { handleTicketDm } from './ui/ticket-ui.js';
 import { recoveryEmbed } from './ui/notice.js';
 import { warnEmptyDatabase } from './features/bot-health.js';
-import { fromMessage, isHandoff, sameEmoji } from './bot/text-commands.js';
-import { isTrustedBot, isWhitelistedPerson } from './bot/trusted-bots.js';
+import { Claimed, CommandRateLimit, fromMessage, isCommandMessage, isHandoff, sameEmoji } from './bot/text-commands.js';
+import { isTrustedBot, isWhitelistedPerson, trustedBotReport } from './bot/trusted-bots.js';
 import { forgetGuild, processMessageWave, restoreGates } from './security/raid-waves.js';
 const errors = validateConfig();
 if (errors.length) {
@@ -216,6 +216,20 @@ client.once(Events.ClientReady, async (c) => {
             console.log(closingRule());
         }
         endStartupSummary();
+        // `,gv` is the only command surface and every command arrives as message text: without the intent
+        // each one is silently ignored while Veil still shows its 🛡️ hand-off, so say so at every start.
+        if (!config.messageContentEnabled) {
+            const why = 'MESSAGE_CONTENT_ENABLED=false, so `,gv` commands cannot be read and no command will run. Turn on Message Content Intent in the Developer Portal, then set MESSAGE_CONTENT_ENABLED=true.';
+            logEvent('text_commands_unavailable', { reason: why });
+            if (config.logFormat !== 'json')
+                console.warn(`  ${style.red('⚠')} ${why}`);
+        }
+        task('trusted bots', trustedBotReport(client).then(lines => {
+            logEvent('trusted_bots', { lines });
+            if (config.logFormat !== 'json')
+                for (const line of lines)
+                    console.log(`  ${style.dim('•')} ${line}`);
+        }));
         // A missing notice or slow Discord fetch should not hold up the rest of startup.
         task('restart notice completion', completeRestartNotice(client, store, Date.now(), client.guilds.cache.size, registry.commands.size));
         markSeen(store);
@@ -255,26 +269,39 @@ client.on(Events.InteractionCreate, i => {
     }
     task('interaction', router.handle(i));
 });
-// `,gv …`: Veil Utilities reacts 🛡️ to a member's command message to hand it over; Vanguard runs it.
-const handedOver = new Set();
+// `,gv …`: Vanguard reads its own commands from the message, exactly as its slash command would have run.
+// Veil Utilities' 🛡️ reaction still reaches the same function as a fallback while both bots run; `Claimed`
+// makes sure one message is only ever run once, whichever path arrives first.
+const claimed = new Claimed(), commandLimit = new CommandRateLimit();
+async function runTextCommand(message) {
+    if (!claimed.claim(message.id))
+        return;
+    if (!startupReady || !lifecycle.isReady(message.guildId))
+        return void await message.reply({ content: 'Ghost Vanguard is still starting up. Try again in a moment.', allowedMentions: { parse: [] } }).catch(() => null);
+    try {
+        await router.handle(await fromMessage(message, treeJson(registry)));
+    }
+    catch (error) {
+        await message.reply({ embeds: [embed('✕ Command not understood', error instanceof Error ? error.message : 'Try `,gv help`.', Colors.Red)], allowedMentions: { parse: [] } }).catch(() => null);
+    }
+}
+client.on(Events.MessageCreate, m => {
+    if (!m.inGuild() || !isCommandMessage(m))
+        return;
+    // Silently drop a burst: answering every message would let one member flood a channel with the bot's replies.
+    if (!commandLimit.allow(m.author.id))
+        return;
+    task('text command', runTextCommand(m));
+});
+// The older hand-off: only a trusted bot's own 🛡️ reaction, on a fresh, unedited command message.
 client.on(Events.MessageReactionAdd, (reaction, user) => {
     if (!reaction.message.guildId || !isTrustedBot(user.id) || !sameEmoji(reaction.emoji.name))
         return;
-    task('text command', (async () => {
+    task('text command hand-off', (async () => {
         const message = reaction.message.partial ? await reaction.message.fetch().catch(() => null) : reaction.message;
-        if (!message?.inGuild() || handedOver.has(message.id) || !isHandoff(user.id, reaction.emoji.name, message))
+        if (!message?.inGuild() || !isHandoff(user.id, reaction.emoji.name, message))
             return;
-        handedOver.add(message.id);
-        if (handedOver.size > 5000)
-            handedOver.delete(handedOver.values().next().value);
-        if (!startupReady || !lifecycle.isReady(message.guildId))
-            return void await message.reply({ content: 'Ghost Vanguard is still starting up. Try again in a moment.', allowedMentions: { parse: [] } }).catch(() => null);
-        try {
-            await router.handle(await fromMessage(message, treeJson(registry)));
-        }
-        catch (error) {
-            await message.reply({ embeds: [embed('✕ Command not understood', error instanceof Error ? error.message : 'Try `,gv help`.', Colors.Red)], allowedMentions: { parse: [] } }).catch(() => null);
-        }
+        await runTextCommand(message);
     })());
 });
 client.on(Events.GuildAuditLogEntryCreate, (entry, guild) => {
@@ -394,7 +421,7 @@ const server = createServer((req, res) => {
     // /healthz is the liveness probe uptime monitors use; everything else is the dashboard.
     if ((req.url ?? '').split('?')[0] !== '/healthz') {
         const result = dashboardAnswer(store, req, { token: config.dashboardToken, enabled: config.dashboardEnabled });
-        res.writeHead(result.status, { 'Content-Type': result.type, 'Cache-Control': result.cache, 'X-Robots-Tag': 'noindex' });
+        res.writeHead(result.status, { 'Content-Type': result.type, 'Cache-Control': result.cache, 'X-Robots-Tag': 'noindex', ...DASHBOARD_HEADERS });
         res.end(req.method === 'HEAD' ? undefined : result.encoding === 'base64' ? Buffer.from(result.body, 'base64') : result.body);
         return;
     }

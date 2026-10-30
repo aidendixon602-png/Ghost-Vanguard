@@ -84,8 +84,10 @@ test('every strip is DMed to the bot Developers and TRUSTED_DM_IDS with the same
     const store = new Store(':memory:');
     const sent: { to: string; payload: any }[] = [];
     const client: any = { users: { fetch: async (id: string) => ({ send: async (payload: any) => { sent.push({ to: id, payload }); } }) } };
-    const before = new Set(config.trustedDmIds), devsBefore = new Set(config.developers);
+    const before = new Set(config.trustedDmIds), devsBefore = new Set(config.developers), ownerBefore = config.ownerId;
     // The owner (BOT_OWNER_ID) is a Developer; also one extra Developer and one trusted person who is both.
+    // Nothing is built in, so this test sets its own BOT_OWNER_ID.
+    config.ownerId = '333333333333333333';
     config.trustedDmIds.clear(); config.trustedDmIds.add('111111111111111111'); config.trustedDmIds.add(config.ownerId);
     config.developers.clear(); config.developers.add('222222222222222222');
     const people = [config.ownerId, '222222222222222222', '111111111111111111'].sort();
@@ -106,7 +108,7 @@ test('every strip is DMed to the bot Developers and TRUSTED_DM_IDS with the same
         assert.equal(sent.length, DM_WINDOW_MAX * 3, 'at most 15 alerts per 10 minutes (each to all 3 people)');
         resetDmLimits(); setDmSetting(store, { on: false, warnings: false });
         assert.equal(await dmGlobalAlert(client, store, info('b'), 1000), 0, '/dev alerts dm:false turns them off');
-    } finally { config.trustedDmIds.clear(); for (const id of before) config.trustedDmIds.add(id); config.developers.clear(); for (const id of devsBefore) config.developers.add(id); resetDmLimits(); store.close(); }
+    } finally { config.ownerId = ownerBefore; config.trustedDmIds.clear(); for (const id of before) config.trustedDmIds.add(id); config.developers.clear(); for (const id of devsBefore) config.developers.add(id); resetDmLimits(); store.close(); }
 });
 
 test('exempt people get a blue "not punished" card in the log, the global feed and the DM', async () => {

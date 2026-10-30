@@ -4,11 +4,14 @@ import { TRUSTED_BOTS } from './trusted-bots.js';
 import { gvText } from '../ui/gv-names.js';
 
 /**
- * `,gv …` text commands: Ghost Vanguard has no slash commands. Members type its commands with Veil Utilities'
- * prefix (`,gv raid mode on`, `,gv antinuke status`); Veil checks Ghost Vanguard is in the server and reacts 🛡️
- * to the message. That reaction, from Veil's own bot account, is the hand-off: only then does Vanguard read the
- * message and run the command exactly as its slash command would have run, with every rank, permission and
- * confirmation check, answering in the channel.
+ * `,gv …` text commands: Ghost Vanguard has no slash commands. Members type a command with a prefix
+ * (`,gv raid mode on`, `,gv antinuke status`), and Vanguard reads it from the message itself and runs it
+ * exactly as its slash command would have run, with every rank, permission and confirmation check,
+ * answering in the channel. It does not depend on another bot handing messages over.
+ *
+ * Veil Utilities (the network's older bot) still reacts 🛡️ to `,gv` messages. That reaction is kept as a
+ * fallback while both bots run: it reaches the same code, and `Claimed` makes sure a message only ever
+ * runs once, whichever path arrives first. Removing it is part of retiring Veil.
  *
  *   `,gv raid mode on`                     → /raid mode on
  *   `,gv antinuke whitelist add @mod`      → /antinuke whitelist add user:@mod
@@ -304,4 +307,53 @@ export function isHandoff(userId: string, emoji: string | null, message: Pick<Me
     if (message.editedTimestamp) return false;
     if (now - message.createdTimestamp > HANDOFF_WINDOW_MS) return false;
     return commandText(message.content ?? '') !== null;
+}
+
+/**
+ * Whether this message is a `,gv …` command Ghost Vanguard should run itself.
+ *
+ * Vanguard reads its own commands from the message, so it no longer depends on Veil Utilities (or any
+ * other bot) to hand them over: Veil could be down, removed, or have its token leaked, and `,gv` still
+ * works. Veil's reaction is kept as a fallback while both bots run, and `Claimed` below makes sure a
+ * message is only ever run once, whichever path gets to it first.
+ */
+export function isCommandMessage(message: Pick<Message, 'author' | 'content'>): boolean {
+    if (message.author?.bot) return false;
+    if (!message.content) return false;
+    return commandText(message.content) !== null;
+}
+
+/**
+ * One run per message. The direct read and Veil's fallback reaction both arrive here, so whichever
+ * happens first claims the message id and the other is ignored. Without this a command could run twice.
+ */
+export class Claimed {
+    private seen = new Set<string>();
+    constructor(private readonly limit = 5000) { }
+    claim(id: string): boolean {
+        if (this.seen.has(id)) return false;
+        this.seen.add(id);
+        if (this.seen.size > this.limit) this.seen.delete(this.seen.values().next().value!);
+        return true;
+    }
+}
+
+/**
+ * A small per-person limit on how many commands the bot will answer, now that it replies to `,gv`
+ * messages itself. Veil used to apply this before handing a message over (2 per 3 seconds); without it
+ * one member could make the bot answer a burst of messages. Four in five seconds is well above a human.
+ */
+export class CommandRateLimit {
+    private hits = new Map<string, number[]>();
+    allow(userId: string, now = Date.now(), windowMs = 5000, max = 4): boolean {
+        const recent = (this.hits.get(userId) ?? []).filter(at => now - at < windowMs);
+        if (recent.length >= max) {
+            this.hits.set(userId, recent);
+            return false;
+        }
+        recent.push(now);
+        this.hits.set(userId, recent);
+        if (this.hits.size > 5000) this.hits.delete(this.hits.keys().next().value!);
+        return true;
+    }
 }

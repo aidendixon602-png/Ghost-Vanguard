@@ -35,6 +35,17 @@ const text = (body: string, status = 200, type = 'text/plain; charset=utf-8'): D
 
 export const normaliseToken = (value?: string | null) => (value ?? '').trim() || undefined;
 
+/**
+ * Sent with every dashboard response. The page is read-only and can carry its token in `?token=`, so:
+ * never framed (it reaches every server's data), never MIME-sniffed, and never sent as a Referer to
+ * anything else the page might reach.
+ */
+export const DASHBOARD_HEADERS = {
+    'X-Frame-Options': 'DENY',
+    'X-Content-Type-Options': 'nosniff',
+    'Referrer-Policy': 'no-referrer',
+} as const;
+
 /** Does this request carry the token? Accepts ?token=, a bearer header, or a cookie set by the page. */
 export function tokenAccepted(request: { url: string; headers?: Record<string, string | string[] | undefined> }, token?: string) {
     if (!token)

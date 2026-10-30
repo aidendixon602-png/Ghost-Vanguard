@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { Store } from '../src/database/db.js';
 import { authorize } from './helpers.js';
 import { VERSION } from '../src/config.js';
-import { answer, tokenAccepted } from '../src/dashboard/router.js';
+import { answer, tokenAccepted, DASHBOARD_HEADERS } from '../src/dashboard/router.js';
 import { overview, guilds, incidents, serverDetail, threats, tickets } from '../src/dashboard/data.js';
 import { recordThreat, recordThreatAction } from '../src/security/threat-board.js';
 import { seedTicketTypes } from '../src/features/tickets.js';
@@ -27,6 +27,13 @@ test('the dashboard page is served without any build step or external asset', ()
         assert.match(page.body, /rel="icon" type="image\/png" href="data:image\/png;base64,/, 'the tab icon is inline too');
         assert.match(page.body, /setInterval\(tick, 15000\)/, 'it refreshes itself');
     } finally { s.close(); }
+});
+
+test('dashboard responses are never framed, sniffed or allowed to leak the token as a Referer', () => {
+    // The page can carry its token in ?token=, and it reaches every server's data.
+    assert.equal(DASHBOARD_HEADERS['X-Frame-Options'], 'DENY');
+    assert.equal(DASHBOARD_HEADERS['X-Content-Type-Options'], 'nosniff');
+    assert.equal(DASHBOARD_HEADERS['Referrer-Policy'], 'no-referrer');
 });
 
 test('disabling the built-in dashboard hides its routes but keeps /healthz available', () => {

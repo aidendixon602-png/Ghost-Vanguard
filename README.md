@@ -10,7 +10,7 @@ Anti-nuke and the threat board · Moderation and audit logging · Ticket desk ·
 
 [![CI](https://github.com/aidendixon602-png/Ghost-Vanguard/actions/workflows/ci.yml/badge.svg)](https://github.com/aidendixon602-png/Ghost-Vanguard/actions/workflows/ci.yml)
 ![Version](https://img.shields.io/badge/version-3.2.1-6d5ae6)
-![Tests](https://img.shields.io/badge/tests-562%20passing-2EA043)
+![Tests](https://img.shields.io/badge/tests-592%20passing-2EA043)
 ![Node](https://img.shields.io/badge/node-24-339933?logo=node.js&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
 ![discord.js](https://img.shields.io/badge/discord.js-14-5865F2?logo=discord&logoColor=white)
@@ -23,7 +23,7 @@ Anti-nuke and the threat board · Moderation and audit logging · Ticket desk ·
 
 ---
 
-> **Commands are typed with Veil Utilities' prefix.** Ghost Vanguard has no slash commands: every command is `,gv` followed by what used to come after the slash (`/raid mode on` → `,gv raid mode on`, `/antinuke whitelist add` → `,gv antinuke whitelist add @user`). Veil Utilities hands the message over (it reacts 🛡️) and Ghost Vanguard runs it with the same ranks, permissions and confirmations. `,gv help` lists everything. See `src/bot/text-commands.ts`.
+> **Commands are typed, not slashed.** Ghost Vanguard has no slash commands: every command is `,gv` followed by what used to come after the slash (`/raid mode on` → `,gv raid mode on`, `/antinuke whitelist add` → `,gv antinuke whitelist add @user`). Vanguard reads the message itself and runs it with the same ranks, permissions and confirmations, so it needs no other bot to be online. Veil Utilities still reacts 🛡️ to `,gv` while both bots run, and that hand-off is accepted as a fallback, but one message is only ever run once. `,gv help` lists everything. See `src/bot/text-commands.ts`.
 
 ## Overview
 
@@ -176,7 +176,7 @@ Copy [`.env.example`](.env.example) to `.env` and set at least:
 | `DATABASE_PATH` | No | SQLite database location (default `./data/vanguard.db`) |
 | `DASHBOARD_ENABLED` | No | Set to `false` to disable the built-in dashboard while keeping `/healthz` available (default: enabled) |
 | `DASHBOARD_TOKEN` | Recommended | Require a token for the dashboard and its API when enabled. Without it the dashboard is open to anyone who can reach the port, so keep it on localhost |
-| `BOT_OWNER_ID` | Recommended | The bot owner: Developer rank for ordinary permission checks, and the default for `TRUSTED_DM_IDS`. `/restart` separately requires an exact `DEVELOPER_IDS` entry |
+| `BOT_OWNER_ID` | Recommended | The bot owner: Developer rank for ordinary permission checks, and the default for `TRUSTED_DM_IDS`. There is no built-in fallback, so leave it unset and no account is owner. `/restart` separately requires an exact `DEVELOPER_IDS` entry |
 | `SUPREME_LEADER_IDS` | No | Supreme Leaders: bot-wide rank below Developer; may lift genrebans from ban-log controls, but do not get Developer-only commands. Nobody is built in; every start prints who has bot-wide access |
 | `ALERT_EXEMPT` | No | `true`: also alert when the owner, Developers or whitelisted people hit a limit (default: recorded quietly) |
 | `ANTINUKE_LOCK` | Recommended | `true`: only Developers can turn anti-nuke off or weaken it; servers switched off come back on at start |

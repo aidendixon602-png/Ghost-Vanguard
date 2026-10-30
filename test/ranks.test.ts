@@ -10,6 +10,8 @@ import { RANKS, rankOf, requiredRank } from '../src/bot/ranks.js';
 import staff from '../src/commands/configuration/staff.js';
 
 const G = 'g';
+// Nothing is built in: BOT_OWNER_ID is whatever the deployment sets, so these tests set it.
+config.ownerId = '1277709272041394187';
 const member = (id: string, roles: string[] = [], owner = 'owner') => ({ id, guild: { id: G, ownerId: owner }, roles: { cache: new Collection(roles.map(r => [r, {}])) }, permissions: new PermissionsBitField() }) as any;
 function setup() {
     const store = new Store(':memory:'); authorize(store, G); store.save(store.settings(G));
@@ -21,7 +23,7 @@ function setup() {
 test('rank comes from BOT_OWNER, developers, bot-wide staff, server owner, staff roles and older access settings', () => {
     const store = setup(), dev = '723456789012345678'; config.developers.add(dev);
     try {
-        assert.equal(rankOf(store, G, config.ownerId!, member(config.ownerId!)), RANKS.developer, 'the bot owner is a Developer, the top rank');
+        assert.equal(rankOf(store, G, config.ownerId, member(config.ownerId)), RANKS.developer, 'the bot owner is a Developer, the top rank');
         assert.equal(rankOf(store, G, dev, member(dev)), RANKS.developer);
         store.db.prepare("INSERT INTO bot_staff(user_id,level) VALUES('ov','overseer'),('bm','botmanager')").run();
         assert.equal(rankOf(store, G, 'ov', member('ov')), RANKS.overseer);

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Collection, PermissionFlagsBits, PermissionsBitField, SlashCommandBuilder } from 'discord.js';
-import { commandText, fromMessage, HANDOFF_EMOJI, HANDOFF_WINDOW_MS, isHandoff, parse, PRIVATE_COMMANDS, words } from '../src/bot/text-commands.js';
+import { Claimed, CommandRateLimit, commandText, fromMessage, HANDOFF_EMOJI, HANDOFF_WINDOW_MS, isCommandMessage, isHandoff, parse, PRIVATE_COMMANDS, words } from '../src/bot/text-commands.js';
 import { gvLine, gvText } from '../src/ui/gv-names.js';
 import { Registry, defineCommand } from '../src/bot/registry.js';
 import { Interactions } from '../src/bot/interactions.js';
@@ -170,4 +170,40 @@ test('builders stay builders after the translation', async () => {
     assert.ok(out.embeds[0] instanceof EmbedBuilder && out.components[0] instanceof ActionRowBuilder);
     assert.equal(out.embeds[0].toJSON().description, 'Use `,gv raid mode off`');
     assert.deepEqual([out.components[0].toJSON().components[0].label, out.components[0].toJSON().components[0].custom_id], [',gv raid help', 'x:/raid']);
+});
+
+test('Vanguard reads its own ,gv commands, without another bot handing them over', () => {
+    // This is what makes the command surface independent of Veil Utilities being online or installed.
+    const message = (content: string, bot = false) => ({ author: { bot }, content });
+    assert.ok(isCommandMessage(message(',gv raid mode on')));
+    assert.ok(isCommandMessage(message(',gv help')));
+    assert.ok(isCommandMessage(message(',gv')), 'a bare ,gv still answers with help');
+    assert.ok(!isCommandMessage(message('hello everyone')), 'ordinary chat is not a command');
+    assert.ok(!isCommandMessage(message('raid mode on')), 'the prefix is required');
+    assert.ok(!isCommandMessage(message(',gv help', true)), 'another bot cannot drive it');
+    assert.ok(!isCommandMessage(message('')), 'an empty body (no Message Content intent) is not a command');
+});
+
+test('one message runs once even when both the direct read and Veil\'s reaction arrive', () => {
+    // Veil still reacts 🛡️ while both bots run. Without this a command would execute twice (a double ban).
+    const claimed = new Claimed();
+    assert.equal(claimed.claim('m1'), true, 'the first path runs it');
+    assert.equal(claimed.claim('m1'), false, 'the second path is ignored');
+    assert.equal(claimed.claim('m2'), true, 'a different message still runs');
+});
+
+test('Claimed forgets old ids so it cannot grow without limit', () => {
+    const claimed = new Claimed(2);
+    assert.ok(claimed.claim('a') && claimed.claim('b'));
+    assert.ok(claimed.claim('c'), 'the third claim still runs');
+    assert.ok(claimed.claim('a'), 'the oldest id was forgotten');
+});
+
+test('a burst of commands from one member is dropped, a normal pace is not', () => {
+    const limit = new CommandRateLimit(), now = 1_000_000;
+    for (let n = 0; n < 4; n++)
+        assert.ok(limit.allow(USER, now + n), `command ${n + 1} is answered`);
+    assert.ok(!limit.allow(USER, now + 4), 'the fifth in the window is dropped');
+    assert.ok(limit.allow(USER, now + 5001), 'the window has passed');
+    assert.ok(limit.allow(TARGET, now + 5), 'one member never limits another');
 });

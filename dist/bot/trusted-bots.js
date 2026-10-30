@@ -11,6 +11,25 @@ export const TRUSTED_BOTS = new Map([
 ]);
 export const isTrustedBot = (id) => !!id && TRUSTED_BOTS.has(id);
 /**
+ * Confirm at startup that each trusted ID really is the bot it is named as, and say the account name out
+ * loud. These IDs are exempt from anti-nuke in every server and are the only accounts whose reaction can
+ * hand a `,gv` command over, so a stale or mistyped ID otherwise fails silently: the hand-off just never
+ * happens, and the bot cannot see why. The returned lines are for the startup summary.
+ */
+export async function trustedBotReport(client) {
+    const lines = [];
+    for (const [id, name] of TRUSTED_BOTS) {
+        const user = await client.users.fetch(id).catch(() => null);
+        if (!user)
+            lines.push(`⚠ Trusted bot **${name}** (${id}) could not be fetched. If that ID is wrong, \`,gv\` commands never work: it must be Veil Utilities' application ID.`);
+        else if (!user.bot)
+            lines.push(`⚠ TRUSTED_BOTS lists ${id} as **${name}**, but that account is a user, not a bot. Remove it: it is exempt from anti-nuke in every server.`);
+        else
+            lines.push(`Trusted bot ${name}: @${user.username} (${id})`);
+    }
+    return lines;
+}
+/**
  * People no part of Vanguard ever acts against, in any server: no moderation command can target them (not even a
  * Developer's), anti-nuke never counts, contains or punishes them, and automod, scam protection, raid mode and
  * network bans leave them alone. Kept in the code on purpose, like the trusted bots above.

@@ -20,16 +20,19 @@ export const config = {
     backupWeekly: Number(process.env.DATABASE_BACKUP_KEEP_WEEKLY ?? 8),
     logFormat: process.env.LOG_FORMAT || 'pretty',
     logLevel: process.env.LOG_LEVEL || 'info',
-    ownerId: process.env.BOT_OWNER_ID || '1277709272041394187',
+    // Nobody is built in: an unset BOT_OWNER_ID means no owner, not a fallback account. A hardcoded
+    // default here would hand the top bot-wide rank (and the daily database backup DM) to a stranger
+    // on every self-hosted install that forgot to set it.
+    ownerId: process.env.BOT_OWNER_ID?.trim() ?? '',
     /** Extra Supreme Leaders besides BOT_OWNER_ID (comma-separated IDs). */
     supremeExtra: parseIds(process.env.SUPREME_LEADER_IDS || ''),
     /** Optional uptime check URL (e.g. https://hc-ping.com/<uuid>); pinged every minute. */
     heartbeatUrl: /^https:\/\//.test(process.env.HEARTBEAT_URL?.trim() ?? '') ? process.env.HEARTBEAT_URL!.trim() : '',
     /** The only people the bot DMs about itself (backup files, alerts). Default: BOT_OWNER_ID only. */
-    trustedDmIds: parseIds(process.env.TRUSTED_DM_IDS || process.env.BOT_OWNER_ID || '1277709272041394187'),
+    trustedDmIds: parseIds(process.env.TRUSTED_DM_IDS || process.env.BOT_OWNER_ID || ''),
     /** DM a gzipped database backup to the trusted DM list once a day. */
     dailyBackupDm: process.env.DAILY_BACKUP_DM !== 'false',
-    ownerUsername: process.env.BOT_OWNER_USERNAME || 'web_w2z',
+    ownerUsername: process.env.BOT_OWNER_USERNAME?.trim() || '',
     snapshotActionDelayMs: Number(process.env.SNAPSHOT_ACTION_DELAY_MS || 0),
     dbPath: resolve(process.env.DATABASE_PATH || './data/vanguard.db'),
     host: process.env.HEALTH_HOST || '127.0.0.1',
@@ -43,7 +46,7 @@ export const config = {
     messageContentEnabled: process.env.MESSAGE_CONTENT_ENABLED !== 'false',
     aiEnabled: process.env.AI_ENABLED === 'true',
     openaiKey: process.env.OPENAI_API_KEY?.trim() ?? '',
-    openaiModel: process.env.OPENAI_MODEL?.trim() || 'gpt-6-luna',
+    openaiModel: process.env.OPENAI_MODEL?.trim() || '',
 };
 
 export function validateConfig(): string[] {
@@ -58,6 +61,13 @@ export function validateConfig(): string[] {
         errors.push('HEALTH_PORT must be between 1 and 65535.');
     if (config.aiEnabled && !config.openaiKey)
         errors.push('AI_ENABLED=true requires OPENAI_API_KEY.');
+    // A model name is required: a wrong or placeholder model only fails at the first /ask, with a provider error.
+    if (config.aiEnabled && !config.openaiModel)
+        errors.push('AI_ENABLED=true requires OPENAI_MODEL (the exact model name your OpenAI project can access).');
+    if (config.ownerId && !/^\d{17,20}$/.test(config.ownerId))
+        errors.push('BOT_OWNER_ID must be a Discord user ID (17-20 digits), or left empty.');
+    if (process.env.TRUSTED_DM_IDS && [...parseIds(process.env.TRUSTED_DM_IDS)].length !== process.env.TRUSTED_DM_IDS.split(',').map(v => v.trim()).filter(Boolean).length)
+        errors.push('Every TRUSTED_DM_IDS entry must be a valid Discord user ID, separated by commas.');
     if (!Number.isInteger(config.snapshotActionDelayMs) || config.snapshotActionDelayMs < 0 || config.snapshotActionDelayMs > 60000)
         errors.push('SNAPSHOT_ACTION_DELAY_MS must be an integer between 0 and 60000.');
     for (const [key, value] of Object.entries({ GUILD_RETENTION_DAYS: config.guildRetentionDays, DATABASE_BACKUP_INTERVAL_MINUTES: config.databaseBackupMinutes, DATABASE_BACKUP_KEEP_RECENT: config.backupRecent, DATABASE_BACKUP_KEEP_DAILY: config.backupDaily, DATABASE_BACKUP_KEEP_WEEKLY: config.backupWeekly }))
