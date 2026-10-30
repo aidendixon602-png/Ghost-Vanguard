@@ -8,9 +8,9 @@ import { readiness } from './readiness.js';
 import { antinukeLocked } from '../bot/env-rules.js';
 
 /**
- * The anti-nuke preset is fixed: the rules in RULES, their limits, punishments and reverts.
- * New servers start in observe mode. Enforcement requires the readiness check and an explicit
- * `/antinuke enable`; a staff "off" choice is stored separately and survives restarts.
+ * Anti-nuke ships with a conservative default policy. Guilds can tune per-rule limits and disable
+ * individual rules; the readiness check and explicit `/antinuke enable` still gate enforcement.
+ * A staff "off" choice is stored separately and survives restarts.
  */
 export function antinukeOptedOut(store: Store, guild: string): boolean {
     return store.antinukeStaffDisabled(guild);
@@ -18,15 +18,14 @@ export function antinukeOptedOut(store: Store, guild: string): boolean {
 export function setAntinukeChoice(store: Store, guild: string, enabled: boolean) {
     store.setAntinukeStaffDisabled(guild, !enabled);
 }
-/** Remove any legacy custom limits/toggles and set the requested mode. */
+/** Clear only the obsolete shared limit; retain guild-specific rule settings across enable/restart. */
 export function applyLockedPreset(s: Settings, mode: 'observe' | 'enforce' = 'enforce') {
-    s.rules = {};
     s.ruleDefaults = undefined;
     s.enabled = true;
     s.mode = mode;
 }
 export function presetIsApplied(s: Settings): boolean {
-    return s.enabled && !Object.keys(s.rules).length && !s.ruleDefaults;
+    return s.enabled && !s.ruleDefaults;
 }
 
 /** Called for every authorized server at startup and after authorization. */
@@ -86,14 +85,15 @@ export async function applyDefaultAntinuke(store: Store, guild: Guild, logs: Log
             : 'Readiness is available, but enforcement still needs a deliberate `/antinuke enable` and confirmation.';
         logEvent('antinuke_started_in_observe_mode', { guildId: guild.id, missing: ready.missing });
         logs.push(guild.id, noticeEmbed('🟠 Anti-nuke observe mode', [
-            `The ${RULES.length}-rule preset is recording incidents but will not strip members or revert changes.`,
+            `Anti-nuke is recording incidents but will not strip members or revert changes. ${RULES.length} rules are available; thresholds can be tuned per server.`,
             reason,
-            '**Turn on enforcement:** `/antinuke enable` (requires readiness and confirmation).',
+            '**Turn on enforcement:** `/antinuke enable` (requires readiness and confirmation). Tune rules with `/antinuke rule`.',
             '**Exceptions:** `/antinuke whitelist add`',
         ], Colors.Orange));
         return 'observing';
     }
+    const activeRules = RULES.filter(rule => s.rules[rule.key]?.enabled !== false).length;
     logEvent('antinuke_default_applied', { guildId: guild.id, preservedExistingEnforcement: wasEnforcing });
-    logs.push(guild.id, noticeEmbed('🛡️ Anti-nuke protection on', [`The standard anti-nuke preset is running.`, `**Rules:** ${RULES.length}`, '**Mode:** enforce', '**Exceptions:** `/antinuke whitelist add`', '**Turn off:** `/antinuke disable`'], Colors.Green));
+    logs.push(guild.id, noticeEmbed('🛡️ Anti-nuke protection on', [`The configured anti-nuke policy is running.`, `**Rules:** ${activeRules}/${RULES.length} enabled`, '**Mode:** enforce', '**Tune:** `/antinuke rule`', '**Exceptions:** `/antinuke whitelist add`', '**Turn off:** `/antinuke disable`'], Colors.Green));
     return 'enabled';
 }

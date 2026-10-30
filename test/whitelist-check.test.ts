@@ -26,7 +26,7 @@ test('whitelist check: owner, full bypass, role-based rules, warnings and quaran
         store.run('INSERT INTO incidents(guild_id,actor_id,rule,at,mode,result) VALUES(?,?,?,?,?,?)', 'g', 'person', 'timeout', Date.now(), 'warn', 'Warning');
         store.run('INSERT INTO backups(guild_id,user_id,roles,at,active) VALUES(?,?,?,?,1)', 'g', 'person', '[]', Date.now());
         const after = whitelistCheck(store, guild, 'person', ['staffrole'], false).toJSON().description!;
-        assert.match(after, /Warned <t:\d+:R>/); assert.match(after, /Quarantined/);
+        assert.match(after, /Warned for \*\*Timeout\*\* <t:\d+:R>/); assert.match(after, /Quarantined/);
 
         store.grant('g', 'adminrole', 'trust_role', 'owner');
         assert.match(whitelistCheck(store, guild, 'person', ['adminrole'], false).toJSON().description!, /full bypass.*<@&adminrole>/);

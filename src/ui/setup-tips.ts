@@ -1,6 +1,6 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, Colors, EmbedBuilder, PermissionFlagsBits, type Guild } from 'discord.js';
 import type { Store } from '../database/db.js';
-import { RULES } from '../core.js';
+import { overrideRule, RULES } from '../core.js';
 import { VERSION } from '../config.js';
 import { antinukeOptedOut } from '../security/locked-antinuke.js';
 import { readiness } from '../security/readiness.js';
@@ -69,12 +69,14 @@ const bar = (done: number, total: number) => '🟩'.repeat(done) + '⬛'.repeat(
 /** The panel for a server Vanguard protects. `inviter` is the developer who added it, if known. */
 export function welcomePanel(store: Store | null, guild: Guild, inviter: string | null = null) {
     const c = checklist(store, guild);
+    const settings = store?.settings(guild.id);
+    const enabledRuleCount = settings ? RULES.filter(rule => overrideRule(rule, settings.rules, settings.ruleDefaults).enabled !== false).length : RULES.length;
     const all = c.ready === c.items.length;
     const intro = inviter
         ? `Authorized by approved developer <@${inviter}>.`
         : `**${guild.name}** is authorized.`;
     const protection = c.enforcementOn
-        ? `Anti-nuke enforcement is active with ${RULES.length} rules.`
+        ? `Anti-nuke enforcement is active with ${enabledRuleCount}/${RULES.length} rules.`
         : c.optedOut
             ? 'Staff have opted out of anti-nuke protection; it stays off until they enable it again.'
             : !store
@@ -83,7 +85,7 @@ export function welcomePanel(store: Store | null, guild: Guild, inviter: string 
                     ? 'Anti-nuke starts in observe mode. Enforcement requires a successful readiness check and an explicit confirmation.'
                     : 'Anti-nuke setup has not initialized yet. Once initialized, it starts in observe mode.';
     const protectionField = c.enforcementOn
-        ? `🟢 **Enforce mode** · ${RULES.length} rules · automated containment is active`
+        ? `🟢 **Enforce mode** · ${enabledRuleCount}/${RULES.length} rules · automated containment is active`
         : c.optedOut
             ? '🔴 **Off by staff choice** · use /antinuke enable after readiness is fixed'
             : !store

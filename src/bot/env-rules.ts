@@ -70,7 +70,7 @@ export const isProtectedUser = (userId: string) => protectedUsers().has(userId);
  */
 export const antinukeLocked = () => /^(1|true|yes|on)$/i.test(process.env.ANTINUKE_LOCK?.trim() ?? '');
 /** Commands that weaken anti-nuke; with ANTINUKE_LOCK only Developers may use them. */
-export const ANTINUKE_LOCK_KEYS = new Set(['antinuke/disable', 'disable', 'antinuke-plus/settings']);
+export const ANTINUKE_LOCK_KEYS = new Set(['antinuke/disable', 'disable', 'antinuke/rule', 'antinuke/reset', 'antinuke-plus/settings']);
 
 /** GLOBAL_ALERT_CHANNEL_ID: the global anti-nuke feed channel, fixed in .env (overrides `/dev alerts`). */
 export const envGlobalAlertChannel = () => /^\d{17,20}$/.test(process.env.GLOBAL_ALERT_CHANNEL_ID?.trim() ?? '') ? process.env.GLOBAL_ALERT_CHANNEL_ID!.trim() : null;

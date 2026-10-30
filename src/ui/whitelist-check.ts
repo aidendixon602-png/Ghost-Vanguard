@@ -1,5 +1,5 @@
 import { Colors, EmbedBuilder, type Guild } from 'discord.js';
-import { KNOWN_ROLE_BOTS, RULES, WARN_FIRST, WARNING_MEMORY_MS } from '../core.js';
+import { KNOWN_ROLE_BOTS, overrideRule, RULES, WARN_FIRST, WARNING_MEMORY_MS } from '../core.js';
 import type { Store } from '../database/db.js';
 import { developers } from '../bot/developers.js';
 
@@ -19,12 +19,14 @@ export function whitelistCheck(store: Store, guild: Guild, userId: string, roleI
 
     const skips: string[] = [];
     const checked: string[] = [];
-    for (const rule of RULES.filter(r => r.key !== 'join_flood')) {
+    const settings = store.settings(guild.id);
+    for (const base of RULES.filter(r => r.key !== 'join_flood')) {
+        const rule = overrideRule(base, settings.rules, settings.ruleDefaults);
         const own = live(`trust:${rule.key}`);
         const viaRole = !own ? roleIds.find(r => live(`trust_role:${rule.key}`, r)) : undefined;
         if (own) skips.push(`✅ **${rule.title}** · ${when(own.expires)}`);
         else if (viaRole) skips.push(`✅ **${rule.title}** · from <@&${viaRole}>, ${when(live(`trust_role:${rule.key}`, viaRole)!.expires)}`);
-        else checked.push(`• **${rule.title}**: ${rule.count} in ${rule.seconds}s → ${rule.punishment ?? 'strip'}${(rule.key === 'dangerous_grant' || WARN_FIRST.has(rule.key) && !isBot) ? ' (warns first)' : ''}`);
+        else checked.push(`• **${rule.title}**: ${rule.enabled === false ? 'disabled' : `${rule.count} in ${rule.seconds}s → ${rule.punishment ?? 'strip'}${(rule.key === 'dangerous_grant' || WARN_FIRST.has(rule.key) && !isBot) ? ' (warns first)' : ''}`}`);
     }
     const roleManager = skips.some(s => s.includes('**Role Invite**')) || skips.some(s => s.includes('**Role Update**'));
     const notes: string[] = [];
@@ -32,8 +34,11 @@ export function whitelistCheck(store: Store, guild: Guild, userId: string, roleI
         notes.push(`🤖 Verification bot${KNOWN_ROLE_BOTS[userId] ? ` (${KNOWN_ROLE_BOTS[userId]})` : ''}: giving ordinary roles is never counted.`);
     if (isBot) notes.push('🤖 Bots get no warnings for everyday rules. Dangerous permission grants warn first, except self-assigned Administrator or Manage Server.');
     if (roleManager) notes.push('🎭 They can hand out moderator-level roles (Ban, Kick, Manage Channels, Webhooks). Giving **Administrator** or **Manage Server** is checked; self-assigning either strips immediately.');
-    const warned = store.get("SELECT at FROM incidents WHERE guild_id=? AND actor_id=? AND mode='warn' AND at>? ORDER BY at DESC LIMIT 1", guild.id, userId, now - WARNING_MEMORY_MS);
-    if (warned) notes.push(`⚠️ **Warned <t:${Math.floor(Number(warned.at) / 1000)}:R>.** Their next offence before <t:${Math.floor((Number(warned.at) + WARNING_MEMORY_MS) / 1000)}:t> is punished without another warning.`);
+    const warned = store.get("SELECT rule,at FROM incidents WHERE guild_id=? AND actor_id=? AND mode='warn' AND at>? ORDER BY at DESC LIMIT 1", guild.id, userId, now - WARNING_MEMORY_MS);
+    if (warned) {
+        const warnedRule = RULES.find(rule => rule.key === String(warned.rule));
+        notes.push(`⚠️ Warned for **${warnedRule?.title ?? warned.rule}** <t:${Math.floor(Number(warned.at) / 1000)}:R>. Repeating that same rule before <t:${Math.floor((Number(warned.at) + WARNING_MEMORY_MS) / 1000)}:t> gets its normal response; a different rule does not escalate this warning.`);
+    }
     if (store.get('SELECT 1 FROM backups WHERE guild_id=? AND user_id=? AND active=1', guild.id, userId))
         notes.push('🔒 **Quarantined** from an earlier incident: staff roles given to them are removed again. Use the alert\'s **Undo strip** button or `/antinuke release`.');
 

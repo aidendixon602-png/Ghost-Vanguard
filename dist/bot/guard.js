@@ -7,7 +7,7 @@ import { AppError } from '../errors.js';
 import { aboveSupremeMessage, botRank, needsDeveloper, rankOf, RANKS, requiredRank } from './ranks.js';
 import { ANTINUKE_LOCK_KEYS, antinukeLocked } from './env-rules.js';
 const lockedKey = (key) => !!key && antinukeLocked() && ANTINUKE_LOCK_KEYS.has(key.replace(/\/$/, ''));
-export const ANTINUKE_LOCKED_MESSAGE = 'Anti-nuke is **locked** in the bot settings (`ANTINUKE_LOCK`), so it cannot be turned off or weakened from Discord. Only a Developer can do this.';
+export const ANTINUKE_LOCKED_MESSAGE = 'Anti-nuke is **locked** in the bot settings (`ANTINUKE_LOCK`), so its rules cannot be weakened or turned off from Discord. Only a Developer can change them.';
 const permissionNames = (permissions) => permissions.map(p => new PermissionsBitField(p).toArray().join(' ')).map(p => p.replace(/([a-z])([A-Z])/g, '$1 $2'));
 export class Guard {
     store;

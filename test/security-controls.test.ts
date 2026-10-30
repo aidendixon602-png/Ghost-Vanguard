@@ -46,11 +46,26 @@ test('readiness checks missing permissions, log overwrites and unmanaged role hi
  }finally{store.close();}
 });
 
-test('legacy disabled toggles and loosened limits cannot weaken the fixed preset',async()=>{
+test('per-server thresholds and disabled rules are respected by live anti-nuke enforcement',async()=>{
  const {store,security,guild}=setup();try {
- const s=store.settings('g');s.rules.mass_ban={count:50,seconds:5,enabled:false};s.ruleDefaults={count:100,seconds:5};store.save(s);
- for(const n of [1,2,3,4,5])await security.audit({id:`e${n}`,executorId:'actor',action:AuditLogEvent.MemberBanAdd,targetId:`t${n}`,createdTimestamp:Date.now()} as any,guild);
- assert.equal(store.all('SELECT * FROM incidents').length,1,'5 bans in 60s still triggers');
+ const s=store.settings('g');s.rules.mass_ban={count:2,seconds:60};store.save(s);
+ for(const n of [1,2])await security.audit({id:`e${n}`,executorId:'actor',action:AuditLogEvent.MemberBanAdd,targetId:`t${n}`,createdTimestamp:Date.now()} as any,guild);
+ assert.equal(store.all('SELECT * FROM incidents').length,1,'the custom threshold triggers exactly at two bans');
+ assert.deepEqual([store.settings('g').rules.mass_ban?.count,store.settings('g').rules.mass_ban?.seconds],[2,60],'custom rules persist in storage');
+ const disabled=store.settings('g');disabled.rules.mass_ban={count:2,seconds:60,enabled:false};store.save(disabled);
+ for(const n of [3,4,5,6])await security.audit({id:`e${n}`,executorId:'actor',action:AuditLogEvent.MemberBanAdd,targetId:`t${n}`,createdTimestamp:Date.now()} as any,guild);
+ assert.equal(store.all('SELECT * FROM incidents').length,1,'disabled rules no longer enforce');
+ }finally{store.close();}
+});
+
+test('a first mass-kick threshold warns without stripping, and a warning for another rule does not escalate it',async()=>{
+ const {store,security,guild}=setup();try {
+ const s=store.settings('g');s.rules.mass_kick={count:1,seconds:60};store.save(s);
+ store.incident('g','actor','role_create','warn','Prior warning for a different action');
+ let punished=0;security.punish=async()=>{punished++;return 'Removed 1 dangerous role(s).';};
+ await security.audit({id:'kick-1',executorId:'actor',action:AuditLogEvent.MemberKick,targetId:'target',createdTimestamp:Date.now()} as any,guild);
+ const incident=store.get("SELECT mode,result FROM incidents WHERE guild_id='g' AND rule='mass_kick' ORDER BY id DESC LIMIT 1");
+ assert.equal(incident.mode,'warn');assert.match(incident.result,/not automatically reverted/);assert.equal(punished,0);
  }finally{store.close();}
 });
 
@@ -110,7 +125,7 @@ test('incident report counts completed, failed and skipped reverts separately',a
  security.revert=async()=>outcomes.shift()!;
  for(let n=0;n<5;n++)await security.audit({id:'e'+n,executorId:'actor',targetId:'target'+n,createdTimestamp:Date.now(),action:AuditLogEvent.MemberBanAdd} as any,guild);
  assert.match(store.get('SELECT result FROM incidents WHERE guild_id=?','g')!.result,/1 completed, 1 failed, 3 skipped/);
- const card=logs.at(-1).toJSON();assert.equal(card.description,'<@actor> was **stripped** for triggering anti-nuke.');assert.equal(card.fields.find((f:any)=>f.name==='Changes reverted').value,'1 undone · 1 failed · 3 skipped');assert.equal(card.fields.find((f:any)=>f.name==='Target').value,'`target4`');
+ const card=logs.at(-1).toJSON();assert.match(card.description,/<@actor> got a first-hit \*\*warning\*\* from anti-nuke/);assert.equal(card.fields.find((f:any)=>f.name==='Changes reverted').value,'1 undone · 1 failed · 3 skipped');assert.equal(card.fields.find((f:any)=>f.name==='Target').value,'`target4`');
  }finally{store.close();}
 });
 
@@ -336,7 +351,7 @@ test('whitelisted people are recorded quietly (no cards) unless ALERT_EXEMPT=tru
   security.punish=async()=>'Removed 1 dangerous role(s).';
   for(const n of [1,2,3,4,5])await security.audit({id:`k${n}`,executorId:'mod',action:AuditLogEvent.MemberKick,targetId:`k${n}`,createdTimestamp:Date.now()} as any,guild);
   const card=logs.at(-1).toJSON();
-  assert.equal(card.title,'Anti-nuke Triggered');
+  assert.equal(card.title,'Anti-nuke Warning');
   assert.match(card.fields.find((f:any)=>f.name==='Whitelist').value,/but not for \*\*Kick\*\*/);
   store.close();
  } finally {process.env.ALERT_EXEMPT=saved??'';}

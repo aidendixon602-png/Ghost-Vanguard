@@ -204,9 +204,9 @@ export class Security {
         // Self-assigning Administrator or Manage Server remains an immediate strip-and-revert.
         const immediateSelfAdmin = rule.key === 'dangerous_grant' && isSelfAdminAssignment(entry, guild, actor);
         const canWarn = rule.key === 'dangerous_grant' ? !immediateSelfAdmin : WARN_FIRST.has(rule.key);
-        const recentWarning = rule.key === 'dangerous_grant'
-            ? this.store.get("SELECT 1 FROM incidents WHERE guild_id=? AND actor_id=? AND rule='dangerous_grant' AND mode='warn' AND at>?", guild.id, actor, now - WARNING_MEMORY_MS)
-            : this.store.get("SELECT 1 FROM incidents WHERE guild_id=? AND actor_id=? AND mode='warn' AND at>?", guild.id, actor, now - WARNING_MEMORY_MS);
+        // Escalate only a repeat of the same rule. A warning for a legitimate channel edit must
+        // not turn an unrelated later role change into an immediate strip.
+        const recentWarning = this.store.get("SELECT 1 FROM incidents WHERE guild_id=? AND actor_id=? AND rule=? AND mode='warn' AND at>?", guild.id, actor, rule.key, now - WARNING_MEMORY_MS);
         const warnOnly = s.mode === 'enforce' && canWarn && !recentWarning
             && (rule.key === 'dangerous_grant' || !(await memberOrNull(guild, actor).catch(() => null))?.user?.bot);
         // Write evidence before trying any Discord mutation.
@@ -220,8 +220,8 @@ export class Security {
         const progress = {completed:0,failed:0,skipped:0};
         if (s.mode === 'enforce') {
             if (warnOnly) {
-                result = 'Warning: no roles were removed. Doing this again within an hour gets the normal punishment.';
-                void this.warnActor(guild, actor, active.title);
+                result = `Warning: no roles were removed. ${active.revert ? 'A safe revert was attempted.' : 'The triggering change was not automatically reverted; staff should review it.'} Doing this same action again within an hour gets the normal response.`;
+                void this.warnActor(guild, actor, active.title, !!active.revert);
             } else try {
                 const ignoreRoles = entry.action === AuditLogEvent.MemberRoleUpdate && entry.targetId === actor ? (changesOf(entry).find(c=>c.key==='$add')?.new ?? []).map((r:{id:string})=>r.id) : [];
                 result = await this.punish(guild, actor, active.punishment ?? 'strip', ignoreRoles);
@@ -309,15 +309,15 @@ export class Security {
     }
 
     /** Tell someone privately that anti-nuke warned them, so a staff member doing normal work knows to slow down or ask for a whitelist. */
-    async warnActor(guild: Guild, actor: string, what: string): Promise<boolean> {
+    async warnActor(guild: Guild, actor: string, what: string, revertAttempted: boolean): Promise<boolean> {
         try {
             const member = await memberOrNull(guild, actor);
             if (!member || member.user?.bot) return false;
             await member.send({ embeds: [embed('⚠️ Anti-nuke warning', [
-                `In **${guild.name ?? 'the server'}**, you triggered anti-nuke (**${what}**), so the change was undone.`,
+                `In **${guild.name ?? 'the server'}**, you reached the anti-nuke **${what}** limit.`,
                 '',
-                '**Nothing else happened this time.** If it happens again within the next hour, your staff roles will be removed.',
-                'If this is part of your job, ask the server owner to add you with `/antinuke whitelist add`.',
+                '**No roles were removed this time.**' + (revertAttempted ? ' A safe revert was attempted; check the security log to see whether it succeeded.' : ' This action was not automatically reverted; staff can review the security log.'),
+                'Repeating the same rule within the next hour gets its normal response. If this is expected work, ask the server owner to adjust `/antinuke rule` or whitelist you for that rule.',
             ].join('\n'), Colors.Yellow)] });
             return true;
         } catch { return false; }

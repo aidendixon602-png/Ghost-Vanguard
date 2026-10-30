@@ -179,7 +179,7 @@ test('real protection statistics deduplicate Discord/Roblox users and exclude un
     s.close();
 });
 
-test('anti-nuke rule editors are removed and legacy saved limits are ignored', async () => {
+test('anti-nuke per-rule controls are exposed and persisted limits override shared legacy defaults', async () => {
     const store = new Store(':memory:');
     authorize(store);
     const settings = store.settings('g');
@@ -190,8 +190,12 @@ test('anti-nuke rule editors are removed and legacy saved limits are ignored', a
     await registry.load();
     assert.equal(registry.commands.has('1:antinuke-rule'), false);
     assert.equal(registry.components.some(c => c.prefix === 'ruleui:'), false);
+    const antinukeCommand = registry.json.find(c => c.name === 'antinuke')!;
+    assert.ok(antinukeCommand.options?.some((option: any) => option.name === 'rule'));
+    assert.ok(antinukeCommand.options?.some((option: any) => option.name === 'reset'));
     const state = store.settings('g');
-    for (const rule of RULES) assert.deepEqual(overrideRule(rule, state.rules, state.ruleDefaults), rule);
+    const active = overrideRule(RULES.find(rule => rule.key === 'mass_ban')!, state.rules, state.ruleDefaults);
+    assert.deepEqual([active.count, active.seconds, active.enabled], [10, 60, false]);
     store.close();
 });
 

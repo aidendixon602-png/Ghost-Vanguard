@@ -31,7 +31,7 @@ export function incidentCard(info: IncidentInfo): EmbedBuilder {
         headline = `<@${info.actor}> triggered anti-nuke. They were **not punished** because they are ${info.exemptReason ?? 'exempt'}, and nothing was undone. Check this was intended.`;
         color = Colors.Blurple;
     } else if (info.mode === 'warn') {
-        headline = `<@${info.actor}> got a **warning** from anti-nuke. ${info.rule.revert ? 'What they did was undone. ' : ''}If they do it again within an hour they will be **${verb}**.`;
+        headline = `<@${info.actor}> got a first-hit **warning** from anti-nuke. ${info.rule.revert ? 'A safe revert was attempted. ' : 'No automatic revert is configured. ' }Repeating the same rule within an hour gets the normal response: **${verb}**.`;
         color = Colors.Yellow;
     } else if (info.mode !== 'enforce') {
         headline = `<@${info.actor}> triggered anti-nuke. They would have been **${verb}**, but anti-nuke is in watch-only mode.`;

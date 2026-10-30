@@ -9,7 +9,7 @@ import {authorize} from './helpers.js';
 import antinuke from '../src/commands/antinuke/antinuke.js';
 import { antinukeStatus } from '../src/ui/antinuke-status.js';
 
-test('status embed shows the fixed limits (saved custom limits are ignored) and only active anti-nuke bypasses in this guild',()=>{
+test('status embed shows per-server rule limits and only active anti-nuke bypasses in this guild',()=>{
  const {store}=fixture();
  try {
   const s=store.settings('g');s.rules.mass_ban={count:7,seconds:120};store.save(s);
@@ -17,7 +17,7 @@ test('status embed shows the fixed limits (saved custom limits are ignored) and 
   store.run('UPDATE grants SET expires=? WHERE guild_id=? AND user_id=?',Date.now()-1,'g','333');
   const status=antinukeStatus(store,'g').toJSON();
   assert.equal(status.title,'Antinuke Status');assert.equal(status.color,0x57F287);
-  assert.match(status.description!,/`Ban` – \*\*5 in 60s → strip\*\* `\[revert\]`/);assert.match(status.description!,/fixed preset applies to every server/);
+  assert.match(status.description!,/`Ban` – \*\*7 in 120s → strip\*\* `\[revert\]`/);assert.match(status.description!,/Tune thresholds or turn a rule off with/);
   assert.match(status.description!,/<@111>/);assert.doesNotMatch(status.description!,/<@222>|<@333>/);
   assert.match(status.description!,/manage_webhooks/);assert.ok(status.description!.length<=3900);
   s.enabled=false;store.save(s);assert.equal(antinukeStatus(store,'g').toJSON().color,0xED4245);
@@ -32,6 +32,21 @@ test('status and rules commands send the status embed without pinging trusted us
    let reply:any;await antinuke.execute({store,actor:{id:'owner'}} as any,{guildId:'g',user:{id:'owner'},options:{getSubcommand:()=>sub},editReply:async(value:any)=>{reply=value;}} as any);
    assert.equal(reply.embeds[0].toJSON().title,'Antinuke Status');assert.deepEqual(reply.allowedMentions,{parse:[]});
   }
+ } finally {store.close();}
+});
+
+test('/antinuke rule saves per-server thresholds and toggles; reset restores shipped defaults',async()=>{
+ const {store}=fixture();
+ try {
+  const logs:any[]=[];
+  const options=(sub:string,threshold:number|null,enabled:boolean|null)=>({getSubcommand:()=>sub,getString:()=> 'mass_ban',getInteger:(name:string)=>name==='threshold'?threshold:null,getBoolean:()=>enabled});
+  const ctx:any={store,logs:{push:(_guild:string,card:any)=>logs.push(card)}};
+  await antinuke.execute(ctx,{guildId:'g',user:{id:'owner'},options:options('rule',9,false)} as any);
+  assert.deepEqual(store.settings('g').rules.mass_ban,{count:9,seconds:60,enabled:false});
+  assert.equal(logs.at(-1).toJSON().title,'Anti-nuke rule updated');
+  await antinuke.execute(ctx,{guildId:'g',user:{id:'owner'},options:options('reset',null,null)} as any);
+  assert.equal(store.settings('g').rules.mass_ban,undefined);
+  assert.equal(store.settings('g').rules.bot_add,undefined,'reset only affects the selected rule');
  } finally {store.close();}
 });
 
@@ -55,6 +70,16 @@ function fixture(mode:'observe'|'enforce'='enforce') {
  const entry=(id:string,targetId:string,action=AuditLogEvent.MemberBanAdd,changes:any[]=[],at=Date.now())=>({id,targetId,action,changes,executorId:'actor',createdTimestamp:at} as any);
  return {store,security,guild,entry};
 }
+
+test('startup preserves per-server rule settings for an already-enforcing server',async()=>{
+ const {store}=fixture();
+ try {
+  const settings=store.settings('g');settings.enabled=true;settings.mode='enforce';settings.logChannelId='log';settings.rules.mass_ban={count:9,seconds:90,enabled:false};store.save(settings);
+  const {guild}=readinessGuild({id:'g'});
+  assert.equal(await applyDefaultAntinuke(store,guild,{push:()=>{}} as any),'unchanged');
+  assert.deepEqual(store.settings('g').rules.mass_ban,{count:9,seconds:90,enabled:false});
+ } finally {store.close();}
+});
 
 test('the twelve requested preset limits, actions and revert flags are exact',()=>{
  const expected:any={mass_ban:[5,60,'strip',true],bot_add:[1,60,'strip',true],channel_create:[6,120,'strip',true],channel_delete:[3,120,'strip',false],mass_kick:[5,120,'strip',false],dangerous_grant:[1,60,'strip',true],role_create:[8,120,'strip',true],role_delete:[5,120,'strip',false],role_grant:[8,60,'strip',true],guild_update:[5,120,'strip',false],timeout:[10,120,'strip',true],webhook_change:[3,60,'strip',true]};
@@ -107,7 +132,7 @@ test('/antinuke enable leaves observe mode unchanged until a ready owner confirm
   assert.equal(store.settings('g').mode,'observe');assert.equal(snapshots,0,'nothing is saved or enabled before confirmation');
   assert.match(JSON.stringify(i.replies[0]),/High Staff/,'the role-hierarchy limitation is part of the review prompt');
   await clickDangerConfirmation(ctx,i);
-  const result=store.settings('g');assert.equal(result.enabled,true);assert.equal(result.mode,'enforce');assert.equal(result.ruleDefaults,undefined);assert.deepEqual(result.rules,{});
+  const result=store.settings('g');assert.equal(result.enabled,true);assert.equal(result.mode,'enforce');assert.equal(result.ruleDefaults,undefined);assert.deepEqual(result.rules,{mass_ban:{count:90,seconds:5}});
   assert.equal(snapshots,1);assert.equal(store.antinukeStaffDisabled('g'),false);
   assert.match(JSON.stringify(i.replies.at(-1)),/High Staff|cannot be contained/);
   assert.equal(events.length,1);
@@ -152,16 +177,22 @@ test('/antinuke enable invalidates a confirmation if role hierarchy changes befo
  } finally {store.close();}
 });
 
-test('five bans in sixty seconds strip the executor and revert every observed ban in that window',async()=>{
+test('mass bans warn and revert first, then strip and revert on a same-rule repeat within an hour',async()=>{
  const {store,security,guild,entry}=fixture();
  try {
-  const undone:string[]=[];let banned=0;
-  security.punish=async()=>{banned++;return 'Removed 1 dangerous role(s).';};
+  const undone:string[]=[];let stripped=0;
+  security.punish=async()=>{stripped++;return 'Removed 1 dangerous role(s).';};
   guild.bans={remove:async(id:string)=>{undone.push(id);}};
   await security.audit(entry('old','older',AuditLogEvent.MemberBanAdd,[],Date.now()-61000),guild);
   for(let n=1;n<=5;n++)await security.audit(entry(String(n),'target'+n),guild);
-  assert.equal(banned,1);assert.deepEqual(undone.sort(),['target1','target2','target3','target4','target5']);
-  assert.equal(store.all('SELECT * FROM incidents').length,1);
+  assert.equal(stripped,0,'the first mass-ban threshold does not strip');
+  assert.equal(store.get('SELECT mode FROM incidents')!.mode,'warn');
+  assert.deepEqual(undone.sort(),['target1','target2','target3','target4','target5'],'bans are still safely reverted');
+  store.run('DELETE FROM observations');
+  for(let n=6;n<=10;n++)await security.audit(entry(String(n),'repeat'+n),guild);
+  assert.equal(stripped,1,'a repeat of the same rule escalates');
+  assert.deepEqual(undone.filter(id=>id.startsWith('repeat')).sort(),['repeat10','repeat6','repeat7','repeat8','repeat9']);
+  assert.equal(store.all('SELECT * FROM incidents').length,2);
  } finally {store.close();}
 });
 
@@ -211,7 +242,7 @@ test('new authorized servers start in observe mode even when readiness passes; t
   const s=store.settings('g');s.enabled=false;s.mode='observe';s.logChannelId='log';s.rules.mass_ban={count:90,seconds:5,enabled:false};store.save(s);store.setKickBots('g',true);
   const alerts:any[]=[];const logs:any={push:(_g:any,e:any)=>alerts.push(e.toJSON())};
   assert.equal(await applyDefaultAntinuke(store,guild,logs),'observing');
-  const first=store.settings('g');assert.equal(first.enabled,true);assert.equal(first.mode,'observe');assert.deepEqual(first.rules,{});assert.equal(first.ruleDefaults,undefined);assert.equal(store.kickBots('g'),false);
+  const first=store.settings('g');assert.equal(first.enabled,true);assert.equal(first.mode,'observe');assert.deepEqual(first.rules,{mass_ban:{count:90,seconds:5,enabled:false}});assert.equal(first.ruleDefaults,undefined);assert.equal(store.kickBots('g'),false);
   assert.equal(alerts[0].title,'🟠 Anti-nuke observe mode');assert.match(JSON.stringify(alerts[0]),/enforcement still needs a deliberate/);
   assert.equal(await applyDefaultAntinuke(store,guild,logs),'unchanged');assert.equal(alerts.length,1);
   authorize(store,'other');store.run("UPDATE guild_authorization SET state='DEAUTHORIZED' WHERE guild_id='other'");
@@ -340,7 +371,7 @@ test('Permission Grant only counts permissions the member did not already have',
  }finally{store.close();}
 });
 
-test('warnings: undone and logged, dangerous rules and bots get no warning, and the warning lasts an hour',async()=>{
+test('routine rules warn first, different rules do not escalate each other, and bots skip human warnings',async()=>{
  const pushed:any[]=[];
  const store=new Store(':memory:');authorize(store);const st=store.settings('g');st.enabled=true;st.mode='enforce';store.save(st);
  const security=new Security(store,{push:(_g:string,e:any)=>{pushed.push(e.toJSON());}} as any);
@@ -352,12 +383,13 @@ test('warnings: undone and logged, dangerous rules and bots get no warning, and 
  try {
   for(let n=0;n<6;n++)await security.audit(e('c'+n,'person',AuditLogEvent.ChannelCreate),guild);
   assert.deepEqual(punished,[]);assert.equal(dms,1,'the person is told privately');
-  const card=pushed.at(-1);assert.equal(card.title,'Anti-nuke Warning');assert.match(card.description,/got a \*\*warning\*\*.*undone.*\*\*stripped\*\*/);
+  const card=pushed.at(-1);assert.equal(card.title,'Anti-nuke Warning');assert.match(card.description,/first-hit \*\*warning\*\*.*safe revert was attempted.*same rule.*normal response/);
   assert.match(card.fields.find((f:any)=>f.name==='Changes reverted').value,/6 undone/);
   for(let n=0;n<6;n++)await security.audit(e('b'+n,'somebot',AuditLogEvent.ChannelCreate),guild);
   assert.deepEqual(punished,['somebot'],'bots are punished straight away');
   for(let n=0;n<5;n++)await security.audit(e('k'+n,'person',AuditLogEvent.MemberKick),guild);
-  assert.deepEqual(punished,['somebot','person'],'mass kicks never warn');
+  assert.deepEqual(punished,['somebot'],'mass kicks warn once even after a different rule warned earlier');
+  assert.equal(dms,2,'the separate mass-kick warning is delivered');
   store.run("UPDATE incidents SET at=? WHERE mode='warn'",Date.now()-2*3600000);
   store.run('DELETE FROM observations');punished=[];
   for(let n=0;n<6;n++)await security.audit(e('d'+n,'person',AuditLogEvent.ChannelCreate),guild);
@@ -383,7 +415,7 @@ test('well-known verification bots can give ordinary roles freely, can be switch
  }finally{store.close();}
 });
 
-test('one step before a limit, staff get a single heads-up and nothing is done to the person',async()=>{
+test('heads-up precedes a first-hit warning, and only a same-rule repeat escalates',async()=>{
  const pushed:any[]=[];
  const store=new Store(':memory:');authorize(store);const st=store.settings('g');st.enabled=true;st.mode='enforce';store.save(st);
  const security=new Security(store,{push:(_g:string,e:any)=>{pushed.push(e.toJSON());}} as any);
@@ -392,9 +424,13 @@ test('one step before a limit, staff get a single heads-up and nothing is done t
  try {
   for(let n=0;n<2;n++)await security.audit({id:'d'+n,targetId:'c'+n,action:AuditLogEvent.ChannelDelete,executorId:'admin',createdTimestamp:Date.now()} as any,guild);
   assert.equal(punished,0);
-  assert.equal(pushed.length,1);assert.equal(pushed[0].title,'Anti-nuke heads-up');assert.match(pushed[0].description,/\*\*2 of 3\*\*.*Nothing has been done.*stripped/s);
+  assert.equal(pushed.length,1);assert.equal(pushed[0].title,'Anti-nuke heads-up');assert.match(pushed[0].description,/\*\*2 of 3\*\*.*Nothing has been done.*a warning/s);
   await security.audit({id:'d2',targetId:'c2',action:AuditLogEvent.ChannelDelete,executorId:'admin',createdTimestamp:Date.now()} as any,guild);
-  assert.equal(punished,1,'the third delete is acted on');
+  assert.equal(punished,0,'the third delete warns first without stripping');
+  assert.equal(pushed.at(-1).title,'Anti-nuke Warning');
+  store.run('DELETE FROM observations');
+  for(let n=3;n<6;n++)await security.audit({id:'d'+n,targetId:'c'+n,action:AuditLogEvent.ChannelDelete,executorId:'admin',createdTimestamp:Date.now()} as any,guild);
+  assert.equal(punished,1,'a same-rule repeat within the warning window is acted on');
   assert.equal(pushed.filter(p=>p.title==='Anti-nuke heads-up').length,1,'only one heads-up per window');
  } finally {store.close();}
 });
