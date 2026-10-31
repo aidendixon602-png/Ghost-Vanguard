@@ -7,7 +7,7 @@ node --version  # must be 24 (node:sqlite)
 npm ci
 npm run check   # typecheck
 npm run build   # compile src/ → dist/ (dist is committed)
-npm test        # 565+ tests (Node 24)
+npm test        # full test suite (Node 24)
 npm run docs    # regenerate docs/commands.md + docs/ranks.md
 ```
 
