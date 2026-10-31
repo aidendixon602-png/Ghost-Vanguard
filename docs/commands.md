@@ -1,6 +1,6 @@
 # Commands
 
-Generated from the bot itself (`npm run docs`). Type `/` in Discord and pick **Ghost Vanguard**; `/help` shows only slash commands you can use. Sensitive and admin slash replies are private; ordinary public utility replies stay public. Developer actions are available as `/dev`, `/network` and `/restart` slash commands. For the same list grouped by rank, see [ranks.md](ranks.md).
+Generated from the bot itself (`npm run docs`). Type `/` in Discord and pick **Ghost Vanguard**; `/help` shows only slash commands you can use. Sensitive and admin slash replies are private; ordinary public utility replies stay public. Developer actions are available as `/dev`, `/genreban`, `/ungenreban`, `/hardban`, `/unhardban`, `/netexception` and `/restart` slash commands. For the same list grouped by rank, see [ranks.md](ranks.md).
 
 ## /antinuke
 
@@ -103,7 +103,7 @@ Moderation: ban, kick, timeout, warn, purge, cases, notes and appeals
 | `/mod cases search` | Search cases by member, staff, action, reason or date | Helper+ or Moderate Members |
 | `/mod cases recent` | Show the latest cases | Helper+ or Moderate Members |
 | `/mod ban` | Ban a user | Moderator+ or Ban Members |
-| `/mod unban` | Lift a ban (not genrebans or hardbans) | Admin+ or Administrator (ordinary bans only; an Overseer+ can grant a one-server genreban exception; Supreme Leaders can lift genrebans from the ban-log controls; `/network ungenreban` is Supreme Leader+ and `/network unhardban` is Developer only) |
+| `/mod unban` | Lift a ban (not genrebans or hardbans) | Admin+ or Administrator (ordinary bans only; an Overseer+ can grant a one-server genreban exception; Supreme Leaders can lift genrebans from the ban-log controls; `/ungenreban` is Supreme Leader+ and `/unhardban` is Developer only) |
 | `/mod kick` | Kick a member | Moderator+ or Kick Members |
 | `/mod timeout` | Time out a member | Helper+ or Moderate Members (Helpers up to 60 minutes; Moderators longer) |
 | `/mod untimeout` | Remove a member's timeout | Moderator+ or Moderate Members |
@@ -136,12 +136,6 @@ Server setup: logs, staff ranks, security settings, welcome, panel and config
 | `/setup config command` | Turn a command on or off, or change its cooldown | Server Owner |
 | `/setup config feature` | Turn moderation, verification, AI or backups on or off | Server Owner |
 | `/setup config backups` | Schedule server layout backups | Server Owner |
-| `/setup config workspace-setup` | Open the Workspace setup panel | Server Owner |
-| `/setup config workspace-publish` | Post or update the Workspace panels | Server Owner |
-| `/setup config workspace-status` | Show Workspace status | Server Owner |
-| `/setup config workspace-enable` | Turn Workspace on | Server Owner |
-| `/setup config workspace-disable` | Turn Workspace off (records are kept) | Server Owner |
-| `/setup config workspace-sync` | Sync staff members to Workspace | Server Owner |
 | `/setup logs setup` | Create the log channels and send a test | Admin+ |
 | `/setup logs check` | Check the log channels and permissions | Admin+ |
 | `/setup logs exclude` | Stop or resume logging a channel | Admin+ |
@@ -222,19 +216,6 @@ Look things up: users, roles, the server and the bot
 | `/info role` | Show a role's details | Everyone |
 | `/info server` | Show server details and protection | Everyone |
 | `/info user` | Show a member's details | Everyone |
-
-## /network
-
-Bot staff: genrebans and hardbans across every Midtown server
-
-| Command | What it does | Who |
-|---|---|---|
-| `/network genreban` | Ban a user from every server | Supreme Leader+ |
-| `/network hardban` | Permanently ban a user from every server | Supreme Leader+ |
-| `/network exceptions list` | List genreban exceptions | Supreme Leader+ |
-| `/network exceptions revoke` | Cancel a genreban exception | Supreme Leader+ |
-| `/network ungenreban` | Lift a genreban everywhere | Supreme Leader+ |
-| `/network unhardban` | Lift a hardban everywhere | Developer |
 
 ## /dev
 
@@ -326,3 +307,44 @@ Restart the bot · Developer
 | Command | What it does | Who |
 |---|---|---|
 | `/restart` | Restart the bot | Developer |
+
+## /genreban
+
+Ban a user from every server · Supreme Leader+
+
+| Command | What it does | Who |
+|---|---|---|
+| `/genreban` | Ban a user from every server | Supreme Leader+ |
+
+## /hardban
+
+Permanently ban a user from every server · Supreme Leader+
+
+| Command | What it does | Who |
+|---|---|---|
+| `/hardban` | Permanently ban a user from every server | Supreme Leader+ |
+
+## /netexception
+
+Developer: servers that let a genrebanned user back in (their server only)
+
+| Command | What it does | Who |
+|---|---|---|
+| `/netexception list` | List genreban exceptions | Supreme Leader+ |
+| `/netexception revoke` | Cancel a genreban exception | Supreme Leader+ |
+
+## /ungenreban
+
+Lift a genreban everywhere · Supreme Leader+
+
+| Command | What it does | Who |
+|---|---|---|
+| `/ungenreban` | Lift a genreban everywhere | Supreme Leader+ |
+
+## /unhardban
+
+Lift a hardban everywhere · Developer
+
+| Command | What it does | Who |
+|---|---|---|
+| `/unhardban` | Lift a hardban everywhere | Developer |

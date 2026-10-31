@@ -21,7 +21,7 @@ Automated tests use mock Discord guilds and temporary SQLite databases. No live 
 - Live API behavior and Discord's final role-hierarchy normalization
 - `Setup.ps1` and `Start.cmd`, which need Windows
 - The PowerShell updater, which was payload-verified and simulated against both supplied releases but requires Windows for execution
-- Discord credentials and the Wispbyte host. After deploying, try `/network genreban` and `/network ungenreban` on a disposable test account with an authorized Developer.
+- Discord credentials and the Wispbyte host. After deploying, try `/genreban` and `/ungenreban` on a disposable test account with an authorized Developer.
 
 ## References
 

@@ -14,7 +14,7 @@ const CATEGORY_LABELS = {
 };
 const choices = LOG_CATEGORIES.map(c => ({ name: CATEGORY_LABELS[c].slice(0, 100), value: c }));
 export default defineCommand(new SlashCommandBuilder().setName('logs').setDescription('Server event logs: who changed what, viewable in Discord')
-    .addSubcommand(s => s.setName('setup').setDescription(`Create or reuse #${BANS_CHANNEL} and #${LOGGING_CHANNEL}, check access and send a test`)
+    .addSubcommand(s => s.setName('setup').setDescription(`Set up #${BANS_CHANNEL} and #${LOGGING_CHANNEL} under a Ghost Vanguard Logs category`)
     .addChannelOption(o => o.setName('bans_channel').setDescription(`Use this channel for ban logs instead of #${BANS_CHANNEL}`).addChannelTypes(ChannelType.GuildText))
     .addChannelOption(o => o.setName('logging_channel').setDescription(`Use this channel for server logs instead of #${LOGGING_CHANNEL}`).addChannelTypes(ChannelType.GuildText)))
     .addSubcommand(s => s.setName('check').setDescription('Check both log channels and the bot permissions, then send a test embed'))
@@ -65,7 +65,9 @@ export default defineCommand(new SlashCommandBuilder().setName('logs').setDescri
             }
             bansId = result.bans.channel.id;
             loggingId = result.logging.channel.id;
-            lines.push(`**Ban logs:** <#${bansId}> · ${result.bans.how}`, `**Server logs:** <#${loggingId}> · ${result.logging.how}`);
+            lines.push(`**Category:** ${result.category.name} · active log channels grouped together`, `**Ban logs:** <#${bansId}> · ${result.bans.how}`, `**Server logs:** <#${loggingId}> · ${result.logging.how}`);
+            if (result.archivedCategories.length)
+                lines.push('**Old Veil logs:** moved into an archive category; no old channels or messages were deleted.');
             if (result.previousAlerts)
                 lines.push(`Bot actions (anti-nuke, backups, restores, configuration changes, errors) now go to <#${loggingId}> instead of <#${result.previousAlerts}>.`);
         }

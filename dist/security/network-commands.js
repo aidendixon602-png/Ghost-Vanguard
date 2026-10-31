@@ -8,14 +8,14 @@ import { liveProgress, summaryEmbed } from '../ui/network-ui.js';
 import { classify, finish, outcomeEmbed, showWorking } from '../ui/progress.js';
 import { activeBan, assertTargetable, banEverywhere, createBan, notifyBannedUser, DELETE_MESSAGE_CHOICES, deleteWindow, describeUser, idFrom, KIND_NAME, networkDeps, parseUserId, recordId, resolveTarget, revokeBan, targetServers, unbanEverywhere, } from './network-ban.js';
 /**
- * `/network genreban`, `/network hardban` and their revoke commands share one implementation; only the
+ * `/genreban`, `/hardban` and their revoke commands share one implementation; only the
  * wording and what enforcement does afterwards differ. Their configured slash ranks still apply.
  */
 const POLICY = { category: 'developer', developerOnly: true, requiresAuthorization: false, cooldown: 3000 };
 const OTHER = { genreban: 'hardban', hardban: 'genreban' };
 const AFTER = {
-    genreban: 'While the genreban is active, the bot bans them again if they join any authorized server, including servers authorized later. A Supreme Leader or Developer can lift it with `/network ungenreban`.',
-    hardban: 'While the hardban is active, the bot bans them again whenever they are unbanned or join, and re-checks every server every 10 minutes and after restarts. Only a developer can lift it, with `/network unhardban`.',
+    genreban: 'While the genreban is active, the bot bans them again if they join any authorized server, including servers authorized later. A Supreme Leader can lift it from the ban-log controls; a Developer can also use `/ungenreban`.',
+    hardban: 'While the hardban is active, the bot bans them again whenever they are unbanned or join, and re-checks every server every 10 minutes and after restarts. Only a developer can lift it, with `/unhardban`.',
 };
 function header(ban, user, fields) {
     return [
@@ -34,8 +34,8 @@ async function refuse(i, error, context) {
 export function issueCommand(kind) {
     const name = KIND_NAME[kind];
     const description = kind === 'hardban'
-        ? 'Developer: permanently ban a user from every authorized server until `/network unhardban`'
-        : 'Developer: ban a user from every authorized server until `/network ungenreban`';
+        ? 'Developer: permanently ban a user from every authorized server until `/unhardban`'
+        : 'Developer: ban a user from every authorized server until `/ungenreban`';
     return defineCommand(new SlashCommandBuilder().setName(kind).setDescription(description)
         .addStringOption(o => o.setName('user').setDescription('User ID, @mention or username. IDs work even if they are in no server.').setRequired(true).setMaxLength(40))
         .addStringOption(o => o.setName('reason').setDescription('Reason, shown in every server\'s log and audit log (optional)').setMaxLength(400))
@@ -52,9 +52,6 @@ export function issueCommand(kind) {
             const existing = activeBan(ctx.store, kind, user.id);
             if (existing)
                 throw new AppError('VALIDATION_ERROR', `${describeUser(user)}\nalready has an active ${kind}, **${recordId(existing)}**, since <t:${Math.floor(existing.created_at / 1000)}:R> by <@${existing.moderator_id}>. No duplicate record was created.`);
-            const covering = kind === 'genreban' ? activeBan(ctx.store, 'hardban', user.id) : undefined;
-            if (covering)
-                throw new AppError('VALIDATION_ERROR', `${describeUser(user)}\nalready has an active hardban, **${recordId(covering)}**, which already bans them everywhere. No genreban was created.`);
             if (!targetServers(deps).length)
                 throw new AppError('VALIDATION_ERROR', 'There are no authorized, ready servers to ban them from. Nothing was recorded.');
         }
@@ -69,7 +66,6 @@ export function issueCommand(kind) {
         const seconds = i.options.getInteger('delete_messages') ?? 0;
         const window = deleteWindow(seconds);
         const count = targetServers(deps).length;
-        const replaces = kind === 'hardban' ? activeBan(ctx.store, 'genreban', target.id) : undefined;
         await confirmDanger(ctx, i, {
             title: kind === 'hardban' ? 'Hardban a user from every authorized server' : 'Genreban a user from every authorized server',
             summary: header(null, target, { reason, evidence, evidenceFile, moderator: i.user.id }),
@@ -77,18 +73,15 @@ export function issueCommand(kind) {
                 `They are banned from **${count}** authorized server${count === 1 ? '' : 's'}, by user ID, whether or not they are a member.`,
                 AFTER[kind].replace(/ Only a developer.*$/, ''),
                 window ? `**Their messages from ${window} are permanently deleted in every server.** This cannot be undone.` : 'Their messages are kept.',
-                replaces ? `Their active genreban **${recordId(replaces)}** is closed and replaced by this hardban.` : 'A record is saved, every server\'s log channel is told, and a moderation case is recorded in each server.',
+                'A separate record is saved, every server\'s log channel is told, and a moderation case is recorded in each server.',
             ],
             label: kind === 'hardban' ? `Hardban in ${count} server${count === 1 ? '' : 's'}` : `Genreban in ${count} server${count === 1 ? '' : 's'}`,
-            reversal: `\`/network un${kind}\` lifts it in every server where the bot placed it.`,
+            reversal: `\`/un${kind}\` lifts it in every server where the bot placed it.`,
             run: async (c, b) => {
                 let ban;
                 try {
                     ban = c.store.transaction(() => {
                         const created = createBan(c.store, { kind, user: target, reason, evidence, evidenceFile, moderator: { id: b.user.id, tag: b.user.tag } });
-                        const old = kind === 'hardban' ? activeBan(c.store, 'genreban', target.id) : undefined;
-                        if (old)
-                            revokeBan(c.store, old, { id: b.user.id, tag: b.user.tag }, `Replaced by hardban ${recordId(created)}`);
                         return created;
                     });
                 }
@@ -159,5 +152,5 @@ function findActive(ctx, kind, input) {
     if (ban)
         return ban;
     const other = userId ? activeBan(ctx.store, OTHER[kind], userId) : undefined;
-    throw new AppError('VALIDATION_ERROR', `Could not find an active ${kind} for \`${clip(input, 40)}\`.${other ? ` They have an active ${OTHER[kind]} (${recordId(other)}) instead; use \`/network un${OTHER[kind]}\`.` : ''}`);
+    throw new AppError('VALIDATION_ERROR', `Could not find an active ${kind} for \`${clip(input, 40)}\`.${other ? ` They have an active ${OTHER[kind]} (${recordId(other)}) instead; use \`/un${OTHER[kind]}\`.` : ''}`);
 }

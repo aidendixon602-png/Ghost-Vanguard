@@ -13,8 +13,6 @@ npm run docs    # regenerate docs/commands.md + docs/ranks.md
 
 ## Pull request rules
 
-- **Do not add a standalone `/workspace` command** — Workspace stays under `/setup config workspace-*` (see `src/bot/command-tree.ts`).
-- Midtown preset is opt-in for one guild: `src/workspace/types.ts: MIDTOWN_GUILD_ID`.
 - **Never invent IDs** — channel/role/user IDs must come from Discord selectors and be validated.
 - `dist/` must match `src/` — CI fails if you forget `npm run build`.
 - `docs/commands.md` + `docs/ranks.md` are generated — run `npm run docs`, don't edit by hand.

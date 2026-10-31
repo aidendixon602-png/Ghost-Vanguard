@@ -1,6 +1,5 @@
 import type { Client, User } from 'discord.js';
 import { config } from '../config.js';
-import { gvText } from '../ui/gv-names.js';
 
 /**
  * The only people the bot ever DMs about the bot itself: database backup files, "back online",
@@ -14,7 +13,7 @@ export async function dmTrusted(client: Client | undefined, payload: Parameters<
     let sent = 0;
     for (const id of trustedRecipients()) {
         const user = await client.users.fetch(id).catch(() => null);
-        if (user && await user.send(gvText(payload)).then(() => true, () => false)) sent++;
+        if (user && await user.send(payload).then(() => true, () => false)) sent++;
     }
     return sent;
 }
@@ -32,7 +31,7 @@ export async function dmSecurityAlert(client: Client | undefined, payload: Param
     let sent = 0;
     for (const id of securityAlertRecipients()) {
         const user = await client.users.fetch(id).catch(() => null);
-        if (user && await user.send(gvText(payload)).then(() => true, () => false)) sent++;
+        if (user && await user.send(payload).then(() => true, () => false)) sent++;
     }
     return sent;
 }

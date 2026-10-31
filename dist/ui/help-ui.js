@@ -18,7 +18,7 @@ export const HELP_SECTIONS = [
     { key: 'recovery', label: 'Backups', emoji: '💾', blurb: 'Save and restore the server layout', tops: ['recovery'], commands: ['snapshot', 'backup', 'copylayout'] },
     { key: 'verification', label: 'Roblox', emoji: '🎮', blurb: 'Verification, lookups, blacklist and group ranks', tops: ['roblox', 'verify'], commands: ['verify', 'roblox'] },
     { key: 'utility', label: 'Information', emoji: 'ℹ️', blurb: 'Look up users, roles, the server and the bot', tops: ['info', 'help', 'ask'], commands: ['help', 'userinfo', 'roleinfo', 'server-info', 'bot-info', 'ping', 'ask'] },
-    { key: 'developer', label: 'Developer', emoji: '🧰', blurb: 'Bot-wide staff; the risky tools are Developer only', tops: ['dev', 'network', 'restart'], commands: ['dev', 'restart', 'database', 'autoreact', 'authserver', 'serverauth', 'authorizedservers', 'deauthserver', 'banserver', 'unbanserver', 'genreban', 'ungenreban', 'hardban', 'unhardban', 'netexception'] },
+    { key: 'developer', label: 'Developer', emoji: '🧰', blurb: 'Bot-wide staff; the risky tools are Developer only', tops: ['dev', 'genreban', 'ungenreban', 'hardban', 'unhardban', 'netexception', 'restart'], commands: ['dev', 'restart', 'database', 'autoreact', 'authserver', 'serverauth', 'authorizedservers', 'deauthserver', 'banserver', 'unbanserver', 'genreban', 'ungenreban', 'hardban', 'unhardban', 'netexception'] },
 ];
 /** Who can use a command, shown next to it in /help. */
 export function accessLabel(policy, key) {
@@ -94,7 +94,7 @@ export function helpPage(ctx, guild, user, requested = '', requestedPage = 0) {
     if (!requested || requested === 'home' || !groups.some(g => g.key === requested)) {
         const total = groups.reduce((n, g) => n + g.lines.length, 0);
         const body = groups.map(g => `${section(g.key)?.emoji ?? '•'} **${g.label}** · ${g.lines.length}\n-# ${section(g.key)?.blurb ?? ''}`).join('\n');
-        return { embeds: [embed('Ghost Vanguard · Commands', `Type \`/\` and pick **Ghost Vanguard** to see the main commands:\n\`/antinuke\` \`/automod\` \`/raid\` \`/mod\` \`/role\` \`/setup\` \`/ticket\` \`/recovery\` \`/info\` \`/roblox\` \`/verify\`\n\n${body}\n\n-# ${total} commands available to you · pick a category below`)], components: [menu], allowedMentions: { parse: [] } };
+        return { embeds: [embed('Ghost Vanguard · Commands', `Type \`/\` and pick **Ghost Vanguard** to see the main commands:\n\`/antinuke\` \`/automod\` \`/raid\` \`/mod\` \`/role\` \`/setup\` \`/ticket\` \`/recovery\` \`/info\` \`/roblox\` \`/verify\` \`/genreban\` \`/ungenreban\` \`/hardban\` \`/unhardban\` \`/netexception\`\n\n${body}\n\n-# ${total} commands available to you · pick a category below`)], components: [menu], allowedMentions: { parse: [] } };
     }
     const group = groups.find(g => g.key === requested);
     const pages = Math.ceil(group.lines.length / PER_PAGE), page = Math.min(Math.max(0, requestedPage), pages - 1);

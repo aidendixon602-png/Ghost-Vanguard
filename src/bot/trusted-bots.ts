@@ -15,16 +15,15 @@ export const isTrustedBot = (id: string | null | undefined): boolean => !!id && 
 
 /**
  * Confirm at startup that each trusted ID really is the bot it is named as, and say the account name out
- * loud. These IDs are exempt from anti-nuke in every server and are the only accounts whose reaction can
- * hand a `,gv` command over, so a stale or mistyped ID otherwise fails silently: the hand-off just never
- * happens, and the bot cannot see why. The returned lines are for the startup summary.
+ * loud. These IDs are exempt from anti-nuke in every server, so a stale or mistyped ID must be visible
+ * in the startup summary.
  */
 export async function trustedBotReport(client: Client): Promise<string[]> {
     const lines: string[] = [];
     for (const [id, name] of TRUSTED_BOTS) {
         const user = await client.users.fetch(id).catch(() => null);
         if (!user)
-            lines.push(`⚠ Trusted bot **${name}** (${id}) could not be fetched. If that ID is wrong, \`,gv\` commands never work: it must be Veil Utilities' application ID.`);
+            lines.push(`⚠ Trusted bot **${name}** (${id}) could not be fetched. If that ID is wrong, correct or remove TRUSTED_BOTS; the entry is exempt from anti-nuke.`);
         else if (!user.bot)
             lines.push(`⚠ TRUSTED_BOTS lists ${id} as **${name}**, but that account is a user, not a bot. Remove it: it is exempt from anti-nuke in every server.`);
         else

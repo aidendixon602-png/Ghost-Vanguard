@@ -158,16 +158,32 @@ test('nickname changes, roles and kicks have clear titles and verified actors', 
 
 // ------------------------------------------------------------ setup
 
-function fakeGuild(existing: string[] = [], o: { everyoneCanView?: boolean; botPerms?: bigint[] } = {}) {
+function fakeGuild(existing: string[] = [], o: { everyoneCanView?: boolean; botPerms?: bigint[]; categories?: string[]; legacyChildren?: string[] } = {}) {
     const channels = new Collection<string, any>();
     const created: any[] = [];
     const sentTo: string[] = [];
-    const make = (id: string, name: string) => ({
-        id, name, type: ChannelType.GuildText, isTextBased: () => true,
-        permissionsFor: (who: any) => ({ has: (bit: bigint) => who === 'everyone' ? !!o.everyoneCanView : (o.botPerms ?? [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.EmbedLinks, PermissionFlagsBits.ReadMessageHistory]).includes(bit) }),
-        send: async () => { sentTo.push(id); },
-    });
-    existing.forEach((name, n) => channels.set(`90000000000000000${n}`, make(`90000000000000000${n}`, name)));
+    const makeText = (id: string, name: string, parentId: string | null = null) => {
+        const channel: any = {
+            id, name, type: ChannelType.GuildText, parentId, isTextBased: () => true,
+            permissionsFor: (who: any) => ({ has: (bit: bigint) => who === 'everyone' ? !!o.everyoneCanView : (o.botPerms ?? [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.EmbedLinks, PermissionFlagsBits.ReadMessageHistory]).includes(bit) }),
+            send: async () => { sentTo.push(id); },
+            setParent: async (parent: string) => { channel.parentId = parent; return channel; },
+        };
+        channels.set(id, channel);
+        return channel;
+    };
+    const makeCategory = (id: string, name: string) => {
+        const category: any = {
+            id, name, type: ChannelType.GuildCategory,
+            edit: async (change: any) => { Object.assign(category, change); return category; },
+        };
+        channels.set(id, category);
+        return category;
+    };
+    let next = 0;
+    const categoryIds = (o.categories ?? []).map((name, n) => makeCategory(`91000000000000000${n}`, name).id);
+    existing.forEach(name => makeText(`90000000000000000${next++}`, name));
+    (o.legacyChildren ?? []).forEach(name => makeText(`92000000000000000${next++}`, name, categoryIds[0] ?? null));
     const guild: any = {
         id: G, client: { user: { id: BOT } },
         roles: { everyone: 'everyone', cache: new Collection([['800000000000000001', {}]]) },
@@ -175,7 +191,12 @@ function fakeGuild(existing: string[] = [], o: { everyoneCanView?: boolean; botP
         channels: {
             cache: channels,
             fetch: async (id: string) => channels.get(id) ?? null,
-            create: async (opts: any) => { const c = make(`95000000000000000${created.length}`, opts.name); channels.set(c.id, c); created.push(opts); return c; },
+            create: async (opts: any) => {
+                const id = `9500000000000000${created.length}`;
+                const c = opts.type === ChannelType.GuildCategory ? makeCategory(id, opts.name) : makeText(id, opts.name);
+                created.push(opts);
+                return c;
+            },
         },
     };
     (guild.roles.everyone as any) = 'everyone';
@@ -188,7 +209,10 @@ test('setup creates private #bans and #ghost-vanguard-logging once, then reuses 
         await store.withAuthorized(G, async () => store.run("INSERT INTO staff_roles(guild_id,role_id,level) VALUES(?,?,'admin')", G, '800000000000000001'));
         const { guild, created } = fakeGuild();
         const first = await store.withAuthorized(G, () => setupLogChannels(store, guild, 'admin'));
-        assert.deepEqual(created.map(c => c.name), ['bans', 'ghost-vanguard-logging']);
+        assert.deepEqual(created.map(c => c.name), ['bans', 'ghost-vanguard-logging', 'Ghost Vanguard Logs']);
+        assert.equal(first.category.name, 'Ghost Vanguard Logs');
+        assert.equal(first.bans.channel.parentId, first.category.id);
+        assert.equal(first.logging.channel.parentId, first.category.id);
         const overwrites = created[0].permissionOverwrites;
         assert.deepEqual(overwrites[0].deny, [PermissionFlagsBits.ViewChannel], '@everyone cannot see the log channels');
         assert.ok(overwrites.some((o: any) => o.id === '800000000000000001' && o.allow.includes(PermissionFlagsBits.ViewChannel)), 'staff can read them');
@@ -196,7 +220,7 @@ test('setup creates private #bans and #ghost-vanguard-logging once, then reuses 
         assert.equal(eventLogConfig(store, G).channelId, first.logging.channel.id);
         assert.equal(store.settings(G).logChannelId, first.logging.channel.id, 'bot actions go to the logging channel');
         await store.withAuthorized(G, () => setupLogChannels(store, guild, 'admin'));
-        assert.equal(created.length, 2, 'running setup again creates nothing new');
+        assert.equal(created.length, 3, 'running setup again creates nothing new');
     } finally { store.close(); }
 });
 
@@ -205,9 +229,26 @@ test('setup reuses channels that already exist by name', async () => {
     try {
         const { guild, created } = fakeGuild(['bans', 'ghost-vanguard-logging']);
         const result = await store.withAuthorized(G, () => setupLogChannels(store, guild, 'admin'));
-        assert.equal(created.length, 0);
+        assert.equal(created.length, 1, 'only the category is created for existing channels');
+        assert.equal(result.categoryCreated, true);
         assert.equal(result.bans.how, 'existing channel reused');
         assert.equal(result.logging.how, 'existing channel reused');
+    } finally { store.close(); }
+});
+
+test('setup archives the old VEIL LOGS category without deleting its channels or history', async () => {
+    const store = new Store(':memory:'); authorize(store, G);
+    try {
+        const { guild } = fakeGuild(['bans', 'ghost-vanguard-logging'], { categories: ['VEIL LOGS'], legacyChildren: ['veil-errors', 'join-logs'] });
+        const oldCategory = guild.channels.cache.find((c: any) => c.type === ChannelType.GuildCategory && c.name === 'VEIL LOGS');
+        const oldChannels = ['veil-errors', 'join-logs'].map(name => guild.channels.cache.find((c: any) => c.name === name));
+        const result = await store.withAuthorized(G, () => setupLogChannels(store, guild, 'admin'));
+        assert.equal(oldCategory.name, 'Archive - Veil Logs');
+        assert.equal(result.archivedCategories[0], oldCategory.id);
+        assert.ok(oldChannels.every((c: any) => c && c.parentId === oldCategory.id), 'legacy channels and their messages stay in the archived category');
+        assert.equal(result.bans.channel.parentId, result.category.id);
+        assert.equal(result.logging.channel.parentId, result.category.id);
+        assert.equal(guild.channels.cache.size, 6, 'no old category or log channels are deleted');
     } finally { store.close(); }
 });
 
@@ -216,7 +257,7 @@ test('a server still using the old #midtown-vanguard-logging name keeps it inste
     try {
         const { guild, created } = fakeGuild(['bans', 'midtown-vanguard-logging']);
         const result = await store.withAuthorized(G, () => setupLogChannels(store, guild, 'admin'));
-        assert.equal(created.length, 0, 'no duplicate log channel is created');
+        assert.equal(created.length, 1, 'only the active log category is created; no duplicate log channel is created');
         assert.equal(result.logging.channel.name, 'midtown-vanguard-logging', 'the saved channel is reused as it is');
         assert.equal(result.logging.how, 'existing channel reused (still named #midtown-vanguard-logging)');
         assert.equal(eventLogConfig(store, G).channelId, result.logging.channel.id);

@@ -9,15 +9,15 @@ import { enforceProtectedRoles } from '../src/security/protected-roles.js';
 const A = '111111111111111111', B = '222222222222222222', ROLE = '333333333333333333', OTHER = '444444444444444444', ASSIGNER = '555555555555555555', BOT = '999999999999999999';
 
 test('COMMAND_BLACKLIST: per person, whole commands or single subcommands, * for everything; the bot owner is never blocked', () => {
-    const parsed = parseCommandBlacklist(`${A}:mod ban|/Network ; ${B}=*; junk; ${config.ownerId}:*`);
-    assert.deepEqual(parsed.get(A), ['mod ban', 'network']);
+    const parsed = parseCommandBlacklist(`${A}:mod ban|/Genreban ; ${B}=*; junk; ${config.ownerId}:*`);
+    assert.deepEqual(parsed.get(A), ['mod ban', 'genreban']);
     const saved = process.env.COMMAND_BLACKLIST;
-    process.env.COMMAND_BLACKLIST = `${A}:mod ban|network;${B}:*;${config.ownerId}:*`;
+    process.env.COMMAND_BLACKLIST = `${A}:mod ban|genreban;${B}:*;${config.ownerId}:*`;
     try {
         assert.equal(blockedBy(A, 'mod ban'), 'mod ban');
         assert.equal(blockedBy(A, 'mod bans lookup'), null, '"mod ban" does not block "mod bans"');
         assert.equal(blockedBy(A, 'mod kick'), null);
-        assert.equal(blockedBy(A, 'network genreban'), 'network', 'a whole command blocks everything under it');
+        assert.equal(blockedBy(A, 'genreban'), 'genreban', 'a standalone command can be blocked');
         assert.equal(blockedBy(A, null), null, 'buttons are only blocked by *');
         assert.equal(blockedBy(B, 'info ping'), '*'); assert.equal(blockedBy(B, null), '*');
         assert.equal(blockedBy(config.ownerId, 'dev restart'), null, 'the bot owner cannot be locked out');

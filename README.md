@@ -15,7 +15,7 @@ Anti-nuke and the threat board · Moderation and audit logging · Ticket desk ·
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
 ![discord.js](https://img.shields.io/badge/discord.js-14-5865F2?logo=discord&logoColor=white)
 
-[Overview](#overview) · [Capabilities](#capabilities) · [The threat board](#the-threat-board-scoring-and-staff-response) · [Dashboard](#dashboard) · [Tickets](#ticket-desk) · [Workspace](#workspace) · [Getting started](#getting-started) · [Development](#development)
+[Overview](#overview) · [Capabilities](#capabilities) · [The threat board](#the-threat-board-scoring-and-staff-response) · [Dashboard](#dashboard) · [Tickets](#ticket-desk) · [Getting started](#getting-started) · [Development](#development)
 
 </div>
 
@@ -23,7 +23,7 @@ Anti-nuke and the threat board · Moderation and audit logging · Ticket desk ·
 
 ---
 
-> **Commands are typed, not slashed.** Ghost Vanguard has no slash commands: every command is `,gv` followed by what used to come after the slash (`/raid mode on` → `,gv raid mode on`, `/antinuke whitelist add` → `,gv antinuke whitelist add @user`). Vanguard reads the message itself and runs it with the same ranks, permissions and confirmations, so it needs no other bot to be online. Veil Utilities still reacts 🛡️ to `,gv` while both bots run, and that hand-off is accepted as a fallback, but one message is only ever run once. `,gv help` lists everything. See `src/bot/text-commands.ts`.
+> **Commands use Discord’s application-command menu.** Type `/` and choose **Ghost Vanguard** to browse available commands. Every command uses the bot’s normal rank, permission and confirmation checks; `/help` lists the commands available to you. Message-prefix commands are not supported.
 
 ## Overview
 
@@ -90,15 +90,15 @@ Every command has a minimum rank, and each rank includes everything below it. Bo
 | **Moderator** | One server | Bans, kicks, tempbans, purges, ban records, denying appeals |
 | **Helper** | One server | Warnings, short timeouts, cases and notes |
 
-**Developer is the top bot-wide rank:** the bot owner (`BOT_OWNER_ID`) and IDs in `DEVELOPER_IDS`. Developer actions remain application commands under `/dev`, `/network` and `/restart`; `/help` lists the commands available to you. The existing `/restart` safeguard still requires an exact `DEVELOPER_IDS` entry. Sensitive and admin slash replies are private (ephemeral); ordinary public utility replies stay public.
+**Developer is the top bot-wide rank:** the bot owner (`BOT_OWNER_ID`) and IDs in `DEVELOPER_IDS`. Developer actions remain application commands under `/dev`, `/genreban`, `/ungenreban`, `/hardban`, `/unhardban`, `/netexception` and `/restart`; `/help` lists the commands available to you. The existing `/restart` safeguard still requires an exact `DEVELOPER_IDS` entry. Sensitive and admin slash replies are private (ephemeral); ordinary public utility replies stay public.
 
 **Who can lift a ban**
 
 | Ban | Lifted by |
 |---|---|
 | Ordinary server ban | Admin rank, Discord Administrator or the server owner (`/mod unban`, ban-log buttons, accepting an appeal) |
-| Genreban | A Supreme Leader or Developer can lift it everywhere from ban-log controls or `/network ungenreban`; an Overseer or higher can let the person back into one server (`/mod unban`) |
-| Hardban | Developer only, including `/network unhardban` |
+| Genreban | A Supreme Leader or Developer can lift it everywhere from ban-log controls or `/ungenreban`; an Overseer or higher can let the person back into one server (`/mod unban`) |
+| Hardban | Developer only, including `/unhardban` |
 
 Anti-nuke watches **everyone**. Developers, server owners and explicitly whitelisted people are never punished; their incidents are recorded quietly (set `ALERT_EXEMPT=true` to be alerted). Other dangerous permission grants warn and revert first, then strip on a repeat within an hour. Unwhitelisted self-assignment of **Administrator** or **Manage Server** always strips and reverts immediately. The complete list of commands for each rank is in **[docs/ranks.md](docs/ranks.md)**.
 
@@ -146,15 +146,9 @@ Commands are grouped by job, one top-level command each. Every command in Discor
 | `/recovery` | Snapshots, backups, layout copy |
 | `/info` | Users, roles, server, bot, latency |
 | `/roblox` | Verification, lookups, blacklist, group binds |
-| `/dev`, `/network`, `/restart` | Bot staff: diagnostics, updates, alerts, servers, database, network bans and restart |
+| `/dev`, `/genreban`, `/ungenreban`, `/hardban`, `/unhardban`, `/netexception`, `/restart` | Bot staff: diagnostics, updates, alerts, servers, database, network bans and restart |
 
 `/help` in Discord lists only the application commands available to you. Sensitive/admin slash replies are ephemeral; ordinary public utility replies stay public. The full reference is in **[docs/commands.md](docs/commands.md)**.
-
-## Workspace
-
-Ghost Vanguard now includes a reusable, guild-scoped **Workspace** system for submissions, reviews, records, tasks, staff synchronization and reports. It is button-first: members and staff use persistent panels, while `/setup config workspace-*` is reserved for setup, publishing, status, enable/disable and synchronization. The system does not replace the existing ticket desk.
-
-Start with [docs/user/workspace.md](docs/user/workspace.md). Configure Google Sheets authentication, run `/setup config workspace-setup` with real channel and role selectors, validate the workbook, then run `/setup config workspace-publish`. The Midtown Archives preset is limited to guild `1556485316838293587` and is not active until the existing authorization process and live workbook validation succeed. No channel IDs or staff IDs are guessed.
 
 ## Getting started
 
@@ -182,7 +176,7 @@ Copy [`.env.example`](.env.example) to `.env` and set at least:
 | `ANTINUKE_LOCK` | Recommended | `true`: only Developers can turn anti-nuke off or weaken it; servers switched off come back on at start |
 | `PROTECTED_USERS` | No | People staff can never ban, kick, time out or de-role; manual attempts are undone and alerted |
 | `PROTECTED_ROLES`, `PROTECTED_ROLE_ASSIGNERS` | No | Roles only the listed people (and Developers) may give; anyone else's grant is taken back |
-| `COMMAND_BLACKLIST` | No | People blocked from specific commands, e.g. `111…:mod ban\|network;222…:*` |
+| `COMMAND_BLACKLIST` | No | People blocked from specific commands, e.g. `111…:mod ban\|genreban;222…:*` |
 | `GLOBAL_ALERT_CHANNEL_ID` | No | One channel that receives every anti-nuke trigger from every server |
 | `TRUSTED_DM_IDS` | No | Who gets the daily database backup and other bot DMs (default: `BOT_OWNER_ID`). Security alerts also go to every Developer |
 | `UPDATE_REPO`, `UPDATE_TOKEN` | No | Enable automatic updates (see below) |
@@ -200,7 +194,7 @@ node launch.js
 ### Adding a server
 
 1. Invite the bot using the link printed at startup. Inviting with a developer account authorizes the server automatically.
-2. Run `/setup logs setup` to create the ban and server log channels (including the security log used by anti-nuke).
+2. Run `/setup logs setup` to group the active ban and server log channels under **Ghost Vanguard Logs**. Any old **VEIL LOGS** category is renamed **Archive - Veil Logs**; its channels and history are preserved.
 3. Move the Ghost Vanguard role above staff roles where possible. `/antinuke check` reports missing permissions and roles the bot cannot contain.
 4. When the readiness check passes, run `/antinuke enable` and review the confirmation to start enforce mode. New or unconfigured servers stay in observe mode until this is done.
 5. Run `/setup panel` to create the staff control panel.
@@ -274,7 +268,6 @@ src/
   features/        tickets, automod, joins, rejoin-roles, schedules
   integrations/    roblox.ts + http.ts (4-worker cache, circuit breaker)
   dashboard/       no-build HTML + JSON API (served beside /healthz)
-  workspace/       submissions, reviews, records, tasks, staff, Sheets sync
   ui/              embeds, panels, command-docs generator
 launch.js          supervisor: install/deps, DB restore, run + auto-update (CI-gated)
 scripts/
@@ -305,7 +298,6 @@ dist/              compiled output — committed for Wispbyte hosts
 | [server-lifecycle.md](docs/user/server-lifecycle.md) | Invites, authorization and removal |
 | [hosting.md](docs/user/hosting.md) | Hosting, persistence and the health endpoint |
 | [architecture.md](docs/user/architecture.md) | How the code is organized |
-| [workspace.md](docs/user/workspace.md) | Sheets-backed submissions, reviews & staff sync |
 | [changelog.md](docs/changelog.md) | Release history |
 
 ## Security

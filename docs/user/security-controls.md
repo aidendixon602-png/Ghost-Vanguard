@@ -50,7 +50,7 @@ Nobody can change these from Discord. Restart after editing.
 | `ANTINUKE_LOCK=true` | Only Developers can turn anti-nuke off or change its extra layers. A server someone switched off is switched back on at every start |
 | `PROTECTED_USERS` | Staff can't ban, kick, time out, strip or take roles from these people, through Vanguard or by hand. Manual bans, timeouts and role removals are undone and you are alerted (kicks can't be undone). Anti-nuke still contains them if they set it off |
 | `PROTECTED_ROLES`, `PROTECTED_ROLE_ASSIGNERS` | Only the assigners and Developers may give these roles. Anyone else's grant is taken back and you are alerted |
-| `COMMAND_BLACKLIST` | Blocks specific people from specific commands in every server, e.g. `111…:mod ban\|network`. `*` blocks every command and button. The bot owner can never be blocked |
+| `COMMAND_BLACKLIST` | Blocks specific people from specific commands in every server, e.g. `111…:mod ban\|genreban`. `*` blocks every command and button. The bot owner can never be blocked |
 | `GLOBAL_ALERT_CHANNEL_ID`, `GLOBAL_ALERT_WARNINGS` | The global alert feed channel, and whether first-time warnings go there too |
 
 ## Commands

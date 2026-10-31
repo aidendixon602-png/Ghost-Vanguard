@@ -11,7 +11,6 @@
 - **[Server Lifecycle](user/server-lifecycle.md)** — invites, authorization and removal
 - **[Hosting](user/hosting.md)** — persistence and health endpoint
 - **[Architecture](user/architecture.md)** — how the code is organized
-- **[Workspace](user/workspace.md)** — guild-scoped Sheets integration
 - **[Anti-Ping](user/anti-ping.md)** · **[Scam Protection](user/scam-protection.md)** · **[Snapshots](user/snapshots.md)** · **[Validation](user/validation.md)**
 
 ## Scripts & Automation

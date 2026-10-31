@@ -372,8 +372,8 @@ test('the reorganized command list: the expected top-level commands and groups',
     try {
         indexTree(registry);
         const tree = treeJson(registry);
-        assert.deepEqual(tree.map(c => c.name), ['antinuke', 'automod', 'raid', 'mod', 'setup', 'ticket', 'recovery', 'info', 'network', 'dev', 'help', 'verify', 'roblox', 'ask', 'role', 'restart']);
-        assert.ok(tree.some(c => c.name === 'dev' || c.name === 'network'), 'developer command groups are registered as slash commands');
+        assert.deepEqual(tree.map(c => c.name), ['antinuke', 'automod', 'raid', 'mod', 'setup', 'ticket', 'recovery', 'info', 'dev', 'help', 'verify', 'roblox', 'ask', 'role', 'restart', 'genreban', 'hardban', 'netexception', 'ungenreban', 'unhardban']);
+        assert.ok(tree.some(c => c.name === 'dev'), 'developer command groups are registered as slash commands');
         const ticket = tree.find(c => c.name === 'ticket')!;
         assert.deepEqual(ticket.options.map((o: any) => o.name),
             ['setup', 'panel', 'types', 'settings', 'stats', 'claim', 'unclaim', 'transfer', 'priority', 'close', 'closerequest', 'add', 'remove', 'rename', 'history', 'block', 'unblock', 'blocked']);
