@@ -55,7 +55,7 @@ const NOTES: Record<string, string> = {
     '/role who-can-give': 'staff roles: owner only',
     '/mod massban': 'must also be on the anti-nuke whitelist',
     '/mod timeout': 'Helpers up to 60 minutes; Moderators longer',
-    '/mod unban': 'ordinary bans only; only Developers can lift a genreban or grant a one-server exception; `/ungenreban`, `/unhardban` and network-ban log controls are Developer only',
+    '/mod unban': 'Admins may lift ordinary bans here; ban-log Unban/Reban buttons are limited to the server owner or a Developer; network-ban lifts and exceptions are Developer only',
     '/antinuke threats list': 'Admin and above; scores and levels are informational and never trigger automatic enforcement',
     '/antinuke threats view': 'Admin and above; shows every scored incident and staff action',
     '/antinuke threats clear': 'Head Admin and above; clears the board entry only, cases and bans stay',

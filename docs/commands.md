@@ -103,7 +103,7 @@ Moderation: ban, kick, timeout, warn, purge, cases, notes and appeals
 | `/mod cases search` | Search cases by member, staff, action, reason or date | Helper+ or Moderate Members |
 | `/mod cases recent` | Show the latest cases | Helper+ or Moderate Members |
 | `/mod ban` | Ban a user | Moderator+ or Ban Members |
-| `/mod unban` | Lift a ban (not genrebans or hardbans) | Admin+ or Administrator (ordinary bans only; only Developers can lift a genreban or grant a one-server exception; `/ungenreban`, `/unhardban` and network-ban log controls are Developer only) |
+| `/mod unban` | Lift a ban (not genrebans or hardbans) | Admin+ or Administrator (Admins may lift ordinary bans here; ban-log Unban/Reban buttons are limited to the server owner or a Developer; network-ban lifts and exceptions are Developer only) |
 | `/mod kick` | Kick a member | Moderator+ or Kick Members |
 | `/mod timeout` | Time out a member | Helper+ or Moderate Members (Helpers up to 60 minutes; Moderators longer) |
 | `/mod untimeout` | Remove a member's timeout | Moderator+ or Moderate Members |

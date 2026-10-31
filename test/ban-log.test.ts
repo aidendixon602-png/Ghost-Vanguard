@@ -11,7 +11,7 @@ import { createBan } from '../src/security/network-ban.js';
 
 /**
  * #bans: every ban gets one record (whoever made it), unbans update that record, nothing is
- * guessed, and only developers can use the Unban / Reban buttons, with confirmation.
+ * guessed, and only the server owner or Developers can use Unban / Reban buttons, with confirmation.
  */
 
 timing.settleMs = 0;
@@ -178,28 +178,34 @@ function click(w: ReturnType<typeof world>, customId: string, userId: string, ex
 }
 const run = (w: ReturnType<typeof world>, c: { i: any }) => handleBanLogInteraction(c.i, { store: w.store, logs: w.logs, assertLocalUnban: async () => undefined });
 
-test('staff without the Admin rank cannot press Unban or Reban, checked on every click including the confirmation', async () => {
+test('even Admins cannot press Unban or Reban; the owner or a Developer is required on every click', async () => {
     const w = world();
     try {
         const record = (await w.discordBan(MANUAL, 'raid'))!;
+        w.store.grant(G, STAFF, 'admin', 'owner');
         for (const id of [`banrec:unban:${record.id}`, `banrec:cunban:${record.id}`, `banrec:reban:${record.id}`, `banrec:creban:${record.id}`]) {
             const c = click(w, id, STAFF);
             await run(w, c);
-            assert.match(c.replies[0].content, /Only Admins, the server owner and Ghost Vanguard developers/);
+            assert.match(c.replies[0].content, /Only the server owner and Ghost Vanguard developers/);
         }
         assert.ok(w.bans.has(USER), 'nothing changed');
     } finally { w.store.close(); }
 });
 
-test('a server Admin can lift an ordinary ban from its record, but not a genreban or hardban', async () => {
+test('the server owner can use local ban-log buttons, but cannot lift a network ban', async () => {
     const w = world();
     try {
         const record = (await w.discordBan(MANUAL, 'raid'))!;
-        w.store.grant(G, STAFF, 'admin', 'owner'); // security admin = Head Admin, above Admin
-        const ask = click(w, `banrec:unban:${record.id}`, STAFF);
+        w.store.grant(G, STAFF, 'admin', 'owner');
+        const admin = click(w, `banrec:unban:${record.id}`, STAFF);
+        await run(w, admin);
+        assert.match(admin.replies[0].content, /Only the server owner and Ghost Vanguard developers/);
+        assert.ok(w.bans.has(USER), 'an Admin cannot use the log button');
+
+        const ask = click(w, `banrec:unban:${record.id}`, 'owner');
         await run(w, ask);
         assert.equal(ask.replies[0].embeds[0].data.title, '🔓 Unban urloffy?');
-        const ok = click(w, `banrec:cunban:${record.id}`, STAFF);
+        const ok = click(w, `banrec:cunban:${record.id}`, 'owner');
         await run(w, ok);
         assert.equal(ok.replies[0].embeds[0].data.title, '✅ urloffy unbanned');
         assert.ok(!w.bans.has(USER));
@@ -209,12 +215,17 @@ test('a server Admin can lift an ordinary ban from its record, but not a genreba
             const deps = { store: w.store, logs: w.logs, assertLocalUnban: async () => undefined,
                 network: { active: () => ({ kind, record: 'X-1' }), lift: async () => { throw new Error('must not lift'); } } };
             for (const id of [`banrec:unban:${again.id}`, `banrec:cunban:${again.id}`]) {
-                const c = click(w, id, STAFF);
+                const c = click(w, id, 'owner');
                 await handleBanLogInteraction(c.i, deps as any);
                 assert.match(c.replies[0].content, new RegExp(`Midtown-wide \\*\\*${kind}\\*\\*: only a Developer`));
             }
-            assert.ok(w.bans.has(USER), `${kind}: nothing changed`);
+            assert.ok(w.bans.has(USER), `${kind}: the server owner cannot lift a network ban`);
         }
+
+        await w.discordUnban(MANUAL, 'reban button access check');
+        const reban = click(w, `banrec:reban:${again.id}`, 'owner');
+        await run(w, reban);
+        assert.equal(reban.replies[0].kind, 'modal', 'the server owner can open the Reban form');
     } finally { w.store.close(); }
 });
 
@@ -232,7 +243,7 @@ test('only a Developer can lift either network-ban type from its record', async 
             const before = lifted.length;
             const blocked = click(w, `banrec:cunban:${record.id}`, JUNIOR);
             await handleBanLogInteraction(blocked.i, deps(kind) as any);
-            assert.match(blocked.replies[0].content, /only a Developer can lift it/);
+            assert.match(blocked.replies[0].content, /Only the server owner and Ghost Vanguard developers/);
             assert.equal(lifted.length, before, `${kind}: Supreme Leader is refused`);
             assert.ok(w.bans.has(USER));
 
@@ -353,7 +364,7 @@ test('a Developer can lift a hardban straight from its record: it confirms, then
         assert.equal(getRecord(w.store, G, record.id)!.status, 'unbanned');
         const staff = click(w, `banrec:cunban:${record.id}`, STAFF);
         await handleBanLogInteraction(staff.i, deps);
-        assert.match(staff.replies[0].content, /Only Admins, the server owner and Ghost Vanguard developers/, 'ordinary staff still cannot');
+        assert.match(staff.replies[0].content, /Only the server owner and Ghost Vanguard developers/, 'ordinary staff still cannot');
     } finally { config.developers.delete(DEV); w.store.close(); }
 });
 

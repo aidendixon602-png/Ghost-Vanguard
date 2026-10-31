@@ -6,7 +6,7 @@ import { configureEventLog, eventLogConfig } from './event-log.js';
 
 /**
  * Where Vanguard's logs go in each server:
- *   #bans                      one record per ban, with developer Unban / Reban buttons
+ *   #bans                      one record per ban, with server-owner / Developer Unban and Reban buttons
  *   #ghost-vanguard-logging    server events (messages, roles, channels, members) and bot actions
  * Settings are saved per server; existing channels are reused, never duplicated.
  */
