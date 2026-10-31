@@ -13,6 +13,14 @@ export const DEFAULT_CHANNELS = {
     logging: 'ghost-vanguard-logging',
 };
 /** Log channel names from older releases; kept so existing servers reuse them instead of getting a second channel. */
+export const DEFAULT_CATEGORIES = {
+    logs: 'Ghost Vanguard Logs',
+};
+/** Legacy category names are renamed to an archive during log setup; their channels and history are preserved. */
+export const LEGACY_CATEGORIES = {
+    logs: ['veil logs', 'veil-logs', 'veil_logs'],
+    archivedLogs: 'Archive - Veil Logs',
+};
 export const LEGACY_CHANNELS = {
     logging: ['midtown-vanguard-logging'],
 };

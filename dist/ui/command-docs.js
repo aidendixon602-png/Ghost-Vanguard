@@ -48,7 +48,7 @@ const NOTES = {
     '/role who-can-give': 'staff roles: owner only',
     '/mod massban': 'must also be on the anti-nuke whitelist',
     '/mod timeout': 'Helpers up to 60 minutes; Moderators longer',
-    '/mod unban': 'ordinary bans only; an Overseer+ can grant a one-server genreban exception; Supreme Leaders can lift genrebans from the ban-log controls; `/network ungenreban` is Supreme Leader+ and `/network unhardban` is Developer only',
+    '/mod unban': 'ordinary bans only; an Overseer+ can grant a one-server genreban exception; Supreme Leaders can lift genrebans from the ban-log controls; `/ungenreban` is Supreme Leader+ and `/unhardban` is Developer only',
     '/antinuke threats list': 'Admin and above; scores and levels are informational and never trigger automatic enforcement',
     '/antinuke threats view': 'Admin and above; shows every scored incident and staff action',
     '/antinuke threats clear': 'Head Admin and above; clears the board entry only, cases and bans stay',
@@ -70,7 +70,7 @@ const NOTES = {
 };
 export function commandsDoc(registry) {
     const leaves = commandLeaves(registry);
-    const out = ['# Commands', '', 'Generated from the bot itself (`npm run docs`). Type `/` in Discord and pick **Ghost Vanguard**; `/help` shows only slash commands you can use. Sensitive and admin slash replies are private; ordinary public utility replies stay public. Developer actions are available as `/dev`, `/network` and `/restart` slash commands. For the same list grouped by rank, see [ranks.md](ranks.md).', ''];
+    const out = ['# Commands', '', 'Generated from the bot itself (`npm run docs`). Type `/` in Discord and pick **Ghost Vanguard**; `/help` shows only slash commands you can use. Sensitive and admin slash replies are private; ordinary public utility replies stay public. Developer actions are available as `/dev`, `/genreban`, `/ungenreban`, `/hardban`, `/unhardban`, `/netexception` and `/restart` slash commands. For the same list grouped by rank, see [ranks.md](ranks.md).', ''];
     for (const top of treeJson(registry)) {
         const rows = leaves.filter(l => l.top === top.name);
         if (!rows.length)

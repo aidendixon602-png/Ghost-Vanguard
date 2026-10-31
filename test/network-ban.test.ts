@@ -421,7 +421,7 @@ test('/genreban shows loading, asks to confirm, then reports the result with the
     f.store.close();
 });
 
-test('/genreban refuses a duplicate, an invalid ID, and a user already hardbanned', async () => {
+test('/genreban refuses a duplicate and invalid ID, but remains distinct from an active hardban', async () => {
     const a = fakeGuild('100000000000000043', 'Alpha');
     let f = commandRun([a.guild], TARGET);
     newBan(f.store);
@@ -436,13 +436,19 @@ test('/genreban refuses a duplicate, an invalid ID, and a user already hardbanne
     f.store.close();
 
     f = commandRun([a.guild], TARGET);
-    newBan(f.store, 'hardban');
+    const hard = newBan(f.store, 'hardban');
+    f.setPolicy('genreban');
     await issueCommand('genreban').execute(f.ctx, f.i);
-    assert.match(String(f.replies.at(-1).embeds[0].data.description), /active hardban.*No genreban was created/s);
+    assert.match(title(f.replies.at(-1)), /^⚠ Genreban a user/);
+    assert.equal(activeBan(f.store, 'genreban', TARGET), undefined, 'the genreban still requires its own confirmation');
+    await f.press();
+    assert.equal(activeBan(f.store, 'hardban', TARGET)?.id, hard.id, 'creating a genreban does not revoke the hardban');
+    assert.ok(activeBan(f.store, 'genreban', TARGET), 'a distinct genreban can coexist with an active hardban');
+    assert.equal(f.store.get('SELECT COUNT(*) AS n FROM network_bans')!.n, 2);
     f.store.close();
 });
 
-test('/hardban replaces an active genreban instead of stacking two records', async () => {
+test('/hardban remains separate from an active genreban instead of revoking it', async () => {
     const a = fakeGuild('100000000000000044', 'Alpha');
     const f = commandRun([a.guild], TARGET);
     const gen = newBan(f.store);
@@ -450,8 +456,9 @@ test('/hardban replaces an active genreban instead of stacking two records', asy
     await issueCommand('hardban').execute(f.ctx, f.i);
     await f.press();
     assert.match(title(f.clickReplies.at(-1)), /^✅ Hardban HB-00002 succeeded in all 1 server/);
-    assert.equal(activeBan(f.store, 'genreban', TARGET), undefined);
-    assert.match(String(f.store.get('SELECT revoke_reason FROM network_bans WHERE id=?', gen.id)!.revoke_reason), /Replaced by hardban/);
+    assert.equal(activeBan(f.store, 'genreban', TARGET)?.id, gen.id, 'issuing a hardban does not revoke the distinct genreban');
+    assert.equal(activeBan(f.store, 'hardban', TARGET)?.id, gen.id + 1, 'the hardban gets its own active record');
+    assert.equal(f.store.get('SELECT COUNT(*) AS n FROM network_bans')!.n, 2, 'both records are retained');
     f.store.close();
 });
 
@@ -460,7 +467,7 @@ test('/unhardban and /ungenreban only revoke their own type and keep the record'
     let f = commandRun([a.guild], TARGET, { reason: 'appeal' });
     const hard = newBan(f.store, 'hardban');
     await revokeCommand('genreban').execute(f.ctx, f.i);
-    assert.ok(String(f.replies.at(-1).embeds[0].data.description).includes('active hardban') && String(f.replies.at(-1).embeds[0].data.description).includes('/network unhardban'), 'genreban points to slash hardban revocation');
+    assert.ok(String(f.replies.at(-1).embeds[0].data.description).includes('active hardban') && String(f.replies.at(-1).embeds[0].data.description).includes('/unhardban'), 'genreban points to slash hardban revocation');
     assert.ok(activeBan(f.store, 'hardban', TARGET), '/ungenreban did not touch the hardban');
     await revokeCommand('hardban').execute(f.ctx, f.i);
     assert.match(title(f.replies.at(-1)), /^✅ Unhardban HB-00001 succeeded/);
@@ -594,7 +601,7 @@ test('/moderation unban lifts local bans only, and never a genreban or hardban',
     f = moderation('unban', { bans: { [TARGET]: `${TAG.hardban} HB-00001 ${DEV}: raiding` } });
     await moderationCommand.execute(f.ctx, f.i);
     assert.match(title(f.replies.at(-1)), /not allowed/);
-    assert.ok(String(f.replies.at(-1).embeds[0].data.description).includes('/network unhardban'));
+    assert.ok(String(f.replies.at(-1).embeds[0].data.description).includes('/unhardban'));
     assert.deepEqual(f.calls.unbanned, []);
     f.store.close();
 
@@ -630,7 +637,7 @@ test('/moderation unban lifts local bans only, and never a genreban or hardban',
     newBan(f.store, 'genreban'); newBan(f.store, 'hardban');
     f.store.grant('g', 'mod', 'admin', 'owner');
     await moderationCommand.execute(f.ctx, f.i);
-    assert.ok(String(f.replies.at(-1).embeds[0].data.description).includes('/network unhardban'));
+    assert.ok(String(f.replies.at(-1).embeds[0].data.description).includes('/unhardban'));
     assert.deepEqual(f.calls.unbanned, []);
     f.store.close();
 

@@ -18,9 +18,9 @@ The top rank: the bot owner (`BOT_OWNER_ID`) and anyone in `DEVELOPER_IDS`. Ever
 - `/dev server ban`: Ban a server from the bot
 - `/dev server deauthorize`: Remove this server and leave
 - `/dev server unban`: Unban a server
-- `/network unhardban`: Lift a hardban everywhere
 - `/restart`: Restart the bot
 - `/setup staff global`: Give someone a bot-wide rank
+- `/unhardban`: Lift a hardban everywhere
 
 ## 🏠 Server Owner
 
@@ -42,11 +42,11 @@ Bot-wide, every server: everything except the Developer-only tools. Diagnostics,
 - `/dev database verify`: Verify a database backup
 - `/dev sync`: Re-register the slash commands
 - `/dev update`: Show update status or install now
-- `/network exceptions list`: List genreban exceptions
-- `/network exceptions revoke`: Cancel a genreban exception
-- `/network genreban`: Ban a user from every server
-- `/network hardban`: Permanently ban a user from every server
-- `/network ungenreban`: Lift a genreban everywhere
+- `/genreban`: Ban a user from every server
+- `/hardban`: Permanently ban a user from every server
+- `/netexception list`: List genreban exceptions
+- `/netexception revoke`: Cancel a genreban exception
+- `/ungenreban`: Lift a genreban everywhere
 
 ## 🔭 Overseer
 
@@ -113,12 +113,6 @@ Server rank: anti-nuke, whitelist, control panel, backups and staff ranks. Given
 - `/setup config feature`: Turn moderation, verification, AI or backups on or off
 - `/setup config permission-role`: Give a role a staff rank (older method)
 - `/setup config provider`: Turn a verification provider on or off
-- `/setup config workspace-disable`: Turn Workspace off (records are kept)
-- `/setup config workspace-enable`: Turn Workspace on
-- `/setup config workspace-publish`: Post or update the Workspace panels
-- `/setup config workspace-setup`: Open the Workspace setup panel
-- `/setup config workspace-status`: Show Workspace status
-- `/setup config workspace-sync`: Sync staff members to Workspace
 - `/setup history list`: Show recent setting changes
 - `/setup panel`: Create or update the staff control panel
 - `/setup permissions discord`: Show roles with Administrator or Manage Roles
@@ -162,7 +156,7 @@ Server rank: lifting ordinary bans and accepting appeals, raid tools, automod, s
 - `/automod spam`: Set limits for mass pings, repeats and message bursts
 - `/automod status`: Show what automod is doing here
 - `/mod massban`: Ban up to 200 user IDs at once _(must also be on the anti-nuke whitelist)_
-- `/mod unban`: Lift a ban (not genrebans or hardbans) _(ordinary bans only; an Overseer+ can grant a one-server genreban exception; Supreme Leaders can lift genrebans from the ban-log controls; `/network ungenreban` is Supreme Leader+ and `/network unhardban` is Developer only)_
+- `/mod unban`: Lift a ban (not genrebans or hardbans) _(ordinary bans only; an Overseer+ can grant a one-server genreban exception; Supreme Leaders can lift genrebans from the ban-log controls; `/ungenreban` is Supreme Leader+ and `/unhardban` is Developer only)_
 - `/raid emergency panel`: Post Emergency and All clear buttons here
 - `/raid emergency start`: Lock down, pause invites, turn on raid mode, ping Admins
 - `/raid emergency status`: Show whether emergency mode is on

@@ -1,4 +1,3 @@
-import { gvText } from './ui/gv-names.js';
 /** After this many failures a row waits 30 minutes between attempts; after KEEP_MS it is dropped. */
 export const FAST_ATTEMPTS = 8;
 export const SLOW_RETRY_MS = 30 * 60000;
@@ -71,7 +70,7 @@ export class LogQueue {
                     if (!this.store.isAuthorized(row.guild_id))
                         continue;
                     const message = stored.embed ? { embeds: [stored.embed], components: stored.components ?? [] } : { embeds: [stored] };
-                    await channel.send({ ...gvText(message), allowedMentions: { parse: [] }, nonce: `mv${row.id}`, enforceNonce: true });
+                    await channel.send({ ...message, allowedMentions: { parse: [] }, nonce: `mv${row.id}`, enforceNonce: true });
                     this.store.run('DELETE FROM outbox WHERE id=?', row.id);
                 }
                 catch (error) {
@@ -90,7 +89,7 @@ export class LogQueue {
             this.store.run('DELETE FROM outbox WHERE id=?', row.id);
             return;
         }
-        const message = { ...gvText(payload), allowedMentions: { parse: [] } };
+        const message = { ...payload, allowedMentions: { parse: [] } };
         if (stored.edit) {
             const where = renderer.location(row.guild_id, stored.id);
             // Not posted yet: the pending post renders the latest state anyway.

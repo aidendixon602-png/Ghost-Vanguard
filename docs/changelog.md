@@ -3,7 +3,10 @@
 - Removed comma-prefix command dispatch, parsing, aliases, cleanup jobs and their configuration. Slash/application commands and their permissions remain, including `/restart`.
 - Threat scores and history remain, but automatic threat-board containment, strikes and "Threat board acted" posts are disabled. The minute timer only decays/expires scores; manual staff controls remain.
 - Dangerous permission grants are reverted with a first warning and strip on a repeat within an hour. Unwhitelisted self-assignment of Administrator or Manage Server still strips and reverts immediately; explicit whitelist entries remain exempt.
+- Genreban and hardban are separate records: either can be issued while the other is active, and neither silently revokes the other. The hardban still takes enforcement priority until a Developer revokes it.
 - The shared global/DM anti-nuke card now has Ghost Vanguard branding, incident/status/response fields, role history, rollback details and an **Open server log** button. DM delivery policy is unchanged.
+- Restored standalone `/genreban`, `/ungenreban`, `/hardban` and `/unhardban` commands; removed the `/network` command group. Genreban exception controls now live under `/netexception`.
+- `/setup logs setup` groups the active `#bans` and `#ghost-vanguard-logging` channels under **Ghost Vanguard Logs** and renames **VEIL LOGS** to **Archive - Veil Logs**. Existing old channels and their message history are preserved.
 
 # Changelog
 
@@ -65,12 +68,9 @@
   - HTTP 400 and other client errors: a request or configuration problem, not an outage. The message says to check the key, the provider's access to the server and the member's link, and the server is paused for 5 minutes instead of being told to wait for a pause that was never set.
   - Verification roles are still never removed on a provider error, and console warnings still omit keys and response bodies.
 
-## Unreleased: reusable Workspace management system
-- Added a guild-scoped, button-first Workspace for submissions, reviews, linked records, directives/tasks, staff synchronization and live reports.
-- Added durable sessions and panels, exact Discord-ID checks, idempotent counters, retry-safe linked Record IDs, audit history, setup validation, module visibility, authorization isolation and scheduled reminder state.
-- Added generic profiles plus the opt-in Midtown Archives preset (guild `1556485316838293587`, configured spreadsheet ID, `America/Los_Angeles`, row 7 headers and rows 8–207). Channel and role IDs remain setup selectors; none are invented.
-- Added Google Sheets v4 access-token/service-account authentication through environment variables, RAW literal writes, live header checks and controlled prepared-row expansion.
-- Added `/setup config workspace-setup`, `publish`, `status`, `enable`, `disable` and `sync`, plus member/staff/task/review controls. See [docs/workspace.md](workspace.md).
+## Unreleased: retire the Google Sheets-backed Workspace feature
+- Removed Workspace setup commands, component handlers, reminder jobs and Google Sheets credential configuration from the running bot. Existing Discord panel messages are left untouched; their controls now fail closed as unavailable.
+- Workspace SQLite tables remain under the database scope guard so existing records are retained in place and in backups; the retired feature no longer reads or writes them.
 
 ## Unreleased: comma-prefix Developer actions and private admin replies
 - Developer-only and bot-wide risky actions use comma-prefix commands; their slash entries are hidden and stale slash calls are rejected. Ordinary slash utilities remain available under their normal policies.

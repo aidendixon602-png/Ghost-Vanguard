@@ -11,7 +11,7 @@ import { handleRaidJoin, sweepTempbans } from './security/raidmode.js';
 import { handleNewAccountJoin } from './security/new-accounts.js';
 import { processStaffMention } from './security/antiping.js';
 import { rejectRecoveryWait, recoveryApiWait } from './recovery/recovery-api.js';
-import { ActivityType, Client, Colors, Events, Partials, GatewayIntentBits, MessageFlags, type Message } from 'discord.js';
+import { ActivityType, Client, Colors, Events, Partials, GatewayIntentBits, MessageFlags } from 'discord.js';
 import { randomUUID } from 'node:crypto';
 import { createServer } from 'node:http';
 import { cleanLegacyGuildCommands, syncCommands } from './bot/command-sync.js';
@@ -39,8 +39,6 @@ import { clearAutomod, processAutomod } from './features/automod.js';
 import { checkAltAccount, historyOnJoin, sendWelcome } from './features/joins.js';
 import { logRankChange } from './features/hr.js';
 import { runSchedules } from './features/schedules.js';
-import { runWorkspaceReminders } from './workspace/reports.js';
-import { disableWorkspacePanels } from './workspace/panels.js';
 import { handleAppealDm } from './features/appeals.js';
 import { announceComeback, dailyBackupDm, heartbeat } from './features/bot-health.js';
 import { aiModerate } from './features/ai-moderation.js';
@@ -59,8 +57,7 @@ import { answer as dashboardAnswer, DASHBOARD_HEADERS } from './dashboard/router
 import { handleTicketDm } from './ui/ticket-ui.js';
 import { recoveryEmbed } from './ui/notice.js';
 import { warnEmptyDatabase } from './features/bot-health.js';
-import { Claimed, CommandRateLimit, fromMessage, isCommandMessage, isHandoff, sameEmoji } from './bot/text-commands.js';
-import { isTrustedBot, isWhitelistedPerson, trustedBotReport } from './bot/trusted-bots.js';
+import { isWhitelistedPerson, trustedBotReport } from './bot/trusted-bots.js';
 import { forgetGuild, processMessageWave, restoreGates } from './security/raid-waves.js';
 
 const errors = validateConfig();
@@ -85,8 +82,7 @@ const offlineSince = lastSeen(store);
 // Tickets left mid-close by a crash are usable again, and open ticket channels are known in memory.
 loadTicketChannels(store);
 
-// Message reactions: Veil Utilities hands `,gv` commands over by reacting to them (see bot/text-commands.ts).
-const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers, GatewayIntentBits.GuildModeration, GatewayIntentBits.GuildMessages, GatewayIntentBits.GuildMessageReactions, ...(config.messageContentEnabled ? [GatewayIntentBits.MessageContent] : [])], partials: [Partials.Message, Partials.GuildMember, Partials.Reaction, Partials.User],
+const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers, GatewayIntentBits.GuildModeration, GatewayIntentBits.GuildMessages, ...(config.messageContentEnabled ? [GatewayIntentBits.MessageContent] : [])], partials: [Partials.Message, Partials.GuildMember, Partials.User],
     rest: { rejectOnRateLimit: rejectRecoveryWait },
     allowedMentions: { parse: [], repliedUser: false } });
 
@@ -125,7 +121,6 @@ const lifecycle = new GuildLifecycle(store, client, id => {
     clearAutomod(id);
     roblox.clearGuild(id);
     forgetGuildTickets(store, id);
-    void disableWorkspacePanels(client, store, id).catch(() => undefined);
 }, async (guild) => {
     await scam.initialize(guild);
     store.save(store.settings(guild.id));
@@ -215,9 +210,8 @@ client.once(Events.ClientReady, async (c) => {
         for (const row of store.all('SELECT guild_id,name FROM guild_data WHERE active=1'))
             if (!client.guilds.cache.has(row.guild_id))
                 store.markGuild(row.guild_id, row.name, false);
-        // No slash commands: every command is typed with Veil Utilities' prefix (`,gv …`). Syncing an empty list
-        // removes the old slash commands from Discord; the command code itself stays and runs from `,gv`.
-        const commandsUpdated = await syncCommands(client.rest, config.clientId, []);
+        // Register the current application-command tree. The bulk sync also removes stale commands.
+        const commandsUpdated = await syncCommands(client.rest, config.clientId, treeJson(registry));
         for (const guild of client.guilds.cache.values())
             if (['AUTHORIZED', 'PENDING_AUTHORIZATION'].includes(store.authorization(guild.id)?.state))
                 await cleanLegacyGuildCommands(client.rest, config.clientId, guild.id, store);
@@ -236,11 +230,10 @@ client.once(Events.ClientReady, async (c) => {
             console.log(closingRule());
         }
         endStartupSummary();
-        // `,gv` is the only command surface and every command arrives as message text: without the intent
-        // each one is silently ignored while Veil still shows its 🛡️ hand-off, so say so at every start.
+        // Message Content is only needed for message-based moderation protections, not for commands.
         if (!config.messageContentEnabled) {
-            const why = 'MESSAGE_CONTENT_ENABLED=false, so `,gv` commands cannot be read and no command will run. Turn on Message Content Intent in the Developer Portal, then set MESSAGE_CONTENT_ENABLED=true.';
-            logEvent('text_commands_unavailable', { reason: why });
+            const why = 'MESSAGE_CONTENT_ENABLED=false, so automod and scam protections cannot inspect message text.';
+            logEvent('message_content_disabled', { reason: why });
             if (config.logFormat !== 'json')
                 console.warn(`  ${style.red('⚠')} ${why}`);
         }
@@ -284,39 +277,6 @@ client.on(Events.InteractionCreate, i => {
             } }));
     }
     task('interaction', router.handle(i));
-});
-
-// `,gv …`: Vanguard reads its own commands from the message, exactly as its slash command would have run.
-// Veil Utilities' 🛡️ reaction still reaches the same function as a fallback while both bots run; `Claimed`
-// makes sure one message is only ever run once, whichever path arrives first.
-const claimed = new Claimed(), commandLimit = new CommandRateLimit();
-
-async function runTextCommand(message: Message<true>) {
-    if (!claimed.claim(message.id)) return;
-    if (!startupReady || !lifecycle.isReady(message.guildId))
-        return void await message.reply({ content: 'Ghost Vanguard is still starting up. Try again in a moment.', allowedMentions: { parse: [] } }).catch(() => null);
-    try {
-        await router.handle(await fromMessage(message, treeJson(registry)) as any);
-    } catch (error) {
-        await message.reply({ embeds: [embed('✕ Command not understood', error instanceof Error ? error.message : 'Try `,gv help`.', Colors.Red)], allowedMentions: { parse: [] } }).catch(() => null);
-    }
-}
-
-client.on(Events.MessageCreate, m => {
-    if (!m.inGuild() || !isCommandMessage(m)) return;
-    // Silently drop a burst: answering every message would let one member flood a channel with the bot's replies.
-    if (!commandLimit.allow(m.author.id)) return;
-    task('text command', runTextCommand(m));
-});
-
-// The older hand-off: only a trusted bot's own 🛡️ reaction, on a fresh, unedited command message.
-client.on(Events.MessageReactionAdd, (reaction, user) => {
-    if (!reaction.message.guildId || !isTrustedBot(user.id) || !sameEmoji(reaction.emoji.name)) return;
-    task('text command hand-off', (async () => {
-        const message = reaction.message.partial ? await reaction.message.fetch().catch(() => null) : reaction.message;
-        if (!message?.inGuild() || !isHandoff(user.id, reaction.emoji.name, message)) return;
-        await runTextCommand(message);
-    })());
 });
 
 client.on(Events.GuildAuditLogEntryCreate, (entry, guild) => {
@@ -482,7 +442,6 @@ timers.push(setInterval(() => task('member roster refresh', stats.refreshMembers
 timers.push(setInterval(() => task('database backups', databaseBackups.scheduled()), 60000));
 timers.push(setInterval(() => task('layout backups', scheduledLayouts()), 60000));
 timers.push(setInterval(() => { if (startupReady) task('schedules', runSchedules({ store, logs, client, ready: id => lifecycle.isReady(id), locks: snapshots.locks })); }, 60000));
-timers.push(setInterval(() => { if (startupReady) task('workspace reminders', runWorkspaceReminders({ store, client, ready: id => startupReady && lifecycle.isReady(id) })); }, 60000));
 timers.push(setInterval(() => task('heartbeat', heartbeat()), 60000));
 timers.push(setInterval(() => { if (startupReady) task('daily backup DM', dailyBackupDm(store, client, kind => databaseBackups.create(kind))); }, 600000));
 timers.push(setInterval(() => task('network ban sweep', sweepNetworkBans(network)), 600000));

@@ -3,9 +3,9 @@ import { config } from '../config.js';
  * Rules that live only in .env, so nobody can change them from Discord (a restart applies changes).
  *
  * COMMAND_BLACKLIST: who may not use which commands, in every server.
- *   COMMAND_BLACKLIST=111111111111111111:mod ban|network;222222222222222222:*
+ *   COMMAND_BLACKLIST=111111111111111111:mod ban|genreban;222222222222222222:*
  *   - entries are separated by `;`, commands by `|`
- *   - a command is what you type in Discord without the slash: `mod ban`, `mod` (everything under /mod), `network genreban`
+ *   - a command is what you type in Discord without the slash: `mod ban`, `mod` (everything under /mod), `genreban`
  *   - `*` blocks every command, button and menu for that person
  *   The bot owner (BOT_OWNER_ID) can never be blocked.
  */

@@ -5,8 +5,8 @@
 | Folder | Responsibility |
 |---|---|
 | `src/index.ts` | Creates the client and database, starts the health endpoint, wires everything together |
-| `src/bot/` | Command registry, interaction routing, access guard, guild lifecycle, command sync, prefix (`,`) commands |
-| `src/commands/` | One module per slash command, in 8 category folders → grouped into 12 global `/` commands |
+| `src/bot/` | Command registry, interaction routing, access guard, guild lifecycle, global application-command tree and sync |
+| `src/commands/` | One module per slash command, in category folders → exposed through the global application-command tree |
 | `src/config.ts` + `src/branding.ts` | Env parsing / product name & channel defaults (single source) |
 | `src/database/` | SQLite Store (`node:sqlite`), 42 tables, versioned migrations, verified scheduled backups |
 | `src/security/` | Anti-nuke engine (19 rules), threat board (25/55/85), scam, lockdown, raid mode, readiness |
@@ -15,7 +15,6 @@
 | `src/recovery/` | Snapshots, recovery engine, operation locks, rate-limit handling |
 | `src/integrations/` | Roblox (RoVer/Bloxlink) + shared 4-worker HTTP reader with cache & circuit breaker |
 | `src/features/` | Tickets (desk), automod, joins, rejoin-roles, schedules, appeals |
-| `src/workspace/` | Guild-scoped Sheets integration — submissions, reviews, records, tasks, staff sync |
 | `src/ui/` | Embeds, buttons, select menus, paged views, generated `command-docs` |
 | `src/core.ts`, `errors.ts`, `logging.ts`, `console-ui.ts` | Shared helpers, redacted logging, startup panel |
 

@@ -38,8 +38,7 @@ test('Veil Utilities is a built-in trusted bot', () => {
 });
 
 test('startup names each trusted account and flags an ID that is not a bot or cannot be fetched', async () => {
-    // These IDs are exempt from anti-nuke everywhere and are the only accounts whose reaction hands a `,gv`
-    // command over, so a stale ID must be visible at startup instead of failing silently.
+    // These IDs are exempt from anti-nuke everywhere, so a stale ID must be visible at startup.
     const fake = (users: Record<string, any>) => ({ users: { fetch: async (id: string) => { if (!(id in users)) throw new Error('Unknown User'); return users[id]; } } }) as any;
     const good = await trustedBotReport(fake({ [VEIL]: { id: VEIL, bot: true, username: 'veilutilities' } }));
     assert.equal(good.length, 1);
@@ -50,7 +49,7 @@ test('startup names each trusted account and flags an ID that is not a bot or ca
 
     const missing = await trustedBotReport(fake({}));
     assert.match(missing[0]!, /could not be fetched/);
-    assert.match(missing[0]!, /Veil Utilities' application ID/);
+    assert.match(missing[0]!, /correct or remove TRUSTED_BOTS/);
 });
 
 test('anti-nuke trusts Veil Utilities in every server and leaves its actions alone', async () => {

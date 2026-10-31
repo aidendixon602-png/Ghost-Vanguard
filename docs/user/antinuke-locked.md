@@ -31,7 +31,7 @@ First-hit warnings apply to human actors; bots get the normal response without a
 - **Raid mode** removes (kick or timeout) joiners whose account is younger than the minimum age, and joiners whose name matches two or more other accounts that joined in the last 10 minutes (a lookalike wave), whatever their age.
 - **Join flood → raid mode:** switched on automatically for the raid auto-trigger's hours; the accounts that made up the flood are swept straight away, and the server's verification level is raised to High until raid mode ends (join gate, needs Manage Server; a level staff change during the raid is left as they set it).
 - **Message waves:** the same message from 4 or more accounts that joined in the last 30 minutes, within 30 seconds, is deleted, the accounts are handled like raid mode, and raid mode switches on. In observe mode it is only reported.
-- `,gv antinuke settings join_gate:off message_waves:off` switches either off.
+- `/antinuke settings join_gate:false message_waves:false` switches either off.
 
 ## Observe-first rollout and readiness
 

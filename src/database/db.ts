@@ -40,7 +40,8 @@ export interface Row {
 /**
  * Every table holding per-guild rows. Scope triggers and the cross-guild read check are
  * both built from this one list, and test/schema.test.ts fails if a table with a guild
- * column is missing from it, so a new table cannot quietly escape the guard.
+ * column is missing from it, so a new table cannot quietly escape the guard. Retired
+ * workspace_* tables remain listed so legacy data stays protected and available in backups.
  */
 export const GUILD_SCOPED_TABLES = ['verification_pending', 'scam_config', 'scam_domains', 'scam_images', 'scam_exclusions', 'scam_events', 'antinuke_presets', 'antinuke_event_payloads', 'antiping_config', 'antiping_targets', 'antinuke_options', 'event_log_config', 'event_log', 'lockdowns', 'lockdown_overwrites', 'lockdown_notices', 'guild_config', 'antinuke_rules', 'antinuke_defaults', 'provider_config', 'permission_roles', 'command_settings', 'feature_settings', 'backup_config', 'configuration_history', 'grants', 'observations', 'incidents', 'backups', 'cases', 'links', 'blocked_accounts', 'snapshots', 'snapshot_metadata', 'recovery_mappings', 'recovery_history', 'outbox', 'member_notes', 'tempbans', 'raidmode', 'newaccount_config', 'staff_roles', 'guild_features', 'appeals', 'duty_sessions', 'autoreact_users', 'ban_records', 'role_rules', 'left_roles', 'panel_actions',
     'ticket_config', 'ticket_types', 'ticket_panels', 'ticket_records', 'ticket_blocks',
@@ -121,7 +122,7 @@ export class Store {
         joined_at INTEGER NOT NULL, deadline INTEGER, authorized_by TEXT, authorized_at INTEGER,
         removed_by TEXT, removed_at INTEGER, version TEXT, config_version INTEGER, generation INTEGER NOT NULL DEFAULT 0);
       CREATE TABLE IF NOT EXISTS server_bans (guild_id TEXT PRIMARY KEY, name TEXT NOT NULL, reason TEXT NOT NULL, banned_by TEXT NOT NULL, at INTEGER NOT NULL);
-      -- Developer bans across every authorized server (/network genreban and /network hardban). Rows are never deleted:
+      -- Developer bans across every authorized server (/genreban and /hardban). Rows are never deleted:
       -- a revoked ban keeps who revoked it and why. At most one active ban per user and type.
       CREATE TABLE IF NOT EXISTS network_bans (
         id INTEGER PRIMARY KEY AUTOINCREMENT, kind TEXT NOT NULL CHECK(kind IN ('genreban','hardban')),
@@ -297,8 +298,8 @@ export class Store {
                 user_id TEXT NOT NULL, action TEXT NOT NULL, detail TEXT NOT NULL, by_id TEXT NOT NULL, at INTEGER NOT NULL,
                 undone_at INTEGER, undone_by TEXT);
             CREATE INDEX IF NOT EXISTS threat_actions_guild ON threat_actions(guild_id, at DESC);`);
-        // Workspace: durable, guild-scoped state for the reusable button-based management desk.
-        // JSON columns deliberately hold profile-specific mappings so Archives rules do not leak into other guilds.
+        // Legacy Workspace schema: retain existing records and backups after retiring the Google Sheets feature.
+        // No active commands, handlers or scheduled jobs read or write these tables; do not drop existing data.
         this.db.exec(`CREATE TABLE IF NOT EXISTS workspace_config (
                 guild_id TEXT PRIMARY KEY REFERENCES guild_data(guild_id) ON DELETE CASCADE,
                 enabled INTEGER NOT NULL DEFAULT 0 CHECK(enabled IN (0,1)),

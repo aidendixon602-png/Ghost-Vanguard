@@ -12,9 +12,10 @@ import { RANK_LABEL, RANKS, rankName, requiredRank } from './ranks.js';
  *   /raid       lockdown, raid mode, emergency, new accounts, webhooks
  *   /mod        bans, kicks, timeouts, warnings, cases, notes, appeals
  *   /setup      logs, staff ranks, welcome, config, permissions, control panel
- *   /ticket  /recovery  /info  /roblox  /role  /dev  /network  (+ /help /verify /ask /restart)
+ *   /ticket  /recovery  /info  /roblox  /role  /dev  (+ /help /verify /ask /restart)
+ *   /genreban  /ungenreban  /hardban  /unhardban  /netexception are standalone developer tools.
  *
- * Developer actions (/dev and /network) are slash commands requiring the configured developer rank.
+ * Developer actions are slash commands requiring the configured developer rank.
  * Grouped entries are re-shaped (commandName, subcommand, options) so their original modules run
  * as if they had been called directly. Permissions, ranks, cooldowns and on/off switches keep using the
  * original names.
@@ -57,8 +58,6 @@ export const UMBRELLAS: Umbrella[] = [
     { name: 'info', description: 'Look things up: users, roles, the server and the bot', entries: [
         { child: 'userinfo', mode: 'single', as: 'user' }, { child: 'roleinfo', mode: 'single', as: 'role' }, { child: 'server-info', mode: 'single', as: 'server' },
         { child: 'bot-info', mode: 'single', as: 'bot' }, { child: 'ping', mode: 'single' }] },
-    { name: 'network', description: 'Bot staff: genrebans and hardbans across every Midtown server', entries: [
-        { child: 'genreban', mode: 'single' }, { child: 'ungenreban', mode: 'single' }, { child: 'hardban', mode: 'single' }, { child: 'unhardban', mode: 'single' }, { child: 'netexception', mode: 'group', as: 'exceptions' }] },
     { name: 'dev', description: 'Bot developers: diagnostics, updates, alerts, servers and the database', entries: [
         { child: 'dev', mode: 'flat' },
         { child: 'authserver', mode: 'single', in: 'server', as: 'authorize' }, { child: 'deauthserver', mode: 'single', in: 'server', as: 'deauthorize' },

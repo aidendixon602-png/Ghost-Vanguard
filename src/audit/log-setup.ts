@@ -1,5 +1,5 @@
 import { ChannelType, Colors, EmbedBuilder, OverwriteType, PermissionFlagsBits, type Guild, type GuildBasedChannel, type OverwriteResolvable, type TextChannel } from 'discord.js';
-import { DEFAULT_CHANNELS, LEGACY_CHANNELS } from '../branding.js';
+import { DEFAULT_CATEGORIES, DEFAULT_CHANNELS, LEGACY_CATEGORIES, LEGACY_CHANNELS } from '../branding.js';
 import type { Store } from '../database/db.js';
 import { getFeature, setFeature } from '../features/settings.js';
 import { configureEventLog, eventLogConfig } from './event-log.js';
@@ -12,6 +12,8 @@ import { configureEventLog, eventLogConfig } from './event-log.js';
  */
 export const BANS_CHANNEL = DEFAULT_CHANNELS.bans;
 export const LOGGING_CHANNEL = DEFAULT_CHANNELS.logging;
+export const LOG_CATEGORY = DEFAULT_CATEGORIES.logs;
+export const ARCHIVED_LOG_CATEGORY = LEGACY_CATEGORIES.archivedLogs;
 /**
  * Names used by older releases. A server that already has one keeps using it instead of getting a
  * second log channel; the name is only reported, Vanguard never renames a server's channels by itself.
@@ -77,6 +79,35 @@ async function resolveChannel(store: Store, guild: Guild, names: string | string
     return { channel: created, created: true, how: 'created (private: staff only)' };
 }
 
+const normalizedCategoryName = (name: string) => name.trim().toLowerCase().replace(/[_-]+/g, ' ');
+
+/** Find or create the category for active Ghost Vanguard logs. */
+async function resolveLogCategory(store: Store, guild: Guild, reason: string) {
+    const category = [...guild.channels.cache.values()].find(c => c.type === ChannelType.GuildCategory && normalizedCategoryName(c.name) === normalizedCategoryName(LOG_CATEGORY));
+    if (category) return { category, created: false };
+    const created = await guild.channels.create({ name: LOG_CATEGORY, type: ChannelType.GuildCategory, permissionOverwrites: privateOverwrites(store, guild), reason });
+    return { category: created, created: true };
+}
+
+/** Move only the two active log channels. Keep their channel overrides and every old log message intact. */
+async function placeInLogCategory(channels: Found[], category: any, reason: string) {
+    for (const { channel } of channels)
+        if (channel.parentId !== category.id)
+            await channel.setParent(category.id, { lockPermissions: false, reason });
+}
+
+/** Rename the old Veil category so it is clearly archived; never delete its channels or messages. */
+async function archiveLegacyLogCategories(guild: Guild, reason: string) {
+    const legacyNames = new Set(LEGACY_CATEGORIES.logs.map(normalizedCategoryName));
+    const archived: string[] = [];
+    for (const channel of guild.channels.cache.values()) {
+        if (channel.type !== ChannelType.GuildCategory || !legacyNames.has(normalizedCategoryName(channel.name))) continue;
+        await channel.edit({ name: ARCHIVED_LOG_CATEGORY, reason });
+        archived.push(channel.id);
+    }
+    return archived;
+}
+
 export interface ChannelCheck { channelId: string; ok: boolean; missing: string[]; publiclyVisible: boolean; test: 'sent' | 'failed' | 'skipped'; error?: string }
 
 /** Check one channel: Vanguard's permissions, whether everyone can read it, and send a test embed. */
@@ -120,11 +151,14 @@ export async function setupLogChannels(store: Store, guild: Guild, by: string, c
     const bans = await resolveChannel(store, guild, BANS_CHANNEL, chosen.bans ?? null, current.bansChannelId, reason);
     const logging = await resolveChannel(store, guild, LOGGING_CHANNEL_NAMES, chosen.logging ?? null, eventLogConfig(store, guild.id).channelId, reason);
     if (bans.channel.id === logging.channel.id) throw new Error('Ban logs and server logs need two different channels.');
+    const category = await resolveLogCategory(store, guild, reason);
+    await placeInLogCategory([bans, logging], category.category, reason);
+    const archivedCategories = await archiveLegacyLogCategories(guild, reason);
     setLogChannels(store, guild.id, { bansChannelId: bans.channel.id }, by);
     configureEventLog(store, guild.id, { enabled: true, channelId: logging.channel.id });
     // Bot actions (anti-nuke, backups, restores, configuration changes, errors) go to the logging channel too.
     const settings = store.settings(guild.id);
     const previousAlerts = settings.logChannelId;
     if (previousAlerts !== logging.channel.id) { settings.logChannelId = logging.channel.id; store.save(settings, by); }
-    return { bans, logging, previousAlerts: previousAlerts !== logging.channel.id ? previousAlerts : null };
+    return { bans, logging, category: category.category, categoryCreated: category.created, archivedCategories, previousAlerts: previousAlerts !== logging.channel.id ? previousAlerts : null };
 }
