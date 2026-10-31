@@ -2,23 +2,17 @@ import { Colors } from 'discord.js';
 import { AppError } from '../errors.js';
 import { dmTrusted } from '../bot/trusted-dm.js';
 import { developers } from '../bot/developers.js';
-import { botRank, RANKS } from '../bot/ranks.js';
 import { confirmDanger } from '../ui/danger-ui.js';
 import { embed } from '../ui/ui.js';
 import { activeBan, addException, existingBan, recordId } from './network-ban.js';
 import { staffReason } from './raidmode.js';
 import { clip } from '../core.js';
 /**
- * A genreban keeps someone out of every Midtown server. Bot-wide staff (Overseer or higher) may let that
- * one person back into **one server only**: the genreban stays in force everywhere else, the trusted
- * people are told straight away and authorized staff can cancel it with `/netexception revoke`.
- * Server owners and admins cannot: a network ban is a network decision. Hardbans never have exceptions.
+ * A genreban keeps someone out of every Midtown server. Only Developers may grant or revoke a
+ * one-server exception; the genreban stays in force everywhere else. Hardbans never have exceptions.
  */
-export function canGrantException(store, guild, actor) {
-    if (developers.has(actor.id))
-        return true;
-    // A bot-wide Vanguard rank; no server rank, server ownership or Discord permission counts.
-    return botRank(store, actor.id) >= RANKS.overseer;
+export function canGrantException(_store, _guild, actor) {
+    return developers.has(actor.id);
 }
 export async function tellDevelopers(client, text) {
     await dmTrusted(client, { content: text.slice(0, 1900), allowedMentions: { parse: [] } });
@@ -27,7 +21,7 @@ export async function tellDevelopers(client, text) {
 export async function offerGenrebanException(ctx, i, ban, reason) {
     const guild = i.guild;
     if (!canGrantException(ctx.store, guild, ctx.actor))
-        throw new AppError('PERMISSION_ERROR', `<@${ban.user_id}> has a Midtown-wide **genreban** (${recordId(ban)}). Server owners and admins cannot lift it: an **Overseer or higher** can let them back into this server only; a Supreme Leader or Developer can lift it everywhere from the ban-log controls. Only a Developer can lift it everywhere with \`/ungenreban\`.`);
+        throw new AppError('PERMISSION_ERROR', `<@${ban.user_id}> has a Midtown-wide **genreban** (${recordId(ban)}). Only a **Developer** can lift it or grant a one-server exception with \`/mod unban\`. Use \`/ungenreban\` to lift it everywhere.`);
     await confirmDanger(ctx, i, {
         title: 'Let a genrebanned user back into this server',
         summary: `<@${ban.user_id}> is genrebanned from every Midtown server (**${recordId(ban)}**: ${clip(ban.reason, 200)}).\n**Your reason:** ${clip(reason, 300)}`,

@@ -173,7 +173,7 @@ async function currentBan(guild, userId) {
     }
 }
 const LIFT_AUTHORITY = {
-    genreban: 'A Supreme Leader or Developer',
+    genreban: 'Only a Developer',
     hardban: 'Only a Developer',
 };
 const WHY_NOTE = {
@@ -184,7 +184,7 @@ const WHY_NOTE = {
 export function networkBanLogEmbed(guild, ban, why) {
     const recId = recordId(ban);
     const issued = why === 'issued';
-    const lifts = ban.kind === 'hardban' ? 'Only a Developer can lift it.' : 'Only a Developer or Supreme Leader can lift it.';
+    const lifts = 'Only a Developer can lift it.';
     const e = new EmbedBuilder()
         .setColor(Colors.DarkRed)
         .setTitle(`${KIND_NAME[ban.kind]} ${issued ? 'applied' : 're-applied'} · ${recId}`)
@@ -367,7 +367,7 @@ export function listExceptions(store, userId) {
     return store.all(`SELECT e.*, b.kind, b.status FROM network_exceptions e JOIN network_bans b ON b.id=e.ban_id WHERE e.revoked_at IS NULL AND b.status='active'${userId ? ' AND e.user_id=?' : ''} ORDER BY e.at DESC LIMIT 50`, ...(userId ? [userId] : []));
 }
 async function enforce(deps, guild, ban, why) {
-    // This server's owner/Head Admin let them back in here only. The genreban still applies everywhere else.
+    // A Developer let them back in here only. The genreban still applies everywhere else.
     if (ban.kind === 'genreban' && activeException(deps.store, guild.id, ban.id))
         return false;
     const result = await banIn(deps, guild, ban, why);
@@ -494,7 +494,7 @@ export async function assertLocalUnban(store, guild, userId, existing) {
     if (network) {
         const authority = network.kind === 'hardban'
             ? 'Only a Developer can lift it with `/unhardban`.'
-            : 'A Supreme Leader or Developer can lift it from the ban-log controls or with `/ungenreban`.';
+            : 'Only a Developer can lift it from the ban-log controls or with `/ungenreban`.';
         throw new AppError('PERMISSION_ERROR', `This user has an active ${network.kind}, **${recordId(network)}**, placed by a Ghost Vanguard developer. Server staff cannot lift it. ${authority}${network.kind === 'hardban' ? ' Unbanning them by hand is undone immediately.' : ' If they were unbanned by hand they would be banned again on joining.'}`);
     }
     const ban = existing === undefined ? await existingBan(guild, userId) : existing;

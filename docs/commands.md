@@ -103,7 +103,7 @@ Moderation: ban, kick, timeout, warn, purge, cases, notes and appeals
 | `/mod cases search` | Search cases by member, staff, action, reason or date | Helper+ or Moderate Members |
 | `/mod cases recent` | Show the latest cases | Helper+ or Moderate Members |
 | `/mod ban` | Ban a user | Moderator+ or Ban Members |
-| `/mod unban` | Lift a ban (not genrebans or hardbans) | Admin+ or Administrator (ordinary bans only; an Overseer+ can grant a one-server genreban exception; Supreme Leaders can lift genrebans from the ban-log controls; `/ungenreban` is Supreme Leader+ and `/unhardban` is Developer only) |
+| `/mod unban` | Lift a ban (not genrebans or hardbans) | Admin+ or Administrator (ordinary bans only; only Developers can lift a genreban or grant a one-server exception; `/ungenreban`, `/unhardban` and network-ban log controls are Developer only) |
 | `/mod kick` | Kick a member | Moderator+ or Kick Members |
 | `/mod timeout` | Time out a member | Helper+ or Moderate Members (Helpers up to 60 minutes; Moderators longer) |
 | `/mod untimeout` | Remove a member's timeout | Moderator+ or Moderate Members |
@@ -310,19 +310,19 @@ Restart the bot · Developer
 
 ## /genreban
 
-Ban a user from every server · Supreme Leader+
+Ban a user from every server · Developer
 
 | Command | What it does | Who |
 |---|---|---|
-| `/genreban` | Ban a user from every server | Supreme Leader+ |
+| `/genreban` | Ban a user from every server | Developer |
 
 ## /hardban
 
-Permanently ban a user from every server · Supreme Leader+
+Permanently ban a user from every server · Developer
 
 | Command | What it does | Who |
 |---|---|---|
-| `/hardban` | Permanently ban a user from every server | Supreme Leader+ |
+| `/hardban` | Permanently ban a user from every server | Developer |
 
 ## /netexception
 
@@ -330,16 +330,16 @@ Developer: servers that let a genrebanned user back in (their server only)
 
 | Command | What it does | Who |
 |---|---|---|
-| `/netexception list` | List genreban exceptions | Supreme Leader+ |
-| `/netexception revoke` | Cancel a genreban exception | Supreme Leader+ |
+| `/netexception list` | List genreban exceptions | Developer |
+| `/netexception revoke` | Cancel a genreban exception | Developer |
 
 ## /ungenreban
 
-Lift a genreban everywhere · Supreme Leader+
+Lift a genreban everywhere · Developer
 
 | Command | What it does | Who |
 |---|---|---|
-| `/ungenreban` | Lift a genreban everywhere | Supreme Leader+ |
+| `/ungenreban` | Lift a genreban everywhere | Developer |
 
 ## /unhardban
 

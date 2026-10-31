@@ -15,7 +15,7 @@ import { redact } from './redact.js';
 import { isWhitelistedPerson, whitelistedMessage } from '../bot/trusted-bots.js';
 
 /**
- * The ban log: one record per ban in the server's #bans channel, numbered per server (BAN-0001).
+ * The ban log: one record per ban in the server's #bans channel, numbered per server (BAN-####).
  *
  * Every ban is tracked, whoever made it: Vanguard commands, genrebans and hardbans, anti-nuke,
  * other bots and bans done directly in Discord. A ban is detected from Discord's ban event, then
@@ -336,7 +336,7 @@ export interface BanButtonDeps {
     assertLocalUnban: (guild: Guild, userId: string) => Promise<void>;
     /**
      * Genrebans and hardbans: the active one for this user (shown as e.g. "HB-00005"), and a way
-     * for authorized bot-wide staff to lift it everywhere (same as `/unhardban` or `/ungenreban`).
+     * for Developers to lift it everywhere (same as `/unhardban` or `/ungenreban`).
      */
     network?: {
         active(userId: string): { kind: 'genreban' | 'hardban'; record: string } | null;
@@ -345,7 +345,7 @@ export interface BanButtonDeps {
 }
 
 const NOT_ALLOWED = 'Only Admins, the server owner and Ghost Vanguard developers can use the ban log buttons.';
-const networkLifter = (kind: NetworkKind) => kind === 'hardban' ? 'Developer' : 'Supreme Leader or Developer';
+const networkLifter = (_kind: NetworkKind) => 'Developer';
 const notNetwork = (kind: NetworkKind) => `This is a Midtown-wide **${kind}**: only a ${networkLifter(kind)} can lift it. Server Admins and owners can lift ordinary bans only.`;
 const LOCAL_FOOTER = 'Admins, the server owner and developers can do this';
 const confirmRow = (id: number, action: 'unban' | 'reban', label?: string) => new ActionRowBuilder<ButtonBuilder>().addComponents(
@@ -377,7 +377,7 @@ async function bannedNow(guild: Guild, userId: string): Promise<boolean | null> 
 /**
  * Handles every ban-log button and form. Checked on every single interaction:
  * ordinary bans: Admin rank (or Discord Administrator), the owner or a developer;
- * genrebans: Supreme Leaders and Developers; hardbans: Developers.
+ * genrebans and hardbans: Developers only.
  */
 export async function handleBanLogInteraction(i: ButtonInteraction<'cached'> | ModalSubmitInteraction<'cached'>, deps: BanButtonDeps) {
     const [, action, raw] = i.customId.split(':');

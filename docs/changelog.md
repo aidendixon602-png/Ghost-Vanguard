@@ -1,11 +1,11 @@
-## Unreleased: application commands only, staff-led threat board and clearer alerts
+## Unreleased: Developer-only network bans, application commands and clearer alerts
 
 - Removed comma-prefix command dispatch, parsing, aliases, cleanup jobs and their configuration. Slash/application commands and their permissions remain, including `/restart`.
 - Threat scores and history remain, but automatic threat-board containment, strikes and "Threat board acted" posts are disabled. The minute timer only decays/expires scores; manual staff controls remain.
 - Dangerous permission grants are reverted with a first warning and strip on a repeat within an hour. Unwhitelisted self-assignment of Administrator or Manage Server still strips and reverts immediately; explicit whitelist entries remain exempt.
 - Genreban and hardban are separate records: either can be issued while the other is active, and neither silently revokes the other. The hardban still takes enforcement priority until a Developer revokes it.
 - The shared global/DM anti-nuke card now has Ghost Vanguard branding, incident/status/response fields, role history, rollback details and an **Open server log** button. DM delivery policy is unchanged.
-- Restored standalone `/genreban`, `/ungenreban`, `/hardban` and `/unhardban` commands; removed the `/network` command group. Genreban exception controls now live under `/netexception`.
+- Restored standalone `/genreban`, `/ungenreban`, `/hardban` and `/unhardban` commands; removed the `/network` command group. Every network-ban action—including ban-log lifts and one-server genreban exceptions—is Developer-only; `/netexception` is also Developer-only.
 - `/setup logs setup` groups the active `#bans` and `#ghost-vanguard-logging` channels under **Ghost Vanguard Logs** and renames **VEIL LOGS** to **Archive - Veil Logs**. Existing old channels and their message history are preserved.
 
 # Changelog
@@ -392,7 +392,7 @@ Staff were being stripped for normal work. The everyday rules now allow more bef
 - `/help` shows who can use each command.
 
 ## 2.24.0
-- **`#bans`:** one record per ban (BAN-0001) with user, reason, evidence, moderator, approval, duration and expiry. Tracks bans from commands, other bots and Discord itself.
+- **`#bans`:** one numbered record per ban with user, reason, evidence, moderator, approval, duration and expiry. Tracks bans from commands, other bots and Discord itself.
 - Developer-only **Unban / Reban** buttons with confirmation; records update in place and keep working after restarts.
 - **`#midtown-vanguard-logging`:** compact embeds for messages, roles, channels, nicknames, timeouts, bans, kicks and bot actions. Unverifiable details are shown as "Unavailable".
 - `/setup logs setup | check | exclude | bot-changes`.
