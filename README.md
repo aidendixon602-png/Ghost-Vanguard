@@ -219,6 +219,8 @@ push to main → CI (typecheck, build, tests, secret scan) → launcher installs
 
 - Only commits that passed CI are installed.
 - A version that stops within two minutes of installing is rolled back automatically and skipped.
+- If GitHub rejects the configured token, public repositories are checked using unauthenticated read-only requests; private repositories still require a valid token.
+- Repeated identical updater errors are logged once until the check recovers, so a persistent credential issue does not flood the host panel.
 - `.env` and `data/` are never modified.
 - Developers check update status or install now with `/dev update`; restart from a server with `/restart`. The existing `/restart` safeguard requires an exact `DEVELOPER_IDS` entry.
 
