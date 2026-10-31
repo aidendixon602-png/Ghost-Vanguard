@@ -7,7 +7,7 @@ import { logChannels } from './log-setup.js';
 import { redact } from './redact.js';
 import { isWhitelistedPerson, whitelistedMessage } from '../bot/trusted-bots.js';
 /**
- * The ban log: one record per ban in the server's #bans channel, numbered per server (BAN-0001).
+ * The ban log: one record per ban in the server's #bans channel, numbered per server (BAN-####).
  *
  * Every ban is tracked, whoever made it: Vanguard commands, genrebans and hardbans, anti-nuke,
  * other bots and bans done directly in Discord. A ban is detected from Discord's ban event, then
@@ -319,7 +319,7 @@ export function renderRecord(r) {
     return { embeds: [e.toJSON()], components: [row.toJSON()] };
 }
 const NOT_ALLOWED = 'Only Admins, the server owner and Ghost Vanguard developers can use the ban log buttons.';
-const networkLifter = (kind) => kind === 'hardban' ? 'Developer' : 'Supreme Leader or Developer';
+const networkLifter = (_kind) => 'Developer';
 const notNetwork = (kind) => `This is a Midtown-wide **${kind}**: only a ${networkLifter(kind)} can lift it. Server Admins and owners can lift ordinary bans only.`;
 const LOCAL_FOOTER = 'Admins, the server owner and developers can do this';
 const confirmRow = (id, action, label) => new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`${REF}:c${action}:${id}`).setLabel(label ?? (action === 'unban' ? 'Unban' : 'Reban')).setEmoji(action === 'unban' ? '🔓' : '🔨').setStyle(action === 'unban' ? ButtonStyle.Success : ButtonStyle.Danger), new ButtonBuilder().setCustomId(`${REF}:cancel:${id}`).setLabel('Cancel').setStyle(ButtonStyle.Secondary));
@@ -347,7 +347,7 @@ async function bannedNow(guild, userId) {
 /**
  * Handles every ban-log button and form. Checked on every single interaction:
  * ordinary bans: Admin rank (or Discord Administrator), the owner or a developer;
- * genrebans: Supreme Leaders and Developers; hardbans: Developers.
+ * genrebans and hardbans: Developers only.
  */
 export async function handleBanLogInteraction(i, deps) {
     const [, action, raw] = i.customId.split(':');

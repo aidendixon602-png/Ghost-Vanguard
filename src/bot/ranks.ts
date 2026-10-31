@@ -141,8 +141,8 @@ export const COMMAND_RANK: Record<string, number> = {
     'dev/inspect': 6, authserver: 6,
     // Bot developer tools: available as /dev slash commands.
     dev: 7, 'dev/update': 7, database: 7, autoreact: 7,
-    // Network-ban issuance/revocation: Developers use /genreban, /hardban and their revoke commands; Supreme Leaders may still lift genrebans from ban-log controls.
-    genreban: 7, ungenreban: 7, hardban: 7, netexception: 7,
+    // Every network-ban action is Developer-only: issue, revoke, exceptions and ban-log lifts.
+    genreban: 8, ungenreban: 8, hardban: 8, netexception: 8,
     // Developer only (the bot owner and DEVELOPER_IDS): anything that can take the bot down, rewrite its data or
     // reach every server at once. No Discord permission, server role or lower rank unlocks these.
     restart: 8, 'dev/restart': 8, 'dev/alerts': 8, 'database/restore-settings': 8, deauthserver: 8, banserver: 8, unbanserver: 8, unhardban: 8,
@@ -152,12 +152,12 @@ export const COMMAND_RANK: Record<string, number> = {
 
 /** Developer-only commands: nothing but the Developer rank unlocks them. */
 export const needsDeveloper = (key: string | undefined) => (requiredRank(key) ?? 0) >= RANKS.developer;
-export const DEVELOPER_ONLY_MESSAGE = 'Only a **Developer** (the bot owner, or someone in `DEVELOPER_IDS`) can do this. It affects the bot in every server (restarts, updates, the database, removing servers, bot-wide ranks or lifting hardbans).';
+export const DEVELOPER_ONLY_MESSAGE = 'Only a **Developer** (the bot owner, or someone in `DEVELOPER_IDS`) can do this. It affects the bot in every server (restarts, updates, the database, removing servers, bot-wide ranks and network bans).';
 export const aboveSupremeMessage = (_key: string | undefined) => DEVELOPER_ONLY_MESSAGE;
 
-/** Who may lift a network ban everywhere: genreban = Supreme Leader or Developer, hardban = Developer only. */
-export function canLiftNetworkBan(store: Store, userId: string, kind: 'genreban' | 'hardban'): boolean {
-    return botRank(store, userId) >= (kind === 'hardban' ? RANKS.developer : RANKS.supreme);
+/** Only Developers may lift either kind of network ban everywhere. */
+export function canLiftNetworkBan(_store: Store, userId: string, _kind: 'genreban' | 'hardban'): boolean {
+    return developers.has(userId);
 }
 
 /** "moderation/timeout" → its own entry, else "moderation". */

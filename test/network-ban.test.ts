@@ -343,25 +343,28 @@ test('ban errors are sorted into permissions, hierarchy, invalid user, already d
 
 // ---------------------------------------------------------------- commands
 
-test('every genreban and hardban command is developer-only', () => {
+test('every network-ban command is Developer-only, including exceptions and revocations', () => {
     for (const def of [issueCommand('genreban'), issueCommand('hardban'), revokeCommand('genreban'), revokeCommand('hardban')])
         assert.equal(def.metadata.developerOnly, true, `${def.data.name} must be developer-only`);
     assert.deepEqual([issueCommand('genreban'), revokeCommand('genreban'), issueCommand('hardban'), revokeCommand('hardban')].map(d => d.data.name), ['genreban', 'ungenreban', 'hardban', 'unhardban']);
     const previous = config.developers;
     config.developers = new Set([DEV]);
     const store = new Store(':memory:');
+    config.supremeExtra.add('supreme-user');
     try {
         const guard = new Guard(store);
         // A server owner with every permission is still refused; a developer is allowed.
         const owner: any = { id: 'owner', guild: { id: 'g', ownerId: 'owner' }, roles: { cache: new Map() }, permissions: { has: () => true } };
         for (const def of [issueCommand('hardban'), revokeCommand('hardban'), issueCommand('genreban'), revokeCommand('genreban')]) {
             assert.equal(guard.allowed(def.metadata, 'g', 'owner', owner, def.data.name, def.data.name), false, `${def.data.name}: a server owner is refused`);
+            assert.equal(guard.allowed(def.metadata, 'g', 'supreme-user', owner, def.data.name, def.data.name), false, `${def.data.name}: a Supreme Leader is refused`);
             assert.equal(guard.allowed(def.metadata, 'g', DEV, owner, def.data.name, def.data.name), true, `${def.data.name}: a developer is allowed`);
             store.grant('g', 'owner', 'admin', 'owner');
             assert.equal(guard.allowed(def.metadata, 'g', 'owner', owner, def.data.name, def.data.name), false, `${def.data.name}: a security administrator is refused too`);
         }
     } finally {
         config.developers = previous;
+        config.supremeExtra.delete('supreme-user');
         store.close();
     }
 });
@@ -484,7 +487,7 @@ test('/unhardban and /ungenreban only revoke their own type and keep the record'
 
 // ---------------------------------------------------------------- /moderation ban and unban
 
-function moderation(sub: 'ban' | 'unban', o: { banError?: unknown; bans?: Record<string, string>; checkTargetAbove?: boolean; userId?: string } = {}) {
+function moderation(sub: 'ban' | 'unban', o: { actorId?: string; banError?: unknown; bans?: Record<string, string>; checkTargetAbove?: boolean; userId?: string } = {}) {
     const store = new Store(':memory:');
     authorize(store);
     const above = { comparePositionTo: () => 1 };
@@ -509,11 +512,12 @@ function moderation(sub: 'ban' | 'unban', o: { banError?: unknown; bans?: Record
         },
         bans: { fetch: async ({ user }: any) => { if (!bans.has(user)) throw { code: 10026 }; return { reason: bans.get(user) }; } },
     };
-    const actor: any = { id: 'mod', guild, roles: { cache: new Map(), highest: o.checkTargetAbove ? { comparePositionTo: () => -1 } : above }, permissions: { has: () => true } };
+    const actorId = o.actorId ?? 'mod';
+    const actor: any = { id: actorId, guild, roles: { cache: new Map(), highest: o.checkTargetAbove ? { comparePositionTo: () => -1 } : above }, permissions: { has: () => true } };
     const replies: any[] = [];
     const target = { id: TARGET, tag: 'raider', username: 'raider' };
     const i: any = {
-        guild, guildId: 'g', channelId: 'c', user: { id: 'mod' }, replies,
+        guild, guildId: 'g', channelId: 'c', user: { id: actorId }, replies,
         editReply: async (p: any) => void replies.push(p),
         options: {
             getSubcommand: () => sub,
@@ -528,7 +532,7 @@ function moderation(sub: 'ban' | 'unban', o: { banError?: unknown; bans?: Record
     registerDangerConfirm(registry);
     const confirm = registry.components.find(c => c.prefix === 'dangerconfirm:')!;
     const clickReplies: any[] = [];
-    const click: any = clickFor('mod', 'g', clickReplies, actor);
+    const click: any = clickFor(actorId, 'g', clickReplies, actor);
     const press = async () => {
         click.customId = String(replies.at(-1).components[0].components[0].data.custom_id);
         await confirm.execute(ctx, click);
@@ -607,29 +611,36 @@ test('/moderation unban lifts local bans only, and never a genreban or hardban',
 
     f = moderation('unban', { bans: { [TARGET]: 'mod: spam' } });
     newBan(f.store, 'genreban');
-    await assert.rejects(moderationCommand.execute(f.ctx, f.i), /Server owners and admins cannot lift it: an \*\*Overseer or higher\*\*/, 'a moderator cannot bypass an active genreban');
+    await assert.rejects(moderationCommand.execute(f.ctx, f.i), /Only a \*\*Developer\*\* can lift it or grant a one-server exception/, 'a moderator cannot bypass an active genreban');
     assert.deepEqual(f.calls.unbanned, []);
     f.store.close();
 
-    // A Head Admin (here: a security admin) cannot either: a network ban is a network decision.
+    // A Head Admin (here: a security admin) cannot either: a network ban is a Developer-only decision.
     f = moderation('unban', { bans: { [TARGET]: `${TAG.genreban} GB-00001 ${DEV}: raiding` } });
     newBan(f.store, 'genreban');
     f.store.grant('g', 'mod', 'admin', 'owner');
-    await assert.rejects(moderationCommand.execute(f.ctx, f.i), /Overseer or higher/, 'a Head Admin cannot grant an exception');
+    await assert.rejects(moderationCommand.execute(f.ctx, f.i), /Only a \*\*Developer\*\* can lift it or grant a one-server exception/, 'a Head Admin cannot grant an exception');
     assert.deepEqual(f.calls.unbanned, []);
     f.store.close();
 
-    // An Overseer (bot-wide rank) may let them back into this server only, after confirming.
+    // An Overseer cannot grant a one-server exception; every genreban control is Developer-only.
     f = moderation('unban', { bans: { [TARGET]: `${TAG.genreban} GB-00001 ${DEV}: raiding` } });
     const gb = newBan(f.store, 'genreban');
     f.store.run("INSERT INTO bot_staff(user_id,level,by_id,at) VALUES('mod','overseer','owner',0)");
+    await assert.rejects(moderationCommand.execute(f.ctx, f.i), /Only a \*\*Developer\*\* can lift it or grant a one-server exception/);
+    assert.deepEqual(f.calls.unbanned, []);
+    assert.equal(activeException(f.store, 'g', gb.id), undefined);
+    f.store.close();
+
+    // A Developer can grant that one-server exception after confirmation.
+    f = moderation('unban', { actorId: DEV, bans: { [TARGET]: `${TAG.genreban} GB-00001 ${DEV}: raiding` } });
+    const developerGenreban = newBan(f.store, 'genreban');
     await moderationCommand.execute(f.ctx, f.i);
     assert.match(JSON.stringify(f.replies.at(-1)), /Let a genrebanned user back into this server/);
     await f.press();
-    assert.deepEqual(f.calls.unbanned, [TARGET], 'unbanned here');
-    assert.ok(activeException(f.store, 'g', gb.id), 'the exception is recorded for this server');
-    assert.equal(activeException(f.store, 'other', gb.id), undefined, 'and only this server');
-    assert.ok(activeBan(f.store, 'genreban', TARGET), 'the genreban stays active everywhere else');
+    assert.deepEqual(f.calls.unbanned, [TARGET], 'unbanned in this server only');
+    assert.ok(activeException(f.store, 'g', developerGenreban.id), 'exception is recorded for this server');
+    assert.ok(activeBan(f.store, 'genreban', TARGET), 'the genreban itself stays active');
     f.store.close();
 
     // Hardbans never have exceptions, even for the owner's staff.

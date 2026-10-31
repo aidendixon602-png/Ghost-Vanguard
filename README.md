@@ -54,8 +54,8 @@ Anti-nuke reacts immediately to enforce its rules, while the threat board rememb
 | Feature | Description |
 |---|---|
 | **Moderation suite** | Ban, tempban, softban, massban, kick, timeout, warnings with automatic escalation, cases, notes and appeals. Reasons are optional. |
-| **Ban records** | One record per ban (`BAN-0001`) in `#bans` with reason, evidence, moderator, duration and expiry, including bans made by hand or by other bots. |
-| **Network bans** | Developer-issued genrebans and hardbans across every server, enforced on join. Server staff cannot lift them: genrebans are lifted by a Supreme Leader or Developer (or excepted for one server by an Overseer+), hardbans only by a Developer. |
+| **Ban records** | One record per ban in `#bans` with reason, evidence, moderator, duration and expiry, including bans made by hand or by other bots. |
+| **Network bans** | Developers alone can issue or lift genrebans and hardbans across every server, manage one-server genreban exceptions and use the related ban-log controls. Bans are enforced on join; genrebans and hardbans remain separate. |
 | **Role management** | `/role` with full hierarchy checks, per-role giving rules, and one-click role restore for members who leave and rejoin. |
 
 ### Support desk
@@ -82,8 +82,8 @@ Every command has a minimum rank, and each rank includes everything below it. Bo
 |---|---|---|
 | **Developer** | All servers | The bot owner (`BOT_OWNER_ID`) and `DEVELOPER_IDS`. Developer operations include diagnostics, updates, database and server controls, global ranks and network bans |
 | **Server Owner** | Own server | Whoever owns the Discord server. Outranks Supreme Leaders there: Head Admin, plus security admins, undoing setting changes and undoing strips. Never gets bot-wide tools |
-| **Supreme Leader** | All servers | Everything below; can lift genrebans from ban-log controls. Does not unlock Developer-only commands |
-| **Overseer** | All servers | Bot Manager, plus one-server genreban exceptions through `/mod unban` |
+| **Supreme Leader** | All servers | Everything below. Does not unlock Developer-only commands or network-ban controls |
+| **Overseer** | All servers | Bot Manager. Does not unlock Developer-only network-ban exceptions |
 | **Bot Manager** | All servers | Head Admin-level access in every server; this rank does not unlock Developer-only commands |
 | **Head Admin** | One server | Anti-nuke, whitelist, control panel, backups, staff ranks |
 | **Admin** | One server | Lifting ordinary bans, accepting appeals, raid tools, automod, scam protection, logging |
@@ -97,7 +97,7 @@ Every command has a minimum rank, and each rank includes everything below it. Bo
 | Ban | Lifted by |
 |---|---|
 | Ordinary server ban | Admin rank, Discord Administrator or the server owner (`/mod unban`, ban-log buttons, accepting an appeal) |
-| Genreban | A Supreme Leader or Developer can lift it everywhere from ban-log controls or `/ungenreban`; an Overseer or higher can let the person back into one server (`/mod unban`) |
+| Genreban | Only a Developer can issue, lift or create one-server exceptions for a genreban |
 | Hardban | Developer only, including `/unhardban` |
 
 Anti-nuke watches **everyone**. Developers, server owners and explicitly whitelisted people are never punished; their incidents are recorded quietly (set `ALERT_EXEMPT=true` to be alerted). Other dangerous permission grants warn and revert first, then strip on a repeat within an hour. Unwhitelisted self-assignment of **Administrator** or **Manage Server** always strips and reverts immediately. The complete list of commands for each rank is in **[docs/ranks.md](docs/ranks.md)**.
@@ -171,7 +171,7 @@ Copy [`.env.example`](.env.example) to `.env` and set at least:
 | `DASHBOARD_ENABLED` | No | Set to `false` to disable the built-in dashboard while keeping `/healthz` available (default: enabled) |
 | `DASHBOARD_TOKEN` | Recommended | Require a token for the dashboard and its API when enabled. Without it the dashboard is open to anyone who can reach the port, so keep it on localhost |
 | `BOT_OWNER_ID` | Recommended | The bot owner: Developer rank for ordinary permission checks, and the default for `TRUSTED_DM_IDS`. There is no built-in fallback, so leave it unset and no account is owner. `/restart` separately requires an exact `DEVELOPER_IDS` entry |
-| `SUPREME_LEADER_IDS` | No | Supreme Leaders: bot-wide rank below Developer; may lift genrebans from ban-log controls, but do not get Developer-only commands. Nobody is built in; every start prints who has bot-wide access |
+| `SUPREME_LEADER_IDS` | No | Supreme Leaders: bot-wide rank below Developer; do not get Developer-only commands or network-ban controls. Nobody is built in; every start prints who has bot-wide access |
 | `ALERT_EXEMPT` | No | `true`: also alert when the owner, Developers or whitelisted people hit a limit (default: recorded quietly) |
 | `ANTINUKE_LOCK` | Recommended | `true`: only Developers can turn anti-nuke off or weaken it; servers switched off come back on at start |
 | `PROTECTED_USERS` | No | People staff can never ban, kick, time out or de-role; manual attempts are undone and alerted |

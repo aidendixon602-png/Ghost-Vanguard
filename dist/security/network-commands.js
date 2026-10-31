@@ -9,12 +9,12 @@ import { classify, finish, outcomeEmbed, showWorking } from '../ui/progress.js';
 import { activeBan, assertTargetable, banEverywhere, createBan, notifyBannedUser, DELETE_MESSAGE_CHOICES, deleteWindow, describeUser, idFrom, KIND_NAME, networkDeps, parseUserId, recordId, resolveTarget, revokeBan, targetServers, unbanEverywhere, } from './network-ban.js';
 /**
  * `/genreban`, `/hardban` and their revoke commands share one implementation; only the
- * wording and what enforcement does afterwards differ. Their configured slash ranks still apply.
+ * wording and what enforcement does afterwards differ. All are Developer-only.
  */
 const POLICY = { category: 'developer', developerOnly: true, requiresAuthorization: false, cooldown: 3000 };
 const OTHER = { genreban: 'hardban', hardban: 'genreban' };
 const AFTER = {
-    genreban: 'While the genreban is active, the bot bans them again if they join any authorized server, including servers authorized later. A Supreme Leader can lift it from the ban-log controls; a Developer can also use `/ungenreban`.',
+    genreban: 'While the genreban is active, the bot bans them again if they join any authorized server, including servers authorized later. Only a Developer can lift it or grant a one-server exception.',
     hardban: 'While the hardban is active, the bot bans them again whenever they are unbanned or join, and re-checks every server every 10 minutes and after restarts. Only a developer can lift it, with `/unhardban`.',
 };
 function header(ban, user, fields) {

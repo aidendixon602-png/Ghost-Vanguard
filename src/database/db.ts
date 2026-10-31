@@ -137,7 +137,7 @@ export class Store {
         id INTEGER PRIMARY KEY AUTOINCREMENT, ban_id INTEGER NOT NULL REFERENCES network_bans(id),
         guild_id TEXT NOT NULL, guild_name TEXT, action TEXT NOT NULL, outcome TEXT NOT NULL, detail TEXT, at INTEGER NOT NULL);
       CREATE INDEX IF NOT EXISTS network_ban_results_ban ON network_ban_results(ban_id, id);
-      -- A server's owner/Head Admin letting one genrebanned person back into that server only. Never for hardbans.
+      -- A Developer letting one genrebanned person back into that server only. Never for hardbans.
       CREATE TABLE IF NOT EXISTS network_exceptions (
         id INTEGER PRIMARY KEY AUTOINCREMENT, ban_id INTEGER NOT NULL REFERENCES network_bans(id), guild_id TEXT NOT NULL, guild_name TEXT,
         user_id TEXT NOT NULL, by_id TEXT NOT NULL, reason TEXT NOT NULL, at INTEGER NOT NULL, revoked_by TEXT, revoked_at INTEGER);

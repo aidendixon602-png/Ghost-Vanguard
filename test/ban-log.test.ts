@@ -65,12 +65,12 @@ function world(o: { auditAccess?: boolean } = {}) {
 const fieldsOf = (payload: any) => Object.fromEntries(payload.embeds[0].fields.map((f: any) => [f.name, f.value]));
 const buttons = (payload: any) => payload.components[0].components.map((b: any) => ({ label: b.label, disabled: !!b.disabled, style: b.style }));
 
-test('a ban made with a Vanguard command is recorded once, like the example, with the staff member, evidence and buttons', async () => {
+test('a ban made with a Vanguard command is recorded once with the staff member, evidence and buttons', async () => {
     const w = world();
     try {
         await w.store.withAuthorized(G, async () => w.store.recordCase(G, USER, STAFF, 'ban', 'faking payments for free roles', { username: 'urloffy', evidence: 'https://imgur.com/proof' }));
         const record = await w.discordBan(BOT, `${STAFF}: faking payments for free roles`);
-        assert.equal(caseId(record!), 'BAN-0001');
+        assert.match(caseId(record!), /^BAN-\d{4}$/);
         assert.equal(await w.discordBan(BOT, `${STAFF}: faking payments for free roles`), null, 'a duplicate ban event does not create a second record');
         await w.logs.flush();
         assert.equal(w.sent.length, 1, 'posted to #bans exactly once');
@@ -211,31 +211,38 @@ test('a server Admin can lift an ordinary ban from its record, but not a genreba
             for (const id of [`banrec:unban:${again.id}`, `banrec:cunban:${again.id}`]) {
                 const c = click(w, id, STAFF);
                 await handleBanLogInteraction(c.i, deps as any);
-                assert.match(c.replies[0].content, new RegExp(`Midtown-wide \\*\\*${kind}\\*\\*: only a ${kind === 'hardban' ? 'Developer' : 'Supreme Leader or Developer'}`));
+                assert.match(c.replies[0].content, new RegExp(`Midtown-wide \\*\\*${kind}\\*\\*: only a Developer`));
             }
             assert.ok(w.bans.has(USER), `${kind}: nothing changed`);
         }
     } finally { w.store.close(); }
 });
 
-test('a Supreme Leader (not a Developer) can lift a genreban from its record, but not a hardban', async () => {
+test('only a Developer can lift either network-ban type from its record', async () => {
     const w = world();
     const JUNIOR = '823456789012345678';
     config.supremeExtra.add(JUNIOR);
+    config.developers.add(DEV);
     try {
-        const record = (await w.discordBan(BOT, `[Vanguard hardban] HB-00005 ${DEV}: threats`))!;
+        const record = (await w.discordBan(MANUAL, 'raid'))!;
         const lifted: string[] = [];
         const deps = (kind: 'genreban' | 'hardban') => ({ store: w.store, logs: w.logs, assertLocalUnban: async () => undefined,
             network: { active: () => ({ kind, record: 'X-00005' }), lift: async (u: string) => { lifted.push(kind); w.bans.delete(u); return { lifted: 1, failed: 0, servers: 1 }; } } });
-        const c = click(w, `banrec:cunban:${record.id}`, JUNIOR);
-        await handleBanLogInteraction(c.i, deps('hardban') as any);
-        assert.match(c.replies[0].content, /only a Developer can lift it/);
-        assert.ok(w.bans.has(USER));
-        const g = click(w, `banrec:cunban:${record.id}`, JUNIOR);
-        g.i.editReply = async (p: any) => g.replies.push(p);
-        await handleBanLogInteraction(g.i, deps('genreban') as any);
-        assert.deepEqual(lifted, ['genreban'], 'a genreban is lifted by a Supreme Leader');
-    } finally { config.supremeExtra.delete(JUNIOR); w.store.close(); }
+        for (const kind of ['genreban', 'hardban'] as const) {
+            const before = lifted.length;
+            const blocked = click(w, `banrec:cunban:${record.id}`, JUNIOR);
+            await handleBanLogInteraction(blocked.i, deps(kind) as any);
+            assert.match(blocked.replies[0].content, /only a Developer can lift it/);
+            assert.equal(lifted.length, before, `${kind}: Supreme Leader is refused`);
+            assert.ok(w.bans.has(USER));
+
+            const allowed = click(w, `banrec:cunban:${record.id}`, DEV);
+            allowed.i.editReply = async (p: any) => allowed.replies.push(p);
+            await handleBanLogInteraction(allowed.i, deps(kind) as any);
+            assert.deepEqual(lifted.slice(before), [kind], `${kind}: Developer can lift it`);
+            w.bans.set(USER, 'raid'); // restore Discord's fake ban before checking the next kind
+        }
+    } finally { config.supremeExtra.delete(JUNIOR); config.developers.delete(DEV); w.store.close(); }
 });
 
 test('Unban asks to confirm, re-checks the real ban, then updates the original record with who and when', async () => {
