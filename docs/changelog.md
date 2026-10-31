@@ -6,6 +6,7 @@
 - Genreban and hardban are separate records: either can be issued while the other is active, and neither silently revokes the other. The hardban still takes enforcement priority until a Developer revokes it.
 - The shared global/DM anti-nuke card now has Ghost Vanguard branding, incident/status/response fields, role history, rollback details and an **Open server log** button. DM delivery policy is unchanged.
 - Restored standalone `/genreban`, `/ungenreban`, `/hardban` and `/unhardban` commands; removed the `/network` command group. Every network-ban action—including ban-log lifts and one-server genreban exceptions—is Developer-only; `/netexception` is also Developer-only.
+- Ban-log **Unban / Reban buttons** are restricted to the server owner and Developers. Server Admins may still use `/mod unban` for ordinary bans; lifting a network ban remains Developer-only.
 - `/setup logs setup` groups the active `#bans` and `#ghost-vanguard-logging` channels under **Ghost Vanguard Logs** and renames **VEIL LOGS** to **Archive - Veil Logs**. Existing old channels and their message history are preserved.
 
 # Changelog

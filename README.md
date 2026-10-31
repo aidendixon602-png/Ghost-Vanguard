@@ -40,7 +40,7 @@ The **threat board** combines confirmed incidents into Watch, High, and Critical
 ### Keeps moderation and records together
 
 - Ban, tempban, softban, massban, kick, timeout, warnings, cases, notes, and appeals.
-- A per-server ban record and audit history, including bans made directly in Discord or by another bot when Discord exposes the event.
+- A per-server ban record and audit history, including bans made directly in Discord or by another bot when Discord exposes the event. Admins can use `/mod unban` for ordinary bans; the record's Unban/Reban buttons are limited to the server owner and Developers.
 - **Genrebans and hardbans are distinct network-wide ban types.** Each can be issued while the other is active; neither silently revokes the other.
 - **Network-ban actions are Developer-only:** issuing, revoking, lifting from the ban log, and managing one-server genreban exceptions.
 

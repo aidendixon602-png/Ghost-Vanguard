@@ -1,7 +1,7 @@
 import { ActionRowBuilder, AuditLogEvent, ButtonBuilder, MessageFlags, ButtonStyle, Colors, EmbedBuilder, ModalBuilder, PermissionFlagsBits, TextInputBuilder, TextInputStyle, } from 'discord.js';
 import { clip, KeyedQueue } from '../core.js';
 import { developers } from '../bot/developers.js';
-import { canLiftNetworkBan, RANKS, rankOf } from '../bot/ranks.js';
+import { canLiftNetworkBan } from '../bot/ranks.js';
 import { activeBan, recordId, TAG } from '../security/network-ban.js';
 import { logChannels } from './log-setup.js';
 import { redact } from './redact.js';
@@ -16,8 +16,8 @@ import { isWhitelistedPerson, whitelistedMessage } from '../bot/trusted-bots.js'
  *
  * Unbans (by command, by hand, or a temporary ban expiring) update the same record. The record
  * keeps the original ban details and adds the current status, who changed it and when.
- * Developers can Unban or Reban from the record; both ask to confirm, re-check the developer
- * and the user's real ban status, and keep working after restarts (the record is in the database).
+ * The server owner or a Developer can Unban or Reban from the record; each action re-checks
+ * authorization and the user's real ban status. Network-wide lifts remain Developer-only.
  */
 export const REF = 'banrec';
 export const caseId = (r) => `BAN-${String(r.number).padStart(4, '0')}`;
@@ -318,10 +318,10 @@ export function renderRecord(r) {
     const row = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`${REF}:unban:${r.id}`).setLabel('Unban').setStyle(ButtonStyle.Success).setDisabled(!banned), new ButtonBuilder().setCustomId(`${REF}:reban:${r.id}`).setLabel('Reban').setStyle(ButtonStyle.Danger).setDisabled(banned));
     return { embeds: [e.toJSON()], components: [row.toJSON()] };
 }
-const NOT_ALLOWED = 'Only Admins, the server owner and Ghost Vanguard developers can use the ban log buttons.';
+const NOT_ALLOWED = 'Only the server owner and Ghost Vanguard developers can use the ban log buttons.';
 const networkLifter = (_kind) => 'Developer';
 const notNetwork = (kind) => `This is a Midtown-wide **${kind}**: only a ${networkLifter(kind)} can lift it. Server Admins and owners can lift ordinary bans only.`;
-const LOCAL_FOOTER = 'Admins, the server owner and developers can do this';
+const LOCAL_FOOTER = 'The server owner and developers can do this';
 const confirmRow = (id, action, label) => new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`${REF}:c${action}:${id}`).setLabel(label ?? (action === 'unban' ? 'Unban' : 'Reban')).setEmoji(action === 'unban' ? '🔓' : '🔨').setStyle(action === 'unban' ? ButtonStyle.Success : ButtonStyle.Danger), new ButtonBuilder().setCustomId(`${REF}:cancel:${id}`).setLabel('Cancel').setStyle(ButtonStyle.Secondary));
 const KIND_TITLE = { genreban: 'Genreban', hardban: 'Hardban', tempban: 'Temporary ban', softban: 'Softban', automatic: 'Automatic ban' };
 /** The private prompts and results for the ban log buttons: same look as the record itself. */
@@ -352,7 +352,8 @@ async function bannedNow(guild, userId) {
 export async function handleBanLogInteraction(i, deps) {
     const [, action, raw] = i.customId.split(':');
     const reply = (content) => i.replied || i.deferred ? i.followUp({ content, flags: MessageFlags.Ephemeral }) : i.reply({ content, flags: MessageFlags.Ephemeral });
-    if (!developers.has(i.user.id) && rankOf(deps.store, i.guildId, i.user.id, i.member, 'moderation/unban') < RANKS.admin)
+    // These controls are deliberately narrower than /mod unban: only the guild owner or a Developer may use them.
+    if (!developers.has(i.user.id) && i.guild.ownerId !== i.user.id)
         return reply(NOT_ALLOWED);
     if (action === 'cancel')
         return i.isButton() ? i.update({ content: 'Cancelled. Nothing was changed.', embeds: [], components: [] }) : undefined;
