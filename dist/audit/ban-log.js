@@ -1,6 +1,7 @@
 import { ActionRowBuilder, AuditLogEvent, ButtonBuilder, MessageFlags, ButtonStyle, Colors, EmbedBuilder, ModalBuilder, PermissionFlagsBits, TextInputBuilder, TextInputStyle, } from 'discord.js';
-import { clip, KeyedQueue } from '../core.js';
+import { clip, Cooldowns, KeyedQueue } from '../core.js';
 import { developers } from '../bot/developers.js';
+import { logEvent } from '../errors.js';
 import { canLiftNetworkBan } from '../bot/ranks.js';
 import { activeBan, recordId, TAG } from '../security/network-ban.js';
 import { logChannels } from './log-setup.js';
@@ -18,6 +19,7 @@ import { isWhitelistedPerson, whitelistedMessage } from '../bot/trusted-bots.js'
  * keeps the original ban details and adds the current status, who changed it and when.
  * The server owner or a Developer can Unban or Reban from the record; each action re-checks
  * authorization and the user's real ban status. Network-wide lifts remain Developer-only.
+ * Repeated button actions are cooled down for 500 ms; successful actions post a public attribution note.
  */
 export const REF = 'banrec';
 export const caseId = (r) => `BAN-${String(r.number).padStart(4, '0')}`;
@@ -322,6 +324,29 @@ const NOT_ALLOWED = 'Only the server owner and Ghost Vanguard developers can use
 const networkLifter = (_kind) => 'Developer';
 const notNetwork = (kind) => `This is a Midtown-wide **${kind}**: only a ${networkLifter(kind)} can lift it. Server Admins and owners can lift ordinary bans only.`;
 const LOCAL_FOOTER = 'The server owner and developers can do this';
+const BUTTON_COOLDOWN_MS = 500;
+const buttonCooldowns = new WeakMap();
+const announcementQueue = new KeyedQueue();
+function cooldownsFor(store) {
+    let cooldowns = buttonCooldowns.get(store);
+    if (!cooldowns)
+        buttonCooldowns.set(store, cooldowns = new Cooldowns());
+    return cooldowns;
+}
+async function announceButtonAction(i, content) {
+    const channel = i.channel;
+    if (!channel?.isSendable())
+        return;
+    try {
+        await announcementQueue.run(i.guildId, async () => {
+            await new Promise(resolve => setTimeout(resolve, BUTTON_COOLDOWN_MS));
+            await channel.send({ content, allowedMentions: { parse: [] } });
+        });
+    }
+    catch (error) {
+        logEvent('ban_log_button_announcement_failed', { guildId: i.guildId, userId: i.user.id, error: error instanceof Error ? error.message : String(error) });
+    }
+}
 const confirmRow = (id, action, label) => new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`${REF}:c${action}:${id}`).setLabel(label ?? (action === 'unban' ? 'Unban' : 'Reban')).setEmoji(action === 'unban' ? '🔓' : '🔨').setStyle(action === 'unban' ? ButtonStyle.Success : ButtonStyle.Danger), new ButtonBuilder().setCustomId(`${REF}:cancel:${id}`).setLabel('Cancel').setStyle(ButtonStyle.Secondary));
 const KIND_TITLE = { genreban: 'Genreban', hardban: 'Hardban', tempban: 'Temporary ban', softban: 'Softban', automatic: 'Automatic ban' };
 /** The private prompts and results for the ban log buttons: same look as the record itself. */
@@ -345,9 +370,8 @@ async function bannedNow(guild, userId) {
     }
 }
 /**
- * Handles every ban-log button and form. Checked on every single interaction:
- * ordinary bans: Admin rank (or Discord Administrator), the owner or a developer;
- * genrebans and hardbans: Developers only.
+ * Handles every ban-log button and form. On every interaction, only the server owner or a Developer
+ * is admitted; lifting either network-ban type still requires a Developer.
  */
 export async function handleBanLogInteraction(i, deps) {
     const [, action, raw] = i.customId.split(':');
@@ -357,6 +381,8 @@ export async function handleBanLogInteraction(i, deps) {
         return reply(NOT_ALLOWED);
     if (action === 'cancel')
         return i.isButton() ? i.update({ content: 'Cancelled. Nothing was changed.', embeds: [], components: [] }) : undefined;
+    if (!cooldownsFor(deps.store).take(`${i.guildId}:${i.user.id}:${raw}:${action}`, BUTTON_COOLDOWN_MS))
+        return reply('Please wait half a second before using that ban-log button again.');
     const id = Number(raw);
     const { store, logs } = deps;
     return store.withAuthorized(i.guildId, async () => {
@@ -420,13 +446,19 @@ export async function handleBanLogInteraction(i, deps) {
                 if (!own)
                     publish(store, logs, setStatus(store, record, 'unbanned', i.user.id, 'via-bot', `${net.kind} ${net.record} lifted by a ${networkLifter(net.kind)}`), false);
                 const result = await deps.network.lift(record.user_id, { id: i.user.id, tag: i.user.tag }, reason);
-                if (own)
-                    return i.editReply({ embeds: [card(getRecord(store, i.guildId, record.id) ?? record, { title: `✅ ${net.record} lifted everywhere`, color: Colors.Green, ban: `${KIND_TITLE[net.kind]} · ${net.record} (closed)`,
+                const auditMessage = `🌐 <@${i.user.id}> lifted the **${net.kind}** ${net.record} for <@${record.user_id}> from the ban log (${result.lifted} of ${result.servers} server bans lifted).`;
+                if (own) {
+                    await i.editReply({ embeds: [card(getRecord(store, i.guildId, record.id) ?? record, { title: `✅ ${net.record} lifted everywhere`, color: Colors.Green, ban: `${KIND_TITLE[net.kind]} · ${net.record} (closed)`,
                                 fields: [{ name: 'Servers', value: `Unbanned in **${result.lifted} of ${result.servers}**` }, { name: 'This server', value: "Still banned: this server's own ban was there first and stays. Press **Unban** again to lift it too." }],
                                 footer: 'The ban record has been updated' })] });
-                return i.editReply({ embeds: [card(record, { title: `${result.failed ? '⚠️' : '✅'} ${record.username ?? record.user_id} unbanned`, color: result.failed ? Colors.Orange : Colors.Green, ban: `${KIND_TITLE[net.kind]} · ${net.record} (closed)`,
-                            fields: [{ name: 'Servers', value: `Unbanned in **${result.lifted} of ${result.servers}**${result.failed ? `\n${result.failed} could not be reached: check Vanguard's Ban Members permission there` : ''}` }],
-                            footer: 'The ban record has been updated' })] });
+                }
+                else {
+                    await i.editReply({ embeds: [card(record, { title: `${result.failed ? '⚠️' : '✅'} ${record.username ?? record.user_id} unbanned`, color: result.failed ? Colors.Orange : Colors.Green, ban: `${KIND_TITLE[net.kind]} · ${net.record} (closed)`,
+                                fields: [{ name: 'Servers', value: `Unbanned in **${result.lifted} of ${result.servers}**${result.failed ? `\n${result.failed} could not be reached: check Vanguard's Ban Members permission there` : ''}` }],
+                                footer: 'The ban record has been updated' })] });
+                }
+                await announceButtonAction(i, auditMessage);
+                return;
             }
             try {
                 await deps.assertLocalUnban(i.guild, record.user_id);
@@ -438,7 +470,9 @@ export async function handleBanLogInteraction(i, deps) {
             await i.guild.members.unban(record.user_id, clip(`${i.user.id}: ${reason}`, 500));
             const updated = setStatus(store, record, 'unbanned', i.user.id, 'via-bot', reason);
             publish(store, logs, updated, false);
-            return i.update({ embeds: [card(updated, { title: `✅ ${record.username ?? record.user_id} unbanned`, color: Colors.Green, footer: 'The ban record has been updated' })], components: [] });
+            await i.update({ embeds: [card(updated, { title: `✅ ${record.username ?? record.user_id} unbanned`, color: Colors.Green, footer: 'The ban record has been updated' })], components: [] });
+            await announceButtonAction(i, `🔓 <@${i.user.id}> used the ban-log **Unban** button for <@${record.user_id}> · ${caseId(record)}.`);
+            return;
         }
         if (action === 'creban' && i.isButton()) {
             const reason = i.message.embeds[0]?.fields.find(f => f.name === 'Reban reason')?.value;
@@ -459,7 +493,9 @@ export async function handleBanLogInteraction(i, deps) {
                 return i.update({ embeds: [card(record, { title: '❌ Reban failed', color: Colors.Red, fields: [{ name: 'Why', value: clip(`${error instanceof Error ? error.message : 'unknown error'}. Check Vanguard's role is above theirs and it has Ban Members.`, 1024) }] })], components: [] });
             }
             publish(store, logs, updated, false);
-            return i.update({ embeds: [card(updated, { title: `🔨 ${record.username ?? record.user_id} rebanned`, color: Colors.Red, fields: [{ name: 'Reban reason', value: clip(reason, 1024) }], footer: 'The ban record has been updated' })], components: [] });
+            await i.update({ embeds: [card(updated, { title: `🔨 ${record.username ?? record.user_id} rebanned`, color: Colors.Red, fields: [{ name: 'Reban reason', value: clip(reason, 1024) }], footer: 'The ban record has been updated' })], components: [] });
+            await announceButtonAction(i, `🔨 <@${i.user.id}> used the ban-log **Reban** button for <@${record.user_id}> · ${caseId(record)}.`);
+            return;
         }
         return reply('That button is no longer valid.');
     });

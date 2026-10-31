@@ -156,7 +156,7 @@ Server rank: lifting ordinary bans and accepting appeals, raid tools, automod, s
 - `/automod spam`: Set limits for mass pings, repeats and message bursts
 - `/automod status`: Show what automod is doing here
 - `/mod massban`: Ban up to 200 user IDs at once _(must also be on the anti-nuke whitelist)_
-- `/mod unban`: Lift a ban (not genrebans or hardbans) _(Admins may lift ordinary bans here; ban-log Unban/Reban buttons are limited to the server owner or a Developer; network-ban lifts and exceptions are Developer only)_
+- `/mod unban`: Lift a ban (not genrebans or hardbans) _(Admins may lift ordinary bans here; ban-log buttons are server-owner/Developer only (500 ms cooldown; successful actions post who clicked in #bans); network-ban lifts and exceptions are Developer only)_
 - `/raid emergency panel`: Post Emergency and All clear buttons here
 - `/raid emergency start`: Lock down, pause invites, turn on raid mode, ping Admins
 - `/raid emergency status`: Show whether emergency mode is on

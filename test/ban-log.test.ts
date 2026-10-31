@@ -23,7 +23,7 @@ function world(o: { auditAccess?: boolean } = {}) {
     authorize(store, G);
     const bans = new Map<string, string>();
     const audit: any[] = [];
-    const sent: any[] = [], edits: any[] = [];
+    const sent: any[] = [], edits: any[] = [], announcements: any[] = [];
     const users = new Collection<string, any>([[BOT, { id: BOT, bot: true }], [MANUAL, { id: MANUAL, bot: false }]]);
     const channel = {
         id: 'bans-channel', isSendable: () => true, isTextBased: () => true,
@@ -59,7 +59,7 @@ function world(o: { auditAccess?: boolean } = {}) {
         if (executorId) audit.unshift({ action: AuditLogEvent.MemberBanRemove, targetId: USER, executorId, reason, createdTimestamp: Date.now() });
         return store.withAuthorized(G, () => onBanRemove(store, logs, guild, user));
     };
-    return { store, logs, guild, bans, audit, sent, edits, user, discordBan, discordUnban };
+    return { store, logs, guild, bans, audit, sent, edits, announcements, user, discordBan, discordUnban };
 }
 
 const fieldsOf = (payload: any) => Object.fromEntries(payload.embeds[0].fields.map((f: any) => [f.name, f.value]));
@@ -165,7 +165,7 @@ test('an unban of a ban that predates the ban log is still recorded, with the un
 function click(w: ReturnType<typeof world>, customId: string, userId: string, extra: any = {}) {
     const replies: any[] = [];
     const i: any = {
-        customId, user: { id: userId }, guildId: G, guild: w.guild, replied: false, deferred: false,
+        customId, user: { id: userId }, guildId: G, guild: w.guild, channel: { isSendable: () => true, send: async (payload: any) => { w.announcements.push(payload); return { id: `announcement-${w.announcements.length}` }; } }, replied: false, deferred: false,
         isButton: () => !extra.modal, isModalSubmit: () => !!extra.modal,
         reply: async (p: any) => { replies.push({ kind: 'reply', ...p }); i.replied = true; },
         followUp: async (p: any) => replies.push({ kind: 'followUp', ...p }),
@@ -205,10 +205,16 @@ test('the server owner can use local ban-log buttons, but cannot lift a network 
         const ask = click(w, `banrec:unban:${record.id}`, 'owner');
         await run(w, ask);
         assert.equal(ask.replies[0].embeds[0].data.title, '🔓 Unban urloffy?');
+        const rapidRepeat = click(w, `banrec:unban:${record.id}`, 'owner');
+        await run(w, rapidRepeat);
+        assert.match(rapidRepeat.replies[0].content, /wait half a second/);
         const ok = click(w, `banrec:cunban:${record.id}`, 'owner');
         await run(w, ok);
         assert.equal(ok.replies[0].embeds[0].data.title, '✅ urloffy unbanned');
         assert.ok(!w.bans.has(USER));
+        assert.equal(w.announcements.length, 1, 'successful actions send one public audit note');
+        assert.match(w.announcements[0].content, new RegExp(`<@owner> used the ban-log \\*\\*Unban\\*\\* button for <@${USER}>`));
+        assert.deepEqual(w.announcements[0].allowedMentions, { parse: [] }, 'the audit note does not ping users');
 
         const again = (await w.discordBan(MANUAL, 'raid again'))!;
         for (const kind of ['genreban', 'hardban'] as const) {
@@ -220,6 +226,7 @@ test('the server owner can use local ban-log buttons, but cannot lift a network 
                 assert.match(c.replies[0].content, new RegExp(`Midtown-wide \\*\\*${kind}\\*\\*: only a Developer`));
             }
             assert.ok(w.bans.has(USER), `${kind}: the server owner cannot lift a network ban`);
+            if (kind === 'genreban') await new Promise(resolve => setTimeout(resolve, 510)); // let the action cooldown expire before the hardban check
         }
 
         await w.discordUnban(MANUAL, 'reban button access check');
@@ -251,6 +258,7 @@ test('only a Developer can lift either network-ban type from its record', async 
             allowed.i.editReply = async (p: any) => allowed.replies.push(p);
             await handleBanLogInteraction(allowed.i, deps(kind) as any);
             assert.deepEqual(lifted.slice(before), [kind], `${kind}: Developer can lift it`);
+            assert.match(w.announcements.at(-1).content, new RegExp(`<@${DEV}> lifted the \\*\\*${kind}\\*\\*`), `${kind}: public note shows who pressed`);
             w.bans.set(USER, 'raid'); // restore Discord's fake ban before checking the next kind
         }
     } finally { config.supremeExtra.delete(JUNIOR); config.developers.delete(DEV); w.store.close(); }
@@ -306,6 +314,7 @@ test('Reban needs a reason, confirms, records the developer, and never starts a 
         assert.equal(await w.store.withAuthorized(G, () => onBanAdd(w.store, w.logs, w.guild, w.user)), null);
         const updated = getRecord(w.store, G, record.id)!;
         assert.deepEqual([updated.status, updated.status_by, updated.status_reason], ['banned', DEV, 'came back and raided again']);
+        assert.match(w.announcements.at(-1).content, new RegExp(`<@${DEV}> used the ban-log \\*\\*Reban\\*\\* button for <@${USER}>`));
         assert.equal(w.store.get('SELECT COUNT(*) AS n FROM ban_records')!.n, 1);
         assert.equal(JSON.parse(updated.history).map((h: any) => h.action).join(','), 'banned,unbanned,rebanned');
     } finally { config.developers.delete(DEV); w.store.close(); }
