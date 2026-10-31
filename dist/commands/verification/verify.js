@@ -97,7 +97,7 @@ export default defineCommand(new SlashCommandBuilder()
     if (s.verifiedRoleId) {
         const role = await i.guild.roles.fetch(s.verifiedRoleId).catch(() => null);
         if (!role)
-            throw new (await import('../../errors.js')).AppError('INTEGRATION_ERROR', 'Verified role is missing. Ask an admin to set `/setup staff role` / security setup.');
+            throw new (await import('../../errors.js')).AppError('INTEGRATION_ERROR', 'Verified role is missing. Ask a security administrator to set `/setup security verified_role`.');
     }
     const pending = await createPending(ctx.store, guildId, i.user.id, username);
     const row = new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(`verify:confirm:${i.user.id}`).setLabel('I’ve added it — Verify now').setStyle(ButtonStyle.Success).setEmoji('✅'), new ButtonBuilder().setCustomId(`verify:cancel:${i.user.id}`).setLabel('Cancel').setStyle(ButtonStyle.Secondary));

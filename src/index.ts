@@ -354,7 +354,7 @@ client.on(Events.GuildMemberAdd, member => {
     if (member.user.bot) protectedTask('bot quarantine', member.guild.id, () => quarantineNewBot(store, logs, member));
     const s = store.settings(member.guild.id);
     if (s.authorized && s.syncOnJoin && !member.user.bot && s.verifiedRoleId)
-        protectedTask('join verification', member.guild.id, () => roblox.sync(member, { isInitial: true }));
+        protectedTask('join verification', member.guild.id, () => roblox.syncOnJoin(member));
 });
 
 client.on(Events.GuildMemberUpdate, (old, member) => {

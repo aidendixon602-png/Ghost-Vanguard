@@ -19,12 +19,14 @@ export class ReplyPanels {
                             if (!id)
                                 return result;
                             const previous = this.replies.get(key);
-                            if (previous && previous.id !== id) {
+                            if (previous && previous.id !== id && previous.at > Date.now() - 15 * 60 * 1000) {
                                 try {
                                     await previous.remove();
                                 }
-                                catch {
-                                    logEvent('old_reply_cleanup_unavailable', { guildId: i.guildId, userId: i.user.id });
+                                catch (error) {
+                                    // A deleted reply or expired interaction webhook is already unavailable.
+                                    if (error?.code !== 10008 && error?.code !== 10015 && error?.code !== 10062)
+                                        logEvent('old_reply_cleanup_unavailable', { guildId: i.guildId, userId: i.user.id });
                                 }
                             }
                             const remove = property === 'followUp' ? () => i.webhook.deleteMessage(id) : () => i.deleteReply();
