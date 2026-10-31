@@ -60,13 +60,31 @@ if ((env.UPDATE_REPO || env.UPDATE_TOKEN) && updatesOffReason()) say(`Automatic 
 const hide = text => TOKEN ? String(text).split(TOKEN).join('[token hidden]') : String(text);
 
 // ------------------------------------------------------------ git, with the token passed per command (never saved to disk)
-const auth = () => ['-c', `http.extraHeader=Authorization: Basic ${Buffer.from(`x-access-token:${TOKEN}`).toString('base64')}`];
+let tokenRejected = false;
+let warnedAboutTokenFallback = false;
+let lastUpdateFailure = '';
+const auth = () => TOKEN && !tokenRejected ? ['-c', `http.extraHeader=Authorization: Basic ${Buffer.from(`x-access-token:${TOKEN}`).toString('base64')}`] : [];
 const git = (...args) => { const r = quiet('git', [...auth(), ...args]); return { ok: r.status === 0, out: (r.stdout ?? '').trim(), err: hide(r.stderr ?? '').trim() }; };
 const head = () => quiet('git', ['rev-parse', 'HEAD']).stdout?.trim() || null;
 
 async function github(path) {
-    const res = await fetch(`${API}/repos/${REPO}${path}`, { headers: { Authorization: `Bearer ${TOKEN}`, Accept: 'application/vnd.github+json', 'User-Agent': 'midtown-vanguard-updater' } });
-    if (!res.ok) throw new Error(`GitHub ${res.status} on ${path}`);
+    const url = `${API}/repos/${REPO}${path}`;
+    const headers = { Accept: 'application/vnd.github+json', 'User-Agent': 'midtown-vanguard-updater' };
+    let res = await fetch(url, { headers: TOKEN && !tokenRejected ? { ...headers, Authorization: `Bearer ${TOKEN}` } : headers });
+    if (res.status === 401 && TOKEN && !tokenRejected) {
+        // This repository is public. A stale/incorrect optional token should not prevent the
+        // launcher from checking public branch and CI data; Git operations also fall back to public access.
+        tokenRejected = true;
+        if (!warnedAboutTokenFallback) {
+            say('GitHub rejected UPDATE_TOKEN; retrying with public read-only access. Replace the token in .env if this repository becomes private.', '⚠');
+            warnedAboutTokenFallback = true;
+        }
+        res = await fetch(url, { headers });
+    }
+    if (!res.ok) {
+        const fallback = tokenRejected && TOKEN ? ' (public unauthenticated fallback; check UPDATE_TOKEN if this repository is private)' : '';
+        throw new Error(`GitHub ${res.status} on ${path}${fallback}`);
+    }
     return res.json();
 }
 
@@ -240,6 +258,7 @@ async function checkForUpdate(beforeInstall) {
     if (updating || stopping) return { state: 'busy' };
     try {
         const latest = await latestPassing();
+        lastUpdateFailure = '';
         const result = !latest ? { state: 'none' }
             : latest.sha === head() ? { state: 'current', sha: latest.sha }
             : rejected.has(latest.sha) ? { state: 'skipped', sha: latest.sha, why: 'it crashed or failed to install before' }
@@ -275,7 +294,10 @@ async function checkForUpdate(beforeInstall) {
         updating = false;
         const why = hide(error instanceof Error ? error.message : error);
         lastCheck = { at: Date.now(), result: `check failed: ${why}` };
-        say(`Update check failed: ${why} (trying again in ${CHECK_MS / 60000} minutes)`, '⚠');
+        const failure = `${why} (trying again in ${CHECK_MS / 60000} minutes)`;
+        // Avoid flooding host panels if GitHub is persistently unreachable or rate-limiting us.
+        if (failure !== lastUpdateFailure) say(`Update check failed: ${failure}`, '⚠');
+        lastUpdateFailure = failure;
         if (!child && !stopping) startBot();
         return { state: 'error', why };
     }
