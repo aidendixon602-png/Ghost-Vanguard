@@ -18,9 +18,13 @@ export class ReplyPanels {
                     const id=property==='followUp'?result?.id:`original:${i.id}`;
                     if(!id)return result;
                     const previous=this.replies.get(key);
-                    if(previous&&previous.id!==id) {
+                    if(previous&&previous.id!==id&&previous.at>Date.now()-15*60*1000) {
                         try {await previous.remove();}
-                        catch {logEvent('old_reply_cleanup_unavailable',{guildId:i.guildId,userId:i.user.id});}
+                        catch (error:any) {
+                            // A deleted reply or expired interaction webhook is already unavailable.
+                            if(error?.code!==10008&&error?.code!==10015&&error?.code!==10062)
+                                logEvent('old_reply_cleanup_unavailable',{guildId:i.guildId,userId:i.user.id});
+                        }
                     }
                     const remove=property==='followUp'?()=>i.webhook.deleteMessage(id):()=>i.deleteReply();
                     this.replies.set(key,{id,at:Date.now(),remove});

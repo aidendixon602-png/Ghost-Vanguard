@@ -56,7 +56,7 @@ const updatesOffReason = () => !REPO && !TOKEN ? 'UPDATE_REPO and UPDATE_TOKEN a
     : TOKEN.length <= 20 ? 'UPDATE_TOKEN looks too short; paste the whole github_pat_… token'
     : !existsSync(join(root, '.git')) ? 'this folder is not a git checkout yet (restart once so the launcher can set it up)'
     : null;
-if ((env.UPDATE_REPO || env.UPDATE_TOKEN) && updatesOffReason()) say(`Automatic updates are off: ${updatesOffReason()}`, '⚠');
+if ((env.UPDATE_REPO || env.UPDATE_TOKEN) && !updatesOn) say(`Automatic updates are off: ${updatesOffReason()}`, '⚠');
 const hide = text => TOKEN ? String(text).split(TOKEN).join('[token hidden]') : String(text);
 
 // ------------------------------------------------------------ git, with the token passed per command (never saved to disk)
@@ -67,10 +67,10 @@ const auth = () => TOKEN && !tokenRejected ? ['-c', `http.extraHeader=Authorizat
 const git = (...args) => { const r = quiet('git', [...auth(), ...args]); return { ok: r.status === 0, out: (r.stdout ?? '').trim(), err: hide(r.stderr ?? '').trim() }; };
 const head = () => quiet('git', ['rev-parse', 'HEAD']).stdout?.trim() || null;
 
-async function github(path) {
+async function github(path, signal) {
     const url = `${API}/repos/${REPO}${path}`;
     const headers = { Accept: 'application/vnd.github+json', 'User-Agent': 'midtown-vanguard-updater' };
-    let res = await fetch(url, { headers: TOKEN && !tokenRejected ? { ...headers, Authorization: `Bearer ${TOKEN}` } : headers });
+    let res = await fetch(url, { headers: TOKEN && !tokenRejected ? { ...headers, Authorization: `Bearer ${TOKEN}` } : headers, signal });
     if (res.status === 401 && TOKEN && !tokenRejected) {
         // This repository is public. A stale/incorrect optional token should not prevent the
         // launcher from checking public branch and CI data; Git operations also fall back to public access.
@@ -79,7 +79,7 @@ async function github(path) {
             say('GitHub rejected UPDATE_TOKEN; retrying with public read-only access. Replace the token in .env if this repository becomes private.', '⚠');
             warnedAboutTokenFallback = true;
         }
-        res = await fetch(url, { headers });
+        res = await fetch(url, { headers, signal });
     }
     if (!res.ok) {
         const fallback = tokenRejected && TOKEN ? ' (public unauthenticated fallback; check UPDATE_TOKEN if this repository is private)' : '';
@@ -100,12 +100,18 @@ async function latestPassing() {
 }
 
 /** First time: turn this folder into a checkout of the repo, keeping .env, data/ and node_modules. */
-function ensureCheckout() {
+async function ensureCheckout() {
     if (existsSync(join(root, '.git'))) return true;
     say(`Connecting this folder to github.com/${REPO} (first time)...`);
     if (!git('init', '-q').ok) return false;
     quiet('git', ['remote', 'add', 'origin', REMOTE]);
-    const fetched = git('fetch', '-q', 'origin', BRANCH);
+    let fetched = git('fetch', '-q', 'origin', BRANCH);
+    if (!fetched.ok && TOKEN && !tokenRejected) {
+        // A rejected token also breaks the first Git fetch, before the periodic API check runs.
+        // Probe the API to distinguish invalid credentials from other Git failures.
+        try { await github(`/branches/${encodeURIComponent(BRANCH)}`, AbortSignal.timeout(5000)); } catch { }
+        if (tokenRejected) fetched = git('fetch', '-q', 'origin', BRANCH);
+    }
     if (!fetched.ok) { say(`Could not reach the repo: ${fetched.err}`); rmSync(join(root, '.git'), { recursive: true, force: true }); return false; }
     git('reset', '-q', '--hard', 'FETCH_HEAD');
     return true;
@@ -125,7 +131,7 @@ function install(sha) {
 // ------------------------------------------------------------ one-time setup
 if (updatesOn) {
     if (quiet('git', ['--version']).status !== 0) say('Automatic updates need git, which this host does not have. Updates are off.');
-    else if (ensureCheckout()) say(`Automatic updates are on: github.com/${REPO} (${BRANCH}), checked every ${CHECK_MS / 60000} minutes.`);
+    else if (await ensureCheckout()) say(`Automatic updates are on: github.com/${REPO} (${BRANCH}), checked every ${CHECK_MS / 60000} minutes.`);
 }
 
 // Dependencies: installed when missing, and again whenever package-lock.json changed (for
@@ -207,7 +213,7 @@ if (existsSync(importDb)) {
 }
 
 // ------------------------------------------------------------ run the bot, restart it, update it
-let child = null, stopping = false, updating = false;
+let child = null, stopping = false, updating = false, checking = false;
 const launcherHash = () => { try { return createHash('sha256').update(readFileSync(join(root, 'launch.js'))).digest('hex'); } catch { return ''; } };
 const LAUNCHER_HASH = launcherHash();
 const crashes = [];
@@ -255,7 +261,8 @@ let lastNote = '';
 let lastCheck = { at: 0, result: 'not checked yet' };
 /** Returns what it found; `beforeInstall` runs (and is awaited) just before the bot is restarted. */
 async function checkForUpdate(beforeInstall) {
-    if (updating || stopping) return { state: 'busy' };
+    if (checking || updating || stopping) return { state: 'busy' };
+    checking = true;
     try {
         const latest = await latestPassing();
         lastUpdateFailure = '';
@@ -300,6 +307,8 @@ async function checkForUpdate(beforeInstall) {
         lastUpdateFailure = failure;
         if (!child && !stopping) startBot();
         return { state: 'error', why };
+    } finally {
+        checking = false;
     }
 }
 

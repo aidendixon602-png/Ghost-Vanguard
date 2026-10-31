@@ -81,6 +81,50 @@ test('sync with pending code prompts user to add code to profile', async () => {
     f.store.close();
 });
 
+test('join sync skips unlinked members and synchronizes linked members', async () => {
+    const f = fixture();
+    let calls = 0;
+    f.roblox.sync = async (_member, opts) => { calls++; assert.equal(opts?.isInitial, true); return 'ok'; };
+    try {
+        await f.roblox.syncOnJoin(f.member);
+        assert.equal(calls, 0);
+        f.store.run('INSERT INTO links VALUES(?,?,?,?,?)', 'g', 'u', '123', 'RobloxName', 0);
+        await f.roblox.syncOnJoin(f.member);
+        assert.equal(calls, 1);
+    } finally { f.store.close(); }
+});
+
+test('unsafe verified roles are rejected with actionable reasons', async () => {
+    const f = fixture();
+    f.store.run('INSERT INTO links VALUES(?,?,?,?,?)', 'g', 'u', '123', 'RobloxName', 0);
+    const role = { id: 'verified', managed: false, editable: true, permissions: new PermissionsBitField(0n) };
+    try {
+        for (const [candidate, reason] of [
+            [null, /no longer exists/],
+            [{ ...role, managed: true }, /managed by an integration/],
+            [{ ...role, editable: false }, /role hierarchy/],
+            [{ ...role, permissions: new PermissionsBitField(8n) }, /administrative permissions/],
+        ] as const) {
+            f.member.guild.roles.fetch = async () => candidate;
+            await assert.rejects(f.roblox.sync(f.member), reason);
+        }
+        assert.deepEqual(f.changes, []);
+    } finally { f.store.close(); }
+});
+
+test('a role that becomes managed during verification is not granted', async () => {
+    const f = fixture();
+    f.store.run('INSERT INTO links VALUES(?,?,?,?,?)', 'g', 'u', '123', 'RobloxName', 0);
+    let reads = 0;
+    f.member.guild.roles.fetch = async () => ({ id: 'verified', managed: ++reads > 1, editable: true, permissions: new PermissionsBitField(0n) });
+    try {
+        await withFetch(async () => Response.json({ name: 'RobloxName', created: '2020-01-01T00:00:00Z', isBanned: false }), async () => {
+            await assert.rejects(f.roblox.sync(f.member), /unsafe or unavailable/);
+            assert.deepEqual(f.changes, []);
+        });
+    } finally { f.store.close(); }
+});
+
 test('Roblox API outage preserves the verified role', async () => {
     const f = fixture();
     f.store.run('INSERT INTO links VALUES(?,?,?,?,?)', 'g', 'u', '123', 'RobloxName', 0);

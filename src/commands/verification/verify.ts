@@ -102,7 +102,7 @@ export default defineCommand(
         if (!s.authorized) throw new (await import('../../errors.js')).AppError('INTEGRATION_ERROR', 'This server is not authorized.');
         if (s.verifiedRoleId) {
             const role = await i.guild!.roles.fetch(s.verifiedRoleId).catch(() => null);
-            if (!role) throw new (await import('../../errors.js')).AppError('INTEGRATION_ERROR', 'Verified role is missing. Ask an admin to set `/setup staff role` / security setup.');
+            if (!role) throw new (await import('../../errors.js')).AppError('INTEGRATION_ERROR', 'Verified role is missing. Ask a security administrator to set `/setup security verified_role`.');
         }
 
         const pending = await createPending(ctx.store, guildId, i.user.id, username);

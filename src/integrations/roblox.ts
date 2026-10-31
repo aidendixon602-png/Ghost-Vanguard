@@ -51,6 +51,12 @@ export class Roblox {
         // pending is guild-scoped and auto-pruned; nothing else to clear
     }
 
+    /** Only previously linked members can be synchronized when they rejoin. */
+    async syncOnJoin(member: GuildMember): Promise<void> {
+        if (getLink(this.store, member.guild.id, member.id))
+            await this.sync(member, { isInitial: true });
+    }
+
     /** Sync a member's verified role + nickname + group ranks from their linked Roblox account. */
     async sync(member: GuildMember, opts: SyncOptions = {}): Promise<string> {
         return this.queue.run(`${member.guild.id}:${member.id}`, async () => {
@@ -61,12 +67,15 @@ export class Roblox {
             if (!s.authorized) throw new AppError('INTEGRATION_ERROR', 'This server is not authorized.');
             if (this.store.get('SELECT 1 FROM backups WHERE guild_id=? AND user_id=? AND active=1', member.guild.id, member.id))
                 throw new AppError('INTEGRATION_ERROR', 'Verification is unavailable while you are quarantined.');
-            if (!s.verifiedRoleId) throw new AppError('INTEGRATION_ERROR', 'A security administrator must configure the verified role first (set it in the security dashboard).');
+            if (!s.verifiedRoleId) throw new AppError('INTEGRATION_ERROR', 'A security administrator must configure the verified role first (use `/setup security verified_role`).');
 
             const fresh = await member.guild.members.fetch({ user: member.id, force: true });
             const role = await member.guild.roles.fetch(s.verifiedRoleId);
-            if (!role || role.managed || !role.editable || dangerous(role.permissions.bitfield))
-                throw new AppError('INTEGRATION_ERROR', 'The verified role is missing, above the bot, managed, or grants moderation/administrative permissions.');
+            const roleHelp = 'Ask a security administrator to choose a safe, unmanaged role with `/setup security verified_role` and place it below the bot’s highest role.';
+            if (!role) throw new AppError('INTEGRATION_ERROR', `The configured verified role no longer exists. ${roleHelp}`);
+            if (role.managed) throw new AppError('INTEGRATION_ERROR', `The configured verified role is managed by an integration. ${roleHelp}`);
+            if (!role.editable) throw new AppError('INTEGRATION_ERROR', `The bot cannot manage the verified role. Grant Manage Roles and check the role hierarchy. ${roleHelp}`);
+            if (dangerous(role.permissions.bitfield)) throw new AppError('INTEGRATION_ERROR', `The verified role grants moderation or administrative permissions. ${roleHelp}`);
 
             // Custom link lookup — no external provider
             const link = this.store.get('SELECT roblox_id, username FROM links WHERE guild_id=? AND user_id=?', member.guild.id, member.id) as { roblox_id: string; username: string } | undefined;
@@ -99,7 +108,7 @@ export class Roblox {
                 throw new AppError('INTEGRATION_ERROR', 'Verification was canceled because server authorization or quarantine status changed.');
 
             const checkedRole = await member.guild.roles.fetch(role.id, { force: true });
-            if (!checkedRole || !checkedRole.editable || dangerous(checkedRole.permissions.bitfield))
+            if (!checkedRole || checkedRole.managed || !checkedRole.editable || dangerous(checkedRole.permissions.bitfield))
                 throw new AppError('INTEGRATION_ERROR', 'The verified role became unsafe or unavailable during verification.');
             this.store.assertAuthorized(member.guild.id);
 
