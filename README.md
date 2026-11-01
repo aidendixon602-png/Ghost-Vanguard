@@ -131,7 +131,7 @@ The launcher supervises the process and can apply optional CI-gated updates. See
 
    <!-- coderabbit-ai-generated-section:v1:0af77c236d50ce1ee807249c0a0a0d7807110055569c99f296dcfd3dc92d2fcc -->
 
-   Run `/setup logs setup` to configure **Ghost Vanguard Logs**. Existing Veil event-log channels are reused for matching events, with their messages and permissions preserved. Other legacy channels remain archived. If log channels are already scattered across categories, `/setup logs merge` previews grouping Vanguard's own channels (ban logs, server logs and the security log) under **Ghost Vanguard Logs**; other bots' channels, including look-alike names, are never moved, renamed or reused.
+   Run `/setup logs setup` to build **Ghost Vanguard Logs**: `#bans`, `#ghost-vanguard-logging` and a private channel for each log type (`#mod-logs`, `#join-logs`, `#member-logs`, `#role-logs`, `#channel-logs`, `#server-logs`, `#message-logs`, `#voice-logs`, `#command-logs`, `#antinuke-logs`). Channels that already exist in that category or in the old Veil category are reused with their messages and permissions; missing ones are created, and running setup again only fills gaps. Other legacy channels remain archived. If log channels are already scattered across categories, `/setup logs merge` previews grouping Vanguard's own channels (ban logs, server logs and the security log) under **Ghost Vanguard Logs**; other bots' channels, including look-alike names, are never moved, renamed or reused.
 
    <!-- /coderabbit-ai-generated:v1 -->
 3. Run `/antinuke check` and address any missing permissions or role-hierarchy warnings.

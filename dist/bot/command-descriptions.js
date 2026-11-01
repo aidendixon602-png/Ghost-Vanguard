@@ -102,7 +102,7 @@ export const DESCRIPTIONS = {
     "/setup status": "Show security health and settings",
     "/setup security": "Set the security log and Roblox verification options",
     "/setup security-admins": "Developer: add, remove or list security admins",
-    "/setup logs setup": "Set up log channels and reuse existing event logs",
+    "/setup logs setup": "Set up the log channels: bans, server logs and one per log type",
     "/setup logs route": "Choose a private channel for a log type, or reset its destination",
     "/setup logs merge": "Group Vanguard's log channels, leaving other bots' logs alone",
     "/setup logs cleanup-archive": "Preview and delete channels in the old log archive",

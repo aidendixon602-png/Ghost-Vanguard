@@ -139,7 +139,7 @@ Set up logs, staff roles, welcome messages and controls
 | `/setup config command` | Turn a command on or off, or change its cooldown | Server Owner |
 | `/setup config feature` | Turn moderation, verification, AI or backups on or off | Server Owner |
 | `/setup config backups` | Schedule server layout backups | Server Owner |
-| `/setup logs setup` | Set up log channels and reuse existing event logs | Admin+ |
+| `/setup logs setup` | Set up the log channels: bans, server logs and one per log type | Admin+ |
 | `/setup logs route` | Choose a private channel for a log type, or reset its destination | Admin+ |
 | `/setup logs merge` | Group Vanguard's log channels, leaving other bots' logs alone | Admin+ |
 | `/setup logs cleanup-archive` | Preview and delete channels in the old log archive | Server Owner |
