@@ -1,7 +1,7 @@
-import { AuditLogEvent, Colors, EmbedBuilder, PermissionsBitField, type Guild, type GuildAuditLogsEntry, type GuildMember, type PartialGuildMember } from 'discord.js';
+import { AuditLogEvent, Colors, EmbedBuilder, PermissionsBitField, type Guild, type GuildAuditLogsEntry, type GuildMember, type PartialGuildMember, type VoiceState } from 'discord.js';
 import { PRODUCT_NAME } from '../branding.js';
 import { redact } from './redact.js';
-import { isExcluded, logChannels } from './log-setup.js';
+import { isExcluded, logChannels, logRoute, type LogRoute } from './log-setup.js';
 import type { Store } from '../database/db.js';
 import type { LogQueue } from '../logging.js';
 import { responsibleActor } from '../security/security.js';
@@ -27,6 +27,7 @@ export interface EventLogConfig {
 
 export interface LogEvent {
     category: LogCategory;
+    route?: LogRoute;
     action: string;
     actorId?: string | null;
     targetId?: string | null;
@@ -127,7 +128,7 @@ export function recordEvent(store: Store, logs: LogQueue, guildId: string, event
     store.run('INSERT INTO event_log(guild_id,at,category,action,actor_id,target_id,target,summary) VALUES(?,?,?,?,?,?,?,?)', guildId, at, event.category, event.action, event.actorId ?? null, event.targetId ?? null, clean.target ?? null, lines.join('\n') || event.action);
     if (options.post !== false) {
         const display = options.compact ? { ...clean, compact: true, author: null, target: compactTarget(clean.target) } : clean;
-        logs.push(guildId, renderEvent(display), [], config.channelId);
+        logs.push(guildId, renderEvent(display), [], logRoute(store, guildId, event.route ?? event.category) ?? config.channelId);
     }
     return true;
 }
@@ -436,7 +437,7 @@ function flushRoleChangeLog(key: string) {
         color: Colors.Purple,
     };
     const clean: LogEvent = { ...summary, details: (summary.details ?? []).map(detail => redact(detail)), target: redact(summary.target) };
-    batch.logs.push(batch.guildId, renderEvent(clean), [], config.channelId);
+    batch.logs.push(batch.guildId, renderEvent(clean), [], logRoute(batch.store, batch.guildId, 'roles') ?? config.channelId);
 }
 
 function queueRoleChangeLog(store: Store, logs: LogQueue, guildId: string, event: LogEvent) {
@@ -473,8 +474,19 @@ export function recordMemberEvent(store: Store, logs: LogQueue, member: GuildMem
     const user = member.user;
     const created = user?.createdTimestamp ? ` · account created <t:${Math.floor(user.createdTimestamp / 1000)}:R>` : '';
     recordEvent(store, logs, member.guild.id, {
-        category: 'members', action: joined ? 'Member joined' : 'Member left',
+        category: 'members', route: 'joins', action: joined ? 'Member joined' : 'Member left',
         targetId: member.id, target: `<@${member.id}>${user?.tag ? ` (${user.tag})` : ''}`,
         details: joined && created ? [`**Account:**${created.replace(' · account', '')}`] : [],
     }, { compact: true });
+}
+
+/** Voice state changes are recorded only for servers that configured the dedicated channel. */
+export function recordVoiceEvent(store: Store, logs: LogQueue, old: VoiceState, state: VoiceState) {
+    const changes = (['serverMute', 'serverDeaf', 'selfMute', 'selfDeaf', 'streaming', 'selfVideo'] as const)
+        .filter(key => typeof old[key] === 'boolean' && typeof state[key] === 'boolean' && old[key] !== state[key]).map(key => `**${key}:** ${state[key] ? 'on' : 'off'}`);
+    if (old.channelId === state.channelId && (!state.channelId || !changes.length)) return;
+    if (isExcluded(store, state.guild.id, old.channelId) || isExcluded(store, state.guild.id, state.channelId)) return;
+    const action = old.channelId === state.channelId ? 'Voice state updated' : !old.channelId ? 'Voice channel joined' : !state.channelId ? 'Voice channel left' : 'Voice channel changed';
+    const details = [old.channelId ? `**From:** <#${old.channelId}>` : '', state.channelId ? `**To:** <#${state.channelId}>` : ''].filter(Boolean);
+    recordEvent(store, logs, state.guild.id, { category: 'members', route: 'voice', action, targetId: state.id, target: `<@${state.id}>`, channelId: state.channelId ?? old.channelId, details: [...details, ...changes] }, { compact: true });
 }

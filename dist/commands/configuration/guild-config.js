@@ -1,3 +1,4 @@
+import { developers } from '../../bot/developers.js';
 import { SlashCommandBuilder } from 'discord.js';
 import { defineCommand } from '../../bot/registry.js';
 import { AppError } from '../../errors.js';
@@ -20,6 +21,7 @@ export default defineCommand(guildConfigBuilder, { category: 'configuration', ac
         after = ctx.store.get('SELECT * FROM provider_config WHERE guild_id=? AND provider=?', guild, provider);
     }
     else if (sub === 'permission-role') {
+        developers.require(i.user.id);
         const role = i.options.getRole('role', true), access = i.options.getString('access', true);
         component = 'permission-role';
         if (role.id === guild || role.managed)

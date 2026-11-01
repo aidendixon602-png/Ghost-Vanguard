@@ -2,41 +2,41 @@ import { CommandInteractionOptionResolver } from 'discord.js';
 import { describe } from './command-descriptions.js';
 import { RANK_LABEL, RANKS, rankName, requiredRank } from './ranks.js';
 export const UMBRELLAS = [
-    { name: 'antinuke', description: 'Anti-nuke: status, on/off, whitelist, incidents, quarantine and the threat board', entries: [
+    { name: 'antinuke', description: 'Protect your server, review incidents and manage trusted users', entries: [
             { child: 'antinuke', mode: 'flat' }, { child: 'antinuke-plus', mode: 'flat' }, { child: 'trust', mode: 'group', as: 'whitelist' },
             { child: 'security', mode: 'flat', pick: ['incidents', 'quarantine', 'release'] }, { child: 'threats', mode: 'group' }
         ] },
-    { name: 'automod', description: 'Message protection: spam, links, invites, AI, scam links and staff pings', entries: [
+    { name: 'automod', description: 'Manage spam, links, scam protection and message filters', entries: [
             { child: 'automod', mode: 'flat' }, { child: 'scam', mode: 'group' }, { child: 'antiping', mode: 'group' }
         ] },
-    { name: 'raid', description: 'Raid response: lockdown, raid mode, emergency mode, new accounts, webhooks', entries: [
+    { name: 'raid', description: 'Respond to raids, lock channels and inspect server health', entries: [
             { child: 'lockdown', mode: 'single' }, { child: 'unlock', mode: 'single' }, { child: 'health', mode: 'single' }, { child: 'webhooks', mode: 'single' },
             { child: 'raidmode', mode: 'group', as: 'mode' }, { child: 'emergency', mode: 'group' }, { child: 'newaccounts', mode: 'group' }
         ] },
-    { name: 'mod', description: 'Moderation: ban, kick, timeout, warn, purge, cases, notes and appeals', entries: [
+    { name: 'mod', description: 'Moderate members and review cases, notes and appeals', entries: [
             { child: 'moderation', mode: 'flat' }, { child: 'tempban', mode: 'single' }, { child: 'softban', mode: 'single' }, { child: 'massban', mode: 'single' }, { child: 'slowmode', mode: 'single' },
             { child: 'bans', mode: 'group' }, { child: 'case', mode: 'group', as: 'cases' }, { child: 'note', mode: 'group', as: 'notes' }, { child: 'warnings', mode: 'group' }, { child: 'appeals', mode: 'group' }, { child: 'nick', mode: 'group' }
         ] },
-    { name: 'setup', description: 'Server setup: logs, staff ranks, security settings, welcome, panel and config', entries: [
+    { name: 'setup', description: 'Set up logs, staff roles, welcome messages and controls', entries: [
             { child: 'panel', mode: 'single' }, { child: 'security', mode: 'flat', pick: ['status', 'config', 'admin'], rename: { config: 'security', admin: 'security-admins' } },
             { child: 'logs', mode: 'group' }, { child: 'staff', mode: 'group' }, { child: 'welcome', mode: 'group' }, { child: 'guild-config', mode: 'group', as: 'config' },
             { child: 'perm', mode: 'group', as: 'permissions' }, { child: 'config-history', mode: 'group', as: 'history' }
         ] },
     // Setup and configuration first, then the staff tools, so the list reads in the order people need it.
-    { name: 'ticket', description: 'Support tickets: the panel, types, settings, stats and staff tools', entries: [
+    { name: 'ticket', description: 'Set up support tickets and manage open requests', entries: [
             { child: 'ticket-setup', mode: 'single', as: 'setup' }, { child: 'ticket-panel', mode: 'single', as: 'panel' },
             { child: 'ticket-type', mode: 'group', as: 'types' },
             { child: 'ticket-settings', mode: 'single', as: 'settings' }, { child: 'ticket-stats', mode: 'single', as: 'stats' },
             { child: 'ticket', mode: 'flat' }
         ] },
-    { name: 'recovery', description: 'Server backups and snapshots: save, restore, copy layout', entries: [
+    { name: 'recovery', description: 'Save and restore server layouts and backups', entries: [
             { child: 'snapshot', mode: 'group' }, { child: 'backup', mode: 'group' }, { child: 'copylayout', mode: 'single' }
         ] },
-    { name: 'info', description: 'Look things up: users, roles, the server and the bot', entries: [
+    { name: 'info', description: 'Look up members, roles, server information and bot status', entries: [
             { child: 'userinfo', mode: 'single', as: 'user' }, { child: 'roleinfo', mode: 'single', as: 'role' }, { child: 'server-info', mode: 'single', as: 'server' },
             { child: 'bot-info', mode: 'single', as: 'bot' }, { child: 'ping', mode: 'single' }
         ] },
-    { name: 'dev', description: 'Bot developers: diagnostics, updates, alerts, servers and the database', entries: [
+    { name: 'dev', description: 'Manage bot diagnostics, updates, servers and data', entries: [
             { child: 'dev', mode: 'flat' },
             { child: 'authserver', mode: 'single', in: 'server', as: 'authorize' }, { child: 'deauthserver', mode: 'single', in: 'server', as: 'deauthorize' },
             { child: 'serverauth', mode: 'single', in: 'server', as: 'info' }, { child: 'authorizedservers', mode: 'single', in: 'server', as: 'list' },

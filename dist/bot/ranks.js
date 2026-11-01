@@ -1,11 +1,12 @@
 import { PermissionFlagsBits } from 'discord.js';
 import { config } from '../config.js';
+import { BOT_STAFF_IDS, SERVER_STAFF_IDS } from './access-ids.js';
 import { developers } from './developers.js';
 /**
  * Vanguard staff ranks. Each rank can do everything the ranks below it can.
  * Developer (BOT_OWNER_ID + DEVELOPER_IDS) is the top rank: full control, including the destructive bot tools.
  * Server Owner: whoever owns a Discord server, in that server only. Above Supreme Leader there, but never any bot-wide tool.
- * Bot-wide (by user ID): Supreme Leader, Overseer, Bot Manager. Per server (by role): Head Admin, Admin, Moderator, Helper.
+ * Bot-wide (by user ID): Supreme Leader, Overseer, Bot Manager. Per server (by role or user ID): Head Admin, Admin, Moderator, Helper.
  * Per server (by Discord role, /setup staff role): headadmin, admin, moderator, helper.
  * The server owner ranks just above headadmin in their own server.
  */
@@ -47,11 +48,13 @@ export const ADMIN_RESTRICTED = new Set([
     'backup/restore', 'snapshot/restore', 'config-history/restore', 'restore', 'layoutselect', 'incident',
     'backup/delete', 'snapshot/delete', 'snapshot/cleanup', 'snapshotdelete', 'case/delete',
     // Granting permissions or ranks
-    'security/admin', 'staff/role', 'guild-config/permission-role', 'perm', 'role/who-can-give', 'panel', 'vgpanel',
+    'security/admin', 'staff/role', 'staff/user', 'guild-config/permission-role', 'perm', 'role/who-can-give', 'panel', 'vgpanel',
     // Beyond this server
-    'copylayout', 'staff/global', 'roblox/network', 'roblox/partner',
+    'copylayout', 'staff/global', 'roblox/sharing', 'roblox/partner',
 ]);
 export const isAdminRestricted = (key) => !!key && ADMIN_RESTRICTED.has(key.replace(/\/$/, ''));
+/** Active containment suspends protected command access, including user-ID ranks. */
+export const isQuarantined = (store, guildId, userId) => !!store.get('SELECT 1 FROM backups WHERE guild_id=? AND user_id=? AND active=1', guildId, userId);
 /** True when this member holds Discord's Administrator permission (checked live, never by role name). */
 export const hasAdministrator = (member) => {
     try {
@@ -79,6 +82,9 @@ export function botRank(store, userId) {
     if (developers.has(userId))
         return RANKS.developer;
     let rank = isSupreme(userId) ? RANKS.supreme : 0;
+    for (const level of GLOBAL_LEVELS)
+        if (BOT_STAFF_IDS[level]?.includes(userId))
+            rank = Math.max(rank, RANKS[level]);
     // Bot-wide ranks given with /setup staff global.
     const global = store.db.prepare('SELECT level FROM bot_staff WHERE user_id=?').get(userId);
     if (global?.level && GLOBAL_LEVELS.includes(global.level))
@@ -101,6 +107,12 @@ export function explicitRank(store, guildId, userId, member) {
     // Both ids must be present: a member object without them must never count as the owner.
     if (member?.guild && member.id && member.id === member.guild.ownerId)
         rank = Math.max(rank, RANKS.owner);
+    const hardcoded = SERVER_STAFF_IDS[guildId]?.[userId];
+    if (hardcoded && SERVER_LEVELS.includes(hardcoded))
+        rank = Math.max(rank, RANKS[hardcoded]);
+    for (const level of SERVER_LEVELS)
+        if (store.hasGrant(guildId, userId, `staff:${level}`))
+            rank = Math.max(rank, RANKS[level]);
     // Older access settings still count: security admins = Head Admin, Vanguard moderator roles = Moderator.
     if (store.hasGrant(guildId, userId, 'admin'))
         rank = Math.max(rank, RANKS.headadmin);
@@ -131,7 +143,7 @@ export const COMMAND_RANK = {
     raidmode: 3, vgwelcome: 3, vgcommands: 0, lockdown: 3, unlock: 3, massban: 3, newaccounts: 3, scam: 3, logs: 3, antiping: 3, mention: 3, health: 3,
     // Head Admin
     // Owner-level actions that also sit under Head Admin commands: handing out security admins, undoing setting changes.
-    'security/admin': 7.5, 'config-history/restore': 7.5,
+    'config-history/restore': 7.5,
     antinuke: 4, panel: 4, vgpanel: 4, enable: 4, disable: 4, trust: 4, snapshot: 4, backup: 4, copylayout: 4, security: 4, 'guild-config': 4,
     'config-history': 4, perm: 4, 'case/delete': 4, staff: 4, anpanel: 4, trustlist: 4, tp: 4, snapshotdelete: 4, snapshotcancel: 4, snapshotpage: 4,
     restore: 4, layoutselect: 4, layoutcancel: 4, incident: 4, permui: 4,
@@ -146,12 +158,14 @@ export const COMMAND_RANK = {
     // Developer only (the bot owner and DEVELOPER_IDS): anything that can take the bot down, rewrite its data or
     // reach every server at once. No Discord permission, server role or lower rank unlocks these.
     restart: 8, 'dev/restart': 8, 'dev/alerts': 8, 'database/restore-settings': 8, deauthserver: 8, banserver: 8, unbanserver: 8, unhardban: 8,
-    // Giving bot-wide ranks: Developers only.
-    'staff/global': 8,
+    // Managing any bot permission assignment: approved Developer IDs only.
+    'staff/global': 8, 'staff/role': 8, 'staff/user': 8, 'guild-config/permission-role': 8,
+    'security/admin': 8,
+    'logs/cleanup-archive': RANKS.owner,
 };
 /** Developer-only commands: nothing but the Developer rank unlocks them. */
 export const needsDeveloper = (key) => (requiredRank(key) ?? 0) >= RANKS.developer;
-export const DEVELOPER_ONLY_MESSAGE = 'Only a **Developer** (the bot owner, or someone in `DEVELOPER_IDS`) can do this. It affects the bot in every server (restarts, updates, the database, removing servers, bot-wide ranks and network bans).';
+export const DEVELOPER_ONLY_MESSAGE = 'Only an approved **Developer** user ID can do this (the bot owner, `DEVELOPER_IDS`, or `BOT_STAFF_IDS.developer` in `src/bot/access-ids.ts`). This action manages bot permissions or protected bot operations.';
 export const aboveSupremeMessage = (_key) => DEVELOPER_ONLY_MESSAGE;
 /** Only Developers may lift either kind of network ban everywhere. */
 export function canLiftNetworkBan(_store, userId, _kind) {

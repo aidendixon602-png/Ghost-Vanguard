@@ -306,3 +306,120 @@ test('an untrusted grant (or no audit entry) to a quarantined member is still re
         store.close();
     }
 });
+
+test('ongoing bot additions are reverted throughout cooldown without repeated containment, including after restart', async () => {
+    const { store, guild, entry, logs } = setup('enforce');
+    let security = new Security(store, { push: (_g: unknown, e: unknown) => logs.push(e) } as unknown as LogQueue);
+    let punishments = 0;
+    const removed: string[] = [];
+    const attach = () => {
+        security.punish = async () => { punishments++; return 'Removed 1 dangerous role(s).'; };
+        security.revert = async (event) => {
+            assert.ok(store.get('SELECT 1 FROM incidents'), 'evidence precedes mutation');
+            removed.push(event.id);
+            return 'Banned the added bot.';
+        };
+    };
+    attach();
+    for (const id of ['b1', 'b2', 'b3']) await security.audit(entry(id, 'attacker', AuditLogEvent.BotAdd), guild);
+    await security.audit(entry('b2', 'attacker', AuditLogEvent.BotAdd), guild);
+    security = new Security(store, { push: () => {} } as unknown as LogQueue);
+    attach();
+    await security.audit(entry('b4', 'attacker', AuditLogEvent.BotAdd), guild);
+    assert.deepEqual(removed, ['b1', 'b2', 'b3', 'b4']);
+    assert.equal(punishments, 1);
+    assert.equal(store.all('SELECT * FROM incidents').length, 1);
+    assert.equal(logs.length, 2, 'initial alert plus one throttled continuation');
+    assert.match(store.get('SELECT result FROM incidents')!.result, /Continued protection: \[completed\]/);
+    assert.equal(store.all("SELECT 1 FROM antinuke_event_payloads WHERE json_extract(json,'$.revertOutcome')='completed'").length, 4);
+    store.close();
+});
+
+test('warning escalation undoes each ban once and keeps protecting later targets', async () => {
+    const { store, security, guild, entry } = setup('enforce');
+    let punishments = 0;
+    const reverted: string[] = [];
+    security.punish = async () => { punishments++; return 'Removed 1 dangerous role(s).'; };
+    security.revert = async (event) => { reverted.push(event.id); return 'Removed ban.'; };
+    for (let n = 1; n <= 9; n++) await security.audit(entry(String(n)), guild);
+    assert.equal(punishments, 1);
+    assert.deepEqual(store.all('SELECT mode FROM incidents ORDER BY id').map(row => row.mode), ['warn', 'enforce']);
+    assert.deepEqual([...reverted].sort(), ['1', '2', '3', '4', '5', '6', '7', '8', '9']);
+    assert.equal(reverted.length, new Set(reverted).size, 'no historical reverts repeated on escalation');
+    store.close();
+});
+
+test('cooldown reversal honors current exemptions, rule switches, observe mode and disabled state', async () => {
+    for (const change of ['trust', 'rule-trust', 'observe', 'disabled', 'rule-disabled']) {
+        const { store, security, guild, entry } = setup('enforce');
+        let reverted = 0;
+        security.punish = async () => 'Removed 1 dangerous role(s).';
+        security.revert = async () => { reverted++; return 'Banned the added bot.'; };
+        await security.audit(entry('initial', 'attacker', AuditLogEvent.BotAdd), guild);
+        const s = store.settings('g');
+        if (change === 'trust') store.grant('g', 'attacker', 'trust', 'owner');
+        if (change === 'rule-trust') store.grant('g', 'attacker', 'trust:bot_add', 'owner');
+        if (change === 'observe') s.mode = 'observe';
+        if (change === 'disabled') s.enabled = false;
+        if (change === 'rule-disabled') s.rules.bot_add = { count: 1, seconds: 60, enabled: false };
+        store.save(s);
+        await security.audit(entry('later', 'attacker', AuditLogEvent.BotAdd), guild);
+        assert.equal(reverted, 1, change);
+        store.close();
+    }
+});
+
+test('failed ongoing reversals retain evidence and do not block the next target', async () => {
+    const { store, security, guild, entry } = setup('enforce');
+    security.punish = async () => 'Containment failed.';
+    security.revert = async (event) => {
+        if (event.id === 'failed') throw new Error('Missing permissions');
+        return 'Banned the added bot.';
+    };
+    for (const id of ['initial', 'failed', 'next']) await security.audit(entry(id, 'attacker', AuditLogEvent.BotAdd), guild);
+    const outcomes = store.all("SELECT id,json_extract(json,'$.revertOutcome') AS outcome FROM antinuke_event_payloads ORDER BY id");
+    assert.deepEqual(outcomes.map(r => [r.id, r.outcome]), [['failed', 'failed'], ['initial', 'completed'], ['next', 'completed']]);
+    store.close();
+});
+
+test('new Manage Roles grants warn and safely revert for role edits, creation and member assignments', async () => {
+    for (const action of [AuditLogEvent.RoleUpdate, AuditLogEvent.RoleCreate, AuditLogEvent.MemberRoleUpdate]) {
+        const { store, security, guild } = setup('enforce');
+        let reverted = 0;
+        security.revert = async (_entry, _guild, rule) => { assert.equal(rule.key, 'dangerous_grant'); reverted++; return 'Removed the new permission.'; };
+        (guild as any).roles = { cache: new Map([['manager', { id: 'manager', managed: false, permissions: perms(PermissionFlagsBits.ManageRoles) }]]) };
+        const changes = action === AuditLogEvent.MemberRoleUpdate ? [{ key: '$add', new: [{ id: 'manager' }] }]
+            : [{ key: 'permissions', old: '0', new: String(PermissionFlagsBits.ManageRoles) }];
+        await security.audit(auditEntry('grant', action, { changes }), guild);
+        assert.equal(incidentsFor(store, 'dangerous_grant')[0]?.mode, 'warn');
+        assert.equal(reverted, 1);
+        store.close();
+    }
+});
+
+test('escalation preserves a legitimate staff correction made after the first reversal', async () => {
+    const { store, security, guild } = setup('enforce');
+    const send = PermissionFlagsBits.SendMessages;
+    const ban = PermissionFlagsBits.BanMembers;
+    const channels = PermissionFlagsBits.ManageChannels;
+    const makeRole = (id: string, bits: bigint) => ({
+        id, name: id, managed: false, editable: true, permissions: perms(bits),
+        async setPermissions(value: bigint) { this.permissions = perms(value); },
+    });
+    const first = makeRole('first', send | ban);
+    const second = makeRole('second', send | channels);
+    const roles = new Map([['first', first], ['second', second]]);
+    (guild as any).roles = { cache: roles, fetch: async (id: string) => roles.get(id) };
+    security.punish = async () => 'Removed 1 dangerous role(s).';
+    const update = (id: string, targetId: string, bits: bigint) => auditEntry(id, AuditLogEvent.RoleUpdate, {
+        targetId, changes: [{ key: 'permissions', old: String(send), new: String(send | bits) }],
+    });
+    await security.audit(update('event1', 'first', ban), guild);
+    assert.equal(first.permissions.bitfield, send, 'first unauthorized grant is reversed');
+    // A trusted staff member deliberately corrects that role after reviewing the warning.
+    first.permissions = perms(send | ban);
+    await security.audit(update('event2', 'second', channels), guild);
+    assert.equal(second.permissions.bitfield, send, 'new unauthorized grant is reversed');
+    assert.equal(first.permissions.bitfield, send | ban, 'the completed undo is never replayed');
+    store.close();
+});

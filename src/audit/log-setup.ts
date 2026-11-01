@@ -1,4 +1,4 @@
-import { ChannelType, Colors, EmbedBuilder, OverwriteType, PermissionFlagsBits, type Guild, type GuildBasedChannel, type OverwriteResolvable, type TextChannel } from 'discord.js';
+import { ChannelType, Colors, EmbedBuilder, OverwriteType, PermissionFlagsBits, type CategoryChannel, type Guild, type GuildBasedChannel, type OverwriteResolvable, type TextChannel } from 'discord.js';
 import { DEFAULT_CATEGORIES, DEFAULT_CHANNELS, LEGACY_CATEGORIES, LEGACY_CHANNELS } from '../branding.js';
 import type { Store } from '../database/db.js';
 import { getFeature, setFeature } from '../features/settings.js';
@@ -21,17 +21,26 @@ export const ARCHIVED_LOG_CATEGORY = LEGACY_CATEGORIES.archivedLogs;
 export const LEGACY_LOGGING_CHANNELS: string[] = [...LEGACY_CHANNELS.logging];
 export const LOGGING_CHANNEL_NAMES = [LOGGING_CHANNEL, ...LEGACY_LOGGING_CHANNELS];
 
+export const LEGACY_LOG_ROUTES = {
+    joins: 'join-logs', commands: 'command-logs', antinuke: 'antinuke-logs', messages: 'message-logs',
+    members: 'member-logs', roles: 'role-logs', channels: 'channel-logs', voice: 'voice-logs',
+    server: 'server-logs', moderation: 'mod-logs',
+} as const;
+export type LogRoute = keyof typeof LEGACY_LOG_ROUTES;
+
 export interface LogChannels {
     bansChannelId: string | null;
     excludedChannels: string[];
     /** Skip routine changes made by bots, such as member-count channel renames. */
     ignoreBotRoutine: boolean;
+    routes?: Partial<Record<LogRoute, string>>;
 }
 const DEFAULTS: LogChannels = { bansChannelId: null, excludedChannels: [], ignoreBotRoutine: true };
 
 export const logChannels = (store: Store, guild: string): LogChannels => getFeature(store, guild, 'log_channels', DEFAULTS);
 export const setLogChannels = (store: Store, guild: string, change: Partial<LogChannels>, by?: string) => setFeature(store, guild, 'log_channels', DEFAULTS, change, by);
 export const isExcluded = (store: Store, guild: string, channelId: string | null | undefined) => !!channelId && logChannels(store, guild).excludedChannels.includes(channelId);
+export const logRoute = (store: Store, guild: string, route: LogRoute) => logChannels(store, guild).routes?.[route] ?? null;
 
 /** Channel permissions Vanguard needs in each log channel. */
 export const CHANNEL_PERMISSIONS: [bigint, string][] = [
@@ -83,10 +92,10 @@ const normalizedCategoryName = (name: string) => name.trim().toLowerCase().repla
 
 /** Find or create the category for active Ghost Vanguard logs. */
 async function resolveLogCategory(store: Store, guild: Guild, reason: string) {
-    const category = [...guild.channels.cache.values()].find(c => c.type === ChannelType.GuildCategory && normalizedCategoryName(c.name) === normalizedCategoryName(LOG_CATEGORY));
+    const category = [...guild.channels.cache.values()].find((c): c is CategoryChannel => c.type === ChannelType.GuildCategory && normalizedCategoryName(c.name) === normalizedCategoryName(LOG_CATEGORY));
     if (category) return { category, created: false };
     const created = await guild.channels.create({ name: LOG_CATEGORY, type: ChannelType.GuildCategory, permissionOverwrites: privateOverwrites(store, guild), reason });
-    return { category: created, created: true };
+    return { category: created as CategoryChannel, created: true };
 }
 
 /** Move only the two active log channels. Keep their channel overrides and every old log message intact. */
@@ -106,6 +115,43 @@ async function archiveLegacyLogCategories(guild: Guild, reason: string) {
         archived.push(channel.id);
     }
     return archived;
+}
+
+/** Reuse recognized channels from Veil's old category; preserve their overrides and history. */
+async function activateLegacyRoutes(store: Store, guild: Guild, category: GuildBasedChannel, reason: string) {
+    const names = new Set([...LEGACY_CATEGORIES.logs, ARCHIVED_LOG_CATEGORY].map(normalizedCategoryName));
+    const legacyIds = new Set([...guild.channels.cache.values()].filter(c => c.type === ChannelType.GuildCategory && names.has(normalizedCategoryName(c.name))).map(c => c.id));
+    const routes = { ...logChannels(store, guild.id).routes };
+    const skipped: { route: LogRoute; check: ChannelCheck }[] = [];
+    for (const [route, name] of Object.entries(LEGACY_LOG_ROUTES) as [LogRoute, string][]) {
+        store.assertAuthorized(guild.id);
+        const matches = (c: GuildBasedChannel) => c.type === ChannelType.GuildText && c.name === name;
+        // Also find a channel already moved by a setup that failed before saving its routes.
+        const existing = guild.channels.cache.find(c => matches(c) && !!c.parentId && legacyIds.has(c.parentId))
+            ?? guild.channels.cache.find(c => matches(c) && c.parentId === category.id);
+        const saved = routes[route];
+        // A renamed or moved channel can still be the saved destination; check it even if another
+        // legacy channel is found, so an unsafe saved destination cannot survive a failed reuse.
+        if (saved && saved !== existing?.id) {
+            const check = await checkChannel(guild, saved, name, false);
+            if (!check.ok || check.publiclyVisible) {
+                delete routes[route];
+                skipped.push({ route, check });
+            } else continue; // Keep a manually chosen private destination.
+        }
+        if (!existing) continue;
+        const check = await checkChannel(guild, existing.id, name, false);
+        if (!check.ok || check.publiclyVisible) {
+            if (routes[route] === existing.id) delete routes[route];
+            skipped.push({ route, check });
+            continue;
+        }
+        store.assertAuthorized(guild.id);
+        if (existing.parentId !== category.id)
+            await (existing as TextChannel).setParent(category.id, { lockPermissions: false, reason });
+        routes[route] = existing.id;
+    }
+    return { routes, skipped };
 }
 
 export interface ChannelCheck { channelId: string; ok: boolean; missing: string[]; publiclyVisible: boolean; test: 'sent' | 'failed' | 'skipped'; error?: string }
@@ -152,13 +198,15 @@ export async function setupLogChannels(store: Store, guild: Guild, by: string, c
     const logging = await resolveChannel(store, guild, LOGGING_CHANNEL_NAMES, chosen.logging ?? null, eventLogConfig(store, guild.id).channelId, reason);
     if (bans.channel.id === logging.channel.id) throw new Error('Ban logs and server logs need two different channels.');
     const category = await resolveLogCategory(store, guild, reason);
+    await category.category.setPosition(0, { reason });
     await placeInLogCategory([bans, logging], category.category, reason);
+    const { routes, skipped } = await activateLegacyRoutes(store, guild, category.category, reason);
     const archivedCategories = await archiveLegacyLogCategories(guild, reason);
-    setLogChannels(store, guild.id, { bansChannelId: bans.channel.id }, by);
+    setLogChannels(store, guild.id, { bansChannelId: bans.channel.id, routes }, by);
     configureEventLog(store, guild.id, { enabled: true, channelId: logging.channel.id });
     // Bot actions (anti-nuke, backups, restores, configuration changes, errors) go to the logging channel too.
     const settings = store.settings(guild.id);
     const previousAlerts = settings.logChannelId;
     if (previousAlerts !== logging.channel.id) { settings.logChannelId = logging.channel.id; store.save(settings, by); }
-    return { bans, logging, category: category.category, categoryCreated: category.created, archivedCategories, previousAlerts: previousAlerts !== logging.channel.id ? previousAlerts : null };
+    return { bans, logging, category: category.category, categoryCreated: category.created, archivedCategories, routes, skipped, previousAlerts: previousAlerts !== logging.channel.id ? previousAlerts : null };
 }

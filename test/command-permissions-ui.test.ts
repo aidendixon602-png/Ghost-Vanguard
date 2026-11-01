@@ -28,7 +28,11 @@ test('help categories show allowed subcommands and omit disabled commands and in
  const {store,registry,ctx,member}=fixture();try {
  registry.add(defineCommand(new SlashCommandBuilder().setName('tools').setDescription('Tools').addSubcommand(o=>o.setName('ban').setDescription('Ban')).addSubcommand(o=>o.setName('kick').setDescription('Kick')),{category:'moderation'},async()=>{}, {subcommands:{ban:{requiredPermissions:[PermissionFlagsBits.BanMembers]},kick:{requiredPermissions:[PermissionFlagsBits.KickMembers]}}}),'test');
  const groups=helpCategories(ctx,'g',member.id);assert.equal(groups[0]!.lines.length,1);assert.match(groups[0]!.lines[0]!,/tools ban/);
- assert.equal(helpPage(ctx,'g',member.id).components.length,1,'overview: category menu');assert.equal(helpPage(ctx,'g',member.id,'moderation').components.length,2,'category: menu and page buttons');
+ const home=helpPage(ctx,'g',member.id);const detail=helpPage(ctx,'g',member.id,'moderation');
+ assert.equal(home.components.length,1,'overview: category menu');assert.equal(detail.components.length,2,'category: menu and page buttons');
+ assert.match(home.embeds[0]!.data.description!,/Choose a category/);assert.doesNotMatch(home.embeds[0]!.data.description!,/\/dev|\/genreban/);
+ assert.match(detail.embeds[0]!.data.description!,/tools ban/);assert.doesNotMatch(detail.embeds[0]!.data.description!,/tools kick/);
+ assert.deepEqual(detail.components[1]!.toJSON().components.map((b:any)=>b.label),['Overview','Previous','Next']);
  store.run('INSERT INTO command_settings(guild_id,command,enabled,cooldown_ms) VALUES(?,?,?,?)','g','tools',0,0);assert.equal(helpCategories(ctx,'g',member.id).length,0);
  }finally{store.close();}
 });
@@ -36,5 +40,18 @@ test('anti-nuke buttons honor the parent command disable setting',async()=>{
  const {store,i}=fixture();try {
  store.run('INSERT INTO command_settings(guild_id,command,enabled,cooldown_ms) VALUES(?,?,?,?)','g','antinuke',0,0);
  await assert.rejects(new Guard(store).check(i,{...defaults},'anpanel/',false),/disabled/);
+ }finally{store.close();}
+});
+
+test('archive deletion requires server owner access even for a ranked Admin', async () => {
+ const {store,ctx,member}=fixture();
+ try {
+  const {default:logs}=await import('../src/commands/configuration/logs.js');
+  const policy={...logs.metadata,...logs.subcommands?.['cleanup-archive']};
+  member.permissions=new PermissionsBitField(PermissionFlagsBits.Administrator);
+  const guard=new Guard(store);
+  assert.equal(guard.allowed(policy,'g',member.id,member,'logs','logs/cleanup-archive'),false);
+  member.id='owner';
+  assert.equal(guard.allowed(policy,'g','owner',member,'logs','logs/cleanup-archive'),true);
  }finally{store.close();}
 });

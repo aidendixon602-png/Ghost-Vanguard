@@ -1,3 +1,4 @@
+import { developers } from '../bot/developers.js';
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import { AppError } from '../errors.js';
 import { addConfirmation } from './layout-ui.js';
@@ -5,10 +6,16 @@ import { defaults, type CommandContext, type Registry } from '../bot/registry.js
 import { dangerous } from '../core.js';
 import { embed } from './ui.js';
 
+function requirePermissionManager(component: string, user: string, before: string | null, after: string | null) {
+    const kind = component === 'grant' ? (JSON.parse(before ?? after ?? 'null')?.kind as string | undefined) : undefined;
+    if (component === 'permission-role' || component.startsWith('staff/') || kind === 'admin' || kind?.startsWith('staff:')) developers.require(user);
+}
+
 export async function previewHistory(ctx: CommandContext, i: any, id: number) {
     const row = ctx.store.get('SELECT * FROM configuration_history WHERE guild_id=? AND id=?', i.guildId, id);
     if (!row)
         throw new AppError('VALIDATION_ERROR', 'Configuration history entry not found in this guild.');
+    requirePermissionManager(String(row.component), i.user.id, row.before_json, row.after_json);
     if (row.component === 'authorization')
         throw new AppError('VALIDATION_ERROR', 'Authorization history is retained for audit. Authorization must be changed by a developer through /dev server authorize, /dev server deauthorize or /dev server info.');
     if (row.component === 'antiping')
@@ -32,6 +39,7 @@ export function registerHistory(registry: Registry) {
             const row = ctx.store.get('SELECT * FROM configuration_history WHERE guild_id=? AND id=?', i.guildId, p.snapshot);
             if (!row || (row.before_json ?? 'null') !== p.fingerprint)
                 throw new AppError('VALIDATION_ERROR', 'History changed. Review a fresh rollback.');
+            requirePermissionManager(String(row.component), i.user.id, row.before_json, row.after_json);
             if (!ctx.databaseBackups)
                 throw new AppError('DATABASE_ERROR', 'Database backup service unavailable. No rollback performed.');
             const previous = row.before_json === null ? null : JSON.parse(row.before_json), current = row.after_json === null ? null : JSON.parse(row.after_json);

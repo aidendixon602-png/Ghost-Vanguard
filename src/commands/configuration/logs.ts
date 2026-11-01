@@ -1,9 +1,11 @@
+import { confirmDanger } from '../../ui/danger-ui.js';
+import { archivePlan, deleteArchive } from '../../audit/archive-cleanup.js';
 import { ChannelType, Colors, PermissionFlagsBits, SlashCommandBuilder } from 'discord.js';
 import { defineCommand } from '../../bot/registry.js';
 import { AppError } from '../../errors.js';
 import { configureEventLog, eventLogConfig, LOG_CATEGORIES, LOG_RETENTION_DAYS, recentEvents, type LogCategory } from '../../audit/event-log.js';
 import { embed } from '../../ui/ui.js';
-import { BANS_CHANNEL, checkChannel, describeCheck, LOGGING_CHANNEL, logChannels, serverPermissionGaps, setLogChannels, setupLogChannels } from '../../audit/log-setup.js';
+import { BANS_CHANNEL, checkChannel, describeCheck, LEGACY_LOG_ROUTES, LOGGING_CHANNEL, logChannels, serverPermissionGaps, setLogChannels, setupLogChannels, type LogRoute } from '../../audit/log-setup.js';
 
 const CATEGORY_LABELS: Record<LogCategory, string> = {
     moderation: 'Moderation (bans, kicks, timeouts, prunes)',
@@ -17,10 +19,14 @@ const CATEGORY_LABELS: Record<LogCategory, string> = {
 const choices = LOG_CATEGORIES.map(c => ({ name: CATEGORY_LABELS[c].slice(0, 100), value: c }));
 
 export default defineCommand(new SlashCommandBuilder().setName('logs').setDescription('Server event logs: who changed what, viewable in Discord')
-    .addSubcommand(s => s.setName('setup').setDescription(`Set up #${BANS_CHANNEL} and #${LOGGING_CHANNEL} under a Ghost Vanguard Logs category`)
+    .addSubcommand(s => s.setName('setup').setDescription('Set up active log channels and reuse matching legacy log channels')
         .addChannelOption(o => o.setName('bans_channel').setDescription(`Use this channel for ban logs instead of #${BANS_CHANNEL}`).addChannelTypes(ChannelType.GuildText))
         .addChannelOption(o => o.setName('logging_channel').setDescription(`Use this channel for server logs instead of #${LOGGING_CHANNEL}`).addChannelTypes(ChannelType.GuildText)))
-    .addSubcommand(s => s.setName('check').setDescription('Check both log channels and the bot permissions, then send a test embed'))
+    .addSubcommand(s => s.setName('route').setDescription('Choose a channel for one log type, or reset it to the default')
+        .addStringOption(o => o.setName('type').setDescription('Log type').setRequired(true).addChoices(...Object.keys(LEGACY_LOG_ROUTES).map(value => ({ name: value, value }))))
+        .addChannelOption(o => o.setName('channel').setDescription('Destination; omit to use the default log channel').addChannelTypes(ChannelType.GuildText)))
+    .addSubcommand(s => s.setName('cleanup-archive').setDescription('Preview deletion of channels in the old log archive'))
+    .addSubcommand(s => s.setName('check').setDescription('Check configured log channels and bot permissions, then send test embeds'))
     .addSubcommand(s => s.setName('exclude').setDescription('Stop (or start again) logging events from a channel')
         .addChannelOption(o => o.setName('channel').setDescription('Channel').setRequired(true))
         .addBooleanOption(o => o.setName('excluded').setDescription('True: do not log this channel · False: log it again').setRequired(true)))
@@ -39,6 +45,37 @@ export default defineCommand(new SlashCommandBuilder().setName('logs').setDescri
         .addIntegerOption(o => o.setName('page').setDescription('Page number').setMinValue(1))), { category: 'security', access: 'security', requiredPermissions: [PermissionFlagsBits.ManageGuild] }, async (ctx, i) => {
     const guild = i.guildId, sub = i.options.getSubcommand();
     const settings = ctx.store.settings(guild);
+    if (sub === 'route') {
+        const type = i.options.getString('type', true) as LogRoute;
+        if (!Object.hasOwn(LEGACY_LOG_ROUTES, type)) throw new AppError('VALIDATION_ERROR', 'Choose a supported log type.');
+        const channel = i.options.getChannel('channel');
+        if (channel) {
+            const check = await checkChannel(i.guild, channel.id, type, false);
+            if (!check.ok || check.publiclyVisible) throw new AppError('VALIDATION_ERROR', 'Choose a private text channel where Vanguard can view, send embeds and read history.');
+        }
+        const routes = { ...logChannels(ctx.store, guild).routes };
+        if (channel) routes[type] = channel.id; else delete routes[type];
+        setLogChannels(ctx.store, guild, { routes }, i.user.id);
+        return `**${type} logs:** ${channel ? `<#${channel.id}>` : 'default log channel'}. Event logging and category switches still apply; check \`/setup logs status\`.`;
+    }
+    if (sub === 'cleanup-archive') {
+        await i.guild.channels.fetch();
+        const plan = archivePlan(i.guild, ctx.store);
+        if (!plan.categories.length) return 'No archived Veil log categories were found.';
+        return confirmDanger(ctx, i, {
+            title: 'Delete archived channels', label: 'Delete archived channels',
+            summary: `Delete up to ${plan.channels.length} archived channels and ${plan.categories.length} empty archive categories.`,
+            consequences: [
+                ...plan.channels.slice(0, 15).map(c => `<#${c.id}>`),
+                ...(plan.channels.length > 15 ? [`Plus ${plan.channels.length - 15} more archived channels.`] : []),
+                'All channel types in this archive are included, even custom channels with unrelated names.',
+                'All messages in deleted channels are permanently lost.',
+                'Active log destinations and channels moved out of the archive are skipped.',
+            ],
+            reversal: 'Discord channel IDs and message history cannot be restored.',
+            run: async (fresh, click) => deleteArchive(click.guild, fresh.store, plan, click.user.id),
+        });
+    }
     if (sub === 'view') {
         const category = i.options.getString('category') as LogCategory | null;
         const user = i.options.getUser('user');
@@ -57,6 +94,7 @@ export default defineCommand(new SlashCommandBuilder().setName('logs').setDescri
     if (sub === 'setup' || sub === 'check') {
         await i.editReply({ embeds: [embed(sub === 'setup' ? 'Setting up log channels…' : 'Checking log channels…', 'Checking channels and permissions, then sending a test embed.', Colors.Blurple)] }).catch(() => undefined);
         const lines: string[] = [];
+        let skippedRoutes = false;
         let bansId: string | null, loggingId: string | null;
         if (sub === 'setup') {
             let result;
@@ -67,7 +105,12 @@ export default defineCommand(new SlashCommandBuilder().setName('logs').setDescri
             }
             bansId = result.bans.channel.id; loggingId = result.logging.channel.id;
             lines.push(`**Category:** ${result.category.name} · active log channels grouped together`, `**Ban logs:** <#${bansId}> · ${result.bans.how}`, `**Server logs:** <#${loggingId}> · ${result.logging.how}`);
-            if (result.archivedCategories.length) lines.push('**Old Veil logs:** moved into an archive category; no old channels or messages were deleted.');
+            if (Object.keys(result.routes).length) lines.push('**Existing log channels:** reused for matching events; their permissions and message history were preserved.');
+            if (result.archivedCategories.length) lines.push('**Other old Veil channels:** kept in the archive; no channels or messages were deleted.');
+            for (const { route, check } of result.skipped) {
+                skippedRoutes = true;
+                lines.push(`**Not activated:** ${describeCheck(`#${LEGACY_LOG_ROUTES[route]}`, check)}`);
+            }
             if (result.previousAlerts) lines.push(`Bot actions (anti-nuke, backups, restores, configuration changes, errors) now go to <#${loggingId}> instead of <#${result.previousAlerts}>.`);
         } else {
             bansId = logChannels(ctx.store, guild).bansChannelId; loggingId = eventLogConfig(ctx.store, guild).channelId;
@@ -75,9 +118,20 @@ export default defineCommand(new SlashCommandBuilder().setName('logs').setDescri
         }
         const bans = await checkChannel(i.guild, bansId!, 'ban logs'), logging = await checkChannel(i.guild, loggingId!, 'server logs');
         lines.push('', describeCheck('Ban logs', bans), describeCheck('Server logs', logging));
+        let routesOk = true;
+        for (const [route, id] of Object.entries(logChannels(ctx.store, guild).routes ?? {}) as [LogRoute, string][]) {
+            if (!LEGACY_LOG_ROUTES[route]) continue;
+            const result = await checkChannel(i.guild, id, route);
+            routesOk &&= result.ok && !result.publiclyVisible;
+            lines.push(describeCheck(`#${LEGACY_LOG_ROUTES[route]}`, result));
+        }
         const gaps = serverPermissionGaps(i.guild);
         lines.push(gaps.length ? `**Server permissions missing:** ${gaps.join('; ')}` : '**Server permissions:** ✅ View Audit Log and Ban Members');
-        const ok = bans.ok && logging.ok && !gaps.length;
+        const events = eventLogConfig(ctx.store, guild);
+        const disabled = LOG_CATEGORIES.filter(category => !events.categories.has(category));
+        if (!events.enabled) lines.push('**Event logging is off:** use `/setup logs enable` to resume.');
+        if (disabled.length) lines.push(`**Disabled event categories:** ${disabled.join(', ')} · enable with \`/setup logs category\`.`);
+        const ok = bans.ok && logging.ok && !bans.publiclyVisible && !logging.publiclyVisible && routesOk && !skippedRoutes && events.enabled && !gaps.length;
         await i.editReply({ embeds: [embed(ok ? '✅ Log channels ready' : '⚠️ Log channels need attention', lines.join('\n'), ok ? Colors.Green : Colors.Orange)] });
         return;
     }
@@ -102,6 +156,7 @@ export default defineCommand(new SlashCommandBuilder().setName('logs').setDescri
             `**Ban logs:** ${extra.bansChannelId ? `<#${extra.bansChannelId}>` : 'not set up (`/setup logs setup`)'}`,
             `**Excluded channels:** ${extra.excludedChannels.length ? extra.excludedChannels.map(c => `<#${c}>`).join(', ') : 'none'}`,
             `**Routine bot changes:** ${extra.ignoreBotRoutine ? 'skipped' : 'logged'}`,
+            `**Separate log channels:** ${Object.entries(extra.routes ?? {}).map(([name, id]) => `${name}: <#${id}>`).join(' · ') || 'none'}`,
             `**Log entries waiting to retry:** ${pending}`,
             `**Event logging:** ${config.enabled ? 'on' : 'off'}`,
             `**Channel:** ${channel ? `<#${channel}>${config.channelId ? '' : ' (security log channel)'}` : 'none set'}`,
@@ -130,4 +185,4 @@ export default defineCommand(new SlashCommandBuilder().setName('logs').setDescri
     const name = i.options.getString('name', true) as LogCategory, on = i.options.getBoolean('enabled', true);
     configureEventLog(ctx.store, guild, { category: [name, on] });
     return `${CATEGORY_LABELS[name].split(' (')[0]} events are now **${on ? 'logged' : 'not logged'}**.`;
-});
+}, { subcommands: { 'cleanup-archive': { access: 'owner', botPermissions: [PermissionFlagsBits.ManageChannels] } } });

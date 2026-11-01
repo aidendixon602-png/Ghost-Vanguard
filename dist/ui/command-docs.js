@@ -3,12 +3,12 @@ import { describe } from '../bot/command-descriptions.js';
 import { requiredRank } from '../bot/ranks.js';
 import { accessLabel } from './help-ui.js';
 const LEVELS = [
-    [8, '🧰 Developer', 'The top rank: the bot owner (`BOT_OWNER_ID`) and anyone in `DEVELOPER_IDS`. Everything, including the tools that can take the bot down or reach every server at once: restarts, installing updates, restoring database settings, removing or banning servers, giving bot-wide ranks and managing network bans. Watched by anti-nuke, but never punished. Set only in `.env`.'],
-    [7.5, '🏠 Server Owner', 'Whoever owns a Discord server, in that server only. Above Supreme Leader there: everything server-side, including security admins and undoing setting changes. No bot-wide tools (network bans, /dev, the database). Watched by anti-nuke, but never punished.'],
+    [8, '🧰 Developer', 'The top rank: the bot owner (`BOT_OWNER_ID`) and anyone in `DEVELOPER_IDS`. Everything, including the tools that can take the bot down or reach every server at once: restarts, installing updates, restoring database settings, removing or banning servers, giving bot-wide ranks and managing network bans. Watched by anti-nuke, but never punished. Set in the existing bot configuration or `BOT_STAFF_IDS.developer` in `src/bot/access-ids.ts`. Only Developers manage bot permission assignments. Restart additionally requires an exact ID in `DEVELOPER_IDS`.'],
+    [7.5, '🏠 Server Owner', 'Whoever owns a Discord server, in that server only. Above Supreme Leader there: server operations and undoing non-permission settings. Bot permission assignments are Developer-only. No bot-wide tools (network bans, /dev, the database). Watched by anti-nuke, but never punished.'],
     [7, '👑 Supreme Leader', 'Bot-wide, every server: diagnostics, update status, database health and backups. Cannot issue, lift or except network bans; those are Developer-only. Punished by anti-nuke like anyone else. Given with `/setup staff global` or `SUPREME_LEADER_IDS`.'],
     [6, '🔭 Overseer', 'Bot-wide, every server: Bot Manager plus inspecting and authorizing servers. Network-ban exceptions are Developer-only. Given with `/setup staff global`.'],
     [5, '🛠️ Bot Manager', 'Bot-wide, every server: Head Admin everywhere plus bot status, diagnostics and announcements. Given with `/setup staff global`.'],
-    [4, '🛡️ Head Admin', 'Server rank: anti-nuke, whitelist, control panel, backups and staff ranks. Given by linking a role with `/setup staff role`, or `/setup security-admins` (owner). Discord\'s Administrator permission counts as Head Admin, except for actions that weaken protection.'],
+    [4, '🛡️ Head Admin', 'Server rank: anti-nuke, whitelist, control panel, and backups. Given by linking a role with `/setup staff role`, or directly by user ID with `/setup staff user` (Developer only). Discord\'s Administrator permission counts as Head Admin, except for actions that weaken protection.'],
     [3, '🔧 Admin', 'Server rank: lifting ordinary bans and accepting appeals, raid tools, automod, scam protection and logging. Given with `/setup staff role`; Discord\'s Administrator permission also works for unbans.'],
     [2, '🔨 Moderator', 'Server rank, or Discord\'s matching permission (Ban/Kick/Timeout Members, Manage Messages): bans, kicks, purges, denying appeals. Cannot lift bans.'],
     [1, '🤝 Helper', 'Server rank: warnings, short timeouts, cases and notes. Given with `/setup staff role`.'],
@@ -42,13 +42,13 @@ export function commandLeaves(registry) {
     return leaves;
 }
 const NOTES = {
-    '/role add': 'checked role by role: Manage Roles or a Moderator rank, and staff roles need `/role who-can-give`',
+    '/role add': 'ordinary roles require Manage Roles, Administrator or a Vanguard Moderator rank; bot permission roles require a Developer; other privileged roles need owner approval',
     '/role remove': 'checked role by role, like `/role add`',
     '/role restore': 'gives back only roles the person could give with `/role add`',
     '/role who-can-give': 'staff roles: owner only',
     '/mod massban': 'must also be on the anti-nuke whitelist',
     '/mod timeout': 'Helpers up to 60 minutes; Moderators longer',
-    '/mod unban': 'Admins may lift ordinary bans here; ban-log buttons are server-owner/Developer only (500 ms cooldown; successful actions post who clicked in #bans); network-ban lifts and exceptions are Developer only',
+    '/mod unban': 'Admins may lift ordinary bans here; ban-log buttons are server-owner/Developer only (500 ms cooldown; successful actions post who clicked in #bans); genreban and hardban lifts, and genreban exceptions, are Developer only',
     '/antinuke threats list': 'Admin and above; scores and levels are informational and never trigger automatic enforcement',
     '/antinuke threats view': 'Admin and above; shows every scored incident and staff action',
     '/antinuke threats clear': 'Head Admin and above; clears the board entry only, cases and bans stay',

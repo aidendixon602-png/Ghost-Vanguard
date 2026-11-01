@@ -15,13 +15,8 @@ export const style = {
     cyan: paint('36'),
 };
 
-const RULE = '━'.repeat(60);
-const PANEL_WIDTH = 72;
-const stripAnsi = (value: string) => value.replace(/\x1b\[[0-9;]*m/g, '');
-const visibleLength = (value: string) => Array.from(stripAnsi(value)).length;
-const frame = (top: string, fill: string, end: string) => style.cyan(`  ${top}${fill.repeat(PANEL_WIDTH + 2)}${end}`);
-const panelRow = (content: string) => `  │ ${content}${' '.repeat(Math.max(0, PANEL_WIDTH - visibleLength(content)))} │`;
-const detail = (label: string, value: string) => panelRow(`${style.cyan(label.padEnd(10))} ${value}`);
+const RULE = '─'.repeat(48);
+const detail = (label: string, value: string) => `  ${style.dim(label.padEnd(13))} ${value}`;
 
 /** 393216 -> "384 KB". */
 export function readableSize(bytes: number): string {
@@ -42,29 +37,29 @@ export interface StartupInfo {
     servers: number;
     commands: number;
     commandsUpdated: boolean;
+    verification: string;
     integrations: Record<string, boolean>;
     health: string;
 }
 
-/** A compact, framed status panel printed once the bot is connected and ready. */
+/** A compact status summary printed once the bot is connected and ready. */
 export function startupSummary(info: StartupInfo): string[] {
     const integrations = Object.entries(info.integrations)
         .map(([name, on]) => on ? `${name} ${style.green('ON')}` : `${name} ${style.dim('off')}`).join('  ·  ');
-    const network = info.servers > 0 ? `${info.servers} connected` : style.yellow('not in any servers yet');
+    const servers = info.servers > 0 ? `${info.servers} connected` : style.yellow('not in any servers yet');
     const commandState = info.commandsUpdated ? style.yellow('updated on Discord') : style.green('up to date');
     return [
         '',
-        frame('╭', '─', '╮'),
-        panelRow(`${style.bold(PRODUCT_NAME_UPPER)}  ${style.dim(`v${info.version}`)}  ${style.cyan('SECURITY OPERATIONS')}`),
-        panelRow(`${style.green('● SYSTEM ONLINE')}  ${style.dim('as')} ${style.bold(info.tag)}`),
-        frame('├', '─', '┤'),
-        detail('NETWORK', network),
-        detail('COMMANDS', `${info.commands} registered  ·  ${commandState}`),
-        detail('MODULES', integrations),
-        detail('HEALTH', info.health),
-        frame('╰', '─', '╯'),
+        `  ${style.bold(PRODUCT_NAME_UPPER)}  ${style.dim(`v${info.version}`)}`,
+        `  ${style.green('SYSTEM ONLINE')}  ${style.dim('·')}  ${info.tag}`,
+        `  ${style.dim(RULE)}`,
+        detail('Servers', servers),
+        detail('Commands', `${info.commands} registered  ·  ${commandState}`),
+        detail('Verification', info.verification),
+        detail('Integrations', integrations),
+        detail('Health', info.health),
         '',
     ];
 }
 
-export const closingRule = () => style.cyan(RULE);
+export const closingRule = () => `  ${style.dim(RULE)}`;

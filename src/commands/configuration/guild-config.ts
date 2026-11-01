@@ -1,3 +1,4 @@
+import { developers } from '../../bot/developers.js';
 import { SlashCommandBuilder } from 'discord.js';
 import { defineCommand } from '../../bot/registry.js';
 import { AppError } from '../../errors.js';
@@ -21,6 +22,7 @@ export default defineCommand(guildConfigBuilder, { category: 'configuration', ac
         ctx.store.run('INSERT INTO provider_config VALUES(?,?,?) ON CONFLICT(guild_id,provider) DO UPDATE SET enabled=excluded.enabled', guild, provider, Number(i.options.getBoolean('enabled', true)));
         after = ctx.store.get('SELECT * FROM provider_config WHERE guild_id=? AND provider=?', guild, provider);
     } else if (sub === 'permission-role') {
+        developers.require(i.user.id);
         const role = i.options.getRole('role', true), access = i.options.getString('access', true);
         component = 'permission-role';
         if (role.id === guild || role.managed)

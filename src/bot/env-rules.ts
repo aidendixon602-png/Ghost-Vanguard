@@ -37,8 +37,11 @@ export function blockedBy(userId: string, shown: string | null): string | null {
     if (!userId || userId === config.ownerId) return null;
     const entries = blacklist().get(userId);
     if (!entries) return null;
-    for (const entry of entries)
-        if (entry === '*' || shown && (shown === entry || shown.startsWith(`${entry} `))) return entry;
+    for (const entry of entries) {
+        // Keep existing blacklist rules effective after the slash command was renamed.
+        const match = entry === 'roblox network' ? 'roblox sharing' : entry;
+        if (match === '*' || shown && (shown === match || shown.startsWith(`${match} `))) return entry;
+    }
     return null;
 }
 

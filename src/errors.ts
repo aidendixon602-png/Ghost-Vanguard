@@ -68,13 +68,16 @@ const SPECIAL_LINES: Record<string, (e: Record<string, unknown>) => string[] | n
         return lines;
     },
     database_backup_verified: e => [`  ${style.green('✔')} Database backup saved ${style.dim(`· ${e.kind ?? 'backup'} · ${typeof e.size === 'number' ? readableSize(e.size) : '?'}`)}`],
+    quarantine_member_absent: e => [`  ${style.dim('Quarantine retained')} · server ${e.guildId} · member ${e.userId} · ${e.reason}`],
+    trusted_bots: e => Array.isArray(e.lines) ? [`  ${style.bold('Trusted bots')}`, ...e.lines.map(line => `    ${String(line).replace(/\*\*/g, '')}`)] : null,
 };
 
 export function logEvent(event: string, fields: Record<string, unknown> = {}) {
     const sanitized = sanitize({ timestamp: new Date().toISOString(), event, ...fields }) as Record<string, unknown>;
     const level = /fail|error|exception/.test(event) ? 'ERROR' : /unavailable|unverified|retry|pending|warning/.test(event) ? 'WARN' : event === 'command_activity' ? 'DEBUG' : 'INFO';
     const ranks: Record<string, number> = { debug: 0, info: 1, warn: 2, error: 3 };
-    if ((ranks[level.toLowerCase()] ?? 1) < (ranks[config.logLevel] ?? 1))
+    // The trusted-bot report is a startup access audit, including warnings that must stay visible.
+    if (!(config.logFormat !== 'json' && event === 'trusted_bots') && (ranks[level.toLowerCase()] ?? 1) < (ranks[config.logLevel] ?? 1))
         return;
     if (config.logFormat === 'json') {
         console.log(JSON.stringify(sanitized));

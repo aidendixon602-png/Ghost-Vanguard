@@ -1,3 +1,4 @@
+import { isBotPermissionRole } from '../security/role-policy.js';
 import { Colors } from 'discord.js';
 import { ageDays, dangerous, KeyedQueue } from '../core.js';
 import { addToBlacklist, blacklistEntry, syncGroupRoles } from '../features/roblox-tools.js';
@@ -52,7 +53,7 @@ export class Roblox {
                 throw new AppError('INTEGRATION_ERROR', `The configured verified role is managed by an integration. ${roleHelp}`);
             if (!role.editable)
                 throw new AppError('INTEGRATION_ERROR', `The bot cannot manage the verified role. Grant Manage Roles and check the role hierarchy. ${roleHelp}`);
-            if (dangerous(role.permissions.bitfield))
+            if (isBotPermissionRole(this.store, member.guild.id, role.id) || dangerous(role.permissions.bitfield))
                 throw new AppError('INTEGRATION_ERROR', `The verified role grants moderation or administrative permissions. ${roleHelp}`);
             // Custom link lookup — no external provider
             const link = this.store.get('SELECT roblox_id, username FROM links WHERE guild_id=? AND user_id=?', member.guild.id, member.id);
@@ -84,7 +85,7 @@ export class Roblox {
             if (!this.store.settings(member.guild.id).authorized || this.store.get('SELECT 1 FROM backups WHERE guild_id=? AND user_id=? AND active=1', member.guild.id, member.id))
                 throw new AppError('INTEGRATION_ERROR', 'Verification was canceled because server authorization or quarantine status changed.');
             const checkedRole = await member.guild.roles.fetch(role.id, { force: true });
-            if (!checkedRole || checkedRole.managed || !checkedRole.editable || dangerous(checkedRole.permissions.bitfield))
+            if (!checkedRole || checkedRole.managed || !checkedRole.editable || isBotPermissionRole(this.store, member.guild.id, checkedRole.id) || dangerous(checkedRole.permissions.bitfield))
                 throw new AppError('INTEGRATION_ERROR', 'The verified role became unsafe or unavailable during verification.');
             this.store.assertAuthorized(member.guild.id);
             const hadRole = fresh.roles.cache.has(checkedRole.id);

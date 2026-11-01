@@ -2,7 +2,7 @@ import { Colors, PermissionFlagsBits, SlashCommandBuilder } from 'discord.js';
 import { defineCommand } from '../../bot/registry.js';
 import { AppError } from '../../errors.js';
 import { embed } from '../../ui/ui.js';
-import { AUTOMOD_DEFAULTS, automodConfig, cleanDomain, INVITE_PATTERN, SAFE_DOMAINS } from '../../features/automod.js';
+import { AUTOMOD_DEFAULTS, automodConfig, cleanDomain, INVITE_PATTERN, normalizePhrase, SAFE_DOMAINS } from '../../features/automod.js';
 import { rankName, rankOf, RANK_LABEL } from '../../bot/ranks.js';
 import { config } from '../../config.js';
 import { LOCK_SCHEDULE_DEFAULTS, inWindow, lockScheduleConfig, validTime } from '../../features/schedules.js';
@@ -24,6 +24,12 @@ export default defineCommand(new SlashCommandBuilder().setName('automod').setDes
     .addSubcommand(s => s.setName('link-list').setDescription('Add a website to the allowed or blocked list, or remove it')
     .addStringOption(o => o.setName('action').setDescription('What to do').setRequired(true).addChoices({ name: 'Allow this site', value: 'allow' }, { name: 'Block this site', value: 'block' }, { name: 'Remove from both lists', value: 'remove' }))
     .addStringOption(o => o.setName('site').setDescription('The website, e.g. youtube.com (covers its sub-domains too)').setRequired(true).setMaxLength(200)))
+    .addSubcommand(s => s.setName('words').setDescription('Turn the blocked phrase filter on or off')
+    .addBooleanOption(o => o.setName('enabled').setDescription('On or off').setRequired(true)))
+    .addSubcommand(s => s.setName('word-list').setDescription('Manage blocked words and phrases')
+    .addStringOption(o => o.setName('action').setDescription('Add, remove or list').setRequired(true).addChoices({ name: 'Add', value: 'add' }, { name: 'Remove', value: 'remove' }, { name: 'List', value: 'list' }))
+    .addStringOption(o => o.setName('phrase').setDescription('Literal word or phrase to filter').setMinLength(1).setMaxLength(80))
+    .addIntegerOption(o => o.setName('page').setDescription('Page of results when listing').setMinValue(1).setMaxValue(10)))
     .addSubcommand(s => s.setName('ai').setDescription('AI moderation: catch harassment, hate, threats and NSFW text and images')
     .addBooleanOption(o => o.setName('enabled').setDescription('On or off').setRequired(true))
     .addStringOption(o => o.setName('mode').setDescription('What happens to flagged messages (default: report only)').addChoices({ name: 'Report only: staff decide', value: 'report' }, { name: 'Delete clear-cut cases, report the rest', value: 'delete' }, { name: 'Strict: delete + 1h timeout for the worst', value: 'strict' }))
@@ -55,6 +61,7 @@ export default defineCommand(new SlashCommandBuilder().setName('automod').setDes
             `**Links:** ${a.links === 'off' ? '⚪ off (any link is fine)' : a.links === 'blocklist' ? '🟢 block list' : '🟢 allow list (strict)'}`,
             `**Allowed sites:** ${a.allowedDomains.join(', ') || 'none'}`,
             `**Blocked sites:** ${a.blockedDomains.join(', ') || 'none'}`,
+            `**Blocked phrases:** ${onOff(a.wordsEnabled)} · ${a.blockedWords.length} configured`,
             `**Alt-account check:** ${onOff(a.alts)} · needs RoVer or Bloxlink set up`,
             `**AI moderation:** ${onOff(a.ai)} · ${a.aiMode} · sensitivity ${a.aiSensitivity} · images ${a.aiImages ? 'on' : 'off'}${a.aiIgnoreChannels.length ? ` · skips ${a.aiIgnoreChannels.map(c => `<#${c}>`).join(' ')}` : ''}${a.aiIgnoreCategories.length ? ` · ignores ${a.aiIgnoreCategories.join(', ')}` : ''}${a.ai && !config.openaiKey ? ' · ⚠ OPENAI_API_KEY is missing' : ''}`,
             `**Quiet hours:** ${onOff(q.enabled)}${q.enabled ? ` · ${q.start} → ${q.end} (UTC${q.utcOffset >= 0 ? '+' : ''}${q.utcOffset})${inWindow(q) ? ' · **active now**' : ''}` : ''}`,
@@ -117,6 +124,39 @@ export default defineCommand(new SlashCommandBuilder().setName('automod').setDes
         ctx.logs.push(guild, embed('Automod · link list changed', `By <@${i.user.id}> · ${action} **${domain}**`, Colors.Orange));
         const modeNote = a.links === 'off' ? '\n-# Links are off right now; turn the rule on with `/automod links`.' : '';
         return `${action === 'allow' ? `**${domain}** is allowed` : action === 'block' ? `**${domain}** is blocked` : `**${domain}** was removed from the lists`} (sub-domains included).${modeNote}`;
+    }
+    if (sub === 'words') {
+        const enabled = i.options.getBoolean('enabled', true);
+        setFeature(ctx.store, guild, 'automod', AUTOMOD_DEFAULTS, { wordsEnabled: enabled }, i.user.id);
+        ctx.logs.push(guild, embed('Automod · phrase filter changed', `By <@${i.user.id}> · ${enabled ? 'on' : 'off'}`, Colors.Orange));
+        const note = enabled && !config.messageContentEnabled
+            ? '\n⚠ Message Content is disabled for this bot. The phrase filter cannot read ordinary server messages.' : '';
+        return `Blocked phrase filter is **${enabled ? 'on' : 'off'}**. Configure phrases with \`/automod word-list\`.${note}`;
+    }
+    if (sub === 'word-list') {
+        const action = i.options.getString('action', true), existing = automodConfig(ctx.store, guild).blockedWords;
+        if (action === 'list') {
+            const page = i.options.getInteger('page') ?? 1;
+            const items = existing.slice((page - 1) * 10, page * 10).map(p => `• ${p.replaceAll('@', '＠').replace(/[`*_~|\\]/g, '\\$&')}`);
+            return `**Blocked phrases · page ${page}**\n${items.join('\n') || 'None on this page.'}`;
+        }
+        const raw = i.options.getString('phrase');
+        if (!raw)
+            throw new AppError('VALIDATION_ERROR', 'Enter a phrase to add or remove.');
+        const phrase = normalizePhrase(raw);
+        if (phrase.length > 80 || !/[\p{L}\p{N}]/u.test(phrase))
+            throw new AppError('VALIDATION_ERROR', 'Enter a word or phrase containing letters or numbers (up to 80 characters).');
+        const already = existing.includes(phrase);
+        if (action === 'add' && already)
+            throw new AppError('VALIDATION_ERROR', 'That phrase is already blocked.');
+        if (action === 'remove' && !already)
+            throw new AppError('VALIDATION_ERROR', 'That phrase is not on the list.');
+        const phrases = action === 'add' ? [...existing, phrase] : existing.filter(p => p !== phrase);
+        if (phrases.length > 100)
+            throw new AppError('VALIDATION_ERROR', 'The list holds up to 100 phrases.');
+        setFeature(ctx.store, guild, 'automod', AUTOMOD_DEFAULTS, { blockedWords: phrases }, i.user.id);
+        ctx.logs.push(guild, embed('Automod · phrase list changed', `By <@${i.user.id}> · ${action === 'add' ? 'added' : 'removed'} a phrase`, Colors.Orange));
+        return `Phrase ${action === 'add' ? 'added to' : 'removed from'} the blocked list (${phrases.length}/100).`;
     }
     if (sub === 'ai-ignore') {
         const add = i.options.getString('action', true) === 'add', channel = i.options.getChannel('channel'), kind = i.options.getString('kind');

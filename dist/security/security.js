@@ -1,3 +1,4 @@
+import { isBotPermissionRole } from './role-policy.js';
 import { consumeApprovedRoleChange } from './role-authorizations.js';
 import { ActionRowBuilder, AuditLogEvent, PermissionFlagsBits, ButtonBuilder, ButtonStyle, Colors } from 'discord.js';
 import { dangerous, escalationAdded, KeyedQueue, overrideRule, ruleFor, RULES, WARN_FIRST, WARNING_MEMORY_MS, KNOWN_ROLE_BOTS } from '../core.js';
@@ -12,6 +13,7 @@ import { scopeName } from '../ui/antinuke-panel.js';
 import { dmGlobalAlert, sendGlobalAlert, snapshotMember } from './global-alert.js';
 import { recentJoiners, switchOnRaid } from './raid-waves.js';
 import { handleRaidJoin, raidState } from './raidmode.js';
+import { logRoute } from '../audit/log-setup.js';
 /** How far back an incident alert looks for channels and roles the actor deleted. */
 const DELETION_LOOKBACK_MS = 10 * 60 * 1000;
 const ruleByKey = (key) => RULES.find(r => r.key === key);
@@ -99,6 +101,12 @@ export class Security {
     constructor(store, logs) {
         this.store = store;
         this.logs = logs;
+    }
+    incidentLog(guildId, card, rows = []) {
+        this.logs.push(guildId, card, rows);
+        const channel = logRoute(this.store, guildId, 'antinuke');
+        if (channel && channel !== this.store.settings(guildId).logChannelId)
+            this.logs.push(guildId, card, rows, channel);
     }
     trusted(guild, id, ignoreRoles = []) {
         return id === guild.ownerId || id === guild.client.user?.id || developers.has(id) || isTrustedBot(id) || isWhitelistedPerson(id) || this.store.hasGrant(guild.id, id, 'trust') || [...(guild.members?.cache?.get(id)?.roles.cache.keys() ?? [])].some(role => !ignoreRoles.includes(role) && this.store.hasGrant(guild.id, role, 'trust_role'));
@@ -191,8 +199,22 @@ export class Security {
                 this.headsUp(guild, actor, active, count, now);
             return;
         }
-        if (this.store.get("SELECT 1 FROM incidents WHERE guild_id=? AND actor_id=? AND rule=? AND at>? AND mode<>'warn'", guild.id, actor, rule.key, now - active.seconds * 1000))
+        const recent = this.store.get("SELECT id,mode,result FROM incidents WHERE guild_id=? AND actor_id=? AND rule=? AND at>? AND mode<>'warn' ORDER BY id DESC LIMIT 1", guild.id, actor, rule.key, now - active.seconds * 1000);
+        if (recent) {
+            // Suppress repeated containment and alerts, never the reversals of a continuing attack.
+            // Recheck the current mode and exemptions: an earlier incident is not authorization.
+            if (s.mode === 'enforce' && recent.mode === 'enforce' && !exempt && active.revert) {
+                const attempt = await this.attemptRevert(eventId, entry, guild, active);
+                if (attempt) {
+                    const detail = `[${attempt.outcome}] ${attempt.detail}`;
+                    const base = String(recent.result).split('\nContinued protection:')[0].slice(0, 3000);
+                    this.store.run('UPDATE incidents SET result=? WHERE guild_id=? AND id=?', `${base}\nContinued protection: ${detail}`, guild.id, recent.id);
+                    if (this.takeAlert(`${guild.id}:${actor}:${rule.key}:continued`, 5000, now))
+                        this.incidentLog(guild.id, embed(`Incident #${recent.id} · Continued protection`, `<@${actor}> continued **${active.title}** during the incident window.\n${detail.slice(0, 1500)}\nFurther outcomes are saved with the audit evidence.`, Colors.Orange));
+                }
+            }
             return;
+        }
         if (exempt)
             return this.alertExempt(guild, actor, active, count, exempt, entry.targetId ?? null, s.logChannelId);
         // Most dangerous grants are reverted with a warning first; a repeat within an hour strips.
@@ -227,23 +249,18 @@ export class Security {
                     result = 'Containment failed. Check role hierarchy and Manage Roles.';
                 }
             if (active.revert) {
-                const events = this.store.all('SELECT p.json FROM antinuke_event_payloads p JOIN observations o ON o.id=p.id AND o.guild_id=p.guild_id WHERE o.guild_id=? AND o.actor_id=? AND o.rule=? AND o.at>=? ORDER BY o.at DESC', guild.id, actor, rule.key, now - active.seconds * 1000);
+                const events = this.store.all("SELECT p.id,p.json FROM antinuke_event_payloads p JOIN observations o ON o.id=p.id AND o.guild_id=p.guild_id WHERE o.guild_id=? AND o.actor_id=? AND o.rule=? AND o.at>=? AND json_extract(p.json,'$.revertAttempted') IS NULL ORDER BY o.at DESC", guild.id, actor, rule.key, now - active.seconds * 1000);
                 let processed = 0;
                 for (const event of events) {
-                    try {
-                        const detail = await this.revert(JSON.parse(event.json), guild, active);
-                        const outcome = /kept|skipped|absent|protected|No automatic|no roles|Removed 0 /i.test(detail) ? 'skipped' : /^(Removed|Banned|Deleted|Restored) /i.test(detail) ? 'completed' : 'failed';
-                        progress[outcome]++;
-                        result += ` [${outcome}] ${detail}`;
-                    }
-                    catch {
-                        progress.failed++;
-                        result += ' [failed] Revert failed; check bot permissions and role hierarchy.';
-                    }
+                    const attempt = await this.attemptRevert(event.id, JSON.parse(event.json), guild, active);
+                    if (!attempt)
+                        continue;
+                    progress[attempt.outcome]++;
+                    result += ` [${attempt.outcome}] ${attempt.detail}`;
                     this.store.run('UPDATE incidents SET result=? WHERE guild_id=? AND id=?', `${result} Reverts: ${progress.completed} completed, ${progress.failed} failed, ${progress.skipped} skipped.`, guild.id, incident);
                     processed++;
                     if (events.length > 5 && (processed === 1 || processed % 10 === 0))
-                        this.logs.push(guild.id, embed(`Incident #${incident} · Revert progress`, `${processed}/${events.length} reviewed · ${progress.completed} completed · ${progress.failed} failed · ${progress.skipped} skipped`, Colors.Orange));
+                        this.incidentLog(guild.id, embed(`Incident #${incident} · Revert progress`, `${processed}/${events.length} reviewed · ${progress.completed} completed · ${progress.failed} failed · ${progress.skipped} skipped`, Colors.Orange));
                 }
             }
         }
@@ -257,7 +274,7 @@ export class Security {
         if (deleted.channels || deleted.roles)
             buttons.push(new ButtonBuilder().setCustomId(`incident:restore:${incident}`).setLabel('Review restore').setStyle(ButtonStyle.Secondary));
         const rows = buttons.length ? [new ActionRowBuilder().addComponents(...buttons)] : [];
-        this.logs.push(guild.id, incidentCard({ incident, actor, rule: active, mode: warnOnly ? 'warn' : s.mode, count, result, progress, deleted, targetId: entry.targetId ?? null, whitelistNote: this.partialWhitelist(guild, actor, active) }), rows);
+        this.incidentLog(guild.id, incidentCard({ incident, actor, rule: active, mode: warnOnly ? 'warn' : s.mode, count, result, progress, deleted, targetId: entry.targetId ?? null, whitelistNote: this.partialWhitelist(guild, actor, active) }), rows);
         try {
             const info = {
                 guild: { id: guild.id, name: guild.name }, actor, snapshot, rule: active, mode: warnOnly ? 'warn' : s.mode, incident,
@@ -272,6 +289,35 @@ export class Security {
         }
         catch { /* the feed is extra; the server's own alert above is what matters */ }
     }
+    /** Persist the attempt before Discord I/O so repeats and restarts cannot reapply an old undo. */
+    async attemptRevert(eventId, entry, guild, rule) {
+        const claimed = this.store.run("UPDATE antinuke_event_payloads SET json=json_set(json,'$.revertAttempted',true) WHERE guild_id=? AND id=? AND json_extract(json,'$.revertAttempted') IS NULL", guild.id, eventId);
+        if (!claimed.changes)
+            return null;
+        let detail;
+        let outcome;
+        try {
+            detail = await this.revert(entry, guild, rule);
+            outcome = /kept|skipped|absent|protected|No automatic|no roles|Removed 0 /i.test(detail) ? 'skipped'
+                : /^(Removed|Banned|Deleted|Restored) /i.test(detail) ? 'completed' : 'failed';
+        }
+        catch {
+            detail = 'Revert failed; check bot permissions and role hierarchy.';
+            outcome = 'failed';
+        }
+        this.store.run("UPDATE antinuke_event_payloads SET json=json_set(json,'$.revertOutcome',?,'$.revertDetail',?) WHERE guild_id=? AND id=?", outcome, detail, guild.id, eventId);
+        return { outcome, detail };
+    }
+    takeAlert(key, milliseconds, now) {
+        if ((this.headsUps.get(key) ?? 0) > now)
+            return false;
+        this.headsUps.set(key, now + milliseconds);
+        if (this.headsUps.size > 5000)
+            for (const [id, expiry] of this.headsUps)
+                if (expiry <= now)
+                    this.headsUps.delete(id);
+        return true;
+    }
     /** Someone anti-nuke never punishes hit a limit: record it and alert everywhere, but take no action. */
     async alertExempt(guild, actor, rule, count, reason, targetId, logChannelId) {
         const result = `Not punished: ${reason}. Nothing was undone.`;
@@ -280,7 +326,7 @@ export class Security {
         if (!alertExempt())
             return;
         const snapshot = snapshotMember(await memberOrNull(guild, actor).catch(() => null));
-        this.logs.push(guild.id, incidentCard({ incident, actor, rule, mode: 'exempt', exemptReason: reason, count, result, progress: { completed: 0, failed: 0, skipped: 0 }, deleted: this.recentDeletions(guild.id, actor, Date.now()), targetId }));
+        this.incidentLog(guild.id, incidentCard({ incident, actor, rule, mode: 'exempt', exemptReason: reason, count, result, progress: { completed: 0, failed: 0, skipped: 0 }, deleted: this.recentDeletions(guild.id, actor, Date.now()), targetId }));
         try {
             const info = { guild: { id: guild.id, name: guild.name }, actor, snapshot, rule, mode: 'exempt', exemptReason: reason, incident, failed: false, reverted: null,
                 jumpUrl: `https://discord.com/channels/${guild.id}${logChannelId ? `/${logChannelId}` : ''}` };
@@ -306,15 +352,10 @@ export class Security {
     /** "Close to the limit" note in the security log, at most once per person, rule and window. */
     headsUp(guild, actor, rule, count, now) {
         const key = `${guild.id}:${actor}:${rule.key}`;
-        if ((this.headsUps.get(key) ?? 0) > now)
+        if (!this.takeAlert(key, rule.seconds * 1000, now))
             return;
-        this.headsUps.set(key, now + rule.seconds * 1000);
-        if (this.headsUps.size > 5000)
-            for (const [k, until] of this.headsUps)
-                if (until <= now)
-                    this.headsUps.delete(k);
         const next = WARN_FIRST.has(rule.key) ? 'a warning' : `being ${rule.punishment === 'ban' ? 'banned' : rule.punishment === 'kick' ? 'kicked' : 'stripped'}`;
-        this.logs.push(guild.id, embed('Anti-nuke heads-up', `<@${actor}> is close to the **${rule.title}** limit: **${count} of ${rule.count}** in ${rule.seconds}s. Nothing has been done. One more gets them ${next}.\n-# If this is normal for them, whitelist them with \`/antinuke whitelist add\`.`, Colors.Blue));
+        this.incidentLog(guild.id, embed('Anti-nuke heads-up', `<@${actor}> is close to the **${rule.title}** limit: **${count} of ${rule.count}** in ${rule.seconds}s. Nothing has been done. One more gets them ${next}.\n-# If this is normal for them, whitelist them with \`/antinuke whitelist add\`.`, Colors.Blue));
     }
     /** Tell someone privately that anti-nuke warned them, so a staff member doing normal work knows to slow down or ask for a whitelist. */
     async warnActor(guild, actor, what, revertAttempted) {
@@ -500,7 +541,7 @@ export class Security {
                     raid += `\nSwept **${swept}** account(s) from the wave that triggered it.`;
             }
             const id = this.store.incident(member.guild.id, 'joins', rule.key, s.mode, `Join flood. ${raid}`);
-            this.logs.push(member.guild.id, embed(`Incident #${id} · Join flood`, `${count} joins in ${rule.seconds}s.\n${raid}`, Colors.Orange));
+            this.incidentLog(member.guild.id, embed(`Incident #${id} · Join flood`, `${count} joins in ${rule.seconds}s.\n${raid}`, Colors.Orange));
         });
     }
     async contain(guild, userId, fromIncident = false, ignoreRoles = []) {
@@ -532,7 +573,7 @@ export class Security {
         const qId = this.store.settings(guild.id).quarantineRoleId;
         const q = qId ? guild.roles.cache.get(qId) : null;
         this.store.assertAuthorized(guild.id);
-        if (q && !q.managed && !dangerous(q.permissions.bitfield) && q.editable)
+        if (q && !q.managed && !isBotPermissionRole(this.store, guild.id, q.id) && !dangerous(q.permissions.bitfield) && q.editable)
             await member.roles.add(q, 'Ghost Vanguard quarantine');
         const fresh = await guild.members.fetch({ user: userId, force: true });
         const remaining = dangerous(fresh.permissions.bitfield);
@@ -574,7 +615,7 @@ export class Security {
             return null;
         return this.trusted(member.guild, actor) ? actor : null;
     }
-    async release(guild, userId, privileged) {
+    async release(guild, userId, privileged, actorId) {
         this.store.assertAuthorized(guild.id);
         const row = this.store.get('SELECT * FROM backups WHERE guild_id=? AND user_id=?', guild.id, userId);
         if (!row)
@@ -585,7 +626,7 @@ export class Security {
         const restored = [], skipped = [];
         for (const id of JSON.parse(row.roles)) {
             const role = guild.roles.cache.get(id);
-            if (!role || role.managed || !role.editable || (!privileged && dangerous(role.permissions.bitfield))) {
+            if (!role || role.managed || !role.editable || (isBotPermissionRole(this.store, guild.id, id) && !developers.has(actorId ?? '')) || (!privileged && dangerous(role.permissions.bitfield))) {
                 skipped.push(id);
                 continue;
             }

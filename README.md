@@ -23,6 +23,11 @@ Ghost Vanguard is a **single-process, multi-server Discord security and operatio
 
 > **Commands are slash commands.** Type `/` in Discord and select **Ghost Vanguard**. Use `/help` to see the commands your account can access. Message-prefix commands are not supported.
 
+<!-- coderabbit-ai-generated:v1 -->
+
+Use `/roblox sharing` to manage blacklist sharing with partner servers.
+<!-- /coderabbit-ai-generated:v1 -->
+
 ## What it does
 
 ### Protects servers
@@ -32,6 +37,11 @@ Ghost Vanguard is a **single-process, multi-server Discord security and operatio
 - **Raid response:** lockdown and emergency controls, new-account holds, join-flood detection, lookalike-name waves, and coordinated message-wave handling.
 - **Content protection:** spam, link and invite controls, scam-link and scam-image detection, staff anti-ping, and optional AI moderation.
 - **Whitelist:** exempt people or roles globally or per rule, with optional expiry and verification-bot recognition.
+
+<!-- coderabbit-ai-generated:v1 -->
+
+The blocked phrase filter is off by default. Use `/automod word-list` to add, remove, or list literal words and phrases, then enable it with `/automod words`. It checks new and edited messages, deletes matches, and exempts staff and trusted members. Message Content intent must be enabled.
+<!-- /coderabbit-ai-generated:v1 -->
 
 ### Gives staff context—not automatic punishment
 
@@ -65,7 +75,15 @@ Ghost Vanguard separates **server permissions**, **bot-wide ranks**, and **Devel
 
 **Network-ban permissions are deliberately narrower than ordinary moderation:** only Developers may issue or lift a genreban or hardban, or grant/revoke a one-server genreban exception. Local staff can still manage ordinary server bans without changing a network ban.
 
+<!-- coderabbit-ai-generated:v1 -->
+
+<!-- coderabbit-ai-generated-section:v1:79b9947e57132f8c59e2e59f03c59ef3697df22365423e341352473f64c56d01 -->
+
 For the complete command-to-rank map, see [the generated rank reference](docs/ranks.md) and [command reference](docs/commands.md).
+
+Only approved Developer IDs manage bot permission assignments. Assign a rank in one server with `/setup staff user user_id:… rank:…`, or configure IDs in `src/bot/access-ids.ts`. `/setup staff global` is intentionally bot-wide. See [assigning access](docs/user/access.md) for role controls and source IDs. Run `/setup logs setup` to put the active log category at the top.
+
+<!-- /coderabbit-ai-generated:v1 -->
 
 ## Get started
 
@@ -109,7 +127,13 @@ The launcher supervises the process and can apply optional CI-gated updates. See
 ### Bring a server online
 
 1. Invite the bot with the required scopes and permissions. Use a Developer account to authorize the server.
-2. Run `/setup logs setup` to create the active **Ghost Vanguard Logs** layout. The legacy **VEIL LOGS** category is renamed and archived; its channels and message history are preserved.
+2. <!-- coderabbit-ai-generated:v1 -->
+
+   <!-- coderabbit-ai-generated-section:v1:0af77c236d50ce1ee807249c0a0a0d7807110055569c99f296dcfd3dc92d2fcc -->
+
+   Run `/setup logs setup` to configure **Ghost Vanguard Logs**. Existing Veil event-log channels are reused for matching events, with their messages and permissions preserved. Other legacy channels remain archived.
+
+   <!-- /coderabbit-ai-generated:v1 -->
 3. Run `/antinuke check` and address any missing permissions or role-hierarchy warnings.
 4. After readiness passes, run `/antinuke enable` and confirm the change. New and unconfigured servers remain in observe mode until explicitly enabled.
 5. Create the staff panel with `/setup panel`, map staff roles with `/setup staff role`, and post the ticket panel with `/ticket setup` as needed.

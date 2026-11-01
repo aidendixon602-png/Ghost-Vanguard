@@ -6,7 +6,7 @@ import type { Store } from '../database/db.js';
 import { developers } from './developers.js';
 import { AppError } from '../errors.js';
 import type { Policy } from './registry.js';
-import { aboveSupremeMessage, botRank, needsDeveloper, rankOf, RANKS, requiredRank } from './ranks.js';
+import { aboveSupremeMessage, botRank, isQuarantined, needsDeveloper, rankOf, RANKS, requiredRank } from './ranks.js';
 import { ANTINUKE_LOCK_KEYS, antinukeLocked } from './env-rules.js';
 
 const lockedKey = (key?: string) => !!key && antinukeLocked() && ANTINUKE_LOCK_KEYS.has(key.replace(/\/$/, ''));
@@ -28,6 +28,10 @@ export class Guard {
             return false;
         if (policy.requiresAuthorization && this.ready && !this.ready(guildId!))
             return false;
+        const protectedAction = policy.requiresAuthorization || policy.developerOnly || policy.access !== 'member'
+            || policy.requiredPermissions.length > 0 || (requiredRank(rankKey ?? command) ?? 0) > 0;
+        if (guildId && protectedAction && isQuarantined(this.store, guildId, user)
+            && !developers.has(user) && user !== actor?.guild.ownerId) return false;
         // Developer-only commands: the Developer rank is the only way in (no Discord permission, server role
         // or lower bot-wide rank).
         // ANTINUKE_LOCK (.env): turning anti-nuke off or changing its layers is Developer-only.

@@ -1,3 +1,5 @@
+import { isBotPermissionRole } from '../../security/role-policy.js';
+import { developers } from '../../bot/developers.js';
 import { ChannelType, Colors, PermissionFlagsBits, SlashCommandBuilder } from 'discord.js';
 import { clip, dangerous, overrideRule, RULES } from '../../core.js';
 import { AppError } from '../../errors.js';
@@ -14,7 +16,7 @@ export default defineCommand(new SlashCommandBuilder().setName('security').setDe
     .addBooleanOption(o => o.setName('revoke_on_unlink').setDescription('Remove verified role when all providers confirm no link'))
     .addBooleanOption(o => o.setName('block_known_bans').setDescription('Block banned Roblox accounts and locally recorded ban-linked accounts'))
     .addBooleanOption(o => o.setName('nickname_sync').setDescription('Set nickname to Roblox username')))
-    .addSubcommand(s => s.setName('admin').setDescription('Server owner: add, remove or list security admins')
+    .addSubcommand(s => s.setName('admin').setDescription('Developer: add, remove or list security admins')
     .addStringOption(o => o.setName('action').setDescription('Action').setRequired(true).addChoices({ name: 'Add', value: 'add' }, { name: 'Remove', value: 'remove' }, { name: 'List', value: 'list' }))
     .addUserOption(o => o.setName('user').setDescription('Required for add/remove')))
     .addSubcommand(s => s.setName('incidents').setDescription('View recent anti-nuke incidents').addIntegerOption(o => o.setName('id').setDescription('Specific incident ID').setMinValue(1)))
@@ -35,7 +37,7 @@ export default defineCommand(new SlashCommandBuilder().setName('security').setDe
             const chosen = i.options.getRole(option);
             if (chosen) {
                 const role = await i.guild.roles.fetch(chosen.id);
-                if (!role || role.id === i.guildId || role.managed || !role.editable || dangerous(role.permissions.bitfield))
+                if (!role || role.id === i.guildId || role.managed || !role.editable || isBotPermissionRole(ctx.store, i.guildId, role.id) || dangerous(role.permissions.bitfield))
                     throw new AppError('VALIDATION_ERROR', `${option} must be a safe, unmanaged role below the bot without moderation or administrative permissions.`);
                 s[field] = role.id;
             }
@@ -59,6 +61,7 @@ export default defineCommand(new SlashCommandBuilder().setName('security').setDe
         return 'Configuration saved. Use /setup status to review it.';
     }
     if (sub === 'admin') {
+        developers.require(i.user.id);
         const action = i.options.getString('action', true);
         if (action === 'list')
             return ctx.store.all('SELECT user_id FROM grants WHERE guild_id=? AND kind=?', i.guildId, 'admin').map(r => `<@${r.user_id}>`).join('\n') || 'No additional security admins. Developers and the server owner already have access.';
@@ -85,7 +88,7 @@ export default defineCommand(new SlashCommandBuilder().setName('security').setDe
         checkTarget(actor, target, await i.guild.members.fetchMe());
         if (sub === 'quarantine' && ctx.security.trusted(i.guild, user.id))
             throw new AppError('VALIDATION_ERROR', 'This member is protected by owner/developer/trust status. Revoke explicit trust before quarantine.');
-        const result = sub === 'quarantine' ? await ctx.security.contain(i.guild, user.id) : await ctx.security.release(i.guild, user.id, i.options.getBoolean('restore_privileged') ?? false);
+        const result = sub === 'quarantine' ? await ctx.security.contain(i.guild, user.id) : await ctx.security.release(i.guild, user.id, i.options.getBoolean('restore_privileged') ?? false, i.user.id);
         ctx.logs.push(i.guildId, embed(sub === 'quarantine' ? 'Manual quarantine' : 'Quarantine release', `By <@${actor.id}> · member <@${user.id}>\n${result}`, Colors.Orange));
         return result;
     }

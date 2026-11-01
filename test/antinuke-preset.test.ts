@@ -86,9 +86,9 @@ test('the twelve requested preset limits, actions and revert flags are exact',()
  for(const [key,values] of Object.entries(expected)) {const r=RULES.find(r=>r.key===key)!;assert.deepEqual([r.count,r.seconds,r.punishment,r.revert],values);}
 });
 
-test('Permission Grant detects exactly the requested six permission bits',()=>{
+test('Permission Grant detects takeover permissions including Manage Roles',()=>{
  for(const bit of [PermissionFlagsBits.Administrator,PermissionFlagsBits.BanMembers,PermissionFlagsBits.KickMembers,PermissionFlagsBits.ManageChannels,PermissionFlagsBits.ManageGuild,PermissionFlagsBits.ManageWebhooks])assert.equal(escalationAdded(0n,bit),bit);
- assert.equal(escalationAdded(0n,PermissionFlagsBits.ManageRoles),0n);
+ assert.equal(escalationAdded(0n,PermissionFlagsBits.ManageRoles),PermissionFlagsBits.ManageRoles);
 });
 
 function readinessGuild({ id = 'g', actorId = 'owner', missing = new Set<bigint>(), above = [] as any[] } = {}) {

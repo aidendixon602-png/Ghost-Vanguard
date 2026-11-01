@@ -9,6 +9,8 @@ import { Interactions } from '../src/bot/interactions.js';
 import { failure, redact, logEvent } from '../src/errors.js';
 import { config } from '../src/config.js';
 import { authorize } from './helpers.js';
+import { setLogChannels } from '../src/audit/log-setup.js';
+import { configureEventLog } from '../src/audit/event-log.js';
 
 const guildId = '123456789012345678', userId = '223456789012345678';
 
@@ -174,6 +176,23 @@ test('interaction ACK precedes async execution; duplicate deliveries execute onc
     s.close();
 });
 
+test('command log records the command and actor without options or replies', async () => {
+    const s = new Store(':memory:'); authorize(s, guildId);
+    const r = new Registry(), f = interaction(), calls: any[] = [];
+    try {
+        setLogChannels(s, guildId, { routes: { commands: 'command-log' } });
+        configureEventLog(s, guildId, { enabled: true, channelId: 'general-log' });
+        r.add(defineCommand(new SlashCommandBuilder().setName('probe').setDescription('Test').addStringOption(o => o.setName('input').setDescription('Input')), {}, async () => 'private reply'), 'probe');
+        f.i.options.data = [{ name: 'input', type: 3, value: 'sensitive-value' }];
+        const svc = { ...services(s, r), logs: { push: (_g: string, e: any, _rows: any, channel: string) => calls.push({ channel, card: e.toJSON() }) } };
+        await new Interactions(svc).handle(f.i);
+        assert.equal(calls.length, 1);
+        assert.equal(calls[0].channel, 'command-log');
+        assert.match(JSON.stringify(calls[0]), /probe/);
+        assert.doesNotMatch(JSON.stringify(calls[0]), /sensitive-value|private reply/);
+    } finally { s.close(); }
+});
+
 test('cooldown rejects a second execution; stale unsupported components fail closed', async () => {
     const s = new Store(':memory:');
     authorize(s, guildId);
@@ -220,6 +239,7 @@ test('help is generated from registry and hides protected/developer commands bef
     // Before authorization only the information commands are usable.
     assert.match(text, /Information\*\* · 4/);
     assert.ok(!text.includes('Roblox') && !text.includes('Developer') && !text.includes('Moderation'));
+    assert.doesNotMatch(text, /\/genreban|\/antinuke|\/mod\b/, 'overview does not advertise inaccessible commands');
     s.close();
 });
 
@@ -253,5 +273,6 @@ test('a grouped command (/info ping) runs end to end through the router', async 
     const text = JSON.stringify(f.replies);
     assert.ok(!/replaced|Unknown option/.test(text), text);
     assert.match(text, /42/);
+    assert.equal(f.replies[0].embeds[0].data.title, '/info ping', 'reply identifies the command as shown in Discord');
     s.close();
 });

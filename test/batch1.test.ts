@@ -73,6 +73,23 @@ test('Roblox blacklist: local entries, opt-in network sharing between servers, a
     } finally { store.close(); }
 });
 
+test('renamed Roblox sharing command retains blacklist sharing settings', async () => {
+    const { default: command } = await import('../src/commands/roblox/roblox.js');
+    const { store, queue } = setup();
+    try {
+        const options = (command.data as any).options;
+        assert.ok(options.some((o: any) => o.name === 'sharing'));
+        assert.ok(!options.some((o: any) => o.name === 'network'));
+        addToBlacklist(store, G, '555', 'raider');
+        const i: any = { guildId: G, user: { id: M }, client: { guilds: { cache: new Map() } },
+            options: { getSubcommand: () => 'sharing', getBoolean: () => true } };
+        const reply = await command.execute({ store, logs: queue } as any, i);
+        assert.match(String(reply), /sharing.*on/);
+        assert.equal(store.get('SELECT roblox_id FROM roblox_network WHERE guild_id=?', G)?.roblox_id, '555');
+        assert.equal(store.get('SELECT COUNT(*) AS n FROM guild_features WHERE guild_id=? AND key=?', G, 'network')?.n, 1);
+    } finally { store.close(); }
+});
+
 test('group rank binds: "and above" vs exact, and rank 0 (not in group) gets nothing', () => {
     const binds = [{ rank: 1, roleId: 'member', mode: 'min' as const }, { rank: 50, roleId: 'staff', mode: 'min' as const }, { rank: 255, roleId: 'owner', mode: 'exact' as const }];
     assert.deepEqual([...rolesForRank(binds, 0)], []);

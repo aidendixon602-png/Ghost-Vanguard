@@ -55,6 +55,13 @@ Snapshots taken during a lockdown capture the locked permissions, so lift the lo
 
 Turn categories on or off with `/setup logs category`, and browse with `/setup logs view`, filtered by category or by a user (events done by or to them). Discord does not report people deleting their own messages, and message contents are not logged.
 
+<!-- coderabbit-ai-generated:v1 -->
+
+When `/setup logs setup` finds recognized Veil log channels in the old or archived category, it reuses them under Ghost Vanguard Logs. Messages and permission overrides remain intact. Channels that are public or missing the bot's required permissions are skipped and reported; fix their permissions and run setup again. `/setup logs check` checks configured channels.
+
+Join and leave events go to `#join-logs`; member, role, channel, message, server and moderation events go to their matching channels. `#voice-logs` records voice joins, moves and leaves. `#command-logs` records successful Ghost Vanguard slash command names and users, without arguments or replies. Anti-nuke alerts are also copied to `#antinuke-logs`. Event logging and category settings still apply. If a matching channel is not configured, events use the existing combined log channel.
+<!-- /coderabbit-ai-generated:v1 -->
+
 ## Restarts and downtime
 
 All settings live in the database, so a restart or crash never resets anything. After each restart, every server's log channel gets a **back-online** notice listing the restored anti-nuke state and how long the bot was offline. The bot also reads Discord's audit log for that offline period: missed events are added to the event log, and destructive actions anti-nuke could not respond to are reported, with anyone at or above a rule's limit flagged. Nothing is enforced automatically for that period; review the report and use `/antinuke quarantine` or `/recovery snapshot restore` if needed.
@@ -93,6 +100,20 @@ The script checks the metadata, checksum and integrity, refuses to run while the
 | `LOG_FORMAT`, `LOG_LEVEL` | `pretty`, `info` | `json` is available for log ingestion. |
 | `BOT_OWNER_ID`, `BOT_OWNER_USERNAME` | empty | The bot owner and the default `TRUSTED_DM_IDS`. Nothing is built in: leave it empty and no account holds the owner rank or receives the daily database backup. |
 
+<!-- coderabbit-ai-generated:v1 -->
+
+<!-- coderabbit-ai-generated-section:v1:b736ff13692c5bfb2d902219a997686aa1706d818daf19cb864aa8f80f49b30a -->
+
+## Manual logs and staff levels
+
+Use `/setup logs route type:messages channel:#message-logs` to choose a private destination. Types include joins, voice, commands, anti-nuke, messages, moderation, members, roles, channels and server events. Omit `channel` to reset a route. `/setup logs status` shows routes and category switches. Manual routes do not move channels. Voice logs include mute/deafen, streaming and camera changes.
+
+The server owner can run `/setup logs cleanup-archive` to preview permanent deletion of channels in `Archive - Veil Logs`. Confirmation deletes their message history. Active log destinations and moved channels are skipped; categories with remaining children are retained.
+
+Assign server levels with `/setup staff role role:@Moderators rank:moderator`. Levels: Helper, Moderator, Admin and Head Admin. Only someone above the assigned level can change it. Developers can assign Bot Manager, Overseer and Supreme Leader with `/setup staff global`. Inspect with `/setup staff list` and `/setup staff check`. These commands do not grant Developer access.
+
 ## Limits worth knowing
+
+<!-- /coderabbit-ai-generated:v1 -->
 
 Discord cannot restore deleted object IDs, messages, member-role assignments, managed integrations or unavailable Community and premium features. Member statistics show the cached coverage, and online counts are unavailable without the presence intent.

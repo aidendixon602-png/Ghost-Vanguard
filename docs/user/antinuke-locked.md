@@ -1,3 +1,7 @@
+<!-- coderabbit-ai-generated:v1 -->
+
+<!-- coderabbit-ai-generated-section:v1:05c9eecc889d6b119d2aea92dbfc83951c5da6014483dbb6fc288b3322e023a6 -->
+
 # Anti-nuke shipped defaults
 
 Every authorized server starts with the same baseline rules. Servers can tune each threshold/window or disable a rule with `/antinuke rule`; `/antinuke reset` restores that rule's shipped defaults. New or unconfigured servers start in **observe** mode, and enforcement requires a successful readiness check and explicit confirmation.
@@ -9,7 +13,7 @@ Every authorized server starts with the same baseline rules. Servers can tune ea
 | Channel Create | 6 in 120s | Human first hit: warn + revert; same-rule repeat: strip + revert |
 | Channel Delete | 3 in 120s | Human first hit: warn (no automatic restore); same-rule repeat: strip |
 | Kick | 5 in 120s | Human first hit: warn; same-rule repeat: strip |
-| Permission Grant (Administrator, Ban/Kick, Manage Channels/Server/Webhooks) | 1 in 60s | First event: revert + warn; repeat within an hour: strip + revert. Self-assigned Administrator or Manage Server: immediate strip + revert |
+| Permission Grant (Administrator, Ban/Kick, Manage Channels/Server/Roles/Webhooks) | 1 in 60s | First event: revert + warn; repeat within an hour: strip + revert. Self-assigned Administrator or Manage Server: immediate strip + revert |
 | Role Create | 8 in 120s | Human first hit: warn + revert; same-rule repeat: strip + revert |
 | Role Delete | 5 in 120s | Human first hit: warn (no automatic restore); same-rule repeat: strip |
 | Role Invite | 8 in 60s | Human first hit: warn + revert; same-rule repeat: strip + revert |
@@ -24,7 +28,7 @@ Every authorized server starts with the same baseline rules. Servers can tune ea
 | Unban | 5 in 60s | Strip + re-ban the unbanned users |
 | Emoji Delete (emojis and stickers) | 5 in 60s | Human first hit: warn; same-rule repeat: strip |
 
-First-hit warnings apply to human actors; bots get the normal response without a warning. A safe revert is attempted only for rules with a revert handler. Self-assigned Administrator/Manage Server grants are immediate even if other dangerous grants warn first. Explicit whitelist exemptions still apply.
+First-hit warnings apply to human actors; bots get the normal response without a warning. A safe revert is attempted only for rules with a revert handler. Self-assigned Administrator/Manage Server grants are immediate even if other dangerous grants warn first. Explicit whitelist exemptions still apply. During an enforcement incident cooldown, supported reversals continue for new matching events. Each audit event is attempted once; failed or interrupted reversals need staff review. Continuation alerts are limited to one every five seconds per actor and rule, while outcomes remain saved with the audit evidence.
 
 ## Raid protection
 
@@ -38,3 +42,6 @@ First-hit warnings apply to human actors; bots get the normal response without a
 At startup and after authorization, a new or unconfigured server loads its default rules in **observe** mode. It records incidents but does not strip people or automatically revert changes. Run `/setup logs setup`, then `/antinuke check`; readiness requires the bot permissions and an accessible security-log channel. When ready, `/antinuke enable` opens a confirmation that describes enforcement consequences, the baseline snapshot, and any roles at or above Vanguard. Confirming rechecks the security log, permissions, and hierarchy before enabling enforcement. A hierarchy warning does not block the choice, but Vanguard cannot contain members whose roles are above it.
 
 An enforced server retains its per-rule settings across restarts. If permissions or the security-log destination are missing, startup switches it to observe mode and reports the blockers; fixing readiness alone never silently resumes enforcement. A staff `/antinuke disable` opt-out stays off across restarts. The server owner, configured developers, Vanguard itself and the network's trusted bots are never punished.
+
+
+<!-- /coderabbit-ai-generated:v1 -->

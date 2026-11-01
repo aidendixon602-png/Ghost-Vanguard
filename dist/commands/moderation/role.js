@@ -4,7 +4,7 @@ import { AppError } from '../../errors.js';
 import { clip } from '../../core.js';
 import { staffReason } from '../../security/raidmode.js';
 import { developers } from '../../bot/developers.js';
-import { decideRoleChange, privilegedReason } from '../../security/role-policy.js';
+import { decideRoleChange, privilegedReason, isBotPermissionRole } from '../../security/role-policy.js';
 import { approveRoleChange } from '../../security/role-authorizations.js';
 /**
  * /role add | remove — give or take one role, with every check done in here (not by Discord's
@@ -85,6 +85,8 @@ async function whoCanGive(store, i) {
         return whoCanGiveList(store, guildId);
     if (role.id === guildId || role.managed)
         throw new AppError('VALIDATION_ERROR', 'Choose a normal role (not @everyone or a bot/integration role).');
+    if (isBotPermissionRole(store, guildId, role.id))
+        developers.require(i.user.id);
     const owner = i.user.id === i.guild.ownerId || developers.has(i.user.id);
     const staff = privilegedReason(store, guildId, role);
     const allow = (on) => on
@@ -96,6 +98,8 @@ async function whoCanGive(store, i) {
         const extra = whoOption ? '\n-# This is an ordinary role, so you don\'t need to pick who: it applies to every moderator.' : '';
         return (remove ? `Moderators can **no longer** give or take <@&${role.id}>. Anyone with Manage Roles still can.` : `✅ Moderators can now give and take <@&${role.id}> with \`/role add\`.`) + extra;
     }
+    if (isBotPermissionRole(store, guildId, role.id) && !remove)
+        throw new AppError('VALIDATION_ERROR', 'Bot permission roles cannot be delegated through role rules. Only approved Developer IDs may assign them.');
     // Staff roles: only the owner decides who hands them out.
     if (!owner)
         throw new AppError('PERMISSION_ERROR', `<@&${role.id}> is a staff role (${staff}), so only the server owner can choose who gives it.`);

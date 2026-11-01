@@ -12,7 +12,7 @@ test('docs/commands.md and docs/ranks.md match the commands the bot really has (
 
 test('owner-only actions stay owner-only even for Head Admins', async () => {
     const { requiredRank, RANKS } = await import('../src/bot/ranks.js');
-    assert.equal(requiredRank('security/admin'), RANKS.owner);
+    assert.equal(requiredRank('security/admin'), RANKS.developer);
     assert.equal(requiredRank('config-history/restore'), RANKS.owner);
     assert.ok(requiredRank('security/status')! < RANKS.owner, 'the rest of /security is unchanged');
 });

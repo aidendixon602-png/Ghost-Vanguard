@@ -13,7 +13,7 @@ export const dangerous = (bits: bigint | string) => new PermissionsBitField(BigI
  * Kept narrower than DANGEROUS so routine moderator promotions do not trigger it.
  */
 export const ESCALATION = [PermissionFlagsBits.Administrator, PermissionFlagsBits.ManageGuild,
-    PermissionFlagsBits.BanMembers, PermissionFlagsBits.KickMembers, PermissionFlagsBits.ManageChannels, PermissionFlagsBits.ManageWebhooks];
+    PermissionFlagsBits.ManageRoles, PermissionFlagsBits.BanMembers, PermissionFlagsBits.KickMembers, PermissionFlagsBits.ManageChannels, PermissionFlagsBits.ManageWebhooks];
 
 const ESCALATION_MASK = ESCALATION.reduce((all, bit) => all | BigInt(bit), 0n);
 

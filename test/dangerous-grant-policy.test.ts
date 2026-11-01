@@ -53,7 +53,7 @@ test('other dangerous grants revert and warn first, repeat within an hour strips
 
         await f.security.audit(roleUpdate('second', PermissionFlagsBits.ManageChannels), f.guild);
         assert.equal(f.calls.punished, 1, 'a repeat inside the warning window strips');
-        assert.equal(f.calls.reverted, 3, 'the repeat rolls back both grants in its 60-second event window');
+        assert.equal(f.calls.reverted, 2, 'the repeat undoes the new grant without replaying the first undo');
         assert.equal(f.store.get("SELECT mode FROM incidents WHERE rule='dangerous_grant' ORDER BY id DESC LIMIT 1")!.mode, 'enforce');
 
         const old = Date.now() - 2 * 60 * 60 * 1000;
