@@ -57,6 +57,14 @@ export default defineCommand(new SlashCommandBuilder().setName('trust').setDescr
             throw new AppError('VALIDATION_ERROR', 'You cannot whitelist @everyone.');
         const target = (user ?? role).id, allowed = i.options.getBoolean('allowed') ?? true, days = i.options.getInteger('days');
         const who = `<@${role ? '&' : ''}${target}>`;
+        // The server owner is granted this automatically: anti-nuke never punishes them, so no entry is needed.
+        if (!role && user && user.id === i.guild.ownerId) {
+            if (!allowed)
+                ctx.store.revokeGrant(i.guildId, target, 'trust:dangerous_grant', actor.id);
+            return allowed
+                ? `${who} is the **server owner**, so anti-nuke already allows them to grant Administrator and the other protected permissions. No whitelist entry is needed.`
+                : `${who} is the **server owner**, so anti-nuke never punishes them for granting protected permissions, with or without an entry. Any saved entry is now removed.`;
+        }
         if (allowed && !canManageOwnTrust(actor.id, i.guild.ownerId) && (target === actor.id || !!role && actor.roles.cache.has(target)))
             throw new AppError('PERMISSION_ERROR', 'Another security administrator (or the server owner) must allow you to grant protected permissions. You can still remove it yourself.');
         const kind = role ? 'trust_role:dangerous_grant' : 'trust:dangerous_grant';

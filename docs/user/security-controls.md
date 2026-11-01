@@ -26,7 +26,7 @@ Some people are **never punished**. When they hit a limit it is recorded quietly
 
 | Who | Not punished for |
 |---|---|
-| Server owner, Developers | Everything |
+| Server owner, Developers | Everything, including granting protected permissions (no entry needed) |
 | Full whitelist entries (user or role) | Everything except handing out protected permissions |
 | Rule-specific whitelist entries | Only the chosen rules |
 | Permission-grant whitelist entries (`/antinuke whitelist admin`) | Only granting Administrator and the other protected permissions |
@@ -35,7 +35,7 @@ Some people are **never punished**. When they hit a limit it is recorded quietly
 
 `/antinuke whitelist add` covers ordinary anti-nuke rules: bans, kicks, channel and role work, server settings, and so on. `/antinuke whitelist admin` is a **separate** whitelist for handing out the permissions that take a server over — Administrator, Manage Server, Manage Roles, Manage Channels, Manage Webhooks, Ban Members and Kick Members — through Discord.
 
-Being on the regular whitelist never allows that, not even with **Everything** ticked, and not with a preset. The reverse also holds: the permission-grant entry skips only that check and no other rule. Handling it that way means one compromised "trusted" account cannot quietly make itself Administrator or hand that to someone else; it needs the entry that says so, and another security administrator (or the server owner) must grant it, since you cannot give it to yourself. Entries can expire. The server owner and Developers are never punished either way, and verification bots and protected roles keep their existing limits.
+Being on the regular whitelist never allows that, not even with **Everything** ticked, and not with a preset. The reverse also holds: the permission-grant entry skips only that check and no other rule. Handling it that way means one compromised "trusted" account cannot quietly make itself Administrator or hand that to someone else; it needs the entry that says so, and another security administrator (or the server owner) must grant it, since you cannot give it to yourself. Entries can expire. The server owner, Developers and network-whitelisted people are granted the permission-grant whitelist automatically: they never need an entry and `/antinuke whitelist admin` says so when you try to add one for the owner. Verification bots and protected roles keep their existing limits.
 
 Supreme Leaders and every other rank are punished like anyone else. If someone is whitelisted for some rules but sets off another one, they are punished, and the alert has a **Whitelist** line saying what they are covered for and what was missing.
 

@@ -7,7 +7,7 @@ export function whitelistCheck(store, guild, userId, roleIds, isBot, now = Date.
     const e = new EmbedBuilder().setTitle('Anti-nuke check').setFooter({ text: `User ID: ${userId}` }).setTimestamp();
     const auto = userId === guild.ownerId ? 'the server owner' : developers.has(userId) ? 'a Ghost Vanguard developer' : userId === guild.client?.user?.id ? 'Ghost Vanguard itself' : null;
     if (auto)
-        return e.setColor(Colors.Green).setDescription(userId === guild.client?.user?.id ? `<@${userId}> is **${auto}**. Its own actions count against the staff member who asked for them.` : `<@${userId}> is **${auto}**, so anti-nuke never punishes them. They are still watched: if they hit a limit, you get an alert.`);
+        return e.setColor(Colors.Green).setDescription(userId === guild.client?.user?.id ? `<@${userId}> is **${auto}**. Its own actions count against the staff member who asked for them.` : `<@${userId}> is **${auto}**, so anti-nuke never punishes them. They are still watched: if they hit a limit, you get an alert. That includes granting Administrator and the other protected permissions through Discord — no permission-grant entry is needed.`);
     const live = (kind, id = userId) => store.get('SELECT expires FROM grants WHERE guild_id=? AND user_id=? AND kind=? AND (expires IS NULL OR expires>?)', guild.id, id, kind, now);
     const full = live('trust');
     const fullRole = roleIds.find(r => live('trust_role', r));

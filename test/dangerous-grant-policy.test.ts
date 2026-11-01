@@ -115,3 +115,26 @@ test('only the separate permission-grant whitelist is an exception to self-admin
         } finally { f.store.close(); }
     }
 });
+
+test('the server owner and Developers may grant protected permissions without any whitelist entry', async () => {
+    // The owner is granted this automatically: no trust:dangerous_grant row is written or needed.
+    const owner = fixture();
+    try {
+        const settings = owner.store.settings('g');
+        assert.equal(owner.store.all("SELECT 1 FROM grants WHERE kind LIKE '%dangerous_grant'").length, 0, 'no entry exists');
+        addPrivilegedRole(owner, PermissionFlagsBits.Administrator);
+        await owner.security.audit(selfAssignment(PermissionFlagsBits.Administrator), owner.guild); // actor is not the owner
+        assert.equal(owner.calls.punished, 1, 'everyone else is still checked');
+    } finally { owner.store.close(); }
+
+    const asOwner = fixture();
+    try {
+        (asOwner.guild as any).ownerId = ACTOR;
+        addPrivilegedRole(asOwner, PermissionFlagsBits.Administrator);
+        await asOwner.security.audit(selfAssignment(PermissionFlagsBits.Administrator), asOwner.guild);
+        assert.equal(asOwner.calls.punished, 0, 'the server owner is exempt automatically');
+        assert.equal(asOwner.calls.reverted, 0);
+        assert.equal(asOwner.store.get("SELECT mode FROM incidents WHERE rule='dangerous_grant'")!.mode, 'exempt');
+        assert.equal(asOwner.store.all("SELECT 1 FROM grants WHERE kind LIKE '%dangerous_grant'").length, 0, 'no entry is needed');
+    } finally { asOwner.store.close(); }
+});

@@ -10,6 +10,7 @@ test('whitelist check: owner, full bypass, role-based rules, warnings and quaran
     const store = new Store(':memory:'); authorize(store);
     try {
         assert.match(whitelistCheck(store, guild, 'owner', [], false).toJSON().description!, /server owner/);
+        assert.match(whitelistCheck(store, guild, 'owner', [], false).toJSON().description!, /granting Administrator.*no permission-grant entry is needed/,"the owner is always allowed to grant protected permissions");
         assert.match(whitelistCheck(store, guild, 'nobody', [], false).toJSON().description!, /not whitelisted/);
         const plain = whitelistCheck(store, guild, 'nobody', [], false).toJSON();
         assert.match(plain.fields!.find(f => f.name === 'Still checked')!.value, /Role Invite\*\*: 8 in 60s → strip \(warns first\)/);

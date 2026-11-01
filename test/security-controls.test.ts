@@ -352,6 +352,12 @@ test('/antinuke whitelist admin allows and removes protected permission grants o
   assert.match(String(removed),/no longer hand out protected permissions/);
   assert.equal(store.hasGrant('g','someone','trust:dangerous_grant'),false);
 
+  // The server owner already has it, so no entry is written for them.
+  i.options.getUser=()=>({id:'owner'});i.options.getBoolean=()=>true;
+  const ownerReply=await store.withAuthorized('g',()=>trust.execute(ctx,i));
+  assert.match(String(ownerReply),/server owner/);
+  assert.equal(store.hasGrant('g','owner','trust:dangerous_grant'),false,'the owner needs no entry');
+
   // Granting it to yourself is what a hijacked admin account would do first, so someone else must do it.
   const self:any={...ctx,actor:{id:'admin2',guild:{ownerId:'owner'},roles:{cache:new Collection()}}};
   i.options.getBoolean=()=>true;i.options.getUser=()=>({id:'admin2'});
