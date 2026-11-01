@@ -5,8 +5,10 @@ import { configureEventLog, eventLogConfig } from './event-log.js';
 /**
  * Where Vanguard's logs go in each server:
  *   #bans                      one record per ban, with server-owner / Developer Unban and Reban buttons
- *   #ghost-vanguard-logging    server events (messages, roles, channels, members) and bot actions
- * Settings are saved per server; existing channels are reused, never duplicated.
+ *   one channel per log type   moderation, joins, members, roles, channels, server, messages, voice, commands, anti-nuke
+ *   #ghost-vanguard-logging    bot actions, and any event type that has no channel of its own
+ * Setup creates what is missing, inside Ghost Vanguard Logs. Settings are saved per server; existing
+ * channels are reused, never duplicated.
  */
 export const BANS_CHANNEL = DEFAULT_CHANNELS.bans;
 export const LOGGING_CHANNEL = DEFAULT_CHANNELS.logging;
@@ -19,10 +21,15 @@ export const ARCHIVED_LOG_CATEGORY = LEGACY_CATEGORIES.archivedLogs;
  */
 export const LEGACY_LOGGING_CHANNELS = [...LEGACY_CHANNELS.logging];
 export const LOGGING_CHANNEL_NAMES = [LOGGING_CHANNEL, ...LEGACY_LOGGING_CHANNELS];
+/**
+ * Every log type and the name of its channel. Setup creates a missing channel under this name (the
+ * order here is the order they appear in the category), and reuses one that already has it inside
+ * Ghost Vanguard Logs or the archived Veil category.
+ */
 export const LEGACY_LOG_ROUTES = {
-    joins: 'join-logs', commands: 'command-logs', antinuke: 'antinuke-logs', messages: 'message-logs',
-    members: 'member-logs', roles: 'role-logs', channels: 'channel-logs', voice: 'voice-logs',
-    server: 'server-logs', moderation: 'mod-logs',
+    moderation: 'mod-logs', joins: 'join-logs', members: 'member-logs', roles: 'role-logs',
+    channels: 'channel-logs', server: 'server-logs', messages: 'message-logs', voice: 'voice-logs',
+    commands: 'command-logs', antinuke: 'antinuke-logs',
 };
 /**
  * Every name Vanguard has ever given one of its own log channels. A matching name alone never makes a
@@ -152,6 +159,31 @@ async function activateLegacyRoutes(store, guild, category, reason) {
     }
     return { routes, skipped };
 }
+/**
+ * Give every log type that has no destination its own private channel in the log category. It stops
+ * at the first failure, because the same missing permission or full category would stop the rest too.
+ * Channels already made are kept (they sit in the category, so running setup again finds them by
+ * name instead of making a second set).
+ */
+async function createMissingRoutes(store, guild, category, routes, reason) {
+    const created = [];
+    let failed = null;
+    for (const [route, name] of Object.entries(LEGACY_LOG_ROUTES)) {
+        if (routes[route])
+            continue;
+        store.assertAuthorized(guild.id);
+        try {
+            const channel = await guild.channels.create({ name, type: ChannelType.GuildText, parent: category.id, permissionOverwrites: privateOverwrites(store, guild), reason });
+            routes[route] = channel.id;
+            created.push(route);
+        }
+        catch (error) {
+            failed = { route, error: error instanceof Error ? error.message : String(error) };
+            break;
+        }
+    }
+    return { created, failed };
+}
 /** Check one channel: Vanguard's permissions, whether everyone can read it, and send a test embed. */
 export async function checkChannel(guild, channelId, label, sendTest = true) {
     const channel = guild.channels.cache.get(channelId) ?? await guild.channels.fetch(channelId).catch(() => null);
@@ -191,8 +223,27 @@ export function describeCheck(label, check) {
         lines.push('  ⚠️ Everyone can read this channel. Logs should be staff only: deny View Channel for @everyone.');
     return lines.join('\n');
 }
-/** Set up (or repair) both channels and save them. */
-export async function setupLogChannels(store, guild, by, chosen = {}) {
+const setupRuns = new Map();
+/**
+ * One setup per server at a time. Setup can create a dozen channels, so a second run started in the
+ * meantime (a double submit, or two admins) would otherwise create the same missing channels again.
+ */
+function oneAtATime(guildId, work) {
+    const run = (setupRuns.get(guildId) ?? Promise.resolve()).catch(() => undefined).then(work);
+    setupRuns.set(guildId, run);
+    const clear = () => { if (setupRuns.get(guildId) === run)
+        setupRuns.delete(guildId); };
+    run.then(clear, clear);
+    return run;
+}
+/**
+ * Set up (or repair) the log channels and save them: bans, the combined server log and, unless
+ * `separate` is false, one channel for every log type that does not have one yet.
+ */
+export function setupLogChannels(store, guild, by, chosen = {}, options = {}) {
+    return oneAtATime(guild.id, () => runLogSetup(store, guild, by, chosen, options));
+}
+async function runLogSetup(store, guild, by, chosen, options) {
     const reason = `Ghost Vanguard log setup by ${by}`;
     const current = logChannels(store, guild.id);
     const bans = await resolveChannel(store, guild, BANS_CHANNEL, chosen.bans ?? null, current.bansChannelId, reason);
@@ -203,6 +254,7 @@ export async function setupLogChannels(store, guild, by, chosen = {}) {
     await category.category.setPosition(0, { reason });
     await placeInLogCategory([bans, logging], category.category, reason);
     const { routes, skipped } = await activateLegacyRoutes(store, guild, category.category, reason);
+    const { created, failed } = options.separate !== false ? await createMissingRoutes(store, guild, category.category, routes, reason) : { created: [], failed: null };
     const archivedCategories = await archiveLegacyLogCategories(guild, reason);
     setLogChannels(store, guild.id, { bansChannelId: bans.channel.id, routes }, by);
     configureEventLog(store, guild.id, { enabled: true, channelId: logging.channel.id });
@@ -213,7 +265,34 @@ export async function setupLogChannels(store, guild, by, chosen = {}) {
         settings.logChannelId = logging.channel.id;
         store.save(settings, by);
     }
-    return { bans, logging, category: category.category, categoryCreated: category.created, archivedCategories, routes, skipped, previousAlerts: previousAlerts !== logging.channel.id ? previousAlerts : null };
+    return { bans, logging, category: category.category, categoryCreated: category.created, archivedCategories, routes, skipped, created, failed, previousAlerts: previousAlerts !== logging.channel.id ? previousAlerts : null };
+}
+/** Log types that still post to the combined log (or, for voice and commands, nowhere) for lack of a channel. */
+export function routesWithoutChannel(store, guild) {
+    const saved = logChannels(store, guild).routes ?? {};
+    return Object.keys(LEGACY_LOG_ROUTES).filter(route => !saved[route]);
+}
+/** What setup did for each log type, for the reply to /setup logs setup and the welcome panel button. */
+export function describeRouteSetup(result) {
+    const lines = [];
+    const known = Object.keys(result.routes).filter(route => Object.hasOwn(LEGACY_LOG_ROUTES, route));
+    const mention = (route) => `<#${result.routes[route]}>`;
+    const reused = known.filter(route => !result.created.includes(route));
+    if (result.created.length)
+        lines.push(`**Created, one per log type:** ${result.created.map(mention).join(' ')} · private, staff only`);
+    if (reused.length)
+        lines.push(`**Existing log channels reused:** ${reused.map(mention).join(' ')} · their permissions and message history were preserved.`);
+    let attention = !!result.failed;
+    for (const { route, check } of result.skipped) {
+        const replaced = result.created.includes(route);
+        attention ||= !replaced;
+        lines.push(`**${replaced ? `Not reused (a new private #${LEGACY_LOG_ROUTES[route]} was created instead)` : 'Not activated'}:** ${describeCheck(`#${LEGACY_LOG_ROUTES[route]}`, check)}`);
+    }
+    if (result.failed) {
+        const left = Object.keys(LEGACY_LOG_ROUTES).filter(route => !result.routes[route]);
+        lines.push(`**Could not create #${LEGACY_LOG_ROUTES[result.failed.route]}:** ${result.failed.error}`, `**Still without a channel:** ${left.join(', ')}. Check that Vanguard has Manage Channels and that the category has room, then run \`/setup logs setup\` again. The channels made so far are kept.`);
+    }
+    return { lines, attention };
 }
 // ------------------------------------------------------------ merging scattered log channels
 /**
@@ -294,6 +373,11 @@ export function planLogMerge(store, guild) {
         const keeper = found.find(c => configured.has(c.id)) ?? found.find(c => inLogArea(guild, guild.channels.cache.get(c.id)?.parentId ?? null)) ?? found[0];
         for (const extra of found) {
             if (extra.id === keeper.id)
+                continue;
+            // A same-named channel in another category (staff, or another bot's logs) keeps its own
+            // explanation above: it is not a leftover of Vanguard's, so nobody is told to remove it.
+            const parentId = guild.channels.cache.get(extra.id)?.parentId ?? null;
+            if (parentId && !inLogArea(guild, parentId))
                 continue;
             untouched.set(extra.id, { channelId: extra.id, name: extra.name,
                 why: `another ${role} channel next to <#${keeper.id}>; Vanguard never deletes a channel, so archive or remove it yourself` });

@@ -5,11 +5,12 @@ import { clip } from '../core.js';
 import { logsCategory, recordEvent } from '../audit/event-log.js';
 
 /**
- * Deleted and edited messages, with the original text, in the server logging channel ("messages"
- * category of /setup logs). Only messages Vanguard saw while running have their text and author;
- * for older ones those parts are marked unavailable rather than guessed. Bot messages are skipped.
- * Discord does not say who deleted a message here: a moderator's deletion appears separately
- * from the audit log, so "Deleted by" is never filled in by guesswork.
+ * Deleted and edited messages, with the original text, in the message log channel (the server
+ * logging channel when a server has none), under the "messages" category of /setup logs. Only
+ * messages Vanguard saw while running have their text and author; for older ones those parts are
+ * marked unavailable rather than guessed. Bot messages are skipped. Discord does not say who
+ * deleted a message here: a moderator's deletion appears separately from the audit log, so
+ * "Deleted by" is never filled in by guesswork.
  */
 const text = (m: Message | PartialMessage) => m.partial || m.content == null ? null : m.content;
 const IMAGE = /\.(png|jpe?g|gif|webp)$/i;

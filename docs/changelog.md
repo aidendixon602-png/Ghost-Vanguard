@@ -1,3 +1,15 @@
+## Unreleased: `/setup logs setup` makes a channel for every log type
+
+- **Setup builds the whole set.** It used to create only `#bans` and `#ghost-vanguard-logging`. Every other log type went to the combined channel unless an old Veil channel with the right name already existed (in one server that was only `#message-logs`). Setup now also creates a private channel for each type inside **Ghost Vanguard Logs**: `#mod-logs`, `#join-logs`, `#member-logs`, `#role-logs`, `#channel-logs`, `#server-logs`, `#message-logs`, `#voice-logs`, `#command-logs` and `#antinuke-logs`. A server that was set up before gets them the next time `/setup logs setup` runs.
+- **Existing channels are reused, never copied.** A channel with the right name inside Ghost Vanguard Logs or the archived Veil category keeps its messages and permissions and moves into the category. A channel chosen with `/setup logs route` is kept while it is private and Vanguard can post in it. If a channel that would be reused is public, or Vanguard cannot post in it, setup makes a new private one and says so.
+- **Other bots' channels are left alone.** A same-named channel anywhere else, such as another bot's `#join-logs`, is not reused, moved or renamed; Vanguard makes its own. The `/setup logs merge` preview no longer suggests removing such a channel.
+- **Safe to run again.** Setup only creates what is missing, so a deleted channel comes back and nothing is duplicated. If Discord refuses a channel (no Manage Channels, or a full category), setup keeps what it made, lists the types still missing and stops. Running it again finishes the rest. Two runs started at the same time in one server queue up instead of each creating the same channels.
+- **`separate_channels:false`** keeps the old result: only `#bans` and `#ghost-vanguard-logging`.
+- **Voice and command logs start recording** as soon as `#voice-logs` and `#command-logs` exist, because they only record when their channel is there.
+- `/setup logs check` shows working channels on one line, and lists the log types that have no channel yet. `/setup logs status` lists them too. The welcome panel's **Set up logs** button builds the same set.
+- `/setup logs route` without a channel now says where that type goes (voice and command logs have no fallback), and a setup failure reads as a sentence instead of running into the next one.
+- `docs/user/features.md` lists which events go to which channel, and no longer says message contents are not logged. Deleted and edited messages show their text when Vanguard saw the message after it started.
+
 ## Unreleased: role blacklist and self-escalation fixes
 
 - **Blacklist messages now have real line breaks.** The staff card, and the DMs sent when someone tries to give or delete a blacklisted role, printed a literal `\n` where each new line should start. They read as separate lines now, and the delete notice keeps its blank line between paragraphs.

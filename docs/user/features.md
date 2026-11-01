@@ -53,15 +53,40 @@ Snapshots taken during a lockdown capture the locked permissions, so lift the lo
 | Server | Server settings, invites, webhooks, emojis and stickers, bots and integrations, AutoMod rules |
 | Messages | Messages deleted by moderators, bulk deletes, pins |
 
-Turn categories on or off with `/setup logs category`, and browse with `/setup logs view`, filtered by category or by a user (events done by or to them). Discord does not report people deleting their own messages, and message contents are not logged.
+Turn categories on or off with `/setup logs category`, and browse with `/setup logs view`, filtered by category or by a user (events done by or to them). A deleted or edited message shows its author and text (cut to 600 characters) when Vanguard saw it after it started running. A message sent before the last restart shows as unavailable. Discord does not say who deleted a message, so a moderator's deletion appears as a separate card from the audit log.
 
 <!-- coderabbit-ai-generated:v1 -->
 
-When `/setup logs setup` finds recognized Veil log channels in the old or archived category, it reuses them under Ghost Vanguard Logs. Messages and permission overrides remain intact. Channels that are public or missing the bot's required permissions are skipped and reported; fix their permissions and run setup again. `/setup logs check` checks configured channels.
+### Log channels
 
-`/setup logs merge` cleans up a server whose log channels ended up in different categories. It previews the change, then groups Vanguard's own log channels — ban logs, server logs, the security log and any log channel Vanguard is configured to post in — under **Ghost Vanguard Logs** and renames the old default `#midtown-vanguard-logging` to `#ghost-vanguard-logging` (same channel, same ID, same history). It never moves, renames, reuses or deletes another bot's channels, including look-alike names such as `#modlogs`, `#join-logs`, `#honeypot` or `#veil-utilities-logging`, and it reports duplicate log channels for a human to archive. This works the same in servers that never had Veil.
+`/setup logs setup` builds the log channels inside the **Ghost Vanguard Logs** category. All of them are private. @everyone cannot see them. Roles you gave the Moderator, Admin or Head Admin level with `/setup staff role` can read them but not post, and so can anyone with Administrator.
 
-Join and leave events go to `#join-logs`; member, role, channel, message, server and moderation events go to their matching channels. `#voice-logs` records voice joins, moves and leaves. `#command-logs` records successful Ghost Vanguard slash command names and users, without arguments or replies. Anti-nuke alerts are also copied to `#antinuke-logs`. Event logging and category settings still apply. If a matching channel is not configured, events use the existing combined log channel.
+| Channel | What goes there |
+|---|---|
+| `#bans` | One record per ban, with the Unban and Reban buttons |
+| `#ghost-vanguard-logging` | Bot actions (anti-nuke, backups, restores, configuration changes, errors), and any event type that has no channel of its own |
+| `#mod-logs` | Bans, unbans, kicks, timeouts and prunes |
+| `#join-logs` | Members joining and leaving |
+| `#member-logs` | Nickname changes and other member updates |
+| `#role-logs` | Roles created, changed and deleted, and roles given to or taken from members |
+| `#channel-logs` | Channels and threads created, changed and deleted, and permission overwrites |
+| `#server-logs` | Server settings, invites, webhooks, emojis and stickers, bots and integrations, AutoMod rules |
+| `#message-logs` | Deleted and edited messages, bulk deletes, pins |
+| `#voice-logs` | Voice joins, moves and leaves, plus mute, deafen, streaming and camera changes |
+| `#command-logs` | Which Ghost Vanguard slash command was used and by whom, without arguments or replies |
+| `#antinuke-logs` | A copy of every anti-nuke alert. The alert also stays in `#ghost-vanguard-logging` |
+
+Setup makes only what is missing, so you can run it again whenever you like. A channel somebody deleted comes back, and nothing is duplicated. A channel you picked with `/setup logs route` is kept while it stays private and Vanguard can post in it.
+
+Setup reuses a channel with the right name when it sits in Ghost Vanguard Logs or in the old Veil category (renamed **Archive - Veil Logs**), and keeps its messages and permissions. A channel with the same name anywhere else, such as another bot's `#join-logs`, is never reused, moved or renamed. Vanguard makes its own next to the others instead. A channel that is public, or where Vanguard lacks View Channel, Send Messages, Embed Links or Read Message History, is skipped and reported, and a new private channel is made in its place.
+
+If Discord refuses to create a channel (usually because Vanguard lacks Manage Channels, or the category is full), setup keeps the channels it already made, lists the log types still missing and stops. Fix the problem and run setup again to finish.
+
+Run `/setup logs setup separate_channels:false` if you only want `#bans` and `#ghost-vanguard-logging`. An event type with no channel of its own goes to `#ghost-vanguard-logging`. Voice and command activity is the exception: it is only recorded once `#voice-logs` and `#command-logs` exist. Event logging and the category switches still apply everywhere.
+
+`/setup logs check` sends a test message to every log channel and lists the log types that still have no channel. `/setup logs status` shows the same list.
+
+`/setup logs merge` cleans up a server whose log channels ended up in different categories. It previews the change, then groups Vanguard's own log channels (ban logs, server logs, the security log and any log channel Vanguard is configured to post in) under **Ghost Vanguard Logs** and renames the old default `#midtown-vanguard-logging` to `#ghost-vanguard-logging` (same channel, same ID, same history). It never moves, renames, reuses or deletes another bot's channels, including look-alike names such as `#modlogs`, `#join-logs`, `#honeypot` or `#veil-utilities-logging`, and it reports duplicate log channels for a human to archive. This works the same in servers that never had Veil.
 <!-- /coderabbit-ai-generated:v1 -->
 
 ## Restarts and downtime
@@ -108,7 +133,7 @@ The script checks the metadata, checksum and integrity, refuses to run while the
 
 ## Manual logs and staff levels
 
-Use `/setup logs route type:messages channel:#message-logs` to choose a private destination. Types include joins, voice, commands, anti-nuke, messages, moderation, members, roles, channels and server events. Omit `channel` to reset a route. `/setup logs status` shows routes and category switches. Manual routes do not move channels. Voice logs include mute/deafen, streaming and camera changes.
+Use `/setup logs route type:messages channel:#message-logs` to choose a private destination. Types include joins, voice, commands, anti-nuke, messages, moderation, members, roles, channels and server events. Omit `channel` to remove a route; the next `/setup logs setup` creates a channel for that type again. `/setup logs status` shows routes and category switches. Choosing a route does not move the channel.
 
 The server owner can run `/setup logs cleanup-archive` to preview permanent deletion of channels in `Archive - Veil Logs`. Confirmation deletes their message history. Active log destinations and moved channels are skipped; categories with remaining children are retained.
 

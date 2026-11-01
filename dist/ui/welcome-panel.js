@@ -1,7 +1,7 @@
 import { Colors, PermissionFlagsBits } from 'discord.js';
 import { defaults } from '../bot/registry.js';
 import { AppError } from '../errors.js';
-import { checkChannel, describeCheck, serverPermissionGaps, setupLogChannels } from '../audit/log-setup.js';
+import { checkChannel, describeCheck, describeRouteSetup, serverPermissionGaps, setupLogChannels } from '../audit/log-setup.js';
 import { helpPage } from './help-ui.js';
 import { embed } from './ui.js';
 import { WELCOME_HELP_ID, WELCOME_PREFIX, welcomePanel } from './setup-tips.js';
@@ -32,11 +32,13 @@ export function registerWelcomePanel(registry) {
             const bans = await checkChannel(i.guild, result.bans.channel.id, 'ban logs');
             const logging = await checkChannel(i.guild, result.logging.channel.id, 'server logs');
             const gaps = serverPermissionGaps(i.guild);
-            const ok = bans.ok && logging.ok && !gaps.length;
+            const routeSetup = describeRouteSetup(result);
+            const ok = bans.ok && logging.ok && !gaps.length && !routeSetup.attention;
             await refresh();
             await i.editReply({ embeds: [embed(ok ? '✅ Log channels ready' : '⚠️ Log channels need attention', [
                         `**Ban logs:** <#${result.bans.channel.id}> · ${result.bans.how}`,
                         `**Server logs:** <#${result.logging.channel.id}> · ${result.logging.how}`,
+                        ...routeSetup.lines,
                         '', describeCheck('Ban logs', bans), describeCheck('Server logs', logging),
                         gaps.length ? `**Server permissions missing:** ${gaps.join('; ')}` : '',
                     ].filter(Boolean).join('\n'), ok ? Colors.Green : Colors.Orange)] });

@@ -189,7 +189,7 @@ Server rank: lifting ordinary bans and accepting appeals, raid tools, automod, s
 - `/setup logs exclude`: Stop or resume logging a channel
 - `/setup logs merge`: Group Vanguard's log channels, leaving other bots' logs alone
 - `/setup logs route`: Choose a private channel for a log type, or reset its destination
-- `/setup logs setup`: Set up log channels and reuse existing event logs
+- `/setup logs setup`: Set up the log channels: bans, server logs and one per log type
 - `/setup logs status`: Show logging settings
 - `/setup logs view`: Browse logged events (last 30 days)
 - `/setup staff report`: Show actions per staff member
