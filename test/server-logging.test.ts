@@ -175,7 +175,8 @@ function fakeGuild(existing: string[] = [], o: { everyoneCanView?: boolean; botP
     };
     const makeCategory = (id: string, name: string) => {
         const category: any = {
-            id, name, type: ChannelType.GuildCategory,
+            id, name, type: ChannelType.GuildCategory, position: 10,
+            setPosition: async (position: number) => { category.position = position; return category; },
             edit: async (change: any) => { Object.assign(category, change); return category; },
         };
         channels.set(id, category);
@@ -212,6 +213,7 @@ test('setup creates private #bans and #ghost-vanguard-logging once, then reuses 
         const first = await store.withAuthorized(G, () => setupLogChannels(store, guild, 'admin'));
         assert.deepEqual(created.map(c => c.name), ['bans', 'ghost-vanguard-logging', 'Ghost Vanguard Logs']);
         assert.equal(first.category.name, 'Ghost Vanguard Logs');
+        assert.equal(first.category.position, 0);
         assert.equal(first.bans.channel.parentId, first.category.id);
         assert.equal(first.logging.channel.parentId, first.category.id);
         const overwrites = created[0].permissionOverwrites;
@@ -232,6 +234,7 @@ test('setup reuses channels that already exist by name', async () => {
         const result = await store.withAuthorized(G, () => setupLogChannels(store, guild, 'admin'));
         assert.equal(created.length, 1, 'only the category is created for existing channels');
         assert.equal(result.categoryCreated, true);
+        assert.equal(result.category.position, 0);
         assert.equal(result.bans.how, 'existing channel reused');
         assert.equal(result.logging.how, 'existing channel reused');
     } finally { store.close(); }

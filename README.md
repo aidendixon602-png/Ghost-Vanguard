@@ -75,7 +75,15 @@ Ghost Vanguard separates **server permissions**, **bot-wide ranks**, and **Devel
 
 **Network-ban permissions are deliberately narrower than ordinary moderation:** only Developers may issue or lift a genreban or hardban, or grant/revoke a one-server genreban exception. Local staff can still manage ordinary server bans without changing a network ban.
 
+<!-- coderabbit-ai-generated:v1 -->
+
+<!-- coderabbit-ai-generated-section:v1:79b9947e57132f8c59e2e59f03c59ef3697df22365423e341352473f64c56d01 -->
+
 For the complete command-to-rank map, see [the generated rank reference](docs/ranks.md) and [command reference](docs/commands.md).
+
+Only approved Developer IDs manage bot permission assignments. Assign a rank in one server with `/setup staff user user_id:… rank:…`, or configure IDs in `src/bot/access-ids.ts`. `/setup staff global` is intentionally bot-wide. See [assigning access](docs/user/access.md) for role controls and source IDs. Run `/setup logs setup` to put the active log category at the top.
+
+<!-- /coderabbit-ai-generated:v1 -->
 
 ## Get started
 

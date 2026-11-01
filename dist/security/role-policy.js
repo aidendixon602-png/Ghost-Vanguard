@@ -1,17 +1,17 @@
 import { PermissionFlagsBits } from 'discord.js';
 import { developers } from '../bot/developers.js';
-import { explicitRank, hasAdministrator, RANKS } from '../bot/ranks.js';
+import { explicitRank, hasAdministrator, isQuarantined, RANKS } from '../bot/ranks.js';
 import { isProtectedRole } from '../bot/env-rules.js';
 import { canAssignProtected, PROTECTED_REFUSAL } from './protected-roles.js';
 /**
  * Who may give or take which role with /role.
  *
  *  - Developers (DEVELOPER_IDS): any eligible role, any member, in any server.
- *  - The server owner: any eligible role in their own server, including privileged roles.
+ *  - The server owner: any eligible role in their own server, including Discord privileged roles. Bot permission roles require a Developer.
  *  - Administrator or Manage Roles: roles below their own highest role, on members below them.
  *  - Configured Vanguard moderators (staff role, moderator rank): only roles allowed with /role who-can-give.
  *
- * Privileged roles (admin or moderation powers, Vanguard staff roles, the quarantine role) need a
+ * Bot permission roles always require a Developer. Other privileged roles (admin or moderation powers, the quarantine role) need a
  * saved owner-approved rule (/role who-can-give ... who:) for anyone other than the owner or a developer, for
  * both adding and removing. Nobody but the owner or a developer can give themselves a role.
  * Vanguard can never manage @everyone, bot/integration roles, or roles at or above its own.
@@ -22,6 +22,8 @@ export const PRIVILEGED_PERMISSIONS = [
     [PermissionFlagsBits.ManageRoles, 'Manage Roles'], [PermissionFlagsBits.ManageChannels, 'Manage Channels'],
     [PermissionFlagsBits.ManageGuild, 'Manage Server'], [PermissionFlagsBits.ManageWebhooks, 'Manage Webhooks'],
 ];
+export const isBotPermissionRole = (store, guildId, roleId) => !!store.get('SELECT 1 FROM staff_roles WHERE guild_id=? AND role_id=?', guildId, roleId)
+    || !!store.get('SELECT 1 FROM permission_roles WHERE guild_id=? AND role_id=?', guildId, roleId);
 /** Why a role is privileged, or null when it is an ordinary role. */
 export function privilegedReason(store, guildId, role) {
     const perms = PRIVILEGED_PERMISSIONS.filter(([bit]) => role.permissions.has(bit, false)).map(([, name]) => name);
@@ -43,6 +45,8 @@ export function hasGrantRule(store, guildId, roleId, actor) {
         || roles.some(r => store.get("SELECT 1 FROM role_rules WHERE guild_id=? AND role_id=? AND kind='grant' AND grantor_type='role' AND grantor_id=?", guildId, roleId, r));
 }
 export function decideRoleChange({ store, guild, actor, target, role, me, op }) {
+    if (isQuarantined(store, guild.id, actor.id) && !developers.has(actor.id) && actor.id !== guild.ownerId)
+        return { ok: false, kind: 'permission', reason: 'Bot access is suspended during quarantine. Ask the server owner or a Developer to review your quarantine.' };
     if (role.id === guild.id)
         return { ok: false, kind: 'role', reason: '@everyone cannot be given or taken.' };
     if (role.managed)
@@ -56,6 +60,8 @@ export function decideRoleChange({ store, guild, actor, target, role, me, op }) 
     // Protected roles (PROTECTED_ROLES in .env): only PROTECTED_ROLE_ASSIGNERS and Developers may give them.
     if (op === 'add' && isProtectedRole(role.id) && !canAssignProtected(actor.id))
         return { ok: false, kind: 'permission', reason: PROTECTED_REFUSAL(role.id) };
+    if (isBotPermissionRole(store, guild.id, role.id) && !developers.has(actor.id))
+        return { ok: false, kind: 'permission', reason: 'Only approved Developer user IDs may give or remove Vanguard bot permission roles.' };
     if (developers.has(actor.id))
         return { ok: true, as: 'developer', noop };
     if (actor.id === guild.ownerId)

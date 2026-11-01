@@ -134,7 +134,7 @@ Set up logs, staff roles, welcome messages and controls
 | `/setup history list` | Show recent setting changes | Head Admin+ |
 | `/setup history restore` | Undo a setting change | Server Owner |
 | `/setup config provider` | Turn a verification provider on or off | Server Owner |
-| `/setup config permission-role` | Give a role a staff rank (older method) | Server Owner |
+| `/setup config permission-role` | Developer: assign a server rank to a role | Developer |
 | `/setup config command` | Turn a command on or off, or change its cooldown | Server Owner |
 | `/setup config feature` | Turn moderation, verification, AI or backups on or off | Server Owner |
 | `/setup config backups` | Schedule server layout backups | Server Owner |
@@ -154,9 +154,10 @@ Set up logs, staff roles, welcome messages and controls
 | `/setup permissions discord` | Show roles with Administrator or Manage Roles | Head Admin+ |
 | `/setup status` | Show security health and settings | Head Admin+ |
 | `/setup security` | Set the security log and Roblox verification options | Head Admin+ |
-| `/setup security-admins` | Add, remove or list security admins | Server Owner |
-| `/setup staff role` | Link a role to a staff rank | Server Owner |
-| `/setup staff global` | Give someone a bot-wide rank | Developer |
+| `/setup security-admins` | Developer: add, remove or list security admins | Developer |
+| `/setup staff role` | Developer: assign a server rank to a role | Developer |
+| `/setup staff user` | Developer: assign a server rank by user ID | Developer |
+| `/setup staff global` | Developer: assign access in every server | Developer |
 | `/setup staff report` | Show actions per staff member | Server Owner |
 | `/setup staff list` | Show every staff rank | Helper+ |
 | `/setup staff check` | Show someone's rank | Helper+ |
@@ -299,7 +300,7 @@ Give or take a role from a member, with role rules and hierarchy enforced
 
 | Command | What it does | Who |
 |---|---|---|
-| `/role add` | Give a member a role | Everyone (checked role by role: Manage Roles or a Moderator rank, and staff roles need `/role who-can-give`) |
+| `/role add` | Give a member a role | Everyone (ordinary roles require Manage Roles, Administrator or a Vanguard Moderator rank; bot permission roles require a Developer; other privileged roles need owner approval) |
 | `/role remove` | Take a role from a member | Everyone (checked role by role, like `/role add`) |
 | `/role restore` | Give back the roles a member had before leaving | Everyone (gives back only roles the person could give with `/role add`) |
 | `/role who-can-give` | Choose who can give a role | Owner or Head Admin (staff roles: owner only) |

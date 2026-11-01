@@ -1,3 +1,4 @@
+import { isBotPermissionRole } from './role-policy.js';
 import { consumeApprovedRoleChange } from './role-authorizations.js';
 import { ActionRowBuilder, AuditLogEvent, PermissionFlagsBits, ButtonBuilder, ButtonStyle, Colors, Guild, GuildAuditLogsEntry, GuildMember, type EmbedBuilder } from 'discord.js';
 import { dangerous, escalationAdded, KeyedQueue, overrideRule, ruleFor, RULES, WARN_FIRST, WARNING_MEMORY_MS, KNOWN_ROLE_BOTS, type Rule } from '../core.js';
@@ -552,7 +553,7 @@ export class Security {
         const qId = this.store.settings(guild.id).quarantineRoleId;
         const q = qId ? guild.roles.cache.get(qId) : null;
         this.store.assertAuthorized(guild.id);
-        if (q && !q.managed && !dangerous(q.permissions.bitfield) && q.editable)
+        if (q && !q.managed && !isBotPermissionRole(this.store, guild.id, q.id) && !dangerous(q.permissions.bitfield) && q.editable)
             await member.roles.add(q, 'Ghost Vanguard quarantine');
         const fresh = await guild.members.fetch({ user: userId, force: true });
         const remaining = dangerous(fresh.permissions.bitfield);
@@ -594,7 +595,7 @@ export class Security {
         return this.trusted(member.guild, actor) ? actor : null;
     }
 
-    async release(guild: Guild, userId: string, privileged: boolean): Promise<string> {
+    async release(guild: Guild, userId: string, privileged: boolean, actorId?: string): Promise<string> {
         this.store.assertAuthorized(guild.id);
         const row = this.store.get('SELECT * FROM backups WHERE guild_id=? AND user_id=?', guild.id, userId);
         if (!row)
@@ -605,7 +606,7 @@ export class Security {
         const restored: string[] = [], skipped: string[] = [];
         for (const id of JSON.parse(row.roles) as string[]) {
             const role = guild.roles.cache.get(id);
-            if (!role || role.managed || !role.editable || (!privileged && dangerous(role.permissions.bitfield))) {
+            if (!role || role.managed || !role.editable || (isBotPermissionRole(this.store, guild.id, id) && !developers.has(actorId ?? '')) || (!privileged && dangerous(role.permissions.bitfield))) {
                 skipped.push(id);
                 continue;
             }

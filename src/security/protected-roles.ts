@@ -1,3 +1,4 @@
+import { isBotPermissionRole } from './role-policy.js';
 import { AuditLogEvent, Colors, type Guild, type GuildAuditLogsEntry } from 'discord.js';
 import type { Store } from '../database/db.js';
 import type { LogQueue } from '../logging.js';
@@ -21,11 +22,12 @@ export const PROTECTED_REFUSAL = (roleId: string) =>
  */
 export async function enforceProtectedRoles(store: Store, logs: LogQueue, entry: GuildAuditLogsEntry, guild: Guild): Promise<string[]> {
     if (entry.action !== AuditLogEvent.MemberRoleUpdate || !entry.targetId) return [];
+    const reverted = await enforceBotPermissionRoles(store, logs, entry, guild);
     const added = ((entry.changes ?? []) as any[]).filter(c => c.key === '$add').flatMap(c => (c.new ?? []) as { id: string; name?: string }[]);
     const hits = added.filter(r => isProtectedRole(r.id));
-    if (!hits.length) return [];
+    if (!hits.length) return reverted;
     const actor = responsibleActor(entry, guild);
-    if (!actor || actor === guild.client.user?.id || isTrustedBot(actor) || canAssignProtected(actor)) return [];
+    if (!actor || actor === guild.client.user?.id || isTrustedBot(actor) || canAssignProtected(actor)) return reverted;
     const member = await guild.members.fetch({ user: entry.targetId, force: true }).catch(() => null);
     const ids = hits.map(r => r.id).filter(id => member?.roles.cache.has(id));
     let removed = false;
@@ -37,5 +39,32 @@ export async function enforceProtectedRoles(store: Store, logs: LogQueue, entry:
         .setFooter({ text: `Given by: ${actor} · Member: ${entry.targetId}` }).setTimestamp();
     logs.push(guild.id, card);
     void dmSecurityAlert(guild.client, { embeds: [embed('Protected role blocked', `**${guild.name}** (\`${guild.id}\`)\n<@${actor}> (\`${actor}\`) gave ${hits.map(r => `**${r.name ?? r.id}**`).join(', ')} to <@${entry.targetId}> (\`${entry.targetId}\`).\n${outcome}`, removed ? Colors.Orange : Colors.Red)] }).catch(() => 0);
-    return removed ? ids : [];
+    return [...reverted, ...(removed ? ids : [])];
+}
+
+/** Bot permission roles cannot be delegated through Discord roles, trust lists or role rules. */
+async function enforceBotPermissionRoles(store: Store, logs: LogQueue, entry: GuildAuditLogsEntry, guild: Guild): Promise<string[]> {
+    const actor = responsibleActor(entry, guild);
+    // Internal containment/restoration has no staff actor; manual bot commands retain their actor ID.
+    if (actor === guild.client.user?.id || actor && developers.has(actor)) return [];
+    const changes = (entry.changes ?? []) as { key: string; new?: { id: string }[] }[];
+    const ids = (key: string) => [...new Set(changes.filter(c => c.key === key).flatMap(c => c.new ?? []).map(r => r.id))]
+        .filter(id => isBotPermissionRole(store, guild.id, id));
+    const added = ids('$add'), removed = ids('$remove');
+    if (!added.length && !removed.length) return [];
+    const member = await guild.members.fetch({ user: entry.targetId!, force: true }).catch(() => null);
+    const undoAdded = added.filter(id => member?.roles.cache.has(id));
+    const undoRemoved = removed.filter(id => member && !member.roles.cache.has(id));
+    const reverted: string[] = [], failed: string[] = [];
+    for (const [roleIds, op] of [[undoAdded, 'remove'], [undoRemoved, 'add']] as const) {
+        if (!member || !roleIds.length) continue;
+        try { await member.roles[op](roleIds, 'Ghost Vanguard: undo unauthorized bot permission role change'); reverted.push(...roleIds); }
+        catch { failed.push(...roleIds); }
+    }
+    logs.push(guild.id, embed('Bot permission role change blocked',
+        `Actor: ${actor ? `<@${actor}>` : 'unknown'} · Member: <@${entry.targetId}>\nOnly approved Developer IDs may manage bot permission roles.\n`
+        + `Roles: ${[...added, ...removed].map(id => `<@&${id}>`).join(', ')}\n`
+        + (!member ? 'Member unavailable; review manually.' : failed.length ? `Could not revert ${failed.map(id => `<@&${id}>`).join(', ')}. Check Manage Roles and the bot hierarchy.` : 'Unauthorized changes reverted or already resolved.'),
+        failed.length || !member ? Colors.Red : Colors.Orange));
+    return reverted;
 }

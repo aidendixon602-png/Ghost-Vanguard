@@ -1,3 +1,4 @@
+import { BOT_STAFF_IDS } from './access-ids.js';
 import type { Store } from '../database/db.js';
 import { config } from '../config.js';
 import { style } from '../console-ui.js';
@@ -6,17 +7,17 @@ import { trustedRecipients } from './trusted-dm.js';
 import { antinukeLocked, blacklistSize, envGlobalAlertChannel, protectedRoleAssigners, protectedRoles, protectedUsers } from './env-rules.js';
 
 /**
- * Printed at every start: exactly who holds bot-wide power, and where it comes from. Nothing is
- * built in: Developers (the top rank) are BOT_OWNER_ID and DEVELOPER_IDS; Supreme Leaders come from
+ * Printed at every start: who holds bot-wide power and where it comes from.
+ * Includes source IDs in access-ids.ts, BOT_OWNER_ID, DEVELOPER_IDS,
  * SUPREME_LEADER_IDS and `/setup staff global`. The separately restricted `/restart` command also checks exact DEVELOPER_IDS membership.
  * An unexpected ID here is the first sign of trouble.
  */
 export function accessSummary(store: Store): string[] {
     const fromEnv = supremeLeaders();
     const granted = store.all('SELECT user_id, level FROM bot_staff ORDER BY level').map(r => ({ id: String(r.user_id), level: String(r.level) }));
-    const developers = [...new Set([config.ownerId, ...config.developers].filter(Boolean))];
-    const supreme = [...new Set([...fromEnv, ...granted.filter(g => g.level === 'supreme').map(g => g.id)])].filter(id => !developers.includes(id));
-    const others = granted.filter(g => g.level !== 'supreme');
+    const developers = [...new Set([config.ownerId, ...config.developers, ...(BOT_STAFF_IDS.developer ?? [])].filter(Boolean))];
+    const supreme = [...new Set([...fromEnv, ...(BOT_STAFF_IDS.supreme ?? []), ...granted.filter(g => g.level === 'supreme').map(g => g.id)])].filter(id => !developers.includes(id));
+    const others = [...granted.filter(g => g.level !== 'supreme'), ...(['overseer', 'botmanager'] as const).flatMap(level => (BOT_STAFF_IDS[level] ?? []).map(id => ({ id, level })))];
     const row = (label: string, value: string) => `    ${style.dim(label.padEnd(13))} ${value}`;
     const ids = (list: string[]) => list.length ? list.join(', ') : style.dim('none');
     return [

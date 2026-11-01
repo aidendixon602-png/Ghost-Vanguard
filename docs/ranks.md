@@ -11,7 +11,7 @@ Generated from the bot itself (`npm run docs`). Every rank can also use everythi
 
 ## 🧰 Developer
 
-The top rank: the bot owner (`BOT_OWNER_ID`) and anyone in `DEVELOPER_IDS`. Everything, including the tools that can take the bot down or reach every server at once: restarts, installing updates, restoring database settings, removing or banning servers, giving bot-wide ranks and managing network bans. Watched by anti-nuke, but never punished. Set only in `.env`.
+The top rank: the bot owner (`BOT_OWNER_ID`) and anyone in `DEVELOPER_IDS`. Everything, including the tools that can take the bot down or reach every server at once: restarts, installing updates, restoring database settings, removing or banning servers, giving bot-wide ranks and managing network bans. Watched by anti-nuke, but never punished. Set in the existing bot configuration or `BOT_STAFF_IDS.developer` in `src/bot/access-ids.ts`. Only Developers manage bot permission assignments. Restart additionally requires an exact ID in `DEVELOPER_IDS`.
 
 - `/dev alerts`: Set up the global anti-nuke feed and DMs
 - `/dev database restore-settings`: Restore lost settings from a backup file
@@ -23,17 +23,20 @@ The top rank: the bot owner (`BOT_OWNER_ID`) and anyone in `DEVELOPER_IDS`. Ever
 - `/netexception list`: List genreban exceptions
 - `/netexception revoke`: Cancel a genreban exception
 - `/restart`: Restart the bot
-- `/setup staff global`: Give someone a bot-wide rank
+- `/setup config permission-role`: Developer: assign a server rank to a role
+- `/setup security-admins`: Developer: add, remove or list security admins
+- `/setup staff global`: Developer: assign access in every server
+- `/setup staff role`: Developer: assign a server rank to a role
+- `/setup staff user`: Developer: assign a server rank by user ID
 - `/ungenreban`: Lift a genreban everywhere
 - `/unhardban`: Lift a hardban everywhere
 
 ## 🏠 Server Owner
 
-Whoever owns a Discord server, in that server only. Above Supreme Leader there: everything server-side, including security admins and undoing setting changes. No bot-wide tools (network bans, /dev, the database). Watched by anti-nuke, but never punished.
+Whoever owns a Discord server, in that server only. Above Supreme Leader there: server operations and undoing non-permission settings. Bot permission assignments are Developer-only. No bot-wide tools (network bans, /dev, the database). Watched by anti-nuke, but never punished.
 
 - `/setup history restore`: Undo a setting change
 - `/setup logs cleanup-archive`: Preview and delete channels in the old log archive
-- `/setup security-admins`: Add, remove or list security admins
 
 ## 👑 Supreme Leader
 
@@ -69,7 +72,7 @@ Bot-wide, every server: Head Admin everywhere plus bot status, diagnostics and a
 
 ## 🛡️ Head Admin
 
-Server rank: anti-nuke, whitelist, control panel, backups and staff ranks. Given by linking a role with `/setup staff role`, or `/setup security-admins` (owner). Discord's Administrator permission counts as Head Admin, except for actions that weaken protection.
+Server rank: anti-nuke, whitelist, control panel, and backups. Given by linking a role with `/setup staff role`, or directly by user ID with `/setup staff user` (Developer only). Discord's Administrator permission counts as Head Admin, except for actions that weaken protection.
 
 - `/antinuke check`: Check the bot's permissions and role position
 - `/antinuke disable`: Turn anti-nuke off (stays off after restarts)
@@ -112,14 +115,12 @@ Server rank: anti-nuke, whitelist, control panel, backups and staff ranks. Given
 - `/setup config backups`: Schedule server layout backups
 - `/setup config command`: Turn a command on or off, or change its cooldown
 - `/setup config feature`: Turn moderation, verification, AI or backups on or off
-- `/setup config permission-role`: Give a role a staff rank (older method)
 - `/setup config provider`: Turn a verification provider on or off
 - `/setup history list`: Show recent setting changes
 - `/setup panel`: Create or update the staff control panel
 - `/setup permissions discord`: Show roles with Administrator or Manage Roles
 - `/setup permissions list`: Show roles with bot command access
 - `/setup security`: Set the security log and Roblox verification options
-- `/setup staff role`: Link a role to a staff rank
 - `/setup status`: Show security health and settings
 
 ## 🔧 Admin
@@ -252,7 +253,7 @@ Any member. Some of these check more inside the command (noted next to them).
 - `/info role`: Show a role's details
 - `/info server`: Show server details and protection
 - `/info user`: Show a member's details
-- `/role add`: Give a member a role _(checked role by role: Manage Roles or a Moderator rank, and staff roles need `/role who-can-give`)_
+- `/role add`: Give a member a role _(ordinary roles require Manage Roles, Administrator or a Vanguard Moderator rank; bot permission roles require a Developer; other privileged roles need owner approval)_
 - `/role remove`: Take a role from a member _(checked role by role, like `/role add`)_
 - `/role restore`: Give back the roles a member had before leaving _(gives back only roles the person could give with `/role add`)_
 - `/ticket add`: Add someone to this ticket _(ticket staff only)_

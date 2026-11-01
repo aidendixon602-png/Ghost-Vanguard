@@ -74,7 +74,7 @@ async function resolveChannel(store, guild, names, chosen, saved, reason) {
 const normalizedCategoryName = (name) => name.trim().toLowerCase().replace(/[_-]+/g, ' ');
 /** Find or create the category for active Ghost Vanguard logs. */
 async function resolveLogCategory(store, guild, reason) {
-    const category = [...guild.channels.cache.values()].find(c => c.type === ChannelType.GuildCategory && normalizedCategoryName(c.name) === normalizedCategoryName(LOG_CATEGORY));
+    const category = [...guild.channels.cache.values()].find((c) => c.type === ChannelType.GuildCategory && normalizedCategoryName(c.name) === normalizedCategoryName(LOG_CATEGORY));
     if (category)
         return { category, created: false };
     const created = await guild.channels.create({ name: LOG_CATEGORY, type: ChannelType.GuildCategory, permissionOverwrites: privateOverwrites(store, guild), reason });
@@ -186,6 +186,7 @@ export async function setupLogChannels(store, guild, by, chosen = {}) {
     if (bans.channel.id === logging.channel.id)
         throw new Error('Ban logs and server logs need two different channels.');
     const category = await resolveLogCategory(store, guild, reason);
+    await category.category.setPosition(0, { reason });
     await placeInLogCategory([bans, logging], category.category, reason);
     const { routes, skipped } = await activateLegacyRoutes(store, guild, category.category, reason);
     const archivedCategories = await archiveLegacyLogCategories(guild, reason);

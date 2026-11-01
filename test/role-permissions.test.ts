@@ -97,7 +97,7 @@ test('a Vanguard staff role counts as protected even with no Discord permissions
     try {
         store.run("INSERT INTO staff_roles(guild_id,role_id,level) VALUES(?,?,'admin')", G, R.helperish.id);
         const d = decide(p.admin, R.helperish);
-        assert.equal(d.ok, false); assert.match((d as any).reason, /Vanguard staff role/);
+        assert.equal(d.ok, false); assert.match((d as any).reason, /bot permission roles/);
     } finally { store.close(); }
 });
 
@@ -286,7 +286,7 @@ test('the risky tools are Developer only: Supreme Leaders, Overseers and server 
     config.supremeExtra.add(SUPREME);
     store.run("INSERT INTO bot_staff(user_id,level,by_id,at) VALUES(?,?,?,0)", MEMBER, 'overseer', OWNER);
     store.run("INSERT INTO bot_staff(user_id,level,by_id,at) VALUES(?,?,?,0)", ADMIN, 'supreme', OWNER);
-    const risky = ['dev/restart', 'database/restore-settings', 'deauthserver', 'banserver', 'unbanserver', 'staff/global', 'genreban', 'ungenreban', 'hardban', 'unhardban', 'netexception'];
+    const risky = ['dev/restart', 'database/restore-settings', 'deauthserver', 'banserver', 'unbanserver', 'staff/global', 'staff/role', 'staff/user', 'guild-config/permission-role', 'security/admin', 'genreban', 'ungenreban', 'hardban', 'unhardban', 'netexception'];
     try {
         for (const key of risky) {
             assert.equal(can(plainMember(SUPREME), key), false, `Supreme Leader (SUPREME_LEADER_IDS) must not use /${key}`);
@@ -299,7 +299,7 @@ test('the risky tools are Developer only: Supreme Leaders, Overseers and server 
         // The server owner outranks Supreme Leaders in their server, but never gets bot-wide tools.
         for (const key of [...risky, 'genreban', 'hardban', 'ungenreban', 'dev/diagnostics', 'dev/update', 'database/backup', 'authserver', 'autoreact/add'])
             assert.equal(can(plainMember(OWNER), key), false, `Server Owner must not use /${key}`);
-        for (const key of ['security/admin', 'config-history/restore', 'antinuke/disable', 'trust/add'])
+        for (const key of ['config-history/restore', 'antinuke/disable', 'trust/add'])
             assert.equal(can(plainMember(OWNER), key), true, `Server Owner can use /${key}`);
         for (const key of ['security/admin', 'config-history/restore'])
             assert.equal(can(plainMember(SUPREME), key), false, `a Supreme Leader is below the Server Owner for /${key}`);

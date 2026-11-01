@@ -1,4 +1,4 @@
-import { ChannelType, Colors, EmbedBuilder, OverwriteType, PermissionFlagsBits, type Guild, type GuildBasedChannel, type OverwriteResolvable, type TextChannel } from 'discord.js';
+import { ChannelType, Colors, EmbedBuilder, OverwriteType, PermissionFlagsBits, type CategoryChannel, type Guild, type GuildBasedChannel, type OverwriteResolvable, type TextChannel } from 'discord.js';
 import { DEFAULT_CATEGORIES, DEFAULT_CHANNELS, LEGACY_CATEGORIES, LEGACY_CHANNELS } from '../branding.js';
 import type { Store } from '../database/db.js';
 import { getFeature, setFeature } from '../features/settings.js';
@@ -92,10 +92,10 @@ const normalizedCategoryName = (name: string) => name.trim().toLowerCase().repla
 
 /** Find or create the category for active Ghost Vanguard logs. */
 async function resolveLogCategory(store: Store, guild: Guild, reason: string) {
-    const category = [...guild.channels.cache.values()].find(c => c.type === ChannelType.GuildCategory && normalizedCategoryName(c.name) === normalizedCategoryName(LOG_CATEGORY));
+    const category = [...guild.channels.cache.values()].find((c): c is CategoryChannel => c.type === ChannelType.GuildCategory && normalizedCategoryName(c.name) === normalizedCategoryName(LOG_CATEGORY));
     if (category) return { category, created: false };
     const created = await guild.channels.create({ name: LOG_CATEGORY, type: ChannelType.GuildCategory, permissionOverwrites: privateOverwrites(store, guild), reason });
-    return { category: created, created: true };
+    return { category: created as CategoryChannel, created: true };
 }
 
 /** Move only the two active log channels. Keep their channel overrides and every old log message intact. */
@@ -198,6 +198,7 @@ export async function setupLogChannels(store: Store, guild: Guild, by: string, c
     const logging = await resolveChannel(store, guild, LOGGING_CHANNEL_NAMES, chosen.logging ?? null, eventLogConfig(store, guild.id).channelId, reason);
     if (bans.channel.id === logging.channel.id) throw new Error('Ban logs and server logs need two different channels.');
     const category = await resolveLogCategory(store, guild, reason);
+    await category.category.setPosition(0, { reason });
     await placeInLogCategory([bans, logging], category.category, reason);
     const { routes, skipped } = await activateLegacyRoutes(store, guild, category.category, reason);
     const archivedCategories = await archiveLegacyLogCategories(guild, reason);

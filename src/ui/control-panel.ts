@@ -258,7 +258,7 @@ export function registerControlPanel(registry: Registry) {
                         if (backup) {
                             const target = await guild.members.fetch({ user: targetId, force: true }).catch(() => null);
                             if (!target) throw new AppError('VALIDATION_ERROR', `<@${targetId}> is not in the server; their saved roles are kept for when they come back.`);
-                            result = await c.security.release(guild, targetId, isBoss(guild, actorId));
+                            result = await c.security.release(guild, targetId, isBoss(guild, actorId), actorId);
                         } else {
                             const r = await restoreRoles(c.store, guild, actorId, targetId);
                             result = `Restored ${r.given.length} role(s)${r.skipped.length ? `; skipped ${r.skipped.length} (${r.skipped.map((s: any) => s.reason).slice(0, 3).join('; ')})` : ''}.`;
@@ -283,7 +283,7 @@ export function registerControlPanel(registry: Registry) {
                         label: 'Undo strip', reversal: 'Press **Strip Roles** on the panel.',
                         run: async (c: any) => {
                             const again = undoPlan(c.store, guild.id, id, actorId, guild.ownerId);
-                            const result = await c.security.release(guild, again.actor, true);
+                            const result = await c.security.release(guild, again.actor, true, actorId);
                             c.store.run('UPDATE incidents SET result=result || ? WHERE guild_id=? AND id=?', ` Undone by ${actorId}.`, guild.id, id);
                             recordPanelAction(c.store, c.logs, guild.id, actorId, again.actor, 'Revert · undo strip', `Incident #${id}. ${result}`);
                             await afterAction(c, guild);

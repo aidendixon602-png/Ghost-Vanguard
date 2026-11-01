@@ -75,9 +75,9 @@ test('Administrator alone never unlocks developer, cross-server, destructive or 
 test('the server owner can do the restricted server actions, but nothing developer-only', async () => {
     const { store, can } = await setup();
     const owner = member(OWNER, PermissionFlagsBits.Administrator);
-    for (const key of ['backup/restore', 'snapshot/restore', 'antinuke/disable', 'trust/add', 'staff/role', 'guild-config/permission-role', 'case/delete'])
+    for (const key of ['backup/restore', 'snapshot/restore', 'antinuke/disable', 'trust/add', 'case/delete'])
         assert.equal(can(owner, key), true, `owner should be able to use /${key}`);
-    for (const key of ['dev/diagnostics', 'genreban', 'hardban', 'banserver', 'staff/global'])
+    for (const key of ['dev/diagnostics', 'genreban', 'hardban', 'banserver', 'staff/global', 'staff/role', 'staff/user', 'guild-config/permission-role', 'security/admin'])
         assert.equal(can(owner, key), false, `owner must NOT be able to use /${key}`);
     store.close();
 });

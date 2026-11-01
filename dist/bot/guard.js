@@ -4,7 +4,7 @@ import { config } from '../config.js';
 import { inviteUrl } from './invite.js';
 import { developers } from './developers.js';
 import { AppError } from '../errors.js';
-import { aboveSupremeMessage, botRank, needsDeveloper, rankOf, RANKS, requiredRank } from './ranks.js';
+import { aboveSupremeMessage, botRank, isQuarantined, needsDeveloper, rankOf, RANKS, requiredRank } from './ranks.js';
 import { ANTINUKE_LOCK_KEYS, antinukeLocked } from './env-rules.js';
 const lockedKey = (key) => !!key && antinukeLocked() && ANTINUKE_LOCK_KEYS.has(key.replace(/\/$/, ''));
 export const ANTINUKE_LOCKED_MESSAGE = 'Anti-nuke is **locked** in the bot settings (`ANTINUKE_LOCK`), so its rules cannot be weakened or turned off from Discord. Only a Developer can change them.';
@@ -25,6 +25,11 @@ export class Guard {
         if (policy.requiresAuthorization && (!guildId || !this.store.isAuthorized(guildId)))
             return false;
         if (policy.requiresAuthorization && this.ready && !this.ready(guildId))
+            return false;
+        const protectedAction = policy.requiresAuthorization || policy.developerOnly || policy.access !== 'member'
+            || policy.requiredPermissions.length > 0 || (requiredRank(rankKey ?? command) ?? 0) > 0;
+        if (guildId && protectedAction && isQuarantined(this.store, guildId, user)
+            && !developers.has(user) && user !== actor?.guild.ownerId)
             return false;
         // Developer-only commands: the Developer rank is the only way in (no Discord permission, server role
         // or lower bot-wide rank).

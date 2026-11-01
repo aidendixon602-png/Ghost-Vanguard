@@ -88,7 +88,7 @@ export function registerIncidentControls(registry) {
                 reversal: 'Use `/antinuke quarantine` on them to strip them again.',
                 run: async () => {
                     const again = undoPlan(ctx.store, i.guildId, id, i.user.id, i.guild?.ownerId);
-                    const result = await ctx.security.release(i.guild, again.actor, true);
+                    const result = await ctx.security.release(i.guild, again.actor, true, i.user.id);
                     ctx.store.run('UPDATE incidents SET result=result || ? WHERE guild_id=? AND id=?', ` Undone by ${i.user.id}.`, i.guildId, id);
                     ctx.logs.push(i.guildId, embed('Strip undone', `<@${i.user.id}> undid **Incident #${id}** for <@${again.actor}> (false alarm). ${result}`, Colors.Green));
                     if (alert?.components?.length)
