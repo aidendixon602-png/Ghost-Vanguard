@@ -19,7 +19,7 @@ export function statusPanel(ctx, guild, user) {
  */
 export const TRUST_PRESETS = {
     moderation: { title: 'Basic moderation', description: 'bans, unbans, kicks and timeouts', rules: ['mass_ban', 'mass_unban', 'mass_kick', 'timeout'] },
-    roles: { title: 'Role manager', description: 'give roles (including moderator roles), create, edit and delete roles', rules: ['role_grant', 'role_create', 'role_update', 'role_delete'] },
+    roles: { title: 'Role manager', description: 'give ordinary roles, create, edit and delete roles (protected permissions need the permission-grant whitelist)', rules: ['role_grant', 'role_create', 'role_update', 'role_delete'] },
     channels: { title: 'Channel manager', description: 'create, edit and delete channels and webhooks', rules: ['channel_create', 'channel_update', 'channel_delete', 'webhook_change'] },
     administrator: { title: 'Administrator', description: 'everything incl. promoting mods; not Administrator grants, bots or prunes',
         rules: ['mass_ban', 'mass_unban', 'mass_kick', 'timeout', 'role_grant', 'role_create', 'role_update', 'role_delete', 'channel_create', 'channel_update', 'channel_delete', 'webhook_change', 'guild_update', 'automod_tamper', 'emoji_delete'] },
@@ -30,9 +30,9 @@ export const RULE_LABELS = [
     ['role_grant', 'Roles · Give roles to people'], ['role_create', 'Roles · Create roles'], ['role_update', 'Roles · Edit roles'], ['role_delete', 'Roles · Delete roles'],
     ['channel_create', 'Channels · Create channels'], ['channel_update', 'Channels · Edit channels and permissions'], ['channel_delete', 'Channels · Delete channels'], ['webhook_change', 'Channels · Webhooks'],
     ['guild_update', 'Server · Edit server settings'], ['automod_tamper', 'Server · Turn off or delete AutoMod'], ['emoji_delete', 'Server · Delete emojis and stickers'],
-    ['bot_add', '⚠ Danger · Add bots'], ['dangerous_grant', '⚠ Danger · Give dangerous permissions'], ['member_prune', '⚠ Danger · Prune members'],
+    ['bot_add', '⚠ Danger · Add bots'], ['dangerous_grant', '⚠ Danger · Grant protected permissions'], ['member_prune', '⚠ Danger · Prune members'],
 ];
-const friendly = (key) => RULE_LABELS.find(([k]) => k === key)?.[1].replace(/^.*· /, '') ?? RULES.find(r => r.key === key)?.title ?? key;
+const friendly = (key) => key === 'dangerous_grant' ? 'Permission grants' : RULE_LABELS.find(([k]) => k === key)?.[1].replace(/^.*· /, '') ?? RULES.find(r => r.key === key)?.title ?? key;
 /** "preset:moderation" → its rule keys; a rule key → [key]; empty → [] (all rules). */
 export function rulesFor(choice) {
     if (!choice)
@@ -140,7 +140,7 @@ export function trustListPage(ctx, guildId, user, requested = 1, expired = false
         const gone = g.role && guild && !guild.roles.cache.has(g.id) ? ` *(role deleted · ID ${g.id} · remove with \`/antinuke whitelist add\`)*` : '';
         return `${g.role ? '🛡️' : '👤'} <@${g.role ? '&' : ''}${g.id}>${gone} · **${scope}** · ${g.expires ? `${g.expires > now ? 'expires' : 'EXPIRED'} <t:${Math.floor(g.expires / 1000)}:R>` : 'until removed'} · set by <@${g.by}>`;
     });
-    const body = `${lines.join('\n') || 'Nobody is whitelisted.'}\n\n**All rules** = never punished (you are still alerted). A **preset** or **<Rule> only** = not punished for those rules only.\n-# Page ${page}/${pages} · ${all.length} entr${all.length === 1 ? 'y' : 'ies'} · updated <t:${Math.floor(now / 1000)}:T>`;
+    const body = `${lines.join('\n') || 'Nobody is whitelisted.'}\n\n**All rules** = never punished (you are still alerted), except for granting Administrator and other protected permissions. A **preset** or **<Rule> only** = not punished for those rules only.\n**Permission grants** = the separate whitelist for handing out those permissions (\`/antinuke whitelist admin\`).\n-# Page ${page}/${pages} · ${all.length} entr${all.length === 1 ? 'y' : 'ies'} · updated <t:${Math.floor(now / 1000)}:T>`;
     const id = (p) => `trustlist:${guildId}:${user}:${p}:${expired ? 1 : 0}`;
     return { embeds: [embed('Anti-nuke whitelist', body)], components: [new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId(id(page - 1)).setLabel('< Prev').setStyle(ButtonStyle.Secondary).setDisabled(page <= 1), new ButtonBuilder().setCustomId(id(page) + ':r').setLabel('Refresh').setStyle(ButtonStyle.Primary), new ButtonBuilder().setCustomId(id(page + 1)).setLabel('Next >').setStyle(ButtonStyle.Secondary).setDisabled(page >= pages))], allowedMentions: { parse: [] } };
 }

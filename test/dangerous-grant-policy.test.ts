@@ -78,16 +78,63 @@ test('unwhitelisted self-assignment of Administrator or Manage Server strips and
     }
 });
 
-test('explicit anti-nuke whitelist entries remain an exception to self-admin enforcement', async () => {
-    for (const kind of ['trust', 'trust:dangerous_grant']) {
+test('only the separate permission-grant whitelist is an exception to self-admin enforcement', async () => {
+    // A full bypass never allows handing out Administrator: that is its own whitelist.
+    const full = fixture();
+    try {
+        full.store.grant('g', ACTOR, 'trust', 'owner');
+        addPrivilegedRole(full, PermissionFlagsBits.Administrator);
+        await full.security.audit(selfAssignment(PermissionFlagsBits.Administrator), full.guild);
+        assert.equal(full.calls.punished, 1, 'a full bypass does not cover granting Administrator');
+        assert.equal(full.calls.reverted, 1);
+        assert.notEqual(full.store.get("SELECT mode FROM incidents WHERE rule='dangerous_grant'")!.mode, 'exempt');
+    } finally { full.store.close(); }
+
+    // Neither does a bypass for other rules.
+    const other = fixture();
+    try {
+        other.store.grant('g', ACTOR, 'trust:mass_ban', 'owner');
+        addPrivilegedRole(other, PermissionFlagsBits.Administrator);
+        await other.security.audit(selfAssignment(PermissionFlagsBits.Administrator), other.guild);
+        assert.equal(other.calls.punished, 1);
+    } finally { other.store.close(); }
+
+    // The permission-grant whitelist, for a user or for a role they hold, does.
+    for (const role of [false, true]) {
         const f = fixture();
         try {
-            f.store.grant('g', ACTOR, kind, 'owner');
+            if (role) {
+                f.guild.members.cache.get(ACTOR)!.roles.cache.set('grantrole', { id: 'grantrole' });
+                f.store.grant('g', 'grantrole', 'trust_role:dangerous_grant', 'owner');
+            } else f.store.grant('g', ACTOR, 'trust:dangerous_grant', 'owner');
             addPrivilegedRole(f, PermissionFlagsBits.Administrator);
             await f.security.audit(selfAssignment(PermissionFlagsBits.Administrator), f.guild);
-            assert.equal(f.calls.punished, 0);
+            assert.equal(f.calls.punished, 0, role ? 'allowed by the role entry' : 'allowed by the user entry');
             assert.equal(f.calls.reverted, 0);
             assert.equal(f.store.get("SELECT mode FROM incidents WHERE rule='dangerous_grant'")!.mode, 'exempt');
         } finally { f.store.close(); }
     }
+});
+
+test('the server owner and Developers may grant protected permissions without any whitelist entry', async () => {
+    // The owner is granted this automatically: no trust:dangerous_grant row is written or needed.
+    const owner = fixture();
+    try {
+        const settings = owner.store.settings('g');
+        assert.equal(owner.store.all("SELECT 1 FROM grants WHERE kind LIKE '%dangerous_grant'").length, 0, 'no entry exists');
+        addPrivilegedRole(owner, PermissionFlagsBits.Administrator);
+        await owner.security.audit(selfAssignment(PermissionFlagsBits.Administrator), owner.guild); // actor is not the owner
+        assert.equal(owner.calls.punished, 1, 'everyone else is still checked');
+    } finally { owner.store.close(); }
+
+    const asOwner = fixture();
+    try {
+        (asOwner.guild as any).ownerId = ACTOR;
+        addPrivilegedRole(asOwner, PermissionFlagsBits.Administrator);
+        await asOwner.security.audit(selfAssignment(PermissionFlagsBits.Administrator), asOwner.guild);
+        assert.equal(asOwner.calls.punished, 0, 'the server owner is exempt automatically');
+        assert.equal(asOwner.calls.reverted, 0);
+        assert.equal(asOwner.store.get("SELECT mode FROM incidents WHERE rule='dangerous_grant'")!.mode, 'exempt');
+        assert.equal(asOwner.store.all("SELECT 1 FROM grants WHERE kind LIKE '%dangerous_grant'").length, 0, 'no entry is needed');
+    } finally { asOwner.store.close(); }
 });

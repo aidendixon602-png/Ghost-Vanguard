@@ -305,9 +305,14 @@ test('a brand-new role created with Administrator counts as a Permission Grant s
   assert.equal(store.all("SELECT * FROM incidents WHERE rule='dangerous_grant'").length,0);
   await security.audit(entry('admin','r2',AuditLogEvent.RoleCreate,[{key:'permissions',new:String(PermissionFlagsBits.Administrator)}]),guild);
   assert.equal(store.all("SELECT * FROM incidents WHERE rule='dangerous_grant'").length,1,'first offence, no waiting for five role creations');
-  store.grant('g','actor','trust','owner');
+  const lastMode=()=>String(store.get("SELECT mode FROM incidents WHERE rule='dangerous_grant' ORDER BY id DESC LIMIT 1")!.mode);
+  const ageOut=()=>{store.run('UPDATE incidents SET at=?',Date.now()-2*3600_000);store.run('UPDATE observations SET at=?',Date.now()-2*3600_000);};
+  ageOut();store.grant('g','actor','trust','owner');
   await security.audit(entry('trusted','r3',AuditLogEvent.RoleCreate,[{key:'permissions',new:String(PermissionFlagsBits.Administrator)}]),guild);
-  assert.equal(store.all("SELECT * FROM incidents WHERE rule='dangerous_grant'").length,1,'whitelisted people are not affected');
+  assert.notEqual(lastMode(),'exempt','a full bypass never covers granting Administrator');
+  ageOut();store.grant('g','actor','trust:dangerous_grant','owner');
+  await security.audit(entry('admin-ok','r4',AuditLogEvent.RoleCreate,[{key:'permissions',new:String(PermissionFlagsBits.Administrator)}]),guild);
+  assert.equal(lastMode(),'exempt','the separate permission-grant whitelist does');
  } finally {store.close();}
 });
 
@@ -348,15 +353,18 @@ function staffGuild() {
  return {...f,member,give,incidents};
 }
 
-test('whitelisted role managers can promote moderators, but Administrator is still checked',async()=>{
+test('role whitelist covers role work but never the protected permissions inside a role',async()=>{
  const {store,member,give,incidents}=staffGuild();
  try {
   member('actor',['plain']);member('newmod',['plain','mod']);member('newadmin',['plain','admin']);
   for(const r of ['role_grant','role_create','role_update','role_delete'])store.grant('g','actor',`trust:${r}`,'owner');
   await give('p1','newmod','mod');
-  assert.equal(incidents(),0,'giving a Ban/Kick role is normal work for a whitelisted role manager');
+  assert.equal(incidents(),1,'handing out a Ban/Kick role grants protected permissions, so it is Permission Grant');
   await give('p2','newadmin','admin');
-  assert.equal(incidents(),1,'Administrator still needs a full bypass');
+  assert.equal(incidents(),2,'a full role bypass never covers Administrator grants');
+  store.grant('g','actor','trust:dangerous_grant','owner');
+  await give('p3','newadmin','admin');
+  assert.equal(incidents(),2,'only the permission-grant whitelist allows it');
  }finally{store.close();}
 });
 

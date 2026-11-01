@@ -14,15 +14,20 @@ export function antinukeStatus(store: Store, guildId: string) {
     }).join('\n');
     const grants = store.all("SELECT user_id,kind FROM grants WHERE guild_id=? AND (kind IN ('trust','trust_role') OR kind LIKE 'trust:%' OR kind LIKE 'trust_role:%') AND (expires IS NULL OR expires>?) ORDER BY user_id", guildId, Date.now());
     const full = grants.filter(g => !String(g.kind).includes(':'));
+    // Handing out Administrator and other protected permissions is its own whitelist, so it is listed
+    // apart from "all rules" and from the per-rule bypasses.
+    const grantAdmin = grants.filter(g => String(g.kind).endsWith(':dangerous_grant'));
     const partial = new Map<string, string[]>();
-    for (const g of grants.filter(g => String(g.kind).includes(':'))) {
+    for (const g of grants.filter(g => String(g.kind).includes(':') && !String(g.kind).endsWith(':dangerous_grant'))) {
         const key = `<@${String(g.kind).startsWith('trust_role') ? '&' : ''}${g.user_id}>`, title = RULES.find(r => r.key === String(g.kind).split(':')[1])?.title ?? '?';
         partial.set(key, [...(partial.get(key) ?? []), title]);
     }
     const fullText = full.slice(0, 25).map(row => `<@${row.kind === 'trust_role' ? '&' : ''}${row.user_id}>`).join(' ') + (full.length > 25 ? `\n+${full.length - 25} more · /antinuke whitelist list` : '');
     const partialText = [...partial].slice(0, 15).map(([who, rules]) => `${who} · ${rules.join(', ')} only`).join('\n');
-    const whitelist = [fullText && `**All rules:** ${fullText}`, partialText && `**Some rules only:**\n${partialText}`].filter(Boolean).join('\n') || 'No explicit anti-nuke bypasses.';
+    const adminText = grantAdmin.slice(0, 10).map(row => `<@${String(row.kind).startsWith('trust_role') ? '&' : ''}${row.user_id}>`).join(' ') + (grantAdmin.length > 10 ? `\n+${grantAdmin.length - 10} more · /antinuke whitelist list` : '');
+    const whitelist = [fullText && `**All rules:** ${fullText}`, partialText && `**Some rules only:**\n${partialText}`,
+        adminText && `**Permission grants:** ${adminText}`].filter(Boolean).join('\n') || 'No explicit anti-nuke bypasses.';
     const state = !settings.enabled ? 'disabled' : settings.mode === 'observe' ? 'enabled in observe mode' : 'enabled';
     const color = !settings.enabled ? Colors.Red : settings.mode === 'observe' ? Colors.Orange : Colors.Green;
-    return embed('Antinuke Status', `Antinuke is currently **${state}**.\n\n**Rules**\n${rules}\n\n**Whitelisted**\n${whitelist}\n\n-# New or unconfigured servers start in observe mode; enforcement requires readiness and confirmation. If readiness is missing at startup, existing enforcement pauses in observe mode until staff confirm it again. Rules marked \`[warns first]\` warn without role removal on a first hit; safe reversals are attempted only for rules that support them. Repeating the same rule within an hour gets the normal response. Tune thresholds or turn a rule off with \`/antinuke rule\`; restore defaults with \`/antinuke reset\`. Bots get no warnings for routine rules. The server owner, developers and Vanguard are automatically protected. Verification-bot exemptions only bypass member-role updates.`, color);
+    return embed('Antinuke Status', `Antinuke is currently **${state}**.\n\n**Rules**\n${rules}\n\n**Whitelisted**\n${whitelist}\n\n-# New or unconfigured servers start in observe mode; enforcement requires readiness and confirmation. If readiness is missing at startup, existing enforcement pauses in observe mode until staff confirm it again. Rules marked \`[warns first]\` warn without role removal on a first hit; safe reversals are attempted only for rules that support them. Repeating the same rule within an hour gets the normal response. Tune thresholds or turn a rule off with \`/antinuke rule\`; restore defaults with \`/antinuke reset\`. Bots get no warnings for routine rules. The server owner, developers and Vanguard are automatically protected. Verification-bot exemptions only bypass member-role updates. **All rules** never allows handing out Administrator or other protected permissions: that is the separate **Permission grants** whitelist (\`/antinuke whitelist admin\`). The server owner, Developers and network-whitelisted people are always allowed it without an entry.`, color);
 }

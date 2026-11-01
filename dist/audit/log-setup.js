@@ -10,6 +10,7 @@ import { configureEventLog, eventLogConfig } from './event-log.js';
  */
 export const BANS_CHANNEL = DEFAULT_CHANNELS.bans;
 export const LOGGING_CHANNEL = DEFAULT_CHANNELS.logging;
+export const SECURITY_CHANNEL = DEFAULT_CHANNELS.security;
 export const LOG_CATEGORY = DEFAULT_CATEGORIES.logs;
 export const ARCHIVED_LOG_CATEGORY = LEGACY_CATEGORIES.archivedLogs;
 /**
@@ -23,6 +24,14 @@ export const LEGACY_LOG_ROUTES = {
     members: 'member-logs', roles: 'role-logs', channels: 'channel-logs', voice: 'voice-logs',
     server: 'server-logs', moderation: 'mod-logs',
 };
+/**
+ * Every name Vanguard has ever given one of its own log channels. A matching name alone never makes a
+ * channel Vanguard's: another bot (or staff) can run a `join-logs`, `bans` or `vanguard-security` of its
+ * own, so a channel outside Vanguard's log area is only ever reported, never moved, renamed or reused.
+ */
+export const RECOGNIZED_LOG_NAMES = new Set([
+    BANS_CHANNEL, SECURITY_CHANNEL, ...LOGGING_CHANNEL_NAMES, ...Object.values(LEGACY_LOG_ROUTES),
+]);
 const DEFAULTS = { bansChannelId: null, excludedChannels: [], ignoreBotRoutine: true };
 export const logChannels = (store, guild) => getFeature(store, guild, 'log_channels', DEFAULTS);
 export const setLogChannels = (store, guild, change, by) => setFeature(store, guild, 'log_channels', DEFAULTS, change, by);
@@ -65,7 +74,12 @@ async function resolveChannel(store, guild, names, chosen, saved, reason) {
     const savedChannel = text(saved ? guild.channels.cache.get(saved) ?? await guild.channels.fetch(saved).catch(() => null) : null);
     if (savedChannel)
         return { channel: savedChannel, created: false, how: 'already set up' };
-    const named = text(guild.channels.cache.find(c => c.type === ChannelType.GuildText && wanted.includes(c.name)));
+    // Prefer Vanguard's own log area, then an uncategorized channel, before any look-alike elsewhere:
+    // another bot's #join-logs or #bans must not be adopted just because the name matches.
+    const named = text([...guild.channels.cache.values()]
+        .filter(c => c.type === ChannelType.GuildText && wanted.includes(c.name))
+        .sort((a, b) => Number(inLogArea(guild, b.parentId)) - Number(inLogArea(guild, a.parentId))
+        || Number(!!a.parentId) - Number(!!b.parentId))[0]);
     if (named)
         return { channel: named, created: false, how: named.name === wanted[0] ? 'existing channel reused' : `existing channel reused (still named #${named.name})` };
     const created = await guild.channels.create({ name: wanted[0], type: ChannelType.GuildText, permissionOverwrites: privateOverwrites(store, guild), reason });
@@ -74,7 +88,7 @@ async function resolveChannel(store, guild, names, chosen, saved, reason) {
 const normalizedCategoryName = (name) => name.trim().toLowerCase().replace(/[_-]+/g, ' ');
 /** Find or create the category for active Ghost Vanguard logs. */
 async function resolveLogCategory(store, guild, reason) {
-    const category = [...guild.channels.cache.values()].find((c) => c.type === ChannelType.GuildCategory && normalizedCategoryName(c.name) === normalizedCategoryName(LOG_CATEGORY));
+    const category = findLogCategory(guild);
     if (category)
         return { category, created: false };
     const created = await guild.channels.create({ name: LOG_CATEGORY, type: ChannelType.GuildCategory, permissionOverwrites: privateOverwrites(store, guild), reason });
@@ -200,4 +214,148 @@ export async function setupLogChannels(store, guild, by, chosen = {}) {
         store.save(settings, by);
     }
     return { bans, logging, category: category.category, categoryCreated: category.created, archivedCategories, routes, skipped, previousAlerts: previousAlerts !== logging.channel.id ? previousAlerts : null };
+}
+// ------------------------------------------------------------ merging scattered log channels
+/**
+ * Where Vanguard's log channels are allowed to be taken from: its own category and the old Veil ones it
+ * inherited. A channel outside this area is never claimed on a name match alone — another bot's
+ * `join-logs`, `modlogs` or `veil-utilities-logging` must keep working exactly as it does now.
+ */
+function findLogCategory(guild) {
+    return [...guild.channels.cache.values()].find((c) => c.type === ChannelType.GuildCategory && normalizedCategoryName(c.name) === normalizedCategoryName(LOG_CATEGORY)) ?? null;
+}
+function logAreaCategoryNames() {
+    return new Set([LOG_CATEGORY, ...LEGACY_CATEGORIES.logs, ARCHIVED_LOG_CATEGORY].map(normalizedCategoryName));
+}
+function inLogArea(guild, parentId) {
+    if (!parentId)
+        return false;
+    const parent = guild.channels.cache.get(parentId);
+    return !!parent && parent.type === ChannelType.GuildCategory && logAreaCategoryNames().has(normalizedCategoryName(parent.name));
+}
+/**
+ * Work out what a merge would change, without changing anything.
+ *
+ * Vanguard's own channels are the ones it is configured to post in (ban logs, server logs, the security
+ * log, saved route channels) plus the recognized Veil log channels inside an old log category. Everything
+ * else — including look-alike names another bot may be using — is listed and left exactly as it is.
+ */
+export function planLogMerge(store, guild) {
+    const settings = store.settings(guild.id);
+    const saved = logChannels(store, guild.id);
+    const events = eventLogConfig(store, guild.id);
+    const configured = new Map();
+    const claim = (id, why) => { if (id && !configured.has(id))
+        configured.set(id, why); };
+    claim(saved.bansChannelId, 'ban logs');
+    claim(events.channelId, 'server logs');
+    // The security log may be a separate channel chosen with /setup security.
+    claim(settings.logChannelId, 'security log');
+    for (const [route, id] of Object.entries(saved.routes ?? {}))
+        claim(id, `${route} logs`);
+    const category = findLogCategory(guild);
+    const moves = [], renames = [];
+    const untouched = new Map();
+    const describeParent = (parentId) => (parentId ? guild.channels.cache.get(parentId)?.name ?? 'another category' : null);
+    for (const channel of guild.channels.cache.values()) {
+        if (channel.type !== ChannelType.GuildText)
+            continue;
+        const why = configured.get(channel.id);
+        const inherited = !why && inLogArea(guild, channel.parentId) && RECOGNIZED_LOG_NAMES.has(channel.name);
+        if (!why && !inherited) {
+            if (RECOGNIZED_LOG_NAMES.has(channel.name)) {
+                const parent = describeParent(channel.parentId);
+                untouched.set(channel.id, { channelId: channel.id, name: channel.name,
+                    why: parent ? `stays in **${parent}**, outside Vanguard's log area, so it may belong to another bot`
+                        : 'has no category, so Vanguard cannot tell who owns it' });
+            }
+            continue;
+        }
+        if (category?.id && channel.parentId === category.id)
+            continue; // already grouped
+        moves.push({ channelId: channel.id, name: channel.name, from: describeParent(channel.parentId),
+            why: why ?? 'old Veil log channel' });
+    }
+    // A second channel for the same log type (two #vanguard-security channels, or #midtown-vanguard-logging
+    // next to #ghost-vanguard-logging) is never deleted or moved by Vanguard: it is reported so a human can
+    // archive it. This is what earlier releases left behind.
+    const roleOf = (name) => (LOGGING_CHANNEL_NAMES.includes(name) ? 'server logs' : name);
+    const byRole = new Map();
+    for (const channel of guild.channels.cache.values()) {
+        if (channel.type !== ChannelType.GuildText || !RECOGNIZED_LOG_NAMES.has(channel.name))
+            continue;
+        if (moves.some(m => m.channelId === channel.id))
+            continue; // being grouped, not a leftover
+        byRole.set(roleOf(channel.name), [...(byRole.get(roleOf(channel.name)) ?? []), { id: channel.id, name: channel.name }]);
+    }
+    for (const [role, found] of byRole) {
+        if (found.length < 2)
+            continue;
+        const keeper = found.find(c => configured.has(c.id)) ?? found.find(c => inLogArea(guild, guild.channels.cache.get(c.id)?.parentId ?? null)) ?? found[0];
+        for (const extra of found) {
+            if (extra.id === keeper.id)
+                continue;
+            untouched.set(extra.id, { channelId: extra.id, name: extra.name,
+                why: `another ${role} channel next to <#${keeper.id}>; Vanguard never deletes a channel, so archive or remove it yourself` });
+        }
+    }
+    const logging = events.channelId ? guild.channels.cache.get(events.channelId) : null;
+    if (logging?.type === ChannelType.GuildText && LEGACY_LOGGING_CHANNELS.includes(logging.name))
+        renames.push({ channelId: logging.id, from: logging.name, to: LOGGING_CHANNEL });
+    return { categoryId: category?.id ?? null, moves, renames, untouched: [...untouched.values()] };
+}
+/**
+ * Apply the confirmed merge: group Vanguard's log channels under Ghost Vanguard Logs and, for the
+ * logging channel only, replace an old default name with the current one. No channel is deleted, no
+ * permission override is copied (`lockPermissions: false`) and no message history moves.
+ */
+export async function applyLogMerge(store, guild, by) {
+    store.assertAuthorized(guild.id);
+    const reason = `Ghost Vanguard log merge by ${by}`;
+    const plan = planLogMerge(store, guild);
+    const found = plan.categoryId ? guild.channels.cache.get(plan.categoryId) : null;
+    const target = found?.type === ChannelType.GuildCategory ? found : (await resolveLogCategory(store, guild, reason)).category;
+    await target.setPosition(0, { reason });
+    let moved = 0, renamed = 0;
+    const skipped = [];
+    for (const move of plan.moves) {
+        store.assertAuthorized(guild.id);
+        const channel = guild.channels.cache.get(move.channelId);
+        if (channel?.type !== ChannelType.GuildText || channel.parentId === target.id)
+            continue;
+        try {
+            await channel.setParent(target.id, { lockPermissions: false, reason });
+            moved++;
+        }
+        catch (e) {
+            skipped.push(`<#${move.channelId}>: ${e instanceof Error ? e.message : String(e)}`);
+        }
+    }
+    for (const rename of plan.renames) {
+        store.assertAuthorized(guild.id);
+        const channel = guild.channels.cache.get(rename.channelId);
+        // Only rename the exact legacy default Vanguard created; a custom name is never touched.
+        if (channel?.type !== ChannelType.GuildText || channel.name !== rename.from)
+            continue;
+        try {
+            await channel.edit({ name: rename.to, reason });
+            renamed++;
+        }
+        catch (e) {
+            skipped.push(`<#${rename.channelId}>: ${e instanceof Error ? e.message : String(e)}`);
+        }
+    }
+    return { categoryId: target.id, moved, renamed, skipped, untouched: plan.untouched };
+}
+/** The result of a merge, for the confirmation message. */
+export function describeMerge(result) {
+    const lines = [`**${LOG_CATEGORY}:** <#${result.categoryId}>`, `**Channels grouped:** ${result.moved}`];
+    if (result.renamed)
+        lines.push(`**Legacy names updated:** ${result.renamed} (same channel, same ID, same history)`);
+    if (result.untouched.length)
+        lines.push('', '**Left alone:**', ...result.untouched.slice(0, 15).map(u => `• <#${u.channelId}> — ${u.why}`), ...(result.untouched.length > 15 ? [`• Plus ${result.untouched.length - 15} more channels.`] : []));
+    if (result.skipped.length)
+        lines.push('', '**Could not be moved:**', ...result.skipped.slice(0, 10).map(s => `• ${s}`));
+    lines.push('', 'Nothing was deleted or overwritten: every channel kept its permissions and message history, and channels Vanguard does not own were left untouched.');
+    return lines.join('\n');
 }

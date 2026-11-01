@@ -11,7 +11,11 @@ export const DEFAULT_CHANNELS = {
     bans: 'bans',
     /** Server events and bot actions. */
     logging: 'ghost-vanguard-logging',
+    /** Private security log (anti-nuke, scam protection, raid response) and the topic that marks it as Vanguard's. */
+    security: 'vanguard-security',
 };
+/** Topic Vanguard sets on the security log it manages, so a restart finds the same channel instead of a second one. */
+export const SECURITY_LOG_TOPIC = `${PRODUCT_NAME} • managed security log`;
 /** Log channel names from older releases; kept so existing servers reuse them instead of getting a second channel. */
 export const DEFAULT_CATEGORIES = {
     logs: 'Ghost Vanguard Logs',

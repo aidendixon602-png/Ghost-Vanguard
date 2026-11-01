@@ -27,6 +27,7 @@ Protect your server, review incidents and manage trusted users
 | `/antinuke whitelist add` | Whitelist a user or role for some or all rules | Owner or Head Admin |
 | `/antinuke whitelist remove` | Take a user or role off the whitelist | Owner or Head Admin |
 | `/antinuke whitelist list` | Show the whitelist and when entries expire | Head Admin+ |
+| `/antinuke whitelist admin` | Separate whitelist for granting Administrator and protected permissions | Head Admin+ |
 | `/antinuke whitelist check` | See what anti-nuke allows someone and what would strip them | Head Admin+ |
 | `/antinuke whitelist bots` | Let a verification bot give roles without tripping anti-nuke | Owner or Head Admin |
 
@@ -140,6 +141,7 @@ Set up logs, staff roles, welcome messages and controls
 | `/setup config backups` | Schedule server layout backups | Server Owner |
 | `/setup logs setup` | Set up log channels and reuse existing event logs | Admin+ |
 | `/setup logs route` | Choose a private channel for a log type, or reset its destination | Admin+ |
+| `/setup logs merge` | Group Vanguard's log channels, leaving other bots' logs alone | Admin+ |
 | `/setup logs cleanup-archive` | Preview and delete channels in the old log archive | Server Owner |
 | `/setup logs check` | Check the log channels and permissions | Admin+ |
 | `/setup logs exclude` | Stop or resume logging a channel | Admin+ |

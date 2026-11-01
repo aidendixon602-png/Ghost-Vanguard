@@ -10,12 +10,12 @@ export function whitelistCheck(store: Store, guild: Guild, userId: string, roleI
     const e = new EmbedBuilder().setTitle('Anti-nuke check').setFooter({ text: `User ID: ${userId}` }).setTimestamp();
     const auto = userId === guild.ownerId ? 'the server owner' : developers.has(userId) ? 'a Ghost Vanguard developer' : userId === guild.client?.user?.id ? 'Ghost Vanguard itself' : null;
     if (auto)
-        return e.setColor(Colors.Green).setDescription(userId === guild.client?.user?.id ? `<@${userId}> is **${auto}**. Its own actions count against the staff member who asked for them.` : `<@${userId}> is **${auto}**, so anti-nuke never punishes them. They are still watched: if they hit a limit, you get an alert.`);
+        return e.setColor(Colors.Green).setDescription(userId === guild.client?.user?.id ? `<@${userId}> is **${auto}**. Its own actions count against the staff member who asked for them.` : `<@${userId}> is **${auto}**, so anti-nuke never punishes them. They are still watched: if they hit a limit, you get an alert. That includes granting Administrator and the other protected permissions through Discord — no permission-grant entry is needed.`);
     const live = (kind: string, id = userId) => store.get('SELECT expires FROM grants WHERE guild_id=? AND user_id=? AND kind=? AND (expires IS NULL OR expires>?)', guild.id, id, kind, now);
     const full = live('trust');
     const fullRole = roleIds.find(r => live('trust_role', r));
     if (full || fullRole)
-        return e.setColor(Colors.Green).setDescription(`<@${userId}> has a **full bypass** (${full ? when(full.expires) : `from the role <@&${fullRole}>, ${when(live('trust_role', fullRole!)!.expires)}`}). They are never punished, but still watched: if they hit a limit, you get an alert.`);
+        return e.setColor(Colors.Green).setDescription(`<@${userId}> has a **full bypass** (${full ? when(full.expires) : `from the role <@&${fullRole}>, ${when(live('trust_role', fullRole!)!.expires)}`}). They are never punished, but still watched: if they hit a limit, you get an alert.\n\n**Permission grants are separate:** the full bypass does not allow handing out Administrator or other protected permissions through Discord. Allow that with \`/antinuke whitelist admin\`.`);
 
     const skips: string[] = [];
     const checked: string[] = [];
@@ -33,7 +33,7 @@ export function whitelistCheck(store: Store, guild: Guild, userId: string, roleI
     if (isBot && (store.get("SELECT 1 FROM grants WHERE guild_id=? AND user_id=? AND kind='bot'", guild.id, userId) || (userId in KNOWN_ROLE_BOTS && !store.get("SELECT 1 FROM grants WHERE guild_id=? AND user_id=? AND kind='bot_denied'", guild.id, userId))))
         notes.push(`🤖 Verification bot${KNOWN_ROLE_BOTS[userId] ? ` (${KNOWN_ROLE_BOTS[userId]})` : ''}: giving ordinary roles is never counted.`);
     if (isBot) notes.push('🤖 Bots get no warnings for everyday rules. Dangerous permission grants warn first, except self-assigned Administrator or Manage Server.');
-    if (roleManager) notes.push('🎭 They can hand out moderator-level roles (Ban, Kick, Manage Channels, Webhooks). Giving **Administrator** or **Manage Server** is checked; self-assigning either strips immediately.');
+    if (roleManager) notes.push('🎭 Their bypass covers giving, creating and editing roles. Handing out Administrator or another protected permission (Ban, Kick, Manage Server, Manage Roles, Manage Channels, Webhooks) is still checked: allow it with `/antinuke whitelist admin`.');
     const warned = store.get("SELECT rule,at FROM incidents WHERE guild_id=? AND actor_id=? AND mode='warn' AND at>? ORDER BY at DESC LIMIT 1", guild.id, userId, now - WARNING_MEMORY_MS);
     if (warned) {
         const warnedRule = RULES.find(rule => rule.key === String(warned.rule));
@@ -47,6 +47,6 @@ export function whitelistCheck(store: Store, guild: Guild, userId: string, roleI
         .addFields(
             ...(skips.length ? [{ name: 'Not punished for (still alerted)', value: skips.join('\n').slice(0, 1024) }] : []),
             { name: 'Still checked', value: checked.join('\n').slice(0, 1024) || 'Nothing.' },
-            { name: 'Change it', value: '`/antinuke whitelist add` to whitelist them · `/antinuke whitelist remove` to take them off', inline: false },
+            { name: 'Change it', value: '`/antinuke whitelist add` to whitelist them · `/antinuke whitelist admin` to allow protected permission grants · `/antinuke whitelist remove` to take them off', inline: false },
         );
 }

@@ -218,3 +218,27 @@ test('an image burst waits for a bounded slot instead of being skipped',async()=
         assert.equal(f.events.filter(e=>e==='delete').length,6);f.store.close();
     } finally {globalThis.fetch=realFetch;}
 });
+test('automatic startup reuses an existing #vanguard-security instead of creating a second one',async()=>{
+    const f=automaticFixture();const topics:string[]=[];
+    f.channels.set('existing-security',{id:'existing-security',name:'vanguard-security',type:0,topic:null,isSendable:()=>true,permissionsFor:()=>new PermissionsBitField(8n),setTopic:async(t:string)=>{topics.push(t);}});
+    assert.equal(await f.scanner.initialize(f.guild),true);
+    assert.equal(f.created.length,0,'a duplicate security log is never created');
+    assert.equal(f.store.settings(guildId).logChannelId,'existing-security');
+    assert.equal(topics.length,1,'the reused channel is marked as Vanguard\'s for later restarts');
+    const restarted=new ScamProtection(f.store,{push:()=>{}} as any);assert.equal(await restarted.initialize(f.guild),true);
+    assert.equal(f.created.length,0,'a restart finds the same channel');f.store.close();
+});
+test('automatic startup prefers the channel marked by Vanguard over a same-named look-alike',async()=>{
+    const f=automaticFixture();
+    f.channels.set('marked',{id:'marked',name:'security-archive',type:0,topic:'Ghost Vanguard • managed security log',isSendable:()=>true,permissionsFor:()=>new PermissionsBitField(8n)});
+    f.channels.set('lookalike',{id:'lookalike',name:'vanguard-security',type:0,topic:null,isSendable:()=>true,permissionsFor:()=>new PermissionsBitField(8n),setTopic:async()=>{}});
+    assert.equal(await f.scanner.initialize(f.guild),true);
+    assert.equal(f.store.settings(guildId).logChannelId,'marked');assert.equal(f.created.length,0);
+});
+test('automatic startup never adopts a channel another bot has claimed a topic on',async()=>{
+    const f=automaticFixture();
+    f.channels.set('other-bot',{id:'other-bot',name:'vanguard-security',type:0,topic:'Moderation logs for Another Bot',isSendable:()=>true,permissionsFor:()=>new PermissionsBitField(8n),setTopic:async()=>{}});
+    assert.equal(await f.scanner.initialize(f.guild),true);
+    assert.equal(f.created.length,1,'a foreign channel is left alone; Vanguard creates its own');
+    assert.equal(f.store.settings(guildId).logChannelId,'auto-log');
+});

@@ -88,6 +88,7 @@ Server rank: anti-nuke, whitelist, control panel, and backups. Given by linking 
 - `/antinuke threats release`: Undo a strike (unban and clear) _(Head Admin and above; unbans if they were struck)_
 - `/antinuke threats strike`: Strip, revert their damage and ban a member now _(Head Admin and above; manually strips, records and bans)_
 - `/antinuke whitelist add`: Whitelist a user or role for some or all rules
+- `/antinuke whitelist admin`: Separate whitelist for granting Administrator and protected permissions
 - `/antinuke whitelist bots`: Let a verification bot give roles without tripping anti-nuke
 - `/antinuke whitelist check`: See what anti-nuke allows someone and what would strip them
 - `/antinuke whitelist list`: Show the whitelist and when entries expire
@@ -182,6 +183,7 @@ Server rank: lifting ordinary bans and accepting appeals, raid tools, automod, s
 - `/setup logs disable`: Turn event logging off
 - `/setup logs enable`: Turn event logging on
 - `/setup logs exclude`: Stop or resume logging a channel
+- `/setup logs merge`: Group Vanguard's log channels, leaving other bots' logs alone
 - `/setup logs route`: Choose a private channel for a log type, or reset its destination
 - `/setup logs setup`: Set up log channels and reuse existing event logs
 - `/setup logs status`: Show logging settings

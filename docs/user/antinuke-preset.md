@@ -28,4 +28,4 @@ Omitted options stay unchanged. For example, `/antinuke rule rule:Ban members th
 - High-confidence signals such as adding a bot, mass unbanning, pruning members, or granting dangerous permissions retain stronger defaults. Self-assigning Administrator or Manage Server remains immediate strip-and-revert.
 - Bots do not receive first-hit warnings for routine rules. The owner, configured developers, trusted bots and explicit whitelist entries are protected as documented in [security-controls.md](security-controls.md).
 
-`/antinuke whitelist` manages explicit exceptions; whitelist changes reduce protection for their selected scope. For the shipped limits and exact default actions, see [antinuke-locked.md](antinuke-locked.md).
+`/antinuke whitelist` manages explicit exceptions; whitelist changes reduce protection for their selected scope. Granting Administrator and the other protected permissions is a separate whitelist: `/antinuke whitelist admin`. A full bypass ("Everything"), a preset or a role-work entry never allows those grants. For the shipped limits and exact default actions, see [antinuke-locked.md](antinuke-locked.md).

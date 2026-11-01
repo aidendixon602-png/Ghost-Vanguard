@@ -6,7 +6,7 @@ import { Store } from '../src/database/db.js';
 import { FAST_ATTEMPTS, LogQueue, SLOW_RETRY_MS } from '../src/logging.js';
 import { redact } from '../src/audit/redact.js';
 import { configureEventLog, describeAudit, eventLogConfig, recordEvent, recordMemberEvent, recordVoiceEvent } from '../src/audit/event-log.js';
-import { checkChannel, LEGACY_LOG_ROUTES, logChannels, setLogChannels, setupLogChannels } from '../src/audit/log-setup.js';
+import { applyLogMerge, checkChannel, LEGACY_LOG_ROUTES, logChannels, planLogMerge, setLogChannels, setupLogChannels } from '../src/audit/log-setup.js';
 import { reportBotError } from '../src/audit/bot-errors.js';
 import { Security } from '../src/security/security.js';
 
@@ -169,6 +169,7 @@ function fakeGuild(existing: string[] = [], o: { everyoneCanView?: boolean; botP
             permissionsFor: (who: any) => ({ has: (bit: bigint) => who === 'everyone' ? !!o.everyoneCanView : (o.botPerms ?? [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.EmbedLinks, PermissionFlagsBits.ReadMessageHistory]).includes(bit) }),
             send: async () => { sentTo.push(id); },
             setParent: async (parent: string) => { channel.parentId = parent; return channel; },
+            edit: async (change: any) => { Object.assign(channel, change); return channel; },
         };
         channels.set(id, channel);
         return channel;
@@ -452,5 +453,109 @@ test('voice logs include mute and streaming changes without attributing an unkno
         assert.equal(cards.length, 2, 'voice events fall back to combined logging without a route');
         recordVoiceEvent(store, logs, { ...old, selfMute: null }, { ...old, selfMute: false });
         assert.equal(cards.length, 2, 'unknown previous values do not create synthetic toggles');
+    } finally { store.close(); }
+});
+
+// ------------------------------------------------------------ merging scattered log channels
+
+const channelNamed = (guild: any, name: string) => guild.channels.cache.find((c: any) => c.name === name);
+
+test('merging groups only Vanguard\'s own log channels and never takes another bot\'s', async () => {
+    const store = new Store(':memory:'); authorize(store, G);
+    try {
+        const { guild } = fakeGuild(['bans', 'ghost-vanguard-logging', 'vanguard-security'],
+            { categories: ['Staff'], legacyChildren: ['join-logs', 'modlogs', 'veil-utilities-logging', 'honeypot'] });
+        configureEventLog(store, G, { enabled: true, channelId: channelNamed(guild, 'ghost-vanguard-logging').id });
+        setLogChannels(store, G, { bansChannelId: channelNamed(guild, 'bans').id });
+        const settings = store.settings(G); settings.logChannelId = channelNamed(guild, 'vanguard-security').id; store.save(settings);
+
+        const plan = planLogMerge(store, guild);
+        assert.deepEqual(plan.moves.map(m => m.name).sort(), ['bans', 'ghost-vanguard-logging', 'vanguard-security']);
+        assert.ok(!plan.moves.some(m => m.name === 'join-logs'), 'a look-alike channel in another bot\'s category is never claimed');
+        assert.equal(plan.untouched[0]?.name, 'join-logs', 'the look-alike is reported so a human knows why it stays');
+        assert.ok(!plan.untouched.some(u => ['modlogs', 'veil-utilities-logging', 'honeypot'].includes(u.name)), 'unrelated channels are not even listed');
+
+        const result = await applyLogMerge(store, guild, 'admin');
+        assert.equal(result.moved, 3);
+        assert.equal(guild.channels.cache.get(result.categoryId).name, 'Ghost Vanguard Logs');
+        for (const name of ['bans', 'ghost-vanguard-logging', 'vanguard-security'])
+            assert.equal(channelNamed(guild, name).parentId, result.categoryId, `${name} is grouped`);
+        for (const name of ['join-logs', 'modlogs', 'veil-utilities-logging', 'honeypot'])
+            assert.equal(channelNamed(guild, name).parentId, '910000000000000000', `${name} stays where it is`);
+        assert.equal(channelNamed(guild, 'join-logs').name, 'join-logs', 'no channel is renamed');
+        assert.equal(logChannels(store, G).routes?.joins, undefined, 'a look-alike channel is never wired up as a route');
+
+        const again = await applyLogMerge(store, guild, 'admin');
+        assert.equal(again.moved, 0, 'merging again changes nothing');
+    } finally { store.close(); }
+});
+
+test('merging works in a server that never had Veil channels', async () => {
+    const store = new Store(':memory:'); authorize(store, G);
+    try {
+        const { guild } = fakeGuild();
+        const result = await store.withAuthorized(G, () => setupLogChannels(store, guild, 'admin'));
+        assert.equal(result.category.name, 'Ghost Vanguard Logs');
+        const plan = planLogMerge(store, guild);
+        assert.deepEqual([plan.moves.length, plan.renames.length], [0, 0], 'setup alone already groups a fresh server');
+        assert.equal(result.bans.channel.parentId, result.category.id);
+        assert.equal(result.logging.channel.parentId, result.category.id);
+    } finally { store.close(); }
+});
+
+test('merging brings only the legacy default logging name up to date, on the same channel', async () => {
+    const store = new Store(':memory:'); authorize(store, G);
+    try {
+        const { guild } = fakeGuild(['bans', 'midtown-vanguard-logging']);
+        const legacy = channelNamed(guild, 'midtown-vanguard-logging');
+        configureEventLog(store, G, { enabled: true, channelId: legacy.id });
+        setLogChannels(store, G, { bansChannelId: channelNamed(guild, 'bans').id });
+        const plan = planLogMerge(store, guild);
+        assert.deepEqual(plan.renames, [{ channelId: legacy.id, from: 'midtown-vanguard-logging', to: 'ghost-vanguard-logging' }]);
+        const result = await applyLogMerge(store, guild, 'admin');
+        assert.deepEqual([result.moved, result.renamed], [2, 1]);
+        assert.equal(legacy.name, 'ghost-vanguard-logging', 'same channel object, new name');
+        assert.equal(legacy.id, eventLogConfig(store, G).channelId, 'the saved destination is unchanged');
+        assert.equal(legacy.parentId, result.categoryId);
+
+        // A name an admin chose is never rewritten.
+        const custom = fakeGuild(['bans', 'staff-logs']);
+        configureEventLog(store, G, { channelId: channelNamed(custom.guild, 'staff-logs').id });
+        assert.deepEqual(planLogMerge(store, custom.guild).renames, []);
+    } finally { store.close(); }
+});
+
+test('a duplicate log channel is reported, never deleted, and the configured one keeps being used', async () => {
+    const store = new Store(':memory:'); authorize(store, G);
+    try {
+        const { guild } = fakeGuild(['vanguard-security'], { categories: ['Ghost Vanguard Logs'], legacyChildren: ['vanguard-security'] });
+        const both = [...guild.channels.cache.values()].filter((c: any) => c.name === 'vanguard-security');
+        const inside = both.find((c: any) => c.parentId === '910000000000000000');
+        const outside = both.find((c: any) => c.parentId === null);
+        const settings = store.settings(G); settings.logChannelId = inside.id; store.save(settings);
+        const size = guild.channels.cache.size;
+        const plan = planLogMerge(store, guild);
+        assert.deepEqual(plan.moves, [], 'the duplicate outside the log area is not pulled in');
+        assert.ok(plan.untouched.some(u => u.channelId === outside.id && /another .* channel next to/.test(u.why)));
+        const result = await applyLogMerge(store, guild, 'admin');
+        assert.equal(result.moved, 0);
+        assert.equal(guild.channels.cache.size, size, 'nothing is deleted');
+        assert.equal(store.settings(G).logChannelId, inside.id, 'the configured channel is still the security log');
+    } finally { store.close(); }
+});
+
+test('setup prefers an uncategorized Vanguard channel over a same-named look-alike in another bot\'s category', async () => {
+    const store = new Store(':memory:'); authorize(store, G);
+    try {
+        // Vanguard creates its own channels uncategorized; a #bans inside a staff category is far more
+        // likely to belong to another bot, so it is not adopted when there is a better candidate.
+        const { guild } = fakeGuild(['bans'], { categories: ['Staff'], legacyChildren: ['bans'] });
+        const candidates = [...guild.channels.cache.values()].filter((c: any) => c.name === 'bans');
+        const own = candidates.find((c: any) => c.parentId === null);
+        const foreign = candidates.find((c: any) => c.parentId === '910000000000000000');
+        const result = await store.withAuthorized(G, () => setupLogChannels(store, guild, 'admin'));
+        assert.equal(result.bans.channel.id, own.id, 'the uncategorized channel is reused');
+        assert.equal(foreign.parentId, '910000000000000000', 'the look-alike stays in its own category');
+        assert.equal(logChannels(store, G).bansChannelId, own.id);
     } finally { store.close(); }
 });
