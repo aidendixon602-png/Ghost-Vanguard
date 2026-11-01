@@ -9,12 +9,12 @@ Protect your server, review incidents and manage trusted users
 | Command | What it does | Who |
 |---|---|---|
 | `/antinuke scan` | Scan for risky roles, roles above the bot and admin bots | Admin+ |
-| `/antinuke settings` | Turn the extra protection layers on or off | Owner or Head Admin |
+| `/antinuke settings` | Turn the extra protection layers on or off | Server Owner |
 | `/antinuke status` | See whether anti-nuke is on, its rules and the whitelist | Head Admin+ |
-| `/antinuke rule` | Tune one rule threshold or turn it on/off | Head Admin+ |
-| `/antinuke reset` | Restore one rule to its default threshold and state | Head Admin+ |
-| `/antinuke enable` | Turn anti-nuke enforcement on (runs a readiness check first) | Head Admin+ |
-| `/antinuke disable` | Turn anti-nuke off (stays off after restarts) | Owner or Head Admin |
+| `/antinuke rule` | Tune one rule threshold or turn it on/off | Server Owner |
+| `/antinuke reset` | Restore one rule to its default threshold and state | Server Owner |
+| `/antinuke enable` | Turn anti-nuke enforcement on (runs a readiness check first) | Server Owner |
+| `/antinuke disable` | Turn anti-nuke off (stays off after restarts) | Server Owner |
 | `/antinuke check` | Check the bot's permissions and role position | Head Admin+ |
 | `/antinuke incidents` | Show recent anti-nuke incidents | Head Admin+ |
 | `/antinuke quarantine` | Strip a member's roles and save them | Head Admin+ |
@@ -24,12 +24,12 @@ Protect your server, review incidents and manage trusted users
 | `/antinuke threats clear` | Clear a member from the threat board | Owner or Head Admin (Head Admin and above; clears the board entry only, cases and bans stay) |
 | `/antinuke threats release` | Undo a strike (unban and clear) | Owner or Head Admin (Head Admin and above; unbans if they were struck) |
 | `/antinuke threats strike` | Strip, revert their damage and ban a member now | Owner or Head Admin (Head Admin and above; manually strips, records and bans) |
-| `/antinuke whitelist add` | Whitelist a user or role for some or all rules | Owner or Head Admin |
-| `/antinuke whitelist remove` | Take a user or role off the whitelist | Owner or Head Admin |
+| `/antinuke whitelist add` | Whitelist a user or role for some or all rules | Server Owner |
+| `/antinuke whitelist remove` | Take a user or role off the whitelist | Server Owner |
 | `/antinuke whitelist list` | Show the whitelist and when entries expire | Head Admin+ |
-| `/antinuke whitelist admin` | Separate whitelist for granting Administrator and protected permissions | Head Admin+ |
+| `/antinuke whitelist admin` | Separate whitelist for granting Administrator and protected permissions | Server Owner |
 | `/antinuke whitelist check` | See what anti-nuke allows someone and what would strip them | Head Admin+ |
-| `/antinuke whitelist bots` | Let a verification bot give roles without tripping anti-nuke | Owner or Head Admin |
+| `/antinuke whitelist bots` | Let a verification bot give roles without tripping anti-nuke | Server Owner |
 
 ## /automod
 
@@ -135,7 +135,7 @@ Set up logs, staff roles, welcome messages and controls
 | `/setup history list` | Show recent setting changes | Head Admin+ |
 | `/setup history restore` | Undo a setting change | Server Owner |
 | `/setup config provider` | Turn a verification provider on or off | Server Owner |
-| `/setup config permission-role` | Developer: assign a server rank to a role | Developer |
+| `/setup config permission-role` | Server owner: give a Discord role a Vanguard rank | Server Owner |
 | `/setup config command` | Turn a command on or off, or change its cooldown | Server Owner |
 | `/setup config feature` | Turn moderation, verification, AI or backups on or off | Server Owner |
 | `/setup config backups` | Schedule server layout backups | Server Owner |
@@ -151,15 +151,15 @@ Set up logs, staff roles, welcome messages and controls
 | `/setup logs disable` | Turn event logging off | Admin+ |
 | `/setup logs category` | Choose which events are logged | Admin+ |
 | `/setup logs view` | Browse logged events (last 30 days) | Admin+ |
-| `/setup panel` | Create or update the staff control panel | Owner or Head Admin |
+| `/setup panel` | Create or update the staff control panel | Server Owner |
 | `/setup permissions list` | Show roles with bot command access | Head Admin+ |
-| `/setup permissions discord` | Show roles with Administrator or Manage Roles | Head Admin+ |
+| `/setup permissions discord` | Show roles with Administrator or Manage Roles | Server Owner |
 | `/setup status` | Show security health and settings | Head Admin+ |
-| `/setup security` | Set the security log and Roblox verification options | Head Admin+ |
+| `/setup security` | Set the security log and Roblox verification options | Server Owner |
 | `/setup security-admins` | Developer: add, remove or list security admins | Developer |
-| `/setup staff role` | Developer: assign a server rank to a role | Developer |
-| `/setup staff user` | Developer: assign a server rank by user ID | Developer |
-| `/setup staff global` | Developer: assign access in every server | Developer |
+| `/setup staff role` | Link a Discord role to a server rank, below your own | Server Owner |
+| `/setup staff user` | Assign a server rank to one user ID, below your own | Server Owner |
+| `/setup staff global` | Developer: give a bot-wide rank in every server | Developer |
 | `/setup staff report` | Show actions per staff member | Server Owner |
 | `/setup staff list` | Show every staff rank | Helper+ |
 | `/setup staff check` | Show someone's rank | Helper+ |
@@ -230,27 +230,24 @@ Manage bot diagnostics, updates, servers and data
 
 | Command | What it does | Who |
 |---|---|---|
-| `/dev server list` | List authorized servers | Bot Manager+ |
-| `/dev server authorize` | Authorize this server | Overseer+ |
-| `/dev autoreact add` | Auto-react to a member's messages | Supreme Leader+ |
-| `/dev autoreact remove` | Stop auto-reacting to a member | Supreme Leader+ |
-| `/dev autoreact list` | List auto-react members | Supreme Leader+ |
+| `/dev server list` | List authorized servers | Developer |
+| `/dev server authorize` | Authorize this server | Developer |
 | `/dev server ban` | Ban a server from the bot | Developer |
-| `/dev database status` | Show database health | Supreme Leader+ |
-| `/dev database backup` | Back up the database now | Supreme Leader+ |
-| `/dev database backups` | List database backups | Supreme Leader+ |
+| `/dev database status` | Show database health | Developer |
+| `/dev database backup` | Back up the database now | Developer |
+| `/dev database backups` | List database backups | Developer |
 | `/dev database restore-settings` | Restore lost settings from a backup file | Developer |
-| `/dev database verify` | Verify a database backup | Supreme Leader+ |
+| `/dev database verify` | Verify a database backup | Developer |
 | `/dev server deauthorize` | Remove this server and leave | Developer |
-| `/dev diagnostics` | Show runtime health | Bot Manager+ |
-| `/dev inspect` | Inspect any server the bot knows | Overseer+ |
-| `/dev broadcast` | Announce to every server's log channel | Bot Manager+ |
-| `/dev status` | Set a custom bot status | Bot Manager+ |
-| `/dev status-reset` | Go back to the rotating status | Bot Manager+ |
+| `/dev diagnostics` | Show runtime health | Developer |
+| `/dev inspect` | Inspect any server the bot knows | Developer |
+| `/dev broadcast` | Announce to every server's log channel | Developer |
+| `/dev status` | Set a custom bot status | Developer |
+| `/dev status-reset` | Go back to the rotating status | Developer |
 | `/dev alerts` | Set up the global anti-nuke feed and DMs | Developer |
-| `/dev update` | Show update status or install now | Supreme Leader+ |
-| `/dev sync` | Re-register the slash commands | Supreme Leader+ |
-| `/dev server info` | Show this server's authorization | Bot Manager+ |
+| `/dev update` | Show update status or install now | Developer |
+| `/dev sync` | Re-register the slash commands | Developer |
+| `/dev server info` | Show this server's authorization | Developer |
 | `/dev server unban` | Unban a server | Developer |
 
 ## /help
@@ -306,6 +303,10 @@ Give or take a role from a member, with role rules and hierarchy enforced
 | `/role remove` | Take a role from a member | Everyone (checked role by role, like `/role add`) |
 | `/role restore` | Give back the roles a member had before leaving | Everyone (gives back only roles the person could give with `/role add`) |
 | `/role who-can-give` | Choose who can give a role | Owner or Head Admin (staff roles: owner only) |
+| `/role blacklist add` | Blacklist a role so only listed people can give it | Server Owner |
+| `/role blacklist remove` | Take a role off the blacklist | Server Owner |
+| `/role blacklist list` | Show every blacklisted role and who may give it | Server Owner |
+| `/role blacklist who-can-give` | Allow or stop one person or role from giving a blacklisted role | Server Owner |
 
 ## /restart
 

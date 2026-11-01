@@ -6,6 +6,9 @@ import { staffReason } from '../../security/raidmode.js';
 import { developers } from '../../bot/developers.js';
 import { decideRoleChange, privilegedReason, isBotPermissionRole } from '../../security/role-policy.js';
 import { approveRoleChange } from '../../security/role-authorizations.js';
+import { RANKS, rankOf } from '../../bot/ranks.js';
+import { addAssigner, addBlacklisted, assignersOf, blacklistAll, blacklistHolders, describeAssigners, isBlacklisted, removeAssigner, removeBlacklisted } from '../../security/role-blacklist.js';
+import { captureBlacklistHolders, dmActor } from '../../security/role-blacklist-enforce.js';
 /**
  * /role add | remove — give or take one role, with every check done in here (not by Discord's
  * command visibility): see security/role-policy.ts for who may change what.
@@ -21,9 +24,21 @@ export default defineCommand(new SlashCommandBuilder().setName('role').setDescri
     .addSubcommand(s => s.setName('who-can-give').setDescription('Choose who can give a role, or see the list (leave everything empty)')
     .addRoleOption(o => o.setName('role').setDescription('The role (leave empty to see who can give what)'))
     .addMentionableOption(o => o.setName('who').setDescription('Only for staff roles: a role or person who may give it'))
-    .addBooleanOption(o => o.setName('remove').setDescription('True to take this permission away instead'))), { category: 'moderation', access: 'member', botPermissions: [PermissionFlagsBits.ManageRoles], cooldown: 1500 }, async (ctx, i) => {
+    .addBooleanOption(o => o.setName('remove').setDescription('True to take this permission away instead')))
+    .addSubcommandGroup(g => g.setName('blacklist').setDescription('Roles only the server owner or listed people may give or delete')
+    .addSubcommand(s => s.setName('add').setDescription('Blacklist a role so only listed people can give it')
+    .addRoleOption(o => o.setName('role').setDescription('Role').setRequired(true)))
+    .addSubcommand(s => s.setName('remove').setDescription('Take a role off the blacklist')
+    .addRoleOption(o => o.setName('role').setDescription('Role').setRequired(true)))
+    .addSubcommand(s => s.setName('list').setDescription('Show every blacklisted role and who may give it'))
+    .addSubcommand(s => s.setName('who-can-give').setDescription('Allow or stop one person or role from giving a blacklisted role')
+    .addRoleOption(o => o.setName('role').setDescription('Blacklisted role').setRequired(true))
+    .addMentionableOption(o => o.setName('who').setDescription('User or role to allow'))
+    .addBooleanOption(o => o.setName('remove').setDescription('True to take this permission away')))), { category: 'moderation', access: 'member', botPermissions: [PermissionFlagsBits.ManageRoles], cooldown: 1500 }, async (ctx, i) => {
     const sub = i.options.getSubcommand();
     const guildId = i.guildId;
+    if (i.options.getSubcommandGroup?.(false) === 'blacklist')
+        return roleBlacklist(ctx, i);
     if (sub === 'who-can-give')
         return whoCanGive(ctx.store, i);
     const op = sub === 'add' ? 'add' : 'remove';
@@ -38,8 +53,16 @@ export default defineCommand(new SlashCommandBuilder().setName('role').setDescri
     if (!role)
         throw new AppError('VALIDATION_ERROR', 'That role no longer exists.');
     const decision = decideRoleChange({ store: ctx.store, guild: i.guild, actor, target, role, me, op });
-    if (!decision.ok)
-        throw new AppError(decision.kind === 'permission' || decision.kind === 'hierarchy' ? 'PERMISSION_ERROR' : 'VALIDATION_ERROR', decision.reason);
+    if (!decision.ok) {
+        // A blacklisted role is refused here and the person is told privately as well as in the reply.
+        if (decision.kind === 'blacklist')
+            void dmActor(i.client, actor.id, 'Blacklisted role blocked', [
+                `You tried to give <@&${role.id}> (**${role.name}**) to <@${user.id}> in **${i.guild.name}**.`,
+                '', 'That role is blacklisted in this server, so only the people and roles listed for it can give it. Your staff rank or Discord permissions do not override that.', '',
+                `Allowed for this role: ${describeAssigners(assignersOf(ctx.store, guildId, role.id))}.`,
+            ].join('\n')).catch(() => false);
+        throw new AppError(decision.kind === 'permission' || decision.kind === 'hierarchy' || decision.kind === 'blacklist' ? 'PERMISSION_ERROR' : 'VALIDATION_ERROR', decision.reason);
+    }
     if (decision.noop)
         return decision.noop;
     const member = target;
@@ -85,8 +108,6 @@ async function whoCanGive(store, i) {
         return whoCanGiveList(store, guildId);
     if (role.id === guildId || role.managed)
         throw new AppError('VALIDATION_ERROR', 'Choose a normal role (not @everyone or a bot/integration role).');
-    if (isBotPermissionRole(store, guildId, role.id))
-        developers.require(i.user.id);
     const owner = i.user.id === i.guild.ownerId || developers.has(i.user.id);
     const staff = privilegedReason(store, guildId, role);
     const allow = (on) => on
@@ -99,7 +120,7 @@ async function whoCanGive(store, i) {
         return (remove ? `Moderators can **no longer** give or take <@&${role.id}>. Anyone with Manage Roles still can.` : `✅ Moderators can now give and take <@&${role.id}> with \`/role add\`.`) + extra;
     }
     if (isBotPermissionRole(store, guildId, role.id) && !remove)
-        throw new AppError('VALIDATION_ERROR', 'Bot permission roles cannot be delegated through role rules. Only approved Developer IDs may assign them.');
+        throw new AppError('VALIDATION_ERROR', 'A role that carries a Vanguard rank cannot be delegated through role rules. The server owner gives it with `/role add`, or lets someone above that rank do it.');
     // Staff roles: only the owner decides who hands them out.
     if (!owner)
         throw new AppError('PERMISSION_ERROR', `<@&${role.id}> is a staff role (${staff}), so only the server owner can choose who gives it.`);
@@ -108,7 +129,7 @@ async function whoCanGive(store, i) {
             throw new AppError('VALIDATION_ERROR', `<@&${role.id}> is a staff role (${staff}). Pick **who** may give it: a role (like your Head Mods role) or one person.\nExample: \`/role who-can-give role:@${role.name} who:@Head Mods\``);
         store.run("DELETE FROM role_rules WHERE guild_id=? AND role_id=?", guildId, role.id);
         store.history(guildId, 'role/who-can-give', null, { role: role.id, cleared: true }, i.user.id);
-        return `Nobody except you (and developers) can give <@&${role.id}> now.`;
+        return `Nobody except you (and Developers) can give <@&${role.id}> now.`;
     }
     const type = whoOption.role ? 'role' : 'user';
     const id = String((whoOption.role ?? whoOption.user)?.id ?? whoOption.value);
@@ -141,4 +162,67 @@ export function whoCanGiveList(store, guildId) {
     return ['**Who can give which roles**', lines.join('\n') || '*Nothing set up yet.*', '',
         '-# Always: the server owner and developers can give any role. People with Manage Roles or Administrator can give ordinary roles below their own.',
         '-# Set it up: `/role who-can-give role:@Role` (ordinary roles → every moderator) or `/role who-can-give role:@StaffRole who:@HeadMods` (staff roles, owner only).'].join('\n');
+}
+/**
+ * /role blacklist add | remove | list | who-can-give — the per-server role blacklist.
+ *
+ * Only the Server Owner and Developers manage it. A blacklisted role can only be given (or deleted) by
+ * the people and roles explicitly listed for it; staff ranks, Discord Administrator permission and
+ * anti-nuke whitelists never stand in for that list.
+ */
+async function roleBlacklist(ctx, i) {
+    const guildId = i.guildId;
+    if (!developers.has(i.user.id) && rankOf(ctx.store, guildId, i.user.id, ctx.actor) < RANKS.owner)
+        throw new AppError('PERMISSION_ERROR', 'Only the server owner or a Developer can manage the role blacklist.');
+    const sub = i.options.getSubcommand();
+    if (sub === 'list') {
+        const rows = blacklistAll(ctx.store, guildId);
+        if (!rows.length)
+            return 'No blacklisted roles yet. Add one with `/role blacklist add role:@Role`.';
+        const lines = rows.map(row => {
+            const listed = describeAssigners(assignersOf(ctx.store, guildId, row.role_id));
+            const holders = blacklistHolders(ctx.store, guildId, row.role_id).length;
+            return `<@&${row.role_id}> → ${listed === 'nobody yet' ? '**nobody** (nobody can give it)' : listed}${holders ? ` · ${holders} member${holders === 1 ? '' : 's'} have it` : ''}`;
+        });
+        return ['**Blacklisted roles**', ...lines, '', '-# Server owner and Developers manage this list. Higher ranks and Discord Administrator permission never bypass it. `/role blacklist who-can-give role:@Role who:@User`'].join('\n');
+    }
+    const role = i.options.getRole('role', true);
+    if (role.id === guildId || role.managed)
+        throw new AppError('VALIDATION_ERROR', 'Choose a normal role (not @everyone or a bot/integration role).');
+    if (sub === 'add') {
+        if (isBlacklisted(ctx.store, guildId, role.id))
+            return `<@&${role.id}> is already blacklisted.`;
+        addBlacklisted(ctx.store, guildId, role, i.user.id);
+        const holders = await captureBlacklistHolders(ctx.store, i.guild, role.id).catch(() => 0);
+        ctx.store.history(guildId, 'role/blacklist', null, { role: role.id, blacklisted: true }, i.user.id);
+        ctx.logs.push(guildId, new EmbedBuilder().setColor(Colors.Red).setTitle('Role blacklisted')
+            .setDescription(`${role.name} (<@&${role.id}>) is now blacklisted by <@${i.user.id}>.\nOnly listed people may give or delete it. ${holders ? `${holders} current holder${holders === 1 ? '' : 's'} recorded.` : 'Nobody has it right now.'}`).setTimestamp());
+        return `🔒 <@&${role.id}> is blacklisted. Nobody can give it until you list someone: \`/role blacklist who-can-give role:@${role.name} who:@User\`.`;
+    }
+    if (sub === 'remove') {
+        if (!isBlacklisted(ctx.store, guildId, role.id))
+            return `<@&${role.id}> is not blacklisted.`;
+        removeBlacklisted(ctx.store, guildId, role.id);
+        ctx.store.history(guildId, 'role/blacklist', { role: role.id, blacklisted: true }, null, i.user.id);
+        ctx.logs.push(guildId, new EmbedBuilder().setColor(Colors.Green).setTitle('Role unblacklisted').setDescription(`${role.name} (<@&${role.id}>) by <@${i.user.id}>.`).setTimestamp());
+        return `<@&${role.id}> is no longer blacklisted. The normal role rules apply again.`;
+    }
+    // who-can-give
+    if (!isBlacklisted(ctx.store, guildId, role.id))
+        throw new AppError('VALIDATION_ERROR', `<@&${role.id}> is not blacklisted. Blacklist it first with \`/role blacklist add\`.`);
+    const who = i.options.getMentionable('who');
+    const remove = i.options.getBoolean('remove') ?? false;
+    if (!who)
+        throw new AppError('VALIDATION_ERROR', 'Pick who may give it: a person or a role.');
+    const type = 'user' in who ? 'user' : 'role';
+    const id = who.id;
+    if (remove) {
+        removeAssigner(ctx.store, guildId, role.id, type, id);
+        ctx.store.history(guildId, 'role/blacklist', null, { role: role.id, giver: `${type}:${id}`, allowed: false }, i.user.id);
+        return `${type === 'role' ? `<@&${id}>` : `<@${id}>`} can **no longer** give <@&${role.id}>.`;
+    }
+    addAssigner(ctx.store, guildId, role.id, type, id, i.user.id);
+    ctx.store.history(guildId, 'role/blacklist', null, { role: role.id, giver: `${type}:${id}`, allowed: true }, i.user.id);
+    const listed = describeAssigners(assignersOf(ctx.store, guildId, role.id));
+    return `✅ ${type === 'role' ? `Anyone with <@&${id}>` : `<@${id}>`} can now give <@&${role.id}>. Anyone on the list: ${listed}.`;
 }

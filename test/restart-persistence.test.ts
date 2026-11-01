@@ -30,10 +30,9 @@ test('every saved setting survives a restart', async () => {
         store.grant(G, U, 'trust', OWNER); store.grant(G, U, 'trust:mass_ban', OWNER); store.grant(G, ROLE, 'trust_role', OWNER); store.grant(G, '600000000000000001', 'bot', OWNER);
         // Server settings: log and quarantine channels
         const s = store.settings(G); s.logChannelId = '700000000000000001'; s.quarantineRoleId = '700000000000000002'; store.save(s, OWNER);
-        // Staff ranks, permission roles, /role rules, autoreact
+        // Staff ranks, permission roles, /role rules
         store.run("INSERT INTO staff_roles(guild_id,role_id,level) VALUES(?,?,'admin')", G, ROLE);
         store.run("INSERT INTO role_rules(guild_id,role_id,kind,by_id,at) VALUES(?,?,'allow',?,?)", G, ROLE, OWNER, 1);
-        store.run("INSERT INTO autoreact_users(guild_id,user_id,emoji,by_id,at) VALUES(?,?,?,?,?)", G, U, '🐐', OWNER, 1);
         // Logging
         configureEventLog(store, G, { enabled: true, channelId: '700000000000000003', category: ['messages', false] });
         setLogChannels(store, G, { bansChannelId: '700000000000000004', excludedChannels: ['700000000000000005'], ignoreBotRoutine: false }, OWNER);
@@ -66,7 +65,6 @@ test('every saved setting survives a restart', async () => {
             assert.deepEqual([store.settings(G).logChannelId, store.settings(G).quarantineRoleId], ['700000000000000001', '700000000000000002']);
             assert.equal(store.get('SELECT level FROM staff_roles WHERE guild_id=? AND role_id=?', G, ROLE)?.level, 'admin', 'staff rank role');
             assert.ok(store.get("SELECT 1 FROM role_rules WHERE guild_id=? AND role_id=? AND kind='allow'", G, ROLE), '/role allow list');
-            assert.equal(store.get('SELECT emoji FROM autoreact_users WHERE guild_id=? AND user_id=?', G, U)?.emoji, '🐐', 'autoreact');
             const ev = eventLogConfig(store, G);
             assert.deepEqual([ev.enabled, ev.channelId, ev.categories.has('messages')], [true, '700000000000000003', false], 'event logging');
             assert.deepEqual(logChannels(store, G), { bansChannelId: '700000000000000004', excludedChannels: ['700000000000000005'], ignoreBotRoutine: false }, 'log channels');

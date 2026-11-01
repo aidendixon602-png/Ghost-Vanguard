@@ -20,7 +20,6 @@ test('restore settings: lost ones come back, newer ones win, removed whitelist e
         old.run("UPDATE grants SET expires=? WHERE user_id='expired'", Date.now() - 1000);
         old.run("INSERT INTO staff_roles(guild_id,role_id,level,by_id,at) VALUES('g','modrole','moderator','owner',1)");
         old.run("INSERT INTO staff_roles(guild_id,role_id,level,by_id,at) VALUES('g','changedrole','admin','owner',1)");
-        old.run("INSERT INTO autoreact_users(guild_id,user_id,emoji,by_id,at) VALUES('g','goat','🐐','dev',1)");
         old.grant('gone', 'x', 'trust', 'owner');
         old.run("UPDATE configuration_history SET at=?", Date.now() - 3600000);
         old.close();
@@ -36,20 +35,19 @@ test('restore settings: lost ones come back, newer ones win, removed whitelist e
         let plan;
         try { plan = planRestore(live, src.db); } finally { src.close(); }
         const summary = planSummary(plan);
-        assert.equal(summary.total, 4, 'admin1, mod1, modrole and the goat react');
-        assert.match(summary.text, /2 whitelist entries, 1 staff ranks, 1 auto-react users/);
+        assert.equal(summary.total, 3, 'admin1, mod1 and modrole');
+        assert.match(summary.text, /2 whitelist entries, 1 staff ranks/);
         assert.match(summary.text, /1 whitelist entry was changed or removed since the backup/);
         assert.match(summary.text, /1 expired whitelist entry skipped/);
         assert.match(summary.text, /1 server\(s\) in the backup are not authorized now/);
 
-        assert.equal(applyRestore(live, plan, 'dev'), 4);
+        assert.equal(applyRestore(live, plan, 'dev'), 3);
         assert.ok(live.hasGrant('g', 'admin1', 'trust'));
         assert.ok(live.hasGrant('g', 'mod1', 'trust:mass_ban'));
         assert.ok(!live.hasGrant('g', 'removedLater', 'trust'), 'removed on purpose after the backup: stays removed');
         assert.ok(!live.hasGrant('g', 'expired', 'trust'));
         assert.ok(live.hasGrant('g', 'newadmin', 'trust'), 'newer entries untouched');
         assert.equal(live.get("SELECT level FROM staff_roles WHERE role_id='changedrole'")!.level, 'helper', 'the current value wins');
-        assert.equal(live.get("SELECT emoji FROM autoreact_users WHERE user_id='goat'")!.emoji, '🐐');
         assert.equal(live.get("SELECT 1 AS x FROM grants WHERE guild_id='gone'"), undefined, 'servers not authorized now are skipped');
 
         const again = readBackup(gz);

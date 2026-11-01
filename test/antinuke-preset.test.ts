@@ -50,15 +50,19 @@ test('/antinuke rule saves per-server thresholds and toggles; reset restores shi
  } finally {store.close();}
 });
 
-test('Discord Administrators can read anti-nuke status/check and enable enforcement, but cannot disable it on that permission alone',()=>{
+test('Discord Administrators can read anti-nuke status and check, but never change the protection settings',()=>{
  const {store}=fixture();
  try {
   const member:any={id:'admin',guild:{id:'g',ownerId:'different-owner'},roles:{cache:new Collection()},permissions:{has:(permission:bigint)=>permission===PermissionFlagsBits.Administrator}};
   const guard=new Guard(store);const policy=antinuke.metadata;
   assert.equal(guard.allowed(policy,'g','admin',member,undefined,'antinuke/status'),true);
   assert.equal(guard.allowed(policy,'g','admin',member,undefined,'antinuke/check'),true);
-  assert.equal(guard.allowed(policy,'g','admin',member,undefined,'antinuke/enable'),true);
-  assert.equal(guard.allowed(policy,'g','admin',member,undefined,'antinuke/disable'),false,'weakening protection remains restricted');
+  for (const key of ['antinuke/enable','antinuke/disable','antinuke/rule','antinuke/reset'])
+   assert.equal(guard.allowed(policy,'g','admin',member,undefined,key),false,`/${key} is Server Owner and Developers only`);
+  // The server owner can still change it.
+  const owner:any={...member,id:'owner',guild:{id:'g',ownerId:'owner'}};
+  assert.equal(guard.allowed(policy,'g','owner',owner,undefined,'antinuke/enable'),true);
+  assert.equal(guard.allowed(policy,'g','owner',owner,undefined,'antinuke/disable'),true);
  } finally {store.close();}
 });
 

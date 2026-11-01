@@ -1,4 +1,5 @@
 import { isBotPermissionRole } from './role-policy.js';
+import { isBlacklisted } from './role-blacklist.js';
 import { consumeApprovedRoleChange } from './role-authorizations.js';
 import { ActionRowBuilder, AuditLogEvent, PermissionFlagsBits, ButtonBuilder, ButtonStyle, Colors, Guild, GuildAuditLogsEntry, GuildMember, type EmbedBuilder } from 'discord.js';
 import { dangerous, escalationAdded, KeyedQueue, overrideRule, ruleFor, RULES, WARN_FIRST, WARNING_MEMORY_MS, KNOWN_ROLE_BOTS, type Rule } from '../core.js';
@@ -166,6 +167,15 @@ export class Security {
             // Owner, Developers and whitelisted people are watched too, but never punished.
             const exempt = this.exemptReason(guild, actor, newlyAssigned);
             if (entry.action === AuditLogEvent.MemberRoleUpdate && entry.targetId && entry.targetId !== actor) await memberOrNull(guild, entry.targetId).catch(() => null);
+            // Giving yourself Administrator or Manage Server is not a nuke: it is handled as self-escalation,
+            // so it never creates an incident, scores on the threat board, alerts or counts toward a threshold.
+            // Exempt people (owner, Developers, the permission-grant whitelist) are left alone entirely.
+            if (entry.action === AuditLogEvent.MemberRoleUpdate && entry.targetId === actor && isSelfAdminAssignment(entry, guild, actor)) {
+                // Only the permission-grant whitelist (and the owner/Developers) counts here: a full trust
+                // bypass never covers handing out Administrator.
+                if (!this.grantExemptReason(guild, actor, newlyAssigned)) await this.selfEscalation(guild, actor, newlyAssigned);
+                return;
+            }
             for (const { rule, eventId } of this.rulesFor(entry, guild, actor, newlyAssigned))
                 // A role the actor just gave themselves cannot exempt that same action.
                 // Granting protected permissions answers to its own whitelist: a full bypass and every other
@@ -174,6 +184,41 @@ export class Security {
                     ? this.grantExemptReason(guild, actor, newlyAssigned)
                     : exempt ?? (this.trustedFor(guild, actor, rule.key, newlyAssigned) ? 'whitelisted for this action' : null));
         });
+    }
+
+    /**
+     * Self-assigned Administrator/Manage Server. The roles come straight back off and the member is
+     * contained exactly as anti-nuke would have done, but this is not counted as a nuke: no observation,
+     * no incident, no threat-board points, no repeat window and no global alert. Staff get one quiet card
+     * and the member is told why. Works in enforce mode only; observe mode still watches and does nothing.
+     */
+    private async selfEscalation(guild: Guild, actor: string, assigned: string[]) {
+        const s = this.store.settings(guild.id);
+        if (!s.enabled || s.mode !== 'enforce') return;
+        const member = await memberOrNull(guild, actor).catch(() => null);
+        if (!member) return;
+        const me = guild.members.me ?? (typeof guild.members.fetchMe === 'function' ? await guild.members.fetchMe().catch(() => null) : null);
+        const roles = [...member.roles.cache.values()].filter(r => assigned.includes(r.id) && r.id !== guild.id && !r.managed && dangerous(r.permissions.bitfield));
+        const removable = me ? roles.filter(r => me.roles.highest.comparePositionTo(r) > 0) : [];
+        let removed: string[] = [];
+        if (removable.length) {
+            this.store.assertAuthorized(guild.id);
+            removed = await member.roles.remove(removable.map(r => r.id), 'Ghost Vanguard: self-assigned protected permissions')
+                .then(() => removable.map(r => r.id), () => []);
+        }
+        let containment: string;
+        try { containment = await this.punish(guild, actor, 'strip', assigned); } catch { containment = 'Containment failed. Check role hierarchy and Manage Roles.'; }
+        const names = (roles.length ? roles.map(r => `<@&${r.id}>`) : assigned.map(id => `<@&${id}>`)).join(', ');
+        const answer = `${removed.length ? `Removed the self-assigned role${removed.length === 1 ? '' : 's'}.` : 'The self-assigned role could not be removed; move Vanguard\'s role above it.'} ${containment}`;
+        this.store.run('INSERT INTO self_escalations(guild_id,user_id,roles,result,at) VALUES(?,?,?,?,?)', guild.id, actor, JSON.stringify(removed.length ? removed : assigned), answer, Date.now());
+        this.incidentLog(guild.id, embed('Self-escalation blocked', `<@${actor}> gave themselves ${names}.\n${answer}\n-# Handled separately from anti-nuke: no incident, no threat-board score, no alert.`, Colors.Orange));
+        void member.send({ embeds: [embed('Self-assigned role removed', [
+            `In **${guild.name ?? 'this server'}** you gave yourself ${names}.`,
+            '',
+            answer,
+            '',
+            'Roles that carry Administrator or Manage Server are protection-relevant, so Vanguard removes them immediately. Ask the server owner or a Developer if you need one.',
+        ].join('\n'), Colors.Orange)] }).catch(() => 0);
     }
 
     /** Every rule this audit entry counts toward, each with its own observation id. */
@@ -624,7 +669,8 @@ export class Security {
         const restored: string[] = [], skipped: string[] = [];
         for (const id of JSON.parse(row.roles) as string[]) {
             const role = guild.roles.cache.get(id);
-            if (!role || role.managed || !role.editable || (isBotPermissionRole(this.store, guild.id, id) && !developers.has(actorId ?? '')) || (!privileged && dangerous(role.permissions.bitfield))) {
+            // Blacklisted roles are never restored automatically: that would launder them past the list.
+            if (!role || role.managed || !role.editable || isBlacklisted(this.store, guild.id, id) || (isBotPermissionRole(this.store, guild.id, id) && !developers.has(actorId ?? '')) || (!privileged && dangerous(role.permissions.bitfield))) {
                 skipped.push(id);
                 continue;
             }

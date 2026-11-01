@@ -92,12 +92,17 @@ test('Administrator / Manage Roles: ordinary roles below them only, never privil
     } finally { store.close(); }
 });
 
-test('a Vanguard staff role counts as protected even with no Discord permissions', () => {
+test('a role that carries a Vanguard rank can only be given by someone above that rank', () => {
     const { store, p, decide } = setup();
     try {
         store.run("INSERT INTO staff_roles(guild_id,role_id,level) VALUES(?,?,'admin')", G, R.helperish.id);
-        const d = decide(p.admin, R.helperish);
-        assert.equal(d.ok, false); assert.match((d as any).reason, /bot permission roles/);
+        // A Discord Administrator counts as Head Admin: they may give Admin, but still need the owner's rule.
+        const lower = decide(p.admin, R.helperish);
+        assert.equal(lower.ok, false); assert.match((lower as any).reason, /Vanguard staff role/);
+        // Head Admin is equal to their own rank, so it is off limits.
+        store.run("INSERT INTO staff_roles(guild_id,role_id,level) VALUES(?,?,'headadmin')", G, R.cosmetic.id);
+        const equal = decide(p.admin, R.cosmetic);
+        assert.equal(equal.ok, false); assert.match((equal as any).reason, /carries a Vanguard staff rank/);
     } finally { store.close(); }
 });
 
@@ -286,7 +291,9 @@ test('the risky tools are Developer only: Supreme Leaders, Overseers and server 
     config.supremeExtra.add(SUPREME);
     store.run("INSERT INTO bot_staff(user_id,level,by_id,at) VALUES(?,?,?,0)", MEMBER, 'overseer', OWNER);
     store.run("INSERT INTO bot_staff(user_id,level,by_id,at) VALUES(?,?,?,0)", ADMIN, 'supreme', OWNER);
-    const risky = ['dev/restart', 'database/restore-settings', 'deauthserver', 'banserver', 'unbanserver', 'staff/global', 'staff/role', 'staff/user', 'guild-config/permission-role', 'security/admin', 'genreban', 'ungenreban', 'hardban', 'unhardban', 'netexception'];
+    // Bot management only: the bot's own tools, network bans and bot-wide ranks. Server ranks are not
+    // on this list: a Supreme Leader outranks Head Admin, so they may change server ranks below their own.
+    const risky = ['dev/restart', 'database/restore-settings', 'deauthserver', 'banserver', 'unbanserver', 'staff/global', 'security/admin', 'genreban', 'ungenreban', 'hardban', 'unhardban', 'netexception'];
     try {
         for (const key of risky) {
             assert.equal(can(plainMember(SUPREME), key), false, `Supreme Leader (SUPREME_LEADER_IDS) must not use /${key}`);
@@ -294,10 +301,16 @@ test('the risky tools are Developer only: Supreme Leaders, Overseers and server 
             assert.equal(can(plainMember(MEMBER), key), false, `Overseer must not use /${key}`);
             assert.equal(can(plainMember(OWNER, PermissionFlagsBits.Administrator), key), false, `server owner must not use /${key}`);
         }
-        for (const key of ['dev/diagnostics', 'dev/update', 'database/backup'])
-            assert.equal(can(plainMember(SUPREME), key), true, `Supreme Leader can still use /${key}`);
+        // Nobody but a Developer touches the bot itself, whatever their staff rank.
+        for (const key of ['dev/diagnostics', 'dev/update', 'database/backup', 'authserver', 'authorizedservers', 'dev/status'])
+            assert.equal(can(plainMember(SUPREME), key), false, `a Supreme Leader must not manage the bot with /${key}`);
+        // Server ranks are staff work, not bot management: Supreme Leaders and the owner may change them.
+        for (const key of ['staff/role', 'staff/user'])
+            assert.equal(can(plainMember(SUPREME), key), true, `a Supreme Leader may change server ranks with /${key}`);
+        for (const key of ['guild-config/permission-role'])
+            assert.equal(can(plainMember(OWNER), key), true, `the Server Owner assigns permission roles with /${key}`);
         // The server owner outranks Supreme Leaders in their server, but never gets bot-wide tools.
-        for (const key of [...risky, 'genreban', 'hardban', 'ungenreban', 'dev/diagnostics', 'dev/update', 'database/backup', 'authserver', 'autoreact/add'])
+        for (const key of [...risky, 'genreban', 'hardban', 'ungenreban', 'dev/diagnostics', 'dev/update', 'database/backup', 'authserver'])
             assert.equal(can(plainMember(OWNER), key), false, `Server Owner must not use /${key}`);
         for (const key of ['config-history/restore', 'antinuke/disable', 'trust/add'])
             assert.equal(can(plainMember(OWNER), key), true, `Server Owner can use /${key}`);
@@ -311,7 +324,7 @@ test('the risky tools are Developer only: Supreme Leaders, Overseers and server 
 test('the owner cannot use developer-only commands; Administrator cannot use owner-only role rules', async () => {
     const { store, can } = await guardSetup();
     try {
-        for (const key of ['genreban', 'ungenreban', 'hardban', 'unhardban', 'netexception', 'dev/diagnostics', 'staff/global', 'banserver', 'autoreact/add'])
+        for (const key of ['genreban', 'ungenreban', 'hardban', 'unhardban', 'netexception', 'dev/diagnostics', 'staff/global', 'banserver'])
             assert.equal(can(plainMember(OWNER, PermissionFlagsBits.Administrator), key), false, `owner must not use /${key}`);
         assert.equal(can(plainMember(OWNER), 'role/who-can-give'), true);
         const admin = plainMember(ADMIN, PermissionFlagsBits.Administrator);

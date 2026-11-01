@@ -5,6 +5,7 @@ import { dmSecurityAlert } from '../bot/trusted-dm.js';
 import { isProtectedUser } from '../bot/env-rules.js';
 import { embed } from '../ui/ui.js';
 import { responsibleActor } from './security.js';
+import { isBlacklisted } from './role-blacklist.js';
 const REASON = 'Ghost Vanguard: protected user (PROTECTED_USERS); only Developers may do this';
 /**
  * Someone banned, kicked, timed out or took roles from a PROTECTED_USERS member by hand (or through another bot).
@@ -37,7 +38,7 @@ export async function enforceProtectedUsers(store, logs, entry, guild) {
         const removed = changes.filter(c => c.key === '$remove').flatMap(c => (c.new ?? []));
         what = `took ${removed.map(r => `**${r.name ?? r.id}**`).join(', ')} from <@${target}>`;
         const member = await guild.members.fetch({ user: target, force: true }).catch(() => null);
-        const back = removed.map(r => r.id).filter(id => guild.roles?.cache?.get(id)?.editable !== false && !member?.roles.cache.has(id));
+        const back = removed.map(r => r.id).filter(id => guild.roles?.cache?.get(id)?.editable !== false && !member?.roles.cache.has(id) && !isBlacklisted(store, guild.id, id));
         outcome = !member ? 'They are no longer in the server.' : !back.length ? 'They already have their roles back.'
             : await member.roles.add(back, REASON).then(() => 'Their roles were **given back**.', () => '**Vanguard could not give the roles back.** Move its role above them.');
     }

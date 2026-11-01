@@ -36,24 +36,52 @@ test('source IDs give local ranks in one server and bot ranks only when explicit
     } finally { delete SERVER_STAFF_IDS[G]; delete BOT_STAFF_IDS.botmanager; delete BOT_STAFF_IDS.developer; store.close(); }
 });
 
-test('all rank assignment routes require Developer IDs, even for owners and bot-wide staff', () => {
+test('bot-wide ranks, security admins and permission-role overrides stay Developer-only; server ranks do not', () => {
     const {store,actor}=fixture();
     try {
-        const keys=['staff/user','staff/role','staff/global','security/admin','guild-config/permission-role'];
         const guard=new Guard(store);
-        for (const key of keys) assert.equal(guard.allowed(defaults,G,U,actor,key.split('/')[0],key),false,key);
-        BOT_STAFF_IDS.supreme=[U];
-        for (const key of keys) assert.equal(guard.allowed(defaults,G,U,actor,key.split('/')[0],key),false,key);
+        const can=(id:string,key:string,m:any=actor)=>guard.allowed(defaults,G,id,m,key.split('/')[0],key);
+        // The server owner (and Developers) assign server ranks themselves; nobody below Head Admin can.
+        assert.equal(can(U,'staff/role'),true,'the server owner may change server ranks');
+        assert.equal(can(U,'staff/user'),true);
+        for (const key of ['staff/global','security/admin'])
+            assert.equal(can(U,key),false,`${key} stays bot management`);
+        assert.equal(can(U,'guild-config/permission-role'),true,"permission-role assignments are the owner's server work");
+        // A Supreme Leader is bot-wide staff, not the owner: server ranks are in reach (below their own),
+        // bot management is not.
+        const supreme:any={...actor,id:'supreme-users',guild:{id:G,ownerId:'someone-else'}};
+        BOT_STAFF_IDS.supreme=['supreme-users'];
+        assert.equal(can('supreme-users','staff/role',supreme),true,'a Supreme Leader can change server ranks');
+        for (const key of ['staff/global','security/admin','guild-config/permission-role'])
+            assert.equal(can('supreme-users',key,supreme),false,`Supreme Leaders cannot hand out ${key}`);
+        delete BOT_STAFF_IDS.supreme;
         BOT_STAFF_IDS.developer=[D];
-        for (const key of keys) assert.equal(guard.allowed(defaults,G,D,actor,key.split('/')[0],key),true,key);
+        for (const key of ['staff/user','staff/role','staff/global','security/admin','guild-config/permission-role'])
+            assert.equal(can(D,key),true,key);
     }finally {delete BOT_STAFF_IDS.supreme;delete BOT_STAFF_IDS.developer;store.close();}
 });
 
-test('direct user-ID command replaces and removes only the local direct rank, and refuses non-developers', async () => {
+test('direct user-ID command replaces and removes only the local direct rank, and nobody assigns at or above their own rank', async () => {
     const {store,ctx}=fixture();
     const i:any={guildId:G,user:{id:U},client:{users:{fetch:async(id:string)=>({id,bot:false})}},options:{getSubcommand:()=> 'user',getString:(key:string)=>key==='user_id'?U:'admin'}};
     try {
-        await assert.rejects(async()=>staff.execute(ctx,i),/developers/);
+        // A Head Admin may hand out Admin (below them) but never Head Admin or higher.
+        const head:any={...ctx.actor,id:'head',guild:{id:G,ownerId:U},roles:{cache:new Collection([['r-head',{}]]),highest:{}}};
+        store.run("INSERT INTO staff_roles(guild_id,role_id,level) VALUES(?,?,'headadmin')",G,'r-head');
+        ctx.actor=head;i.user.id='head';
+        await staff.execute(ctx,i);
+        assert.equal(rankOf(store,G,U),RANKS.admin);
+        i.options.getString=(key:string)=>key==='user_id'?U:'headadmin';
+        await assert.rejects(async()=>staff.execute(ctx,i),/equal to or above your own rank/);
+        // A plain moderator cannot change ranks at all.
+        const mod:any={...ctx.actor,id:'mod',roles:{cache:new Collection([['r-mod',{}]]),highest:{}}};
+        store.run("INSERT INTO staff_roles(guild_id,role_id,level) VALUES(?,?,'moderator')",G,'r-mod');
+        ctx.actor=mod;i.user.id='mod';
+        i.options.getString=(key:string)=>key==='user_id'?U:'admin';
+        await assert.rejects(async()=>staff.execute(ctx,i),/Head Admins and above/);
+        // The server owner and Developers are exempt.
+        ctx.actor=head.guild.ownerId===U?{...ctx.actor,id:U,guild:{id:G,ownerId:U},roles:{cache:new Collection(),highest:{}}}:ctx.actor;
+        i.user.id=U;
         BOT_STAFF_IDS.developer=[D];i.user.id=D;
         await staff.execute(ctx,i);
         assert.equal(rankOf(store,G,U),RANKS.admin);
@@ -69,16 +97,24 @@ test('direct user-ID command replaces and removes only the local direct rank, an
     }finally{delete BOT_STAFF_IDS.developer;store.close();}
 });
 
-test('owner-approved role rules cannot delegate bot permission roles, on add or remove',()=>{
-    const {store,actor}=fixture();
+test('a role that carries a Vanguard rank can only be given by someone above that rank',()=>{
+    const {store}=fixture();
     try{
         store.run("INSERT INTO staff_roles(guild_id,role_id,level) VALUES(?,?,'helper')",G,ROLE);
+        store.run("INSERT INTO staff_roles(guild_id,role_id,level) VALUES(?,?,'helper')",G,'r-helper');
+        store.run("INSERT INTO staff_roles(guild_id,role_id,level) VALUES(?,?,'admin')",G,'r-admin');
         store.run("INSERT INTO role_rules(guild_id,role_id,kind,grantor_type,grantor_id,by_id,at) VALUES(?,?,'grant','user',?,?,0)",G,ROLE,U,D);
+        store.run("INSERT INTO role_rules(guild_id,role_id,kind,grantor_type,grantor_id,by_id,at) VALUES(?,?,'allow','','',?,0)",G,ROLE,D);
         const role:any={id:ROLE,managed:false,permissions:new PermissionsBitField()};
-        const change:any={store,guild:actor.guild,actor,target:{id:'target',roles:{cache:new Collection(),highest:{}}},role,me:actor};
-        for(const op of ['add','remove'])assert.equal(decideRoleChange({...change,op}).ok,false);
+        const guild:any={id:G,ownerId:'someone-else'};
+        const as=(id:string,roles:string[],owner=false)=>({id,guild:{id:G,ownerId:owner?id:'someone-else'},permissions:new PermissionsBitField(),roles:{cache:new Collection(roles.map(r=>[r,{}])),highest:{comparePositionTo:()=>10}}});
+        const target:any={id:'target',roles:{cache:new Collection(),highest:{comparePositionTo:()=>0}}};
+        const call=(actor:any,op:'add'|'remove')=>decideRoleChange({store,guild,actor,target,role,me:actor,op});
+        assert.equal(call(as(U,['r-helper']),'add').ok,false,'a Helper cannot hand out an equal rank');
+        assert.equal(call(as(U,['r-admin']),'add').ok,true,'an Admin can hand out a rank below their own');
+        assert.equal(call(as(U,['r-admin']),'remove').ok,true,'and take it away');
         BOT_STAFF_IDS.developer=[U];
-        assert.equal(decideRoleChange({...change,op:'add'}).ok,true);
+        assert.equal(call(as(U,[]),'add').ok,true,'Developers are exempt');
     }finally{delete BOT_STAFF_IDS.developer;store.close();}
 });
 

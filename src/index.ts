@@ -49,6 +49,7 @@ import { withdrawSharedBan } from './features/roblox-tools.js';
 import { forgetHeldBot, lockServerSettings, plusConfig, quarantineNewBot } from './features/antinuke-plus.js';
 import { activeBan, assertLocalUnban, enforceOnJoin, enforceOnUnban, existingBan, liftNetworkBan, networkDeps, recordId, sweepNetworkBans } from './security/network-ban.js';
 import { enforceProtectedRoles } from './security/protected-roles.js';
+import { enforceRoleBlacklist } from './security/role-blacklist-enforce.js';
 import { enforceProtectedUsers } from './security/protected-users.js';
 import { handleBanLogInteraction, onBanAdd, onBanRemove, registerBanLogRenderer } from './audit/ban-log.js';
 import { reportBotError } from './audit/bot-errors.js';
@@ -282,6 +283,7 @@ client.on(Events.GuildAuditLogEntryCreate, (entry, guild) => {
     protectedTask('audit', guild.id, () => security.audit(entry, guild));
     protectedTask('protected roles', guild.id, async () => { await enforceProtectedRoles(store, logs, entry, guild); });
     protectedTask('protected users', guild.id, async () => { await enforceProtectedUsers(store, logs, entry, guild); });
+    protectedTask('role blacklist', guild.id, async () => { await enforceRoleBlacklist(store, logs, entry, guild); });
     protectedTask('event log', guild.id, async () => recordAuditEvent(store, logs, entry, guild));
     protectedTask('webhook guard', guild.id, async () => reportWebhook(store, logs, entry, guild));
     protectedTask('settings lock', guild.id, () => lockServerSettings(store, logs, entry, guild, id => security.trusted(guild, id), (id, rule) => security.trustedFor(guild, id, rule)));
@@ -295,7 +297,7 @@ client.on(Events.MessageCreate, m => {
     if (m.guild) protectedTask('ai moderation', m.guild.id, () => aiModerate(store, logs, m, id => security.trusted(m.guild!, id)));
     if (m.guild)
         protectedTask('staff mentions', m.guild.id, () => processStaffMention({ store, security, logs, client }, m));
-    if (m.guild) protectedTask('auto reactions', m.guild.id, () => autoReact(store, m));
+    if (m.guild) protectedTask('auto reactions', m.guild.id, () => autoReact(m));
     // Only ticket channels are tracked, so ordinary chat costs one Set lookup.
     if (m.guild && isTicketChannel(m.channelId)) protectedTask('ticket activity', m.guild.id, async () => { markTicketActivity(store, m.channelId); });
 });

@@ -9,7 +9,7 @@ import type { Store } from './db.js';
 /**
  * Put back settings from an older database file (a daily backup DM, a downloaded data/ folder) without
  * touching anything newer. Only configuration is copied, never history: whitelists, staff ranks, permission
- * roles, command and feature switches, logging, auto-react, who-can-give rules, anti-ping, scam and new-account
+ * roles, command and feature switches, logging, who-can-give rules, anti-ping, scam and new-account
  * settings. A row that exists now always wins, and whitelist entries someone changed or removed after the
  * backup was taken are left alone. Only servers that are authorized right now are touched.
  */
@@ -21,7 +21,6 @@ export const RESTORABLE: { table: string; label: string }[] = [
     { table: 'feature_settings', label: 'feature switches' },
     { table: 'guild_features', label: 'feature settings' },
     { table: 'event_log_config', label: 'logging settings' },
-    { table: 'autoreact_users', label: 'auto-react users' },
     { table: 'role_rules', label: 'who-can-give rules' },
     { table: 'antiping_config', label: 'anti-ping settings' },
     { table: 'antiping_targets', label: 'anti-ping targets' },

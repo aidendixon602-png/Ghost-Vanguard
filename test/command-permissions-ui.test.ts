@@ -37,8 +37,11 @@ test('help categories show allowed subcommands and omit disabled commands and in
  }finally{store.close();}
 });
 test('anti-nuke buttons honor the parent command disable setting',async()=>{
- const {store,i}=fixture();try {
+ const {store,i,member}=fixture();try {
  store.run('INSERT INTO command_settings(guild_id,command,enabled,cooldown_ms) VALUES(?,?,?,?)','g','antinuke',0,0);
+ // The anti-nuke panel is Server Owner and Developers only, so only they reach the on/off check.
+ await assert.rejects(new Guard(store).check(i,{...defaults},'anpanel/',false),/permission/i);
+ member.id='owner';member.guild={id:'g',ownerId:'owner'};i.user={id:'owner'};
  await assert.rejects(new Guard(store).check(i,{...defaults},'anpanel/',false),/disabled/);
  }finally{store.close();}
 });

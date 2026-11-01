@@ -1,8 +1,9 @@
 import { PermissionFlagsBits } from 'discord.js';
 import { developers } from '../bot/developers.js';
-import { explicitRank, hasAdministrator, isQuarantined, RANKS } from '../bot/ranks.js';
+import { explicitRank, hasAdministrator, isQuarantined, rankOf, RANKS } from '../bot/ranks.js';
 import { isProtectedRole } from '../bot/env-rules.js';
 import { canAssignProtected, PROTECTED_REFUSAL } from './protected-roles.js';
+import { assignersOf, canAssignBlacklisted, describeAssigners, isBlacklisted } from './role-blacklist.js';
 /**
  * Who may give or take which role with /role.
  *
@@ -24,6 +25,14 @@ export const PRIVILEGED_PERMISSIONS = [
 ];
 export const isBotPermissionRole = (store, guildId, roleId) => !!store.get('SELECT 1 FROM staff_roles WHERE guild_id=? AND role_id=?', guildId, roleId)
     || !!store.get('SELECT 1 FROM permission_roles WHERE guild_id=? AND role_id=?', guildId, roleId);
+/** The Vanguard rank a Discord role carries, or null when it is not a bot permission role. */
+export function botPermissionRank(store, guildId, roleId) {
+    const level = store.get('SELECT level FROM staff_roles WHERE guild_id=? AND role_id=?', guildId, roleId)?.level;
+    if (level && level in RANKS)
+        return RANKS[level];
+    const access = String(store.get('SELECT access FROM permission_roles WHERE guild_id=? AND role_id=?', guildId, roleId)?.access ?? '');
+    return access === 'admin' ? RANKS.headadmin : access === 'moderator' ? RANKS.moderator : null;
+}
 /** Why a role is privileged, or null when it is an ordinary role. */
 export function privilegedReason(store, guildId, role) {
     const perms = PRIVILEGED_PERMISSIONS.filter(([bit]) => role.permissions.has(bit, false)).map(([, name]) => name);
@@ -57,11 +66,23 @@ export function decideRoleChange({ store, guild, actor, target, role, me, op }) 
         return { ok: false, kind: 'member', reason: 'That user is not in this server (or Discord could not find them).' };
     const noop = op === 'add' && target.roles.cache.has(role.id) ? `<@${target.id}> already has <@&${role.id}>. Nothing was changed.`
         : op === 'remove' && !target.roles.cache.has(role.id) ? `<@${target.id}> does not have <@&${role.id}>. Nothing was changed.` : undefined;
+    // Blacklisted roles answer only to their own list. A staff rank, Discord Administrator permission,
+    // an anti-nuke whitelist entry, server ownership or even being a Developer does not stand in for it:
+    // the list is the permission. Taking the role away is never blocked (that is de-escalation).
+    if (op === 'add' && isBlacklisted(store, guild.id, role.id) && !canAssignBlacklisted(store, guild.id, role.id, actor.id, [...(actor.roles?.cache?.keys() ?? [])])) {
+        const listed = describeAssigners(assignersOf(store, guild.id, role.id));
+        return { ok: false, kind: 'blacklist', reason: `<@&${role.id}> is blacklisted in this server. ${listed === 'nobody yet' ? 'Nobody is listed for it, so nobody can give it.' : `Only ${listed} can give it.`} Staff ranks, Discord Administrator permission and anti-nuke whitelists do not bypass this.` };
+    }
     // Protected roles (PROTECTED_ROLES in .env): only PROTECTED_ROLE_ASSIGNERS and Developers may give them.
     if (op === 'add' && isProtectedRole(role.id) && !canAssignProtected(actor.id))
         return { ok: false, kind: 'permission', reason: PROTECTED_REFUSAL(role.id) };
-    if (isBotPermissionRole(store, guild.id, role.id) && !developers.has(actor.id))
-        return { ok: false, kind: 'permission', reason: 'Only approved Developer user IDs may give or remove Vanguard bot permission roles.' };
+    // A role that carries a Vanguard rank answers to the ranking rules: nobody can hand out their own
+    // rank or anything above it. Only the Server Owner and Developers are exempt from that limit, and
+    // taking a role away is never blocked by it (that is de-escalation, still checked below).
+    const carried = botPermissionRank(store, guild.id, role.id);
+    if (carried !== null && op === 'add' && !developers.has(actor.id) && actor.id !== guild.ownerId
+        && rankOf(store, guild.id, actor.id, actor) <= carried)
+        return { ok: false, kind: 'permission', reason: `<@&${role.id}> carries a Vanguard staff rank. You can only give a rank below your own, so ask the server owner or a Developer.` };
     if (developers.has(actor.id))
         return { ok: true, as: 'developer', noop };
     if (actor.id === guild.ownerId)

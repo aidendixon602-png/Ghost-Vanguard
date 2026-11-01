@@ -107,7 +107,7 @@ test('revert lists only strips still in place and bot-made local bans from the l
     } finally { s.close(); }
 });
 
-test('panel buttons use the security access level: Administrator alone is not enough, security admins and the owner are', () => {
+test('panel buttons are Server Owner and Developers only: Administrator and security admins never reach them', () => {
     const s = store();
     try {
         const guard = new Guard(s);
@@ -115,8 +115,8 @@ test('panel buttons use the security access level: Administrator alone is not en
         const member = (id: string, perms = 0n) => ({ id, guild: { id: G, ownerId: OWNER }, roles: { cache: new Map() }, permissions: { has: (p: any) => (BigInt(perms) & BigInt(p)) === BigInt(p) } }) as any;
         assert.equal(guard.allowed(policy, G, ADMIN, member(ADMIN, PermissionFlagsBits.Administrator), 'vgpanel', 'vgpanel/'), false);
         s.grant(G, ADMIN, 'admin', OWNER);
-        assert.equal(guard.allowed(policy, G, ADMIN, member(ADMIN), 'vgpanel', 'vgpanel/'), true);
-        assert.equal(guard.allowed(policy, G, OWNER, member(OWNER), 'vgpanel', 'vgpanel/'), true);
+        assert.equal(guard.allowed(policy, G, ADMIN, member(ADMIN), 'vgpanel', 'vgpanel/'), false, 'a security-admin grant does not reopen the control panel');
         assert.equal(guard.allowed(policy, G, MOD, member(MOD), 'vgpanel', 'vgpanel/'), false);
+        assert.equal(guard.allowed(policy, G, OWNER, member(OWNER), 'vgpanel', 'vgpanel/'), true);
     } finally { s.close(); }
 });

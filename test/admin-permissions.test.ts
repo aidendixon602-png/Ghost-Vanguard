@@ -42,18 +42,19 @@ const member = (id: string, perms: bigint, roles: string[] = []) => ({
 const ADMIN_CAN = [
     'moderation/ban', 'moderation/unban', 'moderation/kick', 'moderation/timeout', 'moderation/warn', 'moderation/history',
     'case/view', 'case/search', 'case/recent', 'case/reason', 'warnings/status',
-    'security/status', 'security/config', 'security/incidents', 'guild-config/feature', 'guild-config/command', 'guild-config/provider',
-    'logs/status', 'logs/enable', 'logs/category', 'antinuke/status', 'antinuke/enable', 'antinuke/rules', 'antinuke/check',
+    'security/status', 'security/incidents', 'guild-config/feature', 'guild-config/command', 'guild-config/provider',
+    'logs/status', 'logs/enable', 'logs/category', 'antinuke/status', 'antinuke/check',
     'backup/create', 'backup/list', 'snapshot/create', 'snapshot/list', 'trust/list', 'config-history/list',
     'health', 'automod/spam', 'welcome/setup', 'raidmode/on', 'lockdown', 'perm/list', 'staff/report',
 ];
 const ADMIN_CANNOT = [
     // developer-only and cross-server
-    'dev/diagnostics', 'autoreact/add', 'autoreact/remove', 'autoreact/list', 'genreban', 'ungenreban', 'hardban', 'unhardban', 'banserver', 'authserver', 'copylayout', 'staff/global', 'roblox/partner', 'roblox/sharing',
+    'dev/diagnostics', 'genreban', 'ungenreban', 'hardban', 'unhardban', 'banserver', 'authserver', 'copylayout', 'staff/global', 'roblox/partner', 'roblox/sharing',
     // destructive restoration and deleting recovery points or records
     'backup/restore', 'snapshot/restore', 'config-history/restore', 'backup/delete', 'snapshot/delete', 'snapshot/cleanup', 'case/delete',
-    // switching protection off or exempting people
-    'antinuke/disable', 'disable', 'antinuke-plus/settings', 'trust/add', 'trust/remove', 'trust/bots', 'security/release', 'emergency/start', 'emergency/stop',
+    // switching protection off, changing it, or exempting people: Server Owner and Developers only
+    'antinuke/disable', 'antinuke/enable', 'antinuke/rule', 'disable', 'enable', 'antinuke-plus/settings', 'trust/add', 'trust/remove', 'trust/bots',
+    'security/config', 'security/release', 'emergency/start', 'emergency/stop', 'panel', 'perm', 'perm/discord',
     // granting permissions
     'security/admin', 'staff/role', 'guild-config/permission-role',
 ];
@@ -77,8 +78,11 @@ test('the server owner can do the restricted server actions, but nothing develop
     const owner = member(OWNER, PermissionFlagsBits.Administrator);
     for (const key of ['backup/restore', 'snapshot/restore', 'antinuke/disable', 'trust/add', 'case/delete'])
         assert.equal(can(owner, key), true, `owner should be able to use /${key}`);
-    for (const key of ['dev/diagnostics', 'genreban', 'hardban', 'banserver', 'staff/global', 'staff/role', 'staff/user', 'guild-config/permission-role', 'security/admin'])
+    for (const key of ['dev/diagnostics', 'genreban', 'hardban', 'banserver', 'staff/global', 'security/admin'])
         assert.equal(can(owner, key), false, `owner must NOT be able to use /${key}`);
+    // Server ranks and permission-role assignments are server work, so the owner does them.
+    for (const key of ['staff/role', 'staff/user', 'guild-config/permission-role'])
+        assert.equal(can(owner, key), true, `the owner assigns ranks with /${key}`);
     store.close();
 });
 
@@ -87,7 +91,7 @@ test('an explicit security-admin grant still unlocks restricted server actions',
     const head = member('444444444444444444', 0n);
     store.grant(G, head.id, 'admin', OWNER);
     assert.equal(can(head, 'backup/restore'), true);
-    assert.equal(can(head, 'antinuke/disable'), true);
+    assert.equal(can(head, 'antinuke/disable'), false, 'protection changes are Server Owner and Developers only');
     assert.equal(can(head, 'genreban'), false);
     store.close();
 });
@@ -110,7 +114,6 @@ test('developers keep developer commands; server permissions never grant them', 
     try {
         assert.equal(can(member(DEV, 0n), 'genreban'), true);
         assert.equal(can(member(DEV, 0n), 'dev/diagnostics'), true);
-        assert.equal(can(member(DEV, 0n), 'autoreact/add'), true);
         assert.equal(can(member('777777777777777777', PermissionFlagsBits.Administrator), 'dev/diagnostics'), false);
         // BOT_OWNER_ID is whoever the deployment set: nothing is built in, so set it for this check.
         const previousOwner = config.ownerId;
