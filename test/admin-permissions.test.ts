@@ -49,7 +49,7 @@ const ADMIN_CAN = [
 ];
 const ADMIN_CANNOT = [
     // developer-only and cross-server
-    'dev/diagnostics', 'autoreact/add', 'autoreact/remove', 'autoreact/list', 'genreban', 'ungenreban', 'hardban', 'unhardban', 'banserver', 'authserver', 'copylayout', 'staff/global', 'roblox/partner', 'roblox/network',
+    'dev/diagnostics', 'autoreact/add', 'autoreact/remove', 'autoreact/list', 'genreban', 'ungenreban', 'hardban', 'unhardban', 'banserver', 'authserver', 'copylayout', 'staff/global', 'roblox/partner', 'roblox/sharing',
     // destructive restoration and deleting recovery points or records
     'backup/restore', 'snapshot/restore', 'config-history/restore', 'backup/delete', 'snapshot/delete', 'snapshot/cleanup', 'case/delete',
     // switching protection off or exempting people

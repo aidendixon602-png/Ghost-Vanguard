@@ -32,10 +32,11 @@ import { Roblox } from './integrations/roblox.js';
 import { Security } from './security/security.js';
 import { Snapshots } from './recovery/snapshots.js';
 import { embed } from './ui/ui.js';
-import { flushPendingRoleChangeLogs, logsCategory, recordAuditEvent, recordMemberEvent } from './audit/event-log.js';
+import { flushPendingRoleChangeLogs, logsCategory, recordAuditEvent, recordMemberEvent, recordVoiceEvent } from './audit/event-log.js';
+import { logRoute } from './audit/log-setup.js';
 import { catchUp, lastSeen, markSeen } from './audit/downtime.js';
 import { presenceOverride } from './bot/dev-tools.js';
-import { clearAutomod, processAutomod } from './features/automod.js';
+import { clearAutomod, processAutomod, processEditedPhrase } from './features/automod.js';
 import { checkAltAccount, historyOnJoin, sendWelcome } from './features/joins.js';
 import { logRankChange } from './features/hr.js';
 import { runSchedules } from './features/schedules.js';
@@ -82,7 +83,7 @@ const offlineSince = lastSeen(store);
 // Tickets left mid-close by a crash are usable again, and open ticket channels are known in memory.
 loadTicketChannels(store);
 
-const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers, GatewayIntentBits.GuildModeration, GatewayIntentBits.GuildMessages, ...(config.messageContentEnabled ? [GatewayIntentBits.MessageContent] : [])], partials: [Partials.Message, Partials.GuildMember, Partials.User],
+const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers, GatewayIntentBits.GuildModeration, GatewayIntentBits.GuildMessages, GatewayIntentBits.GuildVoiceStates, ...(config.messageContentEnabled ? [GatewayIntentBits.MessageContent] : [])], partials: [Partials.Message, Partials.GuildMember, Partials.User],
     rest: { rejectOnRateLimit: rejectRecoveryWait },
     allowedMentions: { parse: [], repliedUser: false } });
 
@@ -221,7 +222,7 @@ client.once(Events.ClientReady, async (c) => {
         logEvent('integrations', { rover: config.roverKey ? 'configured' : 'disabled', bloxlink: config.bloxlinkKey ? 'configured' : 'disabled', ai: config.aiEnabled ? 'configured' : 'disabled' });
         if (config.logFormat !== 'json')
             for (const line of startupSummary({ version: VERSION, tag: c.user.tag, servers: client.guilds.cache.size, commands: registry.commands.size, commandsUpdated,
-                integrations: { RoVer: !!config.roverKey, Bloxlink: !!config.bloxlinkKey, AI: !!config.aiEnabled }, health: healthUrl }))
+                verification: 'Roblox profile code', integrations: { 'AI moderation': !!config.aiEnabled }, health: healthUrl }))
                 console.log(line);
         printStartupInvite(client.guilds.cache.size);
         if (config.logFormat !== 'json') {
@@ -239,8 +240,6 @@ client.once(Events.ClientReady, async (c) => {
         }
         task('trusted bots', trustedBotReport(client).then(lines => {
             logEvent('trusted_bots', { lines });
-            if (config.logFormat !== 'json')
-                for (const line of lines) console.log(`  ${style.dim('•')} ${line}`);
         }));
         // A missing notice or slow Discord fetch should not hold up the rest of startup.
         task('restart notice completion', completeRestartNotice(client, store, Date.now(), client.guilds.cache.size, registry.commands.size));
@@ -320,6 +319,7 @@ client.on(Events.MessageBulkDelete, messages => {
 client.on(Events.MessageUpdate, (old, m) => {
     if (m.guildId) protectedTask('message log', m.guildId, async () => logEditedMessage(store, logs, old, m));
     if (m.guild) protectedTask('edited scam scanning', m.guild.id, () => scam.process(m));
+    if (m.guild && (m.partial || old.content !== m.content)) protectedTask('edited phrase filter', m.guild.id, () => processEditedPhrase(store, logs, m, id => security.trusted(m.guild!, id)));
     if (m.guild)
         protectedTask('edited mentions', m.guild.id, () => processStaffMention({ store, security, logs, client }, m));
 });
@@ -329,6 +329,13 @@ client.on(Events.GuildMemberRemove, member => {
     protectedTask('event log', member.guild.id, async () => recordMemberEvent(store, logs, member, false));
     protectedTask('save roles on leave', member.guild.id, async () => saveLeftRoles(store, member));
     if (member.user.bot) protectedTask('bot quarantine cleanup', member.guild.id, async () => forgetHeldBot(store, member.guild.id, member.id));
+});
+
+client.on(Events.VoiceStateUpdate, (old, state) => {
+    if (old.channelId === state.channelId || !logRoute(store, state.guild.id, 'voice')) return;
+    protectedTask('voice log', state.guild.id, async () => {
+        recordVoiceEvent(store, logs, old, state);
+    });
 });
 
 client.on(Events.GuildMemberAdd, member => {

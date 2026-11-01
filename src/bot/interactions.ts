@@ -1,13 +1,16 @@
 import { Colors, type Interaction } from 'discord.js';
 import { KeyedQueue } from '../core.js';
 import { BUSY_MESSAGE } from '../recovery/recovery.js';
-import { AppError, logEvent } from '../errors.js';
+import { AppError, failure, logEvent } from '../errors.js';
 import { Guard } from './guard.js';
 import { validateArguments, type CommandContext, type Policy, type Services } from './registry.js';
 import { acknowledge, commandFailure, respond } from './responses.js';
 import { ReplyPanels } from './reply-panels.js';
 import { routeInteraction } from './command-tree.js';
 import { blockedBy } from './env-rules.js';
+import { isExcluded, logRoute } from '../audit/log-setup.js';
+import { eventLogConfig } from '../audit/event-log.js';
+import { embed } from '../ui/ui.js';
 
 export class Interactions {
     readonly guard: Guard;
@@ -110,13 +113,21 @@ export class Interactions {
                 const result = policy.requiresAuthorization && !recovery ? await this.queue.run(guildId, run) : await run();
                 if (typeof result === 'string' && !i.isAutocomplete()) {
                     const title = name === 'dev' && path === 'update' ? '🚀 Ghost Vanguard · Update Center'
-                        : policy.responseKind === 'info' ? 'Ghost Vanguard · Information' : '✓ Action completed';
+                        : shown ? `/${shown}` : policy.responseKind === 'info' ? 'Ghost Vanguard · Information' : 'Action result';
                     await respond(i, result, title, policy.responseKind === 'info' ? Colors.Blurple : Colors.Green);
                 }
             } finally {
                 this.depths.set(guildId, Math.max(0, (this.depths.get(guildId) ?? 1) - 1));
             }
             logEvent('command_activity', { command: name, subcommand: path, user: i.user.tag, userId: i.user.id, guildId, guild: i.inCachedGuild() ? i.guild.name : null, durationMs: Date.now() - start, result: 'success' });
+            // Record the command name and actor, never options or private reply content.
+            if (shown && !i.isAutocomplete()) {
+                try {
+                    const channel = logRoute(this.services.store, guildId, 'commands');
+                    if (channel && eventLogConfig(this.services.store, guildId).enabled && !isExcluded(this.services.store, guildId, i.channelId))
+                        this.services.logs.push(guildId, embed('Command used', `**Command:** \`/${shown}\`\n**By:** <@${i.user.id}>\n**Channel:** <#${i.channelId}>`, Colors.Blurple), [], channel);
+                } catch (error) { logEvent('command_log_failure', { guildId, ...failure(error) }); }
+            }
         } catch (error) {
             await commandFailure(i, error, name, { subcommand: path, user: i.user.tag, guild: i.inCachedGuild() ? i.guild.name : null, durationMs: Date.now() - start, result: 'failure' }, privateReply);
         }

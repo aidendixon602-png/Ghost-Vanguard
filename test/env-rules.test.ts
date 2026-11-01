@@ -25,6 +25,16 @@ test('COMMAND_BLACKLIST: per person, whole commands or single subcommands, * for
     } finally { process.env.COMMAND_BLACKLIST = saved ?? ''; }
 });
 
+test('legacy blacklist rules still block the renamed Roblox sharing command', () => {
+    const saved = process.env.COMMAND_BLACKLIST;
+    try {
+        process.env.COMMAND_BLACKLIST = `${A}:roblox network;${B}:roblox sharing`;
+        assert.equal(blockedBy(A, 'roblox sharing'), 'roblox network');
+        assert.equal(blockedBy(B, 'roblox sharing'), 'roblox sharing');
+        assert.equal(blockedBy(A, 'roblox partner'), null);
+    } finally { process.env.COMMAND_BLACKLIST = saved ?? ''; }
+});
+
 function world(actorId: string, reason: string | null = null) {
     const store = new Store(':memory:');
     const logs: any[] = [], removed: string[][] = [];

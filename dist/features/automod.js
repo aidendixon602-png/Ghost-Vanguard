@@ -5,8 +5,20 @@ import { logEvent } from '../errors.js';
 import { getFeature } from './settings.js';
 /** Sites that are almost always fine to share; used when switching to allowlist mode for the first time. */
 export const SAFE_DOMAINS = ['discord.com', 'discordapp.com', 'discordapp.net', 'roblox.com', 'youtube.com', 'youtu.be', 'tenor.com', 'giphy.com', 'twitter.com', 'x.com', 'twitch.tv', 'google.com'];
-export const AUTOMOD_DEFAULTS = { spam: true, mentionLimit: 5, timeoutMinutes: 10, invites: true, allowedServers: {}, alts: true, ai: false, aiMode: 'report', aiSensitivity: 'normal', aiImages: true, aiIgnoreChannels: [], aiIgnoreCategories: [], links: 'off', allowedDomains: [], blockedDomains: [] };
+export const AUTOMOD_DEFAULTS = { spam: true, mentionLimit: 5, timeoutMinutes: 10, invites: true, allowedServers: {}, alts: true, ai: false, aiMode: 'report', aiSensitivity: 'normal', aiImages: true, aiIgnoreChannels: [], aiIgnoreCategories: [], links: 'off', allowedDomains: [], blockedDomains: [], wordsEnabled: false, blockedWords: [] };
 export const automodConfig = (store, guild) => getFeature(store, guild, 'automod', AUTOMOD_DEFAULTS);
+export const normalizePhrase = (text) => text.normalize('NFKC').toLowerCase().replace(/\s+/gu, ' ').trim();
+/** Literal matching with Unicode word boundaries; phrases cannot inject regular expressions. */
+export function containsBlockedPhrase(text, phrases) {
+    const normalized = normalizePhrase(text);
+    return phrases.some(phrase => {
+        const literal = normalizePhrase(phrase);
+        if (!literal || !/[\p{L}\p{N}]/u.test(literal))
+            return false;
+        const escaped = literal.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        return new RegExp(`(?<![\\p{L}\\p{N}_])${escaped}(?![\\p{L}\\p{N}_])`, 'u').test(normalized);
+    });
+}
 const URL_PATTERN = /https?:\/\/([^\s/?#<>|]+)(\S*)/gi;
 const INVITE_HOSTS = ['discord.gg', 'dsc.gg'];
 /** "https://WWW.Example.com:443/x" → "example.com". */
@@ -103,11 +115,38 @@ async function strike(store, logs, message, key, now, minutes, notice, logTitle,
     else
         logs.push(message.guild.id, embed(`Automod · ${logTitle}`, `**Member:** <@${message.author.id}> · <#${message.channelId}>\n${logLine} · strike ${strikes.length}/3`, Colors.Greyple));
 }
+async function removeBlockedPhrase(store, logs, message) {
+    store.assertAuthorized(message.guild.id);
+    const deleted = await message.delete().then(() => true, () => false);
+    logs.push(message.guild.id, embed('Automod · blocked phrase', `**Member:** <@${message.author.id}> · <#${message.channelId}>\n${deleted ? 'Message deleted.' : 'Could not delete the message; check Manage Messages and channel permissions.'}`, deleted ? Colors.Greyple : Colors.Orange));
+}
+/** Apply only the phrase filter to edits; do not count them as new spam messages. */
+export async function processEditedPhrase(store, logs, message, trusted) {
+    if (!message.inGuild())
+        return;
+    const config = automodConfig(store, message.guild.id);
+    if (!config.wordsEnabled)
+        return;
+    if (message.partial) {
+        try {
+            message = await message.fetch();
+        }
+        catch (error) {
+            if (error && typeof error === 'object' && 'code' in error && error.code === 10008)
+                return;
+            throw error;
+        }
+    }
+    if (!message.inGuild() || message.author.bot || message.webhookId || message.system)
+        return;
+    if (containsBlockedPhrase(message.content ?? '', config.blockedWords) && !await isStaff(store, message, trusted))
+        await removeBlockedPhrase(store, logs, message);
+}
 export async function processAutomod(store, logs, message, trusted, now = Date.now()) {
     if (!message.inGuild() || message.author.bot || message.webhookId || message.system)
         return;
     const config = automodConfig(store, message.guild.id);
-    if (!config.spam && !config.invites && config.links === 'off')
+    if (!config.spam && !config.invites && config.links === 'off' && !config.wordsEnabled)
         return;
     const key = `${message.guild.id}:${message.author.id}`;
     if ((cooldown.get(key) ?? 0) > now) {
@@ -117,6 +156,7 @@ export async function processAutomod(store, logs, message, trusted, now = Date.n
     const text = message.content ?? '';
     const invites = config.invites ? [...text.matchAll(INVITE_PATTERN)].map(m => m[1]) : [];
     const badLink = blockedLink(text, config);
+    const badPhrase = config.wordsEnabled && containsBlockedPhrase(text, config.blockedWords);
     // The person being replied to is pinged automatically; that is not spam.
     const replied = message.mentions.repliedUser?.id;
     const mentionCount = new Set([...message.mentions.users.keys()].filter(id => id !== message.author.id && id !== replied)).size + message.mentions.roles.size;
@@ -126,7 +166,7 @@ export async function processAutomod(store, logs, message, trusted, now = Date.n
     if (++calls % 500 === 0)
         prune(now);
     const verdict = config.spam ? spamVerdict(history, seen, mentionCount, config.mentionLimit) : null;
-    if (!verdict && !invites.length && !badLink)
+    if (!verdict && !invites.length && !badLink && !badPhrase)
         return;
     if (await isStaff(store, message, trusted))
         return;
@@ -159,8 +199,12 @@ export async function processAutomod(store, logs, message, trusted, now = Date.n
         await strike(store, logs, message, key, now, config.timeoutMinutes, 'invite links to other servers aren\'t allowed here.', 'invite link removed', `**Invite:** \`${code}\` (${target.guild ? `server ${target.guild}` : 'expired or invalid'})`);
         return;
     }
-    if (badLink)
+    if (badLink) {
         await strike(store, logs, message, key, now, config.timeoutMinutes, 'that link isn\'t allowed here.', 'link removed', `**Link:** \`${badLink}\` (${config.blockedDomains.some(d => domainMatches(badLink, d)) ? 'blocked site' : 'not on the allowed list'})`);
+        return;
+    }
+    if (badPhrase)
+        await removeBlockedPhrase(store, logs, message);
 }
 export function clearAutomod(guild) {
     for (const map of [recent, cooldown, inviteStrikes])

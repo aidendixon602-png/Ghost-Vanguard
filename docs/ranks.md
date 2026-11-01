@@ -104,8 +104,8 @@ Server rank: anti-nuke, whitelist, control panel, backups and staff ranks. Given
 - `/recovery snapshot restore`: Preview and restore a snapshot
 - `/roblox bind`: Give a role for a group rank
 - `/roblox group`: Set the Roblox group for rank roles
-- `/roblox network`: Share blacklists with partner servers
 - `/roblox partner`: Add or remove a partner server
+- `/roblox sharing`: Share blacklists with partner servers
 - `/roblox unbind`: Remove a group rank role
 - `/role who-can-give`: Choose who can give a role _(staff roles: owner only)_
 - `/setup config backups`: Schedule server layout backups
@@ -155,8 +155,10 @@ Server rank: lifting ordinary bans and accepting appeals, raid tools, automod, s
 - `/automod scam vision`: Let OpenAI read text in images (alerts only)
 - `/automod spam`: Set limits for mass pings, repeats and message bursts
 - `/automod status`: Show what automod is doing here
+- `/automod word-list`: Manage blocked words and phrases
+- `/automod words`: Turn blocked phrase filtering on or off
 - `/mod massban`: Ban up to 200 user IDs at once _(must also be on the anti-nuke whitelist)_
-- `/mod unban`: Lift a ban (not genrebans or hardbans) _(Admins may lift ordinary bans here; ban-log buttons are server-owner/Developer only (500 ms cooldown; successful actions post who clicked in #bans); network-ban lifts and exceptions are Developer only)_
+- `/mod unban`: Lift a ban (not genrebans or hardbans) _(Admins may lift ordinary bans here; ban-log buttons are server-owner/Developer only (500 ms cooldown; successful actions post who clicked in #bans); genreban and hardban lifts, and genreban exceptions, are Developer only)_
 - `/raid emergency panel`: Post Emergency and All clear buttons here
 - `/raid emergency start`: Lock down, pause invites, turn on raid mode, ping Admins
 - `/raid emergency status`: Show whether emergency mode is on
@@ -178,7 +180,7 @@ Server rank: lifting ordinary bans and accepting appeals, raid tools, automod, s
 - `/setup logs disable`: Turn event logging off
 - `/setup logs enable`: Turn event logging on
 - `/setup logs exclude`: Stop or resume logging a channel
-- `/setup logs setup`: Create the log channels and send a test
+- `/setup logs setup`: Set up log channels and reuse existing event logs
 - `/setup logs status`: Show logging settings
 - `/setup logs view`: Browse logged events (last 30 days)
 - `/setup staff report`: Show actions per staff member

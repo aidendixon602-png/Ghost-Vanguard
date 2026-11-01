@@ -75,14 +75,14 @@ export function helpPage(ctx:CommandContext,guild:string,user:string,requested='
     const groups=helpCategories(ctx,guild,user);
     if(!groups.length)return {embeds:[embed('Ghost Vanguard · Commands','No commands are available to your account in this server.')],components:[],allowedMentions:{parse:[] as never[]}};
     const prefix=`helpui:${guild}:${user}:`;
-    const menu=new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(new StringSelectMenuBuilder().setCustomId(prefix+'category').setPlaceholder('Pick a category')
+    const menu=new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(new StringSelectMenuBuilder().setCustomId(prefix+'category').setPlaceholder('Choose a command category')
         .addOptions({label:'Overview',value:'home',emoji:'🏠',description:'All categories at a glance',default:!requested||requested==='home'},
             ...groups.map(g=>({label:g.label,value:g.key,emoji:section(g.key)?.emoji,description:`${section(g.key)?.blurb ?? ''} · ${g.lines.length} command${g.lines.length===1?'':'s'}`.slice(0,100),default:g.key===requested}))));
     // Overview: every category with what it is for and how many commands you can use there.
     if(!requested||requested==='home'||!groups.some(g=>g.key===requested)) {
         const total=groups.reduce((n,g)=>n+g.lines.length,0);
         const body=groups.map(g=>`${section(g.key)?.emoji ?? '•'} **${g.label}** · ${g.lines.length}\n-# ${section(g.key)?.blurb ?? ''}`).join('\n');
-        return {embeds:[embed('Ghost Vanguard · Commands',`Type \`/\` and pick **Ghost Vanguard** to see the main commands:\n\`/antinuke\` \`/automod\` \`/raid\` \`/mod\` \`/role\` \`/setup\` \`/ticket\` \`/recovery\` \`/info\` \`/roblox\` \`/verify\` \`/genreban\` \`/ungenreban\` \`/hardban\` \`/unhardban\` \`/netexception\`\n\n${body}\n\n-# ${total} commands available to you · pick a category below`)],components:[menu],allowedMentions:{parse:[] as never[]}};
+        return {embeds:[embed('Ghost Vanguard · Commands',`Choose a category below to browse the commands available to you. Type \`/\` in Discord to run a command.\n\n${body}\n\n-# ${total} available command${total === 1 ? '' : 's'}`)],components:[menu],allowedMentions:{parse:[] as never[]}};
     }
     const group=groups.find(g=>g.key===requested)!;
     const pages=Math.ceil(group.lines.length/PER_PAGE),page=Math.min(Math.max(0,requestedPage),pages-1);
@@ -90,8 +90,8 @@ export function helpPage(ctx:CommandContext,guild:string,user:string,requested='
         menu,
         new ActionRowBuilder<ButtonBuilder>().addComponents(
             new ButtonBuilder().setCustomId(prefix+'home:0').setLabel('Overview').setStyle(ButtonStyle.Secondary),
-            new ButtonBuilder().setCustomId(prefix+group.key+':'+(page-1)).setLabel('◀').setStyle(ButtonStyle.Secondary).setDisabled(page===0),
-            new ButtonBuilder().setCustomId(prefix+group.key+':'+(page+1)).setLabel('▶').setStyle(ButtonStyle.Secondary).setDisabled(page===pages-1))
+            new ButtonBuilder().setCustomId(prefix+group.key+':'+(page-1)).setLabel('Previous').setStyle(ButtonStyle.Secondary).setDisabled(page===0),
+            new ButtonBuilder().setCustomId(prefix+group.key+':'+(page+1)).setLabel('Next').setStyle(ButtonStyle.Secondary).setDisabled(page===pages-1))
     ],allowedMentions:{parse:[] as never[]}};
 }
 

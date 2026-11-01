@@ -5,7 +5,7 @@ export function antinukeStatus(store, guildId) {
     const settings = store.settings(guildId);
     const rules = RULES.map(base => overrideRule(base, settings.rules, settings.ruleDefaults)).map(rule => {
         const permissions = rule.key === 'dangerous_grant'
-            ? ' (administrator, ban_members, kick_members, manage_channels, manage_guild, manage_webhooks)' : '';
+            ? ' (administrator, ban_members, kick_members, manage_channels, manage_guild, manage_roles, manage_webhooks)' : '';
         if (rule.enabled === false)
             return `\`${rule.title}\`${permissions} – **off**`;
         const flags = (rule.revert ? ` \`[revert${rule.recipient ? ', user' : ''}]\`` : '') + (WARN_FIRST.has(rule.key) || rule.key === 'dangerous_grant' ? ' \`[warns first]\`' : '');

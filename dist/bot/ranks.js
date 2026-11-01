@@ -49,7 +49,7 @@ export const ADMIN_RESTRICTED = new Set([
     // Granting permissions or ranks
     'security/admin', 'staff/role', 'guild-config/permission-role', 'perm', 'role/who-can-give', 'panel', 'vgpanel',
     // Beyond this server
-    'copylayout', 'staff/global', 'roblox/network', 'roblox/partner',
+    'copylayout', 'staff/global', 'roblox/sharing', 'roblox/partner',
 ]);
 export const isAdminRestricted = (key) => !!key && ADMIN_RESTRICTED.has(key.replace(/\/$/, ''));
 /** True when this member holds Discord's Administrator permission (checked live, never by role name). */

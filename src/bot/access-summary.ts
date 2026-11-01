@@ -17,7 +17,7 @@ export function accessSummary(store: Store): string[] {
     const developers = [...new Set([config.ownerId, ...config.developers].filter(Boolean))];
     const supreme = [...new Set([...fromEnv, ...granted.filter(g => g.level === 'supreme').map(g => g.id)])].filter(id => !developers.includes(id));
     const others = granted.filter(g => g.level !== 'supreme');
-    const row = (label: string, value: string) => `  ${style.cyan('•')} ${label.padEnd(13)} ${value}`;
+    const row = (label: string, value: string) => `    ${style.dim(label.padEnd(13))} ${value}`;
     const ids = (list: string[]) => list.length ? list.join(', ') : style.dim('none');
     return [
         `  ${style.bold('Access')} ${style.dim('(check these are all people you trust)')}`,

@@ -1,3 +1,7 @@
+<!-- coderabbit-ai-generated:v1 -->
+
+<!-- coderabbit-ai-generated-section:v1:b6b1f5bd2c9f85335ee5d2ec421714f6516639d9b87850fc527bc90d4b36d434 -->
+
 # Anti-nuke controls
 
 The 19-rule baseline loads for authorized servers and survives restarts. Each server can customize a rule's threshold and time window or disable that rule with `/antinuke rule`; `/antinuke reset` restores the shipped default. New or unconfigured servers begin in **observe** mode: incidents are recorded, but no members are stripped and no changes are automatically reverted. Run `/setup logs setup`, then `/antinuke check`; when required bot permissions and an accessible security-log channel are ready, `/antinuke enable` shows a confirmation, saves a baseline, and rechecks readiness before switching to **enforce**. Roles at or above Vanguard are shown as hierarchy warnings because their members cannot be contained. Existing enforce-mode servers stay enforced only while readiness passes at startup; missing readiness switches them to observe, and fixing it does not silently resume enforcement. A staff opt-out remains off across restarts. The shipped defaults are listed in [antinuke-locked.md](antinuke-locked.md), and `/antinuke status` shows live per-server values.
@@ -9,7 +13,7 @@ The 19-rule baseline loads for authorized servers and survives restarts. Each se
 3. **At the limit:**
    - Routine or ambiguous actions (including mass bans/kicks, channel or role changes/deletions, AutoMod edits and emoji/sticker deletion) warn human actors on the first hit. The bot removes no roles; it attempts a safe revert only when that rule supports one. The alert reports the result. Repeating that same rule within an hour gets the rule's normal response.
    - A warning for one rule does not escalate an unrelated rule. This avoids punishing normal staff work because of an earlier, different action.
-   - High-confidence takeover signals (adding a bot, mass unbanning, member pruning and dangerous permission grants) retain stronger defaults. Dangerous grants warn first except self-assigned Administrator or Manage Server, which are stripped and reverted immediately. A repeat dangerous grant within an hour strips and reverts; bots receive the warning path for dangerous grants.
+   - High-confidence takeover signals (adding a bot, mass unbanning, member pruning and dangerous permission grants) retain stronger defaults. Dangerous grants include newly granted Manage Roles, Administrator, Manage Server, Ban/Kick Members, Manage Channels and Manage Webhooks. They warn first except self-assigned Administrator or Manage Server, which are stripped and reverted immediately. A repeat dangerous grant within an hour strips and reverts; bots receive the warning path for dangerous grants.
    - Bots do not get first-hit warnings for routine rules; their normal configured response applies.
 4. When a rule's normal response is a strip, staff and admin roles are removed and saved, and damage is reverted only where the rule has a supported revert handler. Rule limits can be customized per server, so review the current values with `/antinuke status`.
 5. The alert in the security log has an **Undo strip** button (owner or developer) and, after deletions, **Review restore**.
@@ -74,4 +78,9 @@ Nobody can change these from Discord. Restart after editing.
 
 Evidence is written before any Discord change is made. Incidents record the executor, target, rule, count and window, mode, punishment and completed/failed/skipped reverts. Large incidents post progress every ten events. Permission reverts remove only the newly added dangerous permission bits and keep everything else. Webhook creation is undone; edits and deletions need manual review.
 
+After an enforcement incident, supported reversals continue for new actions by the same actor and rule during its cooldown. This covers continued bot additions, bans, unbans and dangerous grants. Containment and alerts are throttled separately; the cooldown does not create a reversal blind spot. Each reversal attempt and outcome is saved with its audit payload before and after the Discord request. Already attempted events are not automatically retried, including after a restart or warning escalation, so later legitimate staff corrections are not repeatedly undone. A failed or interrupted attempt needs staff review. Current observe/disabled settings and whitelist exemptions still apply. Deletions without a supported reversal still require the previewed recovery workflow.
+
 For a live test plan, see [notes/security-live-test.md](notes/security-live-test.md).
+
+
+<!-- /coderabbit-ai-generated:v1 -->

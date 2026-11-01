@@ -19,7 +19,7 @@ async function resolveRoblox(input: string): Promise<string> {
 }
 const accountOption = (o: any) => o.setName('account').setDescription('Roblox username, user ID or profile link').setRequired(true).setMaxLength(100);
 
-export default defineCommand(new SlashCommandBuilder().setName('roblox').setDescription('Roblox: look up accounts, blacklist, shared ban network and group rank sync')
+export default defineCommand(new SlashCommandBuilder().setName('roblox').setDescription('Roblox: look up accounts, blacklist sharing and group rank sync')
     .addSubcommand(s => s.setName('lookup').setDescription('Profile card: account age, past names, groups, linked Discord, blacklist status')
         .addStringOption(o => o.setName('account').setDescription('Roblox username, user ID or profile link').setMaxLength(100))
         .addUserOption(o => o.setName('member').setDescription('Or a Discord member who verified')))
@@ -27,10 +27,10 @@ export default defineCommand(new SlashCommandBuilder().setName('roblox').setDesc
         .addStringOption(accountOption).addStringOption(o => o.setName('reason').setDescription('Why').setRequired(true).setMaxLength(300)))
     .addSubcommand(s => s.setName('unblacklist').setDescription('Remove a Roblox account from this server\'s blacklist').addStringOption(accountOption))
     .addSubcommand(s => s.setName('blacklisted').setDescription('List blacklisted Roblox accounts'))
-    .addSubcommand(s => s.setName('network').setDescription('Share blacklists with your partner servers (both servers must add each other)')
+    .addSubcommand(s => s.setName('sharing').setDescription('Share blacklists with your partner servers (both servers must add each other)')
         .addBooleanOption(o => o.setName('share').setDescription('Send this server\'s blacklist to partners').setRequired(true))
         .addBooleanOption(o => o.setName('use').setDescription('Block accounts blacklisted by partners').setRequired(true)))
-    .addSubcommand(s => s.setName('partner').setDescription('Add or remove a partner server for the ban network (do it in both servers)')
+    .addSubcommand(s => s.setName('partner').setDescription('Add or remove a partner server for blacklist sharing (set it in both servers)')
         .addStringOption(o => o.setName('action').setDescription('Add or remove').setRequired(true).addChoices({ name: 'Add partner', value: 'add' }, { name: 'Remove partner', value: 'remove' }))
         .addStringOption(o => o.setName('server_id').setDescription('The other server\'s ID (Vanguard must be in it)').setRequired(true).setMinLength(17).setMaxLength(20)))
     .addSubcommand(s => s.setName('group').setDescription('Set the Roblox group whose ranks give Discord roles')
@@ -93,7 +93,7 @@ export default defineCommand(new SlashCommandBuilder().setName('roblox').setDesc
         const total = Number(ctx.store.get('SELECT COUNT(*) AS n FROM blocked_accounts WHERE guild_id=?', guild)?.n ?? 0);
         return `**Blacklisted Roblox accounts · ${total}**\n${rows.map(r => `• [${r.roblox_id}](https://www.roblox.com/users/${r.roblox_id}/profile) · ${String(r.reason ?? '').slice(0, 80)}`).join('\n') || 'None.'}${total > 25 ? '\n…newest 25 shown' : ''}`;
     }
-    if (sub === 'network') {
+    if (sub === 'sharing') {
         const share = i.options.getBoolean('share', true), use = i.options.getBoolean('use', true);
         setFeature(ctx.store, guild, 'network', NETWORK_DEFAULTS, { share, use }, i.user.id);
         // Partners only ever see a plain reason, never moderator names or Discord IDs.
@@ -118,7 +118,7 @@ export default defineCommand(new SlashCommandBuilder().setName('roblox').setDesc
         ctx.store.db.prepare('INSERT OR REPLACE INTO network_partners(guild_id,partner_id,by_id,at) VALUES(?,?,?,?)').run(guild, other, i.user.id, Date.now());
         ctx.logs.push(guild, embed('Ban network partner added', `By <@${i.user.id}> · **${target.name}** (\`${other}\`)`, Colors.Orange));
         const mutual = partnerIds(ctx.store, guild).includes(other);
-        return mutual ? `**${target.name}** is now a confirmed partner. Turn on sharing/using with \`/roblox network\` in both servers.` : `Partner request saved. It becomes active once someone in **${target.name}** runs \`/roblox partner action:Add partner server_id:${guild}\` there too.`;
+        return mutual ? `**${target.name}** is now a confirmed partner. Turn on sharing/using with \`/roblox sharing\` in both servers.` : `Partner request saved. It becomes active once someone in **${target.name}** runs \`/roblox partner action:Add partner server_id:${guild}\` there too.`;
     }
     if (sub === 'group') {
         const raw = i.options.getString('group_id')?.trim();

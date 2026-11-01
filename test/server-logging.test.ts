@@ -5,9 +5,10 @@ import { authorize } from './helpers.js';
 import { Store } from '../src/database/db.js';
 import { FAST_ATTEMPTS, LogQueue, SLOW_RETRY_MS } from '../src/logging.js';
 import { redact } from '../src/audit/redact.js';
-import { configureEventLog, describeAudit, eventLogConfig, recordEvent } from '../src/audit/event-log.js';
-import { checkChannel, logChannels, setLogChannels, setupLogChannels } from '../src/audit/log-setup.js';
+import { configureEventLog, describeAudit, eventLogConfig, recordEvent, recordMemberEvent, recordVoiceEvent } from '../src/audit/event-log.js';
+import { checkChannel, LEGACY_LOG_ROUTES, logChannels, setLogChannels, setupLogChannels } from '../src/audit/log-setup.js';
 import { reportBotError } from '../src/audit/bot-errors.js';
+import { Security } from '../src/security/security.js';
 
 const G = '500000000000000001', BOT = '600000000000000001';
 
@@ -236,7 +237,7 @@ test('setup reuses channels that already exist by name', async () => {
     } finally { store.close(); }
 });
 
-test('setup archives the old VEIL LOGS category without deleting its channels or history', async () => {
+test('setup reuses recognized Veil channels and preserves unrelated archived channels', async () => {
     const store = new Store(':memory:'); authorize(store, G);
     try {
         const { guild } = fakeGuild(['bans', 'ghost-vanguard-logging'], { categories: ['VEIL LOGS'], legacyChildren: ['veil-errors', 'join-logs'] });
@@ -245,10 +246,105 @@ test('setup archives the old VEIL LOGS category without deleting its channels or
         const result = await store.withAuthorized(G, () => setupLogChannels(store, guild, 'admin'));
         assert.equal(oldCategory.name, 'Archive - Veil Logs');
         assert.equal(result.archivedCategories[0], oldCategory.id);
-        assert.ok(oldChannels.every((c: any) => c && c.parentId === oldCategory.id), 'legacy channels and their messages stay in the archived category');
+        assert.equal(oldChannels[0].parentId, oldCategory.id, 'unrecognized legacy channels remain archived');
+        assert.equal(oldChannels[1].parentId, result.category.id, 'join logs become active without replacing the channel');
+        assert.equal(logChannels(store, G).routes.joins, oldChannels[1].id);
         assert.equal(result.bans.channel.parentId, result.category.id);
         assert.equal(result.logging.channel.parentId, result.category.id);
         assert.equal(guild.channels.cache.size, 6, 'no old category or log channels are deleted');
+    } finally { store.close(); }
+});
+
+test('setup activates each existing legacy channel and is repeatable without duplicates', async () => {
+    const store = new Store(':memory:'); authorize(store, G);
+    try {
+        const { guild, created } = fakeGuild(['bans', 'ghost-vanguard-logging'], { categories: ['Archive - Veil Logs'], legacyChildren: Object.values(LEGACY_LOG_ROUTES) });
+        const original = new Map([...guild.channels.cache.values()].filter((c: any) => Object.values(LEGACY_LOG_ROUTES).includes(c.name)).map((c: any) => [c.name, c.id]));
+        const result = await store.withAuthorized(G, () => setupLogChannels(store, guild, 'admin'));
+        for (const [key, name] of Object.entries(LEGACY_LOG_ROUTES)) {
+            assert.equal((result.routes as any)[key], original.get(name));
+            assert.equal(guild.channels.cache.get(original.get(name)).parentId, result.category.id);
+        }
+        await store.withAuthorized(G, () => setupLogChannels(store, guild, 'admin'));
+        assert.equal(created.length, 1);
+        assert.deepEqual(logChannels(store, G).routes, result.routes);
+    } finally { store.close(); }
+});
+
+test('unsafe legacy channels are not activated or moved', async () => {
+    const store = new Store(':memory:'); authorize(store, G);
+    try {
+        const { guild } = fakeGuild(['bans', 'ghost-vanguard-logging'], { categories: ['Archive - Veil Logs'], legacyChildren: ['message-logs'], everyoneCanView: true });
+        const channel = guild.channels.cache.find((c: any) => c.name === 'message-logs');
+        const parent = channel.parentId;
+        const result = await store.withAuthorized(G, () => setupLogChannels(store, guild, 'admin'));
+        assert.equal(channel.parentId, parent);
+        assert.equal(result.routes.messages, undefined);
+        assert.equal(result.skipped[0]?.route, 'messages');
+        assert.equal(result.skipped[0]?.check.publiclyVisible, true);
+    } finally { store.close(); }
+});
+
+test('setup rechecks renamed or moved saved destinations before keeping routes', async () => {
+    for (const state of ['safe', 'public', 'missing-permission', 'missing']) {
+        const store = new Store(':memory:'); authorize(store, G);
+        try {
+            const { guild } = fakeGuild(['bans', 'ghost-vanguard-logging'], { categories: ['Archive - Veil Logs'], legacyChildren: ['message-logs'] });
+            const channel = guild.channels.cache.find((c: any) => c.name === 'message-logs');
+            setLogChannels(store, G, { routes: { messages: channel.id } });
+            channel.name = 'old-records'; channel.parentId = 'elsewhere';
+            if (state === 'public') channel.permissionsFor = () => ({ has: () => true });
+            if (state === 'missing-permission') channel.permissionsFor = () => ({ has: () => false });
+            if (state === 'missing') guild.channels.cache.delete(channel.id);
+            const result = await setupLogChannels(store, guild, 'owner');
+            assert.equal(logChannels(store, G).routes?.messages, state === 'safe' ? channel.id : undefined, state);
+            assert.equal(result.skipped.some(s => s.route === 'messages'), state !== 'safe', state);
+        } finally { store.close(); }
+    }
+});
+
+test('setup recovers routes moved by an interrupted earlier setup', async () => {
+    const store = new Store(':memory:'); authorize(store, G);
+    try {
+        const { guild } = fakeGuild(['bans', 'ghost-vanguard-logging'], { categories: ['Ghost Vanguard Logs'], legacyChildren: ['role-logs'] });
+        const roleLog = guild.channels.cache.find((c: any) => c.name === 'role-logs');
+        const result = await store.withAuthorized(G, () => setupLogChannels(store, guild, 'admin'));
+        assert.equal(result.routes.roles, roleLog.id);
+    } finally { store.close(); }
+});
+
+test('event categories, joins and voice route to existing channels with fallback and exclusions', () => {
+    const store = new Store(':memory:'); authorize(store, G);
+    const sends: any[] = [], logs: any = { push: (_g: string, e: any, _rows: any, channel: string) => sends.push({ channel, card: e.toJSON() }) };
+    try {
+        configureEventLog(store, G, { enabled: true, channelId: 'general-log' });
+        setLogChannels(store, G, { routes: { joins: 'join-log', voice: 'voice-log', messages: 'message-log' }, excludedChannels: ['private'] });
+        recordMemberEvent(store, logs, { id: 'u', user: null, guild: { id: G } } as any, true);
+        recordEvent(store, logs, G, { category: 'messages', action: 'Deleted' });
+        recordEvent(store, logs, G, { category: 'roles', action: 'Role created' });
+        recordVoiceEvent(store, logs, { channelId: null } as any, { id: 'u', guild: { id: G }, channelId: 'voice' } as any);
+        recordVoiceEvent(store, logs, { channelId: 'voice' } as any, { id: 'u', guild: { id: G }, channelId: 'voice' } as any);
+        recordVoiceEvent(store, logs, { channelId: null } as any, { id: 'u', guild: { id: G }, channelId: 'private' } as any);
+        recordVoiceEvent(store, logs, { channelId: 'private' } as any, { id: 'u', guild: { id: G }, channelId: 'voice' } as any);
+        assert.deepEqual(sends.map(s => s.channel), ['join-log', 'message-log', 'general-log', 'voice-log']);
+        configureEventLog(store, G, { category: ['members', false] });
+        recordMemberEvent(store, logs, { id: 'u', user: null, guild: { id: G } } as any, true);
+        assert.equal(sends.length, 4);
+    } finally { store.close(); }
+});
+
+test('anti-nuke alerts keep their original delivery and also reach the dedicated channel', () => {
+    const store = new Store(':memory:'); authorize(store, G);
+    const sends: any[] = [], logs: any = { push: (_g: string, _e: any, _rows: any, channel: string | undefined) => sends.push(channel) };
+    try {
+        const settings = store.settings(G); settings.logChannelId = 'security'; store.save(settings);
+        setLogChannels(store, G, { routes: { antinuke: 'anti' } });
+        (new Security(store, logs) as any).incidentLog(G, new EmbedBuilder().setTitle('Incident'));
+        assert.deepEqual(sends, [undefined, 'anti']);
+        sends.length = 0;
+        setLogChannels(store, G, { routes: { antinuke: 'security' } });
+        (new Security(store, logs) as any).incidentLog(G, new EmbedBuilder().setTitle('Incident'));
+        assert.deepEqual(sends, [undefined]);
     } finally { store.close(); }
 });
 

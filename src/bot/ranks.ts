@@ -55,7 +55,7 @@ export const ADMIN_RESTRICTED = new Set<string>([
     // Granting permissions or ranks
     'security/admin', 'staff/role', 'guild-config/permission-role', 'perm', 'role/who-can-give', 'panel', 'vgpanel',
     // Beyond this server
-    'copylayout', 'staff/global', 'roblox/network', 'roblox/partner',
+    'copylayout', 'staff/global', 'roblox/sharing', 'roblox/partner',
 ]);
 export const isAdminRestricted = (key?: string) => !!key && ADMIN_RESTRICTED.has(key.replace(/\/$/, ''));
 

@@ -55,6 +55,13 @@ Snapshots taken during a lockdown capture the locked permissions, so lift the lo
 
 Turn categories on or off with `/setup logs category`, and browse with `/setup logs view`, filtered by category or by a user (events done by or to them). Discord does not report people deleting their own messages, and message contents are not logged.
 
+<!-- coderabbit-ai-generated:v1 -->
+
+When `/setup logs setup` finds recognized Veil log channels in the old or archived category, it reuses them under Ghost Vanguard Logs. Messages and permission overrides remain intact. Channels that are public or missing the bot's required permissions are skipped and reported; fix their permissions and run setup again. `/setup logs check` checks configured channels.
+
+Join and leave events go to `#join-logs`; member, role, channel, message, server and moderation events go to their matching channels. `#voice-logs` records voice joins, moves and leaves. `#command-logs` records successful Ghost Vanguard slash command names and users, without arguments or replies. Anti-nuke alerts are also copied to `#antinuke-logs`. Event logging and category settings still apply. If a matching channel is not configured, events use the existing combined log channel.
+<!-- /coderabbit-ai-generated:v1 -->
+
 ## Restarts and downtime
 
 All settings live in the database, so a restart or crash never resets anything. After each restart, every server's log channel gets a **back-online** notice listing the restored anti-nuke state and how long the bot was offline. The bot also reads Discord's audit log for that offline period: missed events are added to the event log, and destructive actions anti-nuke could not respond to are reported, with anyone at or above a rule's limit flagged. Nothing is enforced automatically for that period; review the report and use `/antinuke quarantine` or `/recovery snapshot restore` if needed.

@@ -4,7 +4,7 @@ Generated from the bot itself (`npm run docs`). Type `/` in Discord and pick **G
 
 ## /antinuke
 
-Anti-nuke: status, on/off, whitelist, incidents, quarantine and the threat board
+Protect your server, review incidents and manage trusted users
 
 | Command | What it does | Who |
 |---|---|---|
@@ -32,7 +32,7 @@ Anti-nuke: status, on/off, whitelist, incidents, quarantine and the threat board
 
 ## /automod
 
-Message protection: spam, links, invites, AI, scam links and staff pings
+Manage spam, links, scam protection and message filters
 
 | Command | What it does | Who |
 |---|---|---|
@@ -48,6 +48,8 @@ Message protection: spam, links, invites, AI, scam links and staff pings
 | `/automod allow-server` | Allow, or stop allowing, invites to a partner server | Admin+ |
 | `/automod links` | Choose how website links are handled | Admin+ |
 | `/automod link-list` | Add or remove a website on the allow or block list | Admin+ |
+| `/automod words` | Turn blocked phrase filtering on or off | Admin+ |
+| `/automod word-list` | Manage blocked words and phrases | Admin+ |
 | `/automod ai` | Turn AI moderation of text and images on or off | Admin+ |
 | `/automod ai-ignore` | Pick channels or content that AI moderation skips | Admin+ |
 | `/automod alts` | Alert staff when a new member's Roblox account is an alt | Admin+ |
@@ -66,7 +68,7 @@ Message protection: spam, links, invites, AI, scam links and staff pings
 
 ## /raid
 
-Raid response: lockdown, raid mode, emergency mode, new accounts, webhooks
+Respond to raids, lock channels and inspect server health
 
 | Command | What it does | Who |
 |---|---|---|
@@ -87,7 +89,7 @@ Raid response: lockdown, raid mode, emergency mode, new accounts, webhooks
 
 ## /mod
 
-Moderation: ban, kick, timeout, warn, purge, cases, notes and appeals
+Moderate members and review cases, notes and appeals
 
 | Command | What it does | Who |
 |---|---|---|
@@ -103,7 +105,7 @@ Moderation: ban, kick, timeout, warn, purge, cases, notes and appeals
 | `/mod cases search` | Search cases by member, staff, action, reason or date | Helper+ or Moderate Members |
 | `/mod cases recent` | Show the latest cases | Helper+ or Moderate Members |
 | `/mod ban` | Ban a user | Moderator+ or Ban Members |
-| `/mod unban` | Lift a ban (not genrebans or hardbans) | Admin+ or Administrator (Admins may lift ordinary bans here; ban-log buttons are server-owner/Developer only (500 ms cooldown; successful actions post who clicked in #bans); network-ban lifts and exceptions are Developer only) |
+| `/mod unban` | Lift a ban (not genrebans or hardbans) | Admin+ or Administrator (Admins may lift ordinary bans here; ban-log buttons are server-owner/Developer only (500 ms cooldown; successful actions post who clicked in #bans); genreban and hardban lifts, and genreban exceptions, are Developer only) |
 | `/mod kick` | Kick a member | Moderator+ or Kick Members |
 | `/mod timeout` | Time out a member | Helper+ or Moderate Members (Helpers up to 60 minutes; Moderators longer) |
 | `/mod untimeout` | Remove a member's timeout | Moderator+ or Moderate Members |
@@ -125,7 +127,7 @@ Moderation: ban, kick, timeout, warn, purge, cases, notes and appeals
 
 ## /setup
 
-Server setup: logs, staff ranks, security settings, welcome, panel and config
+Set up logs, staff roles, welcome messages and controls
 
 | Command | What it does | Who |
 |---|---|---|
@@ -136,7 +138,7 @@ Server setup: logs, staff ranks, security settings, welcome, panel and config
 | `/setup config command` | Turn a command on or off, or change its cooldown | Server Owner |
 | `/setup config feature` | Turn moderation, verification, AI or backups on or off | Server Owner |
 | `/setup config backups` | Schedule server layout backups | Server Owner |
-| `/setup logs setup` | Create the log channels and send a test | Admin+ |
+| `/setup logs setup` | Set up log channels and reuse existing event logs | Admin+ |
 | `/setup logs check` | Check the log channels and permissions | Admin+ |
 | `/setup logs exclude` | Stop or resume logging a channel | Admin+ |
 | `/setup logs bot-changes` | Skip routine bot changes in the logs | Admin+ |
@@ -161,7 +163,7 @@ Server setup: logs, staff ranks, security settings, welcome, panel and config
 
 ## /ticket
 
-Support tickets: the panel, types, settings, stats and staff tools
+Set up support tickets and manage open requests
 
 | Command | What it does | Who |
 |---|---|---|
@@ -190,7 +192,7 @@ Support tickets: the panel, types, settings, stats and staff tools
 
 ## /recovery
 
-Server backups and snapshots: save, restore, copy layout
+Save and restore server layouts and backups
 
 | Command | What it does | Who |
 |---|---|---|
@@ -207,7 +209,7 @@ Server backups and snapshots: save, restore, copy layout
 
 ## /info
 
-Look things up: users, roles, the server and the bot
+Look up members, roles, server information and bot status
 
 | Command | What it does | Who |
 |---|---|---|
@@ -219,7 +221,7 @@ Look things up: users, roles, the server and the bot
 
 ## /dev
 
-Bot developers: diagnostics, updates, alerts, servers and the database
+Manage bot diagnostics, updates, servers and data
 
 | Command | What it does | Who |
 |---|---|---|
@@ -264,7 +266,7 @@ Link your Roblox account
 
 ## /roblox
 
-Roblox: look up accounts, blacklist, shared ban network and group rank sync
+Roblox: look up accounts, blacklist sharing and group rank sync
 
 | Command | What it does | Who |
 |---|---|---|
@@ -272,7 +274,7 @@ Roblox: look up accounts, blacklist, shared ban network and group rank sync
 | `/roblox blacklist` | Blacklist a Roblox account | Moderator+ |
 | `/roblox unblacklist` | Remove a Roblox account from the blacklist | Moderator+ |
 | `/roblox blacklisted` | List blacklisted Roblox accounts | Helper+ |
-| `/roblox network` | Share blacklists with partner servers | Owner or Head Admin |
+| `/roblox sharing` | Share blacklists with partner servers | Owner or Head Admin |
 | `/roblox partner` | Add or remove a partner server | Owner or Head Admin |
 | `/roblox group` | Set the Roblox group for rank roles | Head Admin+ |
 | `/roblox bind` | Give a role for a group rank | Head Admin+ |
