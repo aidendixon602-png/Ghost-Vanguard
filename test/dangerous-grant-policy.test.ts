@@ -65,15 +65,16 @@ test('other dangerous grants revert and warn first, repeat within an hour strips
     } finally { f.store.close(); }
 });
 
-test('unwhitelisted self-assignment of Administrator or Manage Server strips and reverts immediately', async () => {
+test('self-assignment of Administrator or Manage Server is contained but never counted as anti-nuke', async () => {
     for (const permission of [PermissionFlagsBits.Administrator, PermissionFlagsBits.ManageGuild]) {
         const f = fixture();
         try {
             addPrivilegedRole(f, permission);
-            await f.security.audit(selfAssignment(permission), f.guild);
-            assert.equal(f.calls.punished, 1, `${permission} must not be downgraded to a warning`);
-            assert.equal(f.calls.reverted, 1);
-            assert.equal(f.store.get("SELECT mode FROM incidents WHERE rule='dangerous_grant'")!.mode, 'enforce');
+            for (let n = 0; n < 8; n++) await f.security.audit({ ...selfAssignment(permission), id: `self-${permission}-${n}` }, f.guild);
+            assert.equal(f.calls.punished, 8, `${permission} is contained every time, never downgraded to a warning`);
+            assert.equal(f.store.get('SELECT COUNT(*) AS n FROM incidents')!.n, 0, 'no anti-nuke incident, however often it happens');
+            assert.equal(f.store.get('SELECT COUNT(*) AS n FROM observations')!.n, 0, 'not counted toward Role Invite either');
+            assert.equal(f.store.get('SELECT COUNT(*) AS n FROM self_escalations')!.n, 8, 'each attempt is recorded for staff review');
         } finally { f.store.close(); }
     }
 });
@@ -86,8 +87,7 @@ test('only the separate permission-grant whitelist is an exception to self-admin
         addPrivilegedRole(full, PermissionFlagsBits.Administrator);
         await full.security.audit(selfAssignment(PermissionFlagsBits.Administrator), full.guild);
         assert.equal(full.calls.punished, 1, 'a full bypass does not cover granting Administrator');
-        assert.equal(full.calls.reverted, 1);
-        assert.notEqual(full.store.get("SELECT mode FROM incidents WHERE rule='dangerous_grant'")!.mode, 'exempt');
+        assert.equal(full.store.get('SELECT COUNT(*) AS n FROM incidents')!.n, 0, 'still handled outside anti-nuke');
     } finally { full.store.close(); }
 
     // Neither does a bypass for other rules.
@@ -110,8 +110,8 @@ test('only the separate permission-grant whitelist is an exception to self-admin
             addPrivilegedRole(f, PermissionFlagsBits.Administrator);
             await f.security.audit(selfAssignment(PermissionFlagsBits.Administrator), f.guild);
             assert.equal(f.calls.punished, 0, role ? 'allowed by the role entry' : 'allowed by the user entry');
-            assert.equal(f.calls.reverted, 0);
-            assert.equal(f.store.get("SELECT mode FROM incidents WHERE rule='dangerous_grant'")!.mode, 'exempt');
+            assert.equal(f.store.get('SELECT COUNT(*) AS n FROM incidents')!.n, 0, 'nothing recorded at all');
+            assert.equal(f.store.get('SELECT COUNT(*) AS n FROM self_escalations')!.n, 0);
         } finally { f.store.close(); }
     }
 });
@@ -133,8 +133,7 @@ test('the server owner and Developers may grant protected permissions without an
         addPrivilegedRole(asOwner, PermissionFlagsBits.Administrator);
         await asOwner.security.audit(selfAssignment(PermissionFlagsBits.Administrator), asOwner.guild);
         assert.equal(asOwner.calls.punished, 0, 'the server owner is exempt automatically');
-        assert.equal(asOwner.calls.reverted, 0);
-        assert.equal(asOwner.store.get("SELECT mode FROM incidents WHERE rule='dangerous_grant'")!.mode, 'exempt');
+        assert.equal(asOwner.store.get('SELECT COUNT(*) AS n FROM incidents')!.n, 0, 'and no anti-nuke incident is written');
         assert.equal(asOwner.store.all("SELECT 1 FROM grants WHERE kind LIKE '%dangerous_grant'").length, 0, 'no entry is needed');
     } finally { asOwner.store.close(); }
 });

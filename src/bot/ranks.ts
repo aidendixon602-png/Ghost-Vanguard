@@ -31,8 +31,8 @@ export function rankName(value: number): RankName | null {
 
 /**
  * Discord Administrators count as Head Admin in their own server for everyday management:
- * moderation, cases, server configuration, logging, anti-nuke settings and status, creating
- * and viewing backups, and diagnostics. No Vanguard staff role is needed for that.
+ * moderation, cases, server configuration, logging, anti-nuke status, creating and viewing
+ * backups, and diagnostics. No Vanguard staff role is needed for that.
  *
  * Administrator alone never unlocks the actions below. They need the server owner, an
  * explicit Vanguard staff rank (or security-admin grant), or a developer:
@@ -129,7 +129,7 @@ export function explicitRank(store: Store, guildId: string | null, userId: strin
 /** Minimum rank per command, subcommand ("command/sub") or button prefix. Missing = ranks don't apply. */
 export const COMMAND_RANK: Record<string, number> = {
     // Helper
-    'moderation/warn': 1, 'antinuke-plus': 4, 'antinuke-plus/scan': 3, botq: 4, 'warnings/status': 1, warnings: 4, emergency: 3, webhooks: 3, webhook: 3, aimod: 1, roblox: 4, 'roblox/lookup': 1, 'roblox/sync': 1, 'roblox/bloxlink-sync': 3, 'roblox/blacklist': 2, 'roblox/unblacklist': 2, 'roblox/blacklisted': 1, 'roblox/binds': 1, 'case/search': 1, 'appeals/pending': 2, appeal: 2, 'staff/report': 3, automod: 3, welcome: 3, appeals: 4, 'moderation/timeout': 1, 'moderation/history': 1, 'note/add': 1, 'note/list': 1, 'case/view': 1, 'case/recent': 1,
+    'moderation/warn': 1, 'antinuke-plus/scan': 3, botq: 4, 'warnings/status': 1, warnings: 4, emergency: 3, webhooks: 3, webhook: 3, aimod: 1, roblox: 4, 'roblox/lookup': 1, 'roblox/sync': 1, 'roblox/bloxlink-sync': 3, 'roblox/blacklist': 2, 'roblox/unblacklist': 2, 'roblox/blacklisted': 1, 'roblox/binds': 1, 'case/search': 1, 'appeals/pending': 2, appeal: 2, 'staff/report': 3, automod: 3, welcome: 3, appeals: 4, 'moderation/timeout': 1, 'moderation/history': 1, 'note/add': 1, 'note/list': 1, 'case/view': 1, 'case/recent': 1,
     // Moderator. Lifting a ban is Admin: Moderators can ban, but only Admins and owners undo bans.
     'moderation/unban': 3,
     moderation: 2, bans: 2, tempban: 2, softban: 2, 'role/who-can-give': 4, nick: 2, slowmode: 2, 'case/reason': 2, 'note/remove': 2, newacct: 2,
@@ -143,22 +143,35 @@ export const COMMAND_RANK: Record<string, number> = {
     // Head Admin
     // Owner-level actions that also sit under Head Admin commands: handing out security admins, undoing setting changes.
     'config-history/restore': 7.5,
-    antinuke: 4, panel: 4, vgpanel: 4, enable: 4, disable: 4, trust: 4, snapshot: 4, backup: 4, copylayout: 4, security: 4, 'guild-config': 4,
-    'config-history': 4, perm: 4, 'case/delete': 4, staff: 4, anpanel: 4, trustlist: 4, tp: 4, snapshotdelete: 4, snapshotcancel: 4, snapshotpage: 4,
-    restore: 4, layoutselect: 4, layoutcancel: 4, incident: 4, permui: 4,
-    // Bot Manager
-    authorizedservers: 5, serverauth: 5, 'dev/diagnostics': 5, 'dev/status': 5, 'dev/status-reset': 5, 'dev/broadcast': 5, 'staff/list': 1, 'staff/check': 1,
-    // Overseer
-    'dev/inspect': 6, authserver: 6,
-    // Bot developer tools: available as /dev slash commands.
-    dev: 7, 'dev/update': 7, database: 7, autoreact: 7,
+    snapshot: 4, backup: 4, copylayout: 4, 'guild-config': 4,
+    'config-history': 4, 'case/delete': 4, staff: 4, snapshotdelete: 4, snapshotcancel: 4, snapshotpage: 4,
+    restore: 4, layoutselect: 4, layoutcancel: 4, incident: 4,
+    // Read-only security views stay with Head Admins. Changing protection is owner-level (below).
+    'antinuke/status': 4, 'antinuke/check': 4,
+    'security/status': 4, 'security/incidents': 4, 'security/quarantine': 4, 'security/release': 4,
+    // Reading the whitelist and the permission list stays with Head Admins; changing either does not.
+    'trust/list': 4, 'trust/check': 4, 'trust/expired': 4, 'perm/list': 4, 'perm/page': 4,
+    // Server Owner and Developers only: the protection configuration, the anti-nuke whitelist, the control
+    // panel, and every permission/rank assignment. No staff rank below Server Owner, no Discord
+    // Administrator permission and no server role unlocks these.
+    antinuke: RANKS.owner, 'antinuke/rule': RANKS.owner, 'antinuke/reset': RANKS.owner, 'antinuke/enable': RANKS.owner, 'antinuke/disable': RANKS.owner,
+    'antinuke-plus': RANKS.owner, enable: RANKS.owner, disable: RANKS.owner, trust: RANKS.owner, tp: RANKS.owner, trustlist: RANKS.owner,
+    anpanel: RANKS.owner, panel: RANKS.owner, vgpanel: RANKS.owner, security: RANKS.owner, perm: RANKS.owner, permui: RANKS.owner,
+    'guild-config/permission-role': RANKS.owner,
+    // Vanguard staff ranks: Head Admins and above may change them, but never at or above their own rank
+    // (see canAssignServerRank). Bot-wide ranks stay Developer-only, below.
+    'staff/list': 1, 'staff/check': 1, 'staff/role': 4, 'staff/user': 4, 'role/blacklist': RANKS.owner,
+    // Bot management: Developer only. Bot Manager, Overseer, Supreme Leader and the Server Owner get
+    // staff commands, never the bot's own tools.
+    dev: 8, 'dev/status': 8, 'dev/status-reset': 8, 'dev/diagnostics': 8, 'dev/inspect': 8, 'dev/broadcast': 8, 'dev/update': 8,
+    database: 8, autoreact: 8, authorizedservers: 8, serverauth: 8, authserver: 8,
     // Every network-ban action is Developer-only: issue, revoke, exceptions and ban-log lifts.
     genreban: 8, ungenreban: 8, hardban: 8, netexception: 8,
     // Developer only (the bot owner and DEVELOPER_IDS): anything that can take the bot down, rewrite its data or
     // reach every server at once. No Discord permission, server role or lower rank unlocks these.
     restart: 8, 'dev/restart': 8, 'dev/alerts': 8, 'database/restore-settings': 8, deauthserver: 8, banserver: 8, unbanserver: 8, unhardban: 8,
-    // Managing any bot permission assignment: approved Developer IDs only.
-    'staff/global': 8, 'staff/role': 8, 'staff/user': 8, 'guild-config/permission-role': 8,
+    // Bot-wide ranks are bot management: approved Developer IDs only.
+    'staff/global': 8,
     'security/admin': 8,
     'logs/cleanup-archive': RANKS.owner,
 };
@@ -173,9 +186,50 @@ export function canLiftNetworkBan(_store: Store, userId: string, _kind: 'genreba
     return developers.has(userId);
 }
 
-/** "moderation/timeout" → its own entry, else "moderation". */
+export type RankDecision = { ok: true } | { ok: false; reason: string };
+
+/**
+ * Handing out (or taking away) a Vanguard server rank: /setup staff role, /setup staff user, and a role
+ * that carries a rank through /setup config permission-role.
+ *
+ * Nobody can give or take a rank that is equal to or above their own, so a Head Admin may hand out
+ * Helper, Moderator and Admin but never Head Admin or anything higher. Only the Server Owner and
+ * Developers are exempt from that limit. Everyone still needs Head Admin or above to change ranks at
+ * all, and Discord's Administrator permission never counts here.
+ *
+ * Bot-wide ranks (Bot Manager, Overseer, Supreme Leader) are bot management: Developer only, and they
+ * are never assignable from a server.
+ */
+export function canAssignServerRank(store: Store, guildId: string, userId: string, member: GuildMember | null | undefined, target: RankName | null, current: RankName | null = null): RankDecision {
+    if (developers.has(userId)) return { ok: true };
+    const mine = rankOf(store, guildId, userId, member, 'staff/role');
+    if (mine < RANKS.headadmin)
+        return { ok: false, reason: 'Only Head Admins and above can change Vanguard staff ranks.' };
+    // The server owner answers to nobody in their own server, so their rank assignment is exempt too.
+    if (member?.guild && member.id && member.id === member.guild.ownerId) return { ok: true };
+    for (const level of [target, current]) {
+        if (!level) continue;
+        if (RANKS[level] >= mine)
+            return { ok: false, reason: `${RANK_LABEL[level]} is equal to or above your own rank (${RANK_LABEL[rankName(mine)!]}), so you cannot give or take it. Only the server owner and Developers can assign their own rank or higher.` };
+    }
+    return { ok: true };
+}
+
+/** Bot-wide (every server) ranks are bot management: only Developers give or remove them. */
+export function canAssignBotRank(userId: string): RankDecision {
+    return developers.has(userId) ? { ok: true } : {
+        ok: false,
+        reason: 'Bot-wide ranks (Bot Manager, Overseer, Supreme Leader) are bot management, so only a Developer can give or remove them.',
+    };
+}
+
+/** "moderation/timeout" → its own entry, else the closest parent ("role/blacklist/add" → "role/blacklist" → "role"). */
 export function requiredRank(key: string | undefined): number | undefined {
     if (!key) return undefined;
-    const clean = key.replace(/\/$/, '');
-    return COMMAND_RANK[clean] ?? COMMAND_RANK[clean.split('/')[0]!];
+    const parts = key.replace(/\/$/, '').split('/');
+    for (let i = parts.length; i > 0; i--) {
+        const found = COMMAND_RANK[parts.slice(0, i).join('/')];
+        if (found !== undefined) return found;
+    }
+    return undefined;
 }

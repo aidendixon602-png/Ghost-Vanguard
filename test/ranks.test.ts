@@ -47,11 +47,16 @@ test('each rank opens exactly its commands, without needing Discord permissions'
     assert.equal(can(['r-admin'], 'antinuke/status'), false); assert.equal(can(['r-head'], 'antinuke/status'), true);
     assert.equal(can(['r-head'], 'dev/status', { developerOnly: true }), false, 'server ranks never reach bot tools');
     store.db.prepare("INSERT INTO bot_staff(user_id,level) VALUES('u','botmanager')").run();
-    assert.equal(can([], 'dev/status', { developerOnly: true }), true, 'Bot Manager: bot status');
-    assert.equal(can([], 'dev/inspect', { developerOnly: true }), false);
+    // Bot Manager, Overseer and Supreme Leader are staff ranks: they never manage the bot itself.
+    assert.equal(can([], 'dev/status', { developerOnly: true }), false, 'Bot Manager: staff commands only, no bot management');
     assert.equal(can([], 'moderation/ban'), true, 'bot-wide ranks include everything below');
     store.db.prepare("UPDATE bot_staff SET level='overseer'").run();
-    assert.equal(can([], 'dev/inspect', { developerOnly: true }), true); assert.equal(can([], 'database/status', { developerOnly: true }), false);
+    assert.equal(can([], 'dev/inspect', { developerOnly: true }), false, 'Overseer: no bot management');
+    assert.equal(can([], 'database/status', { developerOnly: true }), false);
+    store.db.prepare("UPDATE bot_staff SET level='supreme'").run();
+    assert.equal(can([], 'dev/update', { developerOnly: true }), false, 'Supreme Leader: no bot management either');
+    assert.equal(can([], 'moderation/ban'), true, 'but every staff command');
+    store.db.prepare("UPDATE bot_staff SET level='botmanager'").run();
     store.run('INSERT INTO feature_settings VALUES(?,?,?)', G, 'moderation', 0);
     assert.equal(guard.allowed({ ...defaults, category: 'moderation' }, G, 'u', member('u'), 'moderation', 'moderation/ban'), false, 'switched-off features stay off for every rank');
     assert.equal(requiredRank('help/'), undefined, 'everyday commands are not rank-gated');
@@ -59,19 +64,21 @@ test('each rank opens exactly its commands, without needing Discord permissions'
     store.close();
 });
 
-test('/staff: all rank assignments require a Developer; ownership remains local', async () => {
+test('/staff: server ranks are Head Admin and above, never at or above your own rank; bot-wide ranks stay Developer-only', async () => {
     const store = setup();
     const run = (actor: any, sub: string, o: any) => staff.execute({ store, actor, logs: { push: () => {} } } as any, { guildId: G, user: { id: actor.id }, guild: { ownerId: 'owner', members: { fetch: async () => member('t') } },
         options: { getSubcommand: () => sub, getRole: () => ({ id: o.role ?? 'new-role', managed: false }), getString: () => o.rank, getUser: () => o.user ?? null } } as any);
     const head = member('h', ['r-head']);
-    await assert.rejects(run(head, 'role', { rank: 'admin' }), /developers/);
-    assert.match(await run(member(config.ownerId!), 'role', { rank: 'admin' }) as string, /now \*\*Admin\*\*/);
-    await assert.rejects(run(head, 'role', { rank: 'headadmin', role: 'other' }), /developers/);
-    await assert.rejects(run(head, 'role', { rank: 'none', role: 'r-head' }), /developers/, 'cannot demote your own level');
-    await assert.rejects(run(member('owner'), 'role', { rank: 'headadmin', role: 'other' }), /developers/);
-    assert.match(await run(member(config.ownerId!), 'role', { rank: 'headadmin', role: 'other' }) as string, /Head Admin/);
-    await assert.rejects(run(member('a', ['r-admin']), 'role', { rank: 'helper', role: 'x' }), /developers/);
-    await assert.rejects(run(member('owner'), 'global', { rank: 'overseer', user: { id: 'z', bot: false } }), /developers/, 'owning a server never unlocks bot-wide ranks');
+    // A Head Admin may hand out Helper, Moderator and Admin, but never Head Admin or higher.
+    assert.match(await run(head, 'role', { rank: 'admin' }) as string, /now \*\*Admin\*\*/);
+    await assert.rejects(run(head, 'role', { rank: 'headadmin', role: 'other' }), /equal to or above your own rank/);
+    await assert.rejects(run(head, 'role', { rank: 'none', role: 'r-head' }), /equal to or above your own rank/, 'cannot demote your own level');
+    // A plain Admin cannot change ranks at all.
+    await assert.rejects(run(member('a', ['r-admin']), 'role', { rank: 'helper', role: 'x' }), /Head Admins and above/);
+    // The server owner and Developers are exempt: they can set any server rank.
+    assert.match(await run(member('owner'), 'role', { rank: 'headadmin', role: 'other' }) as string, /Head Admin/);
+    assert.match(await run(member(config.ownerId!), 'role', { rank: 'headadmin', role: 'another' }) as string, /Head Admin/);
+    await assert.rejects(run(member('owner'), 'global', { rank: 'overseer', user: { id: 'z', bot: false } }), /bot management/, 'owning a server never unlocks bot-wide ranks');
     assert.match(await run(member(config.ownerId!), 'global', { rank: 'overseer', user: { id: 'z', bot: false } }) as string, /Overseer\*\* in every server/);
     assert.equal(rankOf(store, 'anywhere', 'z', null), RANKS.overseer);
     // Server Owner = whoever owns the Discord server: above Supreme Leader there, but no bot-wide tools.
@@ -83,7 +90,7 @@ test('/staff: all rank assignments require a Developer; ownership remains local'
     for (const key of ['dev/diagnostics', 'genreban', 'database/backup', 'authserver', 'staff/global'])
         assert.equal(rankOf(store, G, 'owner', member('owner'), key), 0, `owning a server never unlocks /${key}`);
     assert.equal(rankOf(store, G, 'sl', member('sl'), 'genreban'), RANKS.supreme, 'bot ranks still count for bot-wide tools');
-    await assert.rejects(run(member('sl'), 'global', { rank: 'overseer', user: { id: 'y', bot: false } }), /developers/, 'Supreme Leaders cannot hand out bot-wide ranks');
+    await assert.rejects(run(member('sl'), 'global', { rank: 'overseer', user: { id: 'y', bot: false } }), /bot management/, 'Supreme Leaders cannot hand out bot-wide ranks');
     const list = await run(head, 'list', {}) as string;
     assert.match(list, /Supreme Leader: .*<@sl>/); assert.match(list, /Server Owner: <@owner>/);
     for (const re of [/Overseer: <@z>/, /Head Admin: .*<@&r-head>/, /Head Admin: .*<@&other>/, /\nAdmin: .*<@&new-role>/, /Moderator: <@&r-mod>/, /Helper: <@&r-help>/]) assert.match(list, re);

@@ -7,7 +7,7 @@ import { embed } from '../../ui/ui.js';
 import { activityReport, REPORT_DEFAULTS } from '../../features/schedules.js';
 import { setFeature } from '../../features/settings.js';
 import { developers } from '../../bot/developers.js';
-import { botRank, RANKS, RANK_LABEL, SERVER_LEVELS, rankName, rankOf, isQuarantined, supremeLeaders, isSupreme, type RankName } from '../../bot/ranks.js';
+import { botRank, canAssignBotRank, canAssignServerRank, RANKS, RANK_LABEL, SERVER_LEVELS, rankName, rankOf, isQuarantined, supremeLeaders, isSupreme, type RankName } from '../../bot/ranks.js';
 
 const label = (r: number) => r ? RANK_LABEL[rankName(r)!] : 'No rank';
 
@@ -16,7 +16,7 @@ export default defineCommand(new SlashCommandBuilder().setName('staff').setDescr
         .addRoleOption(o => o.setName('role').setDescription('Discord role').setRequired(true))
         .addStringOption(o => o.setName('rank').setDescription('Rank for this role').setRequired(true).addChoices(
             { name: 'Head Admin', value: 'headadmin' }, { name: 'Admin', value: 'admin' }, { name: 'Moderator', value: 'moderator' }, { name: 'Helper', value: 'helper' }, { name: 'Remove rank', value: 'none' })))
-    .addSubcommand(s => s.setName('user').setDescription('Developer: assign a server rank directly to a user ID')
+    .addSubcommand(s => s.setName('user').setDescription('Assign a server rank to one user ID, below your own rank')
         .addStringOption(o => o.setName('user_id').setDescription('Discord user ID (enable Developer Mode to copy it)').setRequired(true).setMinLength(17).setMaxLength(20))
         .addStringOption(o => o.setName('rank').setDescription('Rank in this server only').setRequired(true).addChoices(
             ...SERVER_LEVELS.map(value => ({ name: RANK_LABEL[value], value })), { name: 'Remove direct rank', value: 'none' })))
@@ -57,15 +57,18 @@ export default defineCommand(new SlashCommandBuilder().setName('staff').setDescr
             ...[...SERVER_LEVELS].reverse().map(l => `${RANK_LABEL[l]}: ${roles.filter(r => r.level === l).map(r => `<@&${r.role_id}>`).join(' ') || 'none'}`),
             ...ctx.store.all("SELECT user_id,kind FROM grants WHERE guild_id=? AND kind LIKE 'staff:%' AND (expires IS NULL OR expires>?)", guild, Date.now()).map(r => `<@${r.user_id}>: ${RANK_LABEL[String(r.kind).slice(6) as RankName] ?? 'Unknown rank'} (direct user ID)`),
             ...Object.entries(SERVER_STAFF_IDS[guild] ?? {}).map(([id, level]) => `<@${id}>: ${RANK_LABEL[level]} (source user ID)`),
-            '', '-# Each rank can do everything below it. Developers assign server ranks with `/setup staff role` or `/setup staff user`. Bot-wide ranks use `/setup staff global`.',
+            '', '-# Each rank can do everything below it. Head Admins and above assign server ranks with `/setup staff role` or `/setup staff user`, but never at or above their own rank; the server owner and Developers are exempt. Bot-wide ranks are Developer-only: `/setup staff global`.',
         ].join('\n');
     }
     if (sub === 'user') {
-        developers.require(i.user.id);
         const id = i.options.getString('user_id', true), rank = i.options.getString('rank', true);
         if (!/^\d{17,20}$/.test(id)) throw new AppError('VALIDATION_ERROR', 'Enter a Discord user ID containing 17–20 digits.');
         if (SERVER_STAFF_IDS[guild]?.[id]) throw new AppError('VALIDATION_ERROR', 'This user has a server rank in src/bot/access-ids.ts. Change it there, rebuild and restart.');
         if (rank !== 'none' && !(SERVER_LEVELS as readonly string[]).includes(rank)) throw new AppError('VALIDATION_ERROR', 'Choose a server rank.');
+        // Nobody can give or take a rank at or above their own; the server owner and Developers are exempt.
+        const current = ([...SERVER_LEVELS].reverse().find(level => ctx.store.hasGrant(guild, id, `staff:${level}`)) ?? null) as RankName | null;
+        const decision = canAssignServerRank(ctx.store, guild, i.user.id, ctx.actor, rank === 'none' ? null : rank as RankName, current);
+        if (!decision.ok) throw new AppError('PERMISSION_ERROR', decision.reason);
         const user = await i.client.users.fetch(id);
         if (user.bot) throw new AppError('VALIDATION_ERROR', 'Ranks are for people, not bots.');
         ctx.store.transaction(() => {
@@ -76,7 +79,8 @@ export default defineCommand(new SlashCommandBuilder().setName('staff').setDescr
         return `<@${id}> ${rank === 'none' ? 'no longer has a direct server rank' : `now has **${RANK_LABEL[rank as RankName]}** in this server only`}. Other role or bot-wide assignments still apply.`;
     }
     if (sub === 'global') {
-        developers.require(i.user.id);
+        const botDecision = canAssignBotRank(i.user.id);
+        if (!botDecision.ok) throw new AppError('PERMISSION_ERROR', botDecision.reason);
         const myBotRank = botRank(ctx.store, i.user.id);
         if (myBotRank < RANKS.developer) throw new AppError('PERMISSION_ERROR', 'Only a Developer can give or remove bot-wide ranks.');
         const user = i.options.getUser('user', true), rank = i.options.getString('rank', true);
@@ -91,14 +95,12 @@ export default defineCommand(new SlashCommandBuilder().setName('staff').setDescr
         ctx.logs.push(guild, embed('Bot-wide rank changed', `By <@${i.user.id}> · <@${user.id}> → ${rank === 'none' ? 'no bot-wide rank' : RANK_LABEL[rank as RankName]}`, Colors.Orange));
         return `<@${user.id}> is now **${rank === 'none' ? 'no longer bot-wide staff' : RANK_LABEL[rank as RankName]}** in every server.`;
     }
-    developers.require(i.user.id);
     const role = i.options.getRole('role', true), rank = i.options.getString('rank', true);
     if (role.id === guild || role.managed) throw new AppError('VALIDATION_ERROR', 'Choose a normal staff role (not @everyone or a bot role).');
     const current = ctx.store.get('SELECT level FROM staff_roles WHERE guild_id=? AND role_id=?', guild, role.id)?.level as RankName | undefined;
-    // You can only hand out (or take away) ranks below your own.
-    for (const level of [rank, current].filter(l => l && l !== 'none') as RankName[])
-        if (myRank <= RANKS[level]) throw new AppError('PERMISSION_ERROR', `Only someone above ${RANK_LABEL[level]} can change that rank.`);
-    if (myRank < RANKS.headadmin) throw new AppError('PERMISSION_ERROR', 'Only Head Admins and above can change ranks.');
+    // You can only hand out (or take away) ranks below your own; the server owner and Developers are exempt.
+    const decision = canAssignServerRank(ctx.store, guild, i.user.id, ctx.actor, rank === 'none' ? null : rank as RankName, current ?? null);
+    if (!decision.ok) throw new AppError('PERMISSION_ERROR', decision.reason);
     ctx.store.transaction(() => {
         ctx.store.run('DELETE FROM permission_roles WHERE guild_id=? AND role_id=?', guild, role.id);
         if (rank === 'none') ctx.store.run('DELETE FROM staff_roles WHERE guild_id=? AND role_id=?', guild, role.id);
@@ -111,5 +113,6 @@ export default defineCommand(new SlashCommandBuilder().setName('staff').setDescr
     ctx.logs.push(guild, embed('Staff rank changed', `By <@${i.user.id}> · <@&${role.id}> → ${rank === 'none' ? 'no rank' : RANK_LABEL[rank as RankName]}`, Colors.Orange));
     return rank === 'none' ? `<@&${role.id}> no longer has a Vanguard rank.` : `Everyone with <@&${role.id}> is now **${RANK_LABEL[rank as RankName]}** in this server.`;
 }, { subcommands: { list: { access: 'member', responseKind: 'info' }, check: { access: 'member', responseKind: 'info' }, report: { responseKind: 'info' },
-    // All permission assignments require an approved Developer ID.
-    global: { developerOnly: true }, role: { developerOnly: true }, user: { developerOnly: true } } });
+    // Bot-wide ranks are bot management: Developers only. Server ranks need Head Admin or above, and
+    // never at or above the caller's own rank (enforced in canAssignServerRank).
+    global: { developerOnly: true } } });

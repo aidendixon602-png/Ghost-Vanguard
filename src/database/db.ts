@@ -45,7 +45,7 @@ export interface Row {
  */
 export const GUILD_SCOPED_TABLES = ['verification_pending', 'scam_config', 'scam_domains', 'scam_images', 'scam_exclusions', 'scam_events', 'antinuke_presets', 'antinuke_event_payloads', 'antiping_config', 'antiping_targets', 'antinuke_options', 'event_log_config', 'event_log', 'lockdowns', 'lockdown_overwrites', 'lockdown_notices', 'guild_config', 'antinuke_rules', 'antinuke_defaults', 'provider_config', 'permission_roles', 'command_settings', 'feature_settings', 'backup_config', 'configuration_history', 'grants', 'observations', 'incidents', 'backups', 'cases', 'links', 'blocked_accounts', 'snapshots', 'snapshot_metadata', 'recovery_mappings', 'recovery_history', 'outbox', 'member_notes', 'tempbans', 'raidmode', 'newaccount_config', 'staff_roles', 'guild_features', 'appeals', 'duty_sessions', 'autoreact_users', 'ban_records', 'role_rules', 'left_roles', 'panel_actions',
     'ticket_config', 'ticket_types', 'ticket_panels', 'ticket_records', 'ticket_blocks',
-    'threat_scores', 'threat_events', 'threat_actions',
+    'threat_scores', 'threat_events', 'threat_actions', 'self_escalations', 'role_blacklist', 'role_blacklist_assigners', 'role_blacklist_holders',
     'workspace_config', 'workspace_counters', 'workspace_submissions', 'workspace_reviews', 'workspace_records', 'workspace_tasks', 'workspace_staff', 'workspace_sessions', 'workspace_panels', 'workspace_jobs', 'workspace_audit', 'workspace_operations'] as const;
 
 /** Tables carrying a guild column that are intentionally not scope-guarded. */
@@ -384,7 +384,16 @@ export class Store {
                 PRIMARY KEY(guild_id,operation_id));
             CREATE INDEX IF NOT EXISTS workspace_operations_item ON workspace_operations(guild_id,kind,item_id);`);
         // 2.32: roles a member had when they left, so staff can give them all back in one click if they rejoin.
-        this.db.exec(`CREATE TABLE IF NOT EXISTS left_roles (guild_id TEXT NOT NULL REFERENCES guild_data(guild_id) ON DELETE CASCADE, user_id TEXT NOT NULL, roles TEXT NOT NULL, left_at INTEGER NOT NULL, PRIMARY KEY(guild_id, user_id));`);
+        this.db.exec(`CREATE TABLE IF NOT EXISTS left_roles (guild_id TEXT NOT NULL REFERENCES guild_data(guild_id) ON DELETE CASCADE, user_id TEXT NOT NULL, roles TEXT NOT NULL, left_at INTEGER NOT NULL, PRIMARY KEY(guild_id, user_id));
+            -- Self-granted Administrator/Manage Server roles are handled outside anti-nuke: contained, but
+            -- never scored as an incident or counted toward a rule threshold. Kept here for staff review.
+            CREATE TABLE IF NOT EXISTS self_escalations (id INTEGER PRIMARY KEY AUTOINCREMENT, guild_id TEXT NOT NULL REFERENCES guild_data(guild_id) ON DELETE CASCADE, user_id TEXT NOT NULL, roles TEXT NOT NULL, result TEXT, at INTEGER NOT NULL);
+            CREATE INDEX IF NOT EXISTS self_escalations_user ON self_escalations(guild_id, user_id, at);
+            -- Role blacklist: a role that cannot be handed out except by the people explicitly listed for it.
+            CREATE TABLE IF NOT EXISTS role_blacklist (guild_id TEXT NOT NULL REFERENCES guild_data(guild_id) ON DELETE CASCADE, role_id TEXT NOT NULL, name TEXT, permissions TEXT, position INTEGER, hoist INTEGER NOT NULL DEFAULT 0, mentionable INTEGER NOT NULL DEFAULT 0, color INTEGER NOT NULL DEFAULT 0, by_id TEXT NOT NULL, at INTEGER NOT NULL, PRIMARY KEY(guild_id, role_id));
+            CREATE TABLE IF NOT EXISTS role_blacklist_assigners (guild_id TEXT NOT NULL REFERENCES guild_data(guild_id) ON DELETE CASCADE, role_id TEXT NOT NULL, grantor_type TEXT NOT NULL CHECK(grantor_type IN ('user','role')), grantor_id TEXT NOT NULL, by_id TEXT NOT NULL, at INTEGER NOT NULL, PRIMARY KEY(guild_id, role_id, grantor_type, grantor_id));
+            -- Best-effort record of who has a blacklisted role, so an unauthorised delete can be put back.
+            CREATE TABLE IF NOT EXISTS role_blacklist_holders (guild_id TEXT NOT NULL REFERENCES guild_data(guild_id) ON DELETE CASCADE, role_id TEXT NOT NULL, user_id TEXT NOT NULL, PRIMARY KEY(guild_id, role_id, user_id));`);
         this.db.exec(`CREATE TABLE IF NOT EXISTS verification_pending (guild_id TEXT NOT NULL REFERENCES guild_data(guild_id) ON DELETE CASCADE, user_id TEXT NOT NULL, roblox_id TEXT NOT NULL, roblox_name TEXT NOT NULL, code TEXT NOT NULL, created_at INTEGER NOT NULL, PRIMARY KEY(guild_id, user_id));`);
         this.db.exec(`CREATE TABLE IF NOT EXISTS autoreact_users (guild_id TEXT NOT NULL REFERENCES guild_data(guild_id) ON DELETE CASCADE, user_id TEXT NOT NULL, emoji TEXT NOT NULL, by_id TEXT NOT NULL, at INTEGER NOT NULL, PRIMARY KEY(guild_id, user_id));`);
         // 2.16.3 / 2.40: bot_staff accepts 'supreme' and 'serverowner' (both given by command). Rebuild older tables (no rows lost).

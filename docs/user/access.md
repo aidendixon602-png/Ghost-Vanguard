@@ -4,13 +4,15 @@
 
 ## Who can assign permissions
 
-Only approved **Developer user IDs** may assign, remove or manage Ghost Vanguard permission ranks, permission-role mappings and security-admin grants. The bot owner and existing `DEVELOPER_IDS` remain approved. Additional source-controlled Developers can be listed in `BOT_STAFF_IDS.developer` in `src/bot/access-ids.ts`.
+The bot ranks run, lowest to highest: **Helper → Moderator → Admin → Head Admin → Bot Manager → Overseer → Supreme Leader → Server Owner → Developer**. Each rank can use everything the ranks below it can.
 
-Server owners, Discord Administrators, Head Admins, Supreme Leaders and other bot ranks cannot delegate bot permission roles. Existing rank assignments continue working. Discord privileged roles that do not grant Vanguard access retain their existing owner-approved role rules.
+**Nobody can give or take a Vanguard rank that is equal to or above their own.** Only the **Server Owner** and **Developers** are exempt. A Head Admin can hand out Helper, Moderator and Admin; they cannot give Head Admin, Bot Manager, Overseer, Supreme Leader or anything higher. Discord's Administrator permission never counts for these assignments, so an Administrator with no Vanguard rank cannot change ranks at all.
+
+**Only Developers manage the bot itself.** Bot Manager, Overseer, Supreme Leader and the Server Owner get staff commands — never bot management. `/dev` (status, diagnostics, inspect, broadcast, update, restart), `/dev database`, `/dev autoreact`, server authorizations, `/setup staff global` (bot-wide ranks) and security-admin grants are Developer-only, as is every network-ban action.
 
 ## Server-only ranks by user ID
 
-A Developer runs this command in the target server:
+A Head Admin or above runs this command in the target server, and can only pick a rank below their own:
 
 ```text
 /setup staff user user_id:123456789012345678 rank:Moderator
@@ -21,7 +23,27 @@ A Developer runs this command in the target server:
 
 Enable Discord Developer Mode and copy the member's user ID. This rank applies only to that server. Removing a direct rank does not remove ranks from Discord roles, source configuration, security-admin grants or bot-wide assignments; these independent sources are still evaluated.
 
-For Discord-role assignments, Developers use `/setup staff role`. Only Developers can give or remove a mapped bot permission role through `/role`, restores or delegated rules.
+For Discord-role assignments, Head Admins and above use `/setup staff role`; the same "below your own rank" rule applies, so a Head Admin can link a role to Helper, Moderator or Admin only. The Server Owner and Developers use `/setup config permission-role`.
+
+A role that carries a rank can be given with `/role add` only by someone above that rank (the Server Owner and Developers are exempt). Taking such a role away is never blocked by the rank rule.
+
+## Role blacklist
+
+`/role blacklist` marks a role that only specific people may give or delete. It is managed by the **Server Owner** and **Developers** only:
+
+```text
+/role blacklist add role:@HighCouncil
+/role blacklist who-can-give role:@HighCouncil who:@DeputyOwner
+/role blacklist who-can-give role:@HighCouncil who:@OwnerTeam
+/role blacklist list
+/role blacklist remove role:@HighCouncil
+```
+
+- A blacklisted role cannot be given to anyone unless the person giving it — or a role they hold — is listed for it. **No staff rank, Discord Administrator permission or anti-nuke whitelist entry bypasses that**, and nobody is listed implicitly, including the server owner and Developers.
+- Taking a blacklisted role away is always allowed; that is de-escalation.
+- If someone who is not listed gives it, **through `/role` or straight in Discord**, the role is removed immediately, the refusal is logged, and the person is DMed with the role name and the reason. Through `/role`, the command reply also refuses and explains it.
+- **Deleting a blacklisted role** is limited to the same people. Anyone else's deletion is undone: Vanguard recreates the role with its saved name, colour, permissions and position, gives it back to the members it recorded as holding it, and moves the blacklist entry to the new role.
+- Automatic restores (`/role restore`, quarantine release, rejoin roles, Roblox bindings) and layout pruning never re-grant or delete a blacklisted role.
 
 ## Source-controlled ID assignments
 

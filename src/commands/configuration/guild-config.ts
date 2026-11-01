@@ -1,9 +1,8 @@
-import { developers } from '../../bot/developers.js';
 import { SlashCommandBuilder } from 'discord.js';
 import { defineCommand } from '../../bot/registry.js';
 import { AppError } from '../../errors.js';
 import { embed } from '../../ui/ui.js';
-import { RANKS, RANK_LABEL, rankOf, type RankName } from '../../bot/ranks.js';
+import { canAssignServerRank, RANK_LABEL, RANKS, type RankName } from '../../bot/ranks.js';
 
 const guildConfigBuilder = new SlashCommandBuilder().setName('guild-config').setDescription('Server owner: command access, features, verification providers and backup schedule')
     .addSubcommand(s => s.setName('provider').setDescription('Enable or disable a configured verification provider').addStringOption(o => o.setName('provider').setDescription('Provider').setRequired(true).addChoices({ name: 'RoVer', value: 'rover' }, { name: 'Bloxlink', value: 'bloxlink' })).addBooleanOption(o => o.setName('enabled').setDescription('Enable this provider for this guild').setRequired(true)))
@@ -22,7 +21,6 @@ export default defineCommand(guildConfigBuilder, { category: 'configuration', ac
         ctx.store.run('INSERT INTO provider_config VALUES(?,?,?) ON CONFLICT(guild_id,provider) DO UPDATE SET enabled=excluded.enabled', guild, provider, Number(i.options.getBoolean('enabled', true)));
         after = ctx.store.get('SELECT * FROM provider_config WHERE guild_id=? AND provider=?', guild, provider);
     } else if (sub === 'permission-role') {
-        developers.require(i.user.id);
         const role = i.options.getRole('role', true), access = i.options.getString('access', true);
         component = 'permission-role';
         if (role.id === guild || role.managed)
@@ -31,9 +29,10 @@ export default defineCommand(guildConfigBuilder, { category: 'configuration', ac
         const read = () => ctx.store.get('SELECT level FROM staff_roles WHERE guild_id=? AND role_id=?', guild, role.id) ?? ctx.store.get('SELECT access AS level FROM permission_roles WHERE guild_id=? AND role_id=?', guild, role.id) ?? null;
         before = read();
         const level = String(before?.level ?? '');
-        const actorRank = rankOf(ctx.store, guild, user, ctx.actor);
-        for (const l of [access, level === 'admin' && !ctx.store.get('SELECT 1 FROM staff_roles WHERE guild_id=? AND role_id=?', guild, role.id) ? 'headadmin' : level].filter(l => l in RANKS) as RankName[])
-            if (actorRank <= RANKS[l]) throw new AppError('PERMISSION_ERROR', `Only someone above ${RANK_LABEL[l]} can change that rank.`);
+        const current = (level === 'admin' && !ctx.store.get('SELECT 1 FROM staff_roles WHERE guild_id=? AND role_id=?', guild, role.id) ? 'headadmin' : level) as RankName | '';
+        // Nobody hands out their own rank or higher; only the server owner and Developers are exempt.
+        const decision = canAssignServerRank(ctx.store, guild, user, ctx.actor, access === 'remove' ? null : access as RankName, current && current in RANKS ? current : null);
+        if (!decision.ok) throw new AppError('PERMISSION_ERROR', decision.reason);
         ctx.store.run('DELETE FROM permission_roles WHERE guild_id=? AND role_id=?', guild, role.id);
         if (access === 'remove')
             ctx.store.run('DELETE FROM staff_roles WHERE guild_id=? AND role_id=?', guild, role.id);

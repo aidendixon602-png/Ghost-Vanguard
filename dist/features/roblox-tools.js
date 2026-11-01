@@ -1,4 +1,5 @@
 import { isBotPermissionRole } from '../security/role-policy.js';
+import { isBlacklisted } from '../security/role-blacklist.js';
 import { Colors } from 'discord.js';
 import { dangerous } from '../core.js';
 import { embed } from '../ui/ui.js';
@@ -62,7 +63,7 @@ export async function syncGroupRoles(store, member, robloxId) {
     const rank = groups.find(g => g.groupId === c.groupId)?.rank ?? 0;
     const want = rolesForRank(c.binds, rank);
     // Never hand out powerful roles from a Roblox rank, and only touch roles Vanguard can manage.
-    const usable = (id) => { const r = member.guild.roles.cache.get(id); return !!r && r.editable && !r.managed && !isBotPermissionRole(store, member.guild.id, id) && !dangerous(r.permissions.bitfield); };
+    const usable = (id) => { const r = member.guild.roles.cache.get(id); return !!r && r.editable && !r.managed && !isBlacklisted(store, member.guild.id, id) && !isBotPermissionRole(store, member.guild.id, id) && !dangerous(r.permissions.bitfield); };
     const add = [...want].filter(id => !member.roles.cache.has(id) && usable(id));
     const remove = c.binds.map(b => b.roleId).filter(id => !want.has(id) && member.roles.cache.has(id) && usable(id));
     if (add.length)

@@ -38,17 +38,24 @@ export class Guard {
             return botRank(this.store, user) >= RANKS.developer && this.enabledHere(policy, guildId, command);
         if (needsDeveloper(rankKey ?? command))
             return botRank(this.store, user) >= requiredRank(rankKey ?? command) && this.enabledHere(policy, guildId, command);
+        // A developer-only action is never unlocked by a rank table entry: only the Developer rank opens it.
+        if (policy.developerOnly && !developers.has(user))
+            return false;
         // For ordinary slash policies, Developers (the bot owner and DEVELOPER_IDS) may use commands without
         // Administrator, Manage Roles or a server role. `/restart` separately requires DEVELOPER_IDS exactly.
         if (developers.has(user))
             return this.enabledHere(policy, guildId, command);
+        // Owner-level actions are a hard minimum: no access grant, staff role, Discord permission or
+        // Administrator permission stands in for the Server Owner (or a Developer).
+        const ownerNeed = requiredRank(rankKey ?? command);
+        if (ownerNeed !== undefined && ownerNeed >= RANKS.owner
+            && rankOf(this.store, guildId, user, actor, rankKey ?? command) < ownerNeed)
+            return false;
         // A Vanguard staff rank high enough for this command replaces the Discord-permission and access checks.
         const need = requiredRank(rankKey ?? command);
         const byRank = need !== undefined && rankOf(this.store, guildId, user, actor, rankKey ?? command) >= need;
         if (byRank)
             return this.enabledHere(policy, guildId, command);
-        if (policy.developerOnly && !developers.has(user))
-            return false;
         const roleAccess = actor && [...(actor.roles?.cache?.keys() ?? [])].some(role => this.store.get('SELECT 1 FROM permission_roles WHERE guild_id=? AND role_id=? AND (access=? OR access=?)', actor.guild.id, role, 'admin', policy.category === 'moderation' ? 'moderator' : 'admin'));
         if (policy.access !== 'member' && !developers.has(user) && (!actor || actor.id !== actor.guild.ownerId && (policy.access === 'owner' || !this.store.hasGrant(actor.guild.id, actor.id, 'admin') && !roleAccess)))
             return false;

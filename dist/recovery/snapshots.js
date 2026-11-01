@@ -3,6 +3,7 @@ import { ChannelType, OverwriteType } from 'discord.js';
 import { createHash } from 'node:crypto';
 import { config } from '../config.js';
 import { ActionPacer, RecoveryLocks, selectComponents } from './recovery.js';
+import { isBlacklisted } from '../security/role-blacklist.js';
 import { AppError, logEvent } from '../errors.js';
 const SUPPORTED = new Set([ChannelType.GuildCategory, ChannelType.GuildText, ChannelType.GuildVoice, ChannelType.GuildAnnouncement, ChannelType.GuildStageVoice, ChannelType.GuildForum, ChannelType.GuildMedia]);
 const mapped = (map, id) => map[id] ?? id;
@@ -730,10 +731,16 @@ export class Snapshots {
                     await action(`Delete extra channel ${id}`, `channel:${id}`, 'Updated', async () => {
                         await guild.channels.cache.get(id)?.delete(reason);
                     });
-                for (const id of plan.roleDelete)
+                for (const id of plan.roleDelete) {
+                    // A blacklisted role is never pruned: it is protected from deletion on purpose.
+                    if (isBlacklisted(this.store, guild.id, id)) {
+                        skipped(`Kept blacklisted role ${id}.`);
+                        continue;
+                    }
                     await action(`Delete extra role ${id}`, `role:${id}`, 'Updated', async () => {
                         await guild.roles.cache.get(id)?.delete(reason);
                     });
+                }
             }
         }
         await progress('Verifying restore...');

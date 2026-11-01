@@ -11,88 +11,96 @@ Generated from the bot itself (`npm run docs`). Every rank can also use everythi
 
 ## 🧰 Developer
 
-The top rank: the bot owner (`BOT_OWNER_ID`) and anyone in `DEVELOPER_IDS`. Everything, including the tools that can take the bot down or reach every server at once: restarts, installing updates, restoring database settings, removing or banning servers, giving bot-wide ranks and managing network bans. Watched by anti-nuke, but never punished. Set in the existing bot configuration or `BOT_STAFF_IDS.developer` in `src/bot/access-ids.ts`. Only Developers manage bot permission assignments. Restart additionally requires an exact ID in `DEVELOPER_IDS`.
+The top rank: the bot owner (`BOT_OWNER_ID`) and anyone in `DEVELOPER_IDS`. Everything, including the tools that can take the bot down or reach every server at once: restarts, installing updates, restoring database settings, removing or banning servers, giving bot-wide ranks and managing network bans. Watched by anti-nuke, but never punished. Set in the existing bot configuration or `BOT_STAFF_IDS.developer` in `src/bot/access-ids.ts`. Only Developers manage the bot itself: bot-wide ranks, permission-role mappings and every bot tool. Bot Manager, Overseer and Supreme Leader get staff commands only. Restart additionally requires an exact ID in `DEVELOPER_IDS`.
 
 - `/dev alerts`: Set up the global anti-nuke feed and DMs
+- `/dev autoreact add`: Auto-react to a member's messages
+- `/dev autoreact list`: List auto-react members
+- `/dev autoreact remove`: Stop auto-reacting to a member
+- `/dev broadcast`: Announce to every server's log channel
+- `/dev database backup`: Back up the database now
+- `/dev database backups`: List database backups
 - `/dev database restore-settings`: Restore lost settings from a backup file
+- `/dev database status`: Show database health
+- `/dev database verify`: Verify a database backup
+- `/dev diagnostics`: Show runtime health
+- `/dev inspect`: Inspect any server the bot knows
+- `/dev server authorize`: Authorize this server
 - `/dev server ban`: Ban a server from the bot
 - `/dev server deauthorize`: Remove this server and leave
+- `/dev server info`: Show this server's authorization
+- `/dev server list`: List authorized servers
 - `/dev server unban`: Unban a server
+- `/dev status`: Set a custom bot status
+- `/dev status-reset`: Go back to the rotating status
+- `/dev sync`: Re-register the slash commands
+- `/dev update`: Show update status or install now
 - `/genreban`: Ban a user from every server
 - `/hardban`: Permanently ban a user from every server
 - `/netexception list`: List genreban exceptions
 - `/netexception revoke`: Cancel a genreban exception
 - `/restart`: Restart the bot
-- `/setup config permission-role`: Developer: assign a server rank to a role
 - `/setup security-admins`: Developer: add, remove or list security admins
-- `/setup staff global`: Developer: assign access in every server
-- `/setup staff role`: Developer: assign a server rank to a role
-- `/setup staff user`: Developer: assign a server rank by user ID
+- `/setup staff global`: Developer: give a bot-wide rank in every server
 - `/ungenreban`: Lift a genreban everywhere
 - `/unhardban`: Lift a hardban everywhere
 
 ## 🏠 Server Owner
 
-Whoever owns a Discord server, in that server only. Above Supreme Leader there: server operations and undoing non-permission settings. Bot permission assignments are Developer-only. No bot-wide tools (network bans, /dev, the database). Watched by anti-nuke, but never punished.
+Whoever owns a Discord server, in that server only. Above Supreme Leader there: every server-level staff command, the protection settings (anti-nuke, whitelist, control panel, security config), permission-role assignments, server ranks below their own, and undoing non-permission settings. No bot-wide tools (network bans, /dev, the database, bot-wide ranks): those are Developer-only. Watched by anti-nuke, but never punished.
 
-- `/setup history restore`: Undo a setting change
-- `/setup logs cleanup-archive`: Preview and delete channels in the old log archive
-
-## 👑 Supreme Leader
-
-Bot-wide, every server: diagnostics, update status, database health and backups. Cannot issue, lift or except network bans; those are Developer-only. Punished by anti-nuke like anyone else. Given with `/setup staff global` or `SUPREME_LEADER_IDS`.
-
-- `/dev autoreact add`: Auto-react to a member's messages
-- `/dev autoreact list`: List auto-react members
-- `/dev autoreact remove`: Stop auto-reacting to a member
-- `/dev database backup`: Back up the database now
-- `/dev database backups`: List database backups
-- `/dev database status`: Show database health
-- `/dev database verify`: Verify a database backup
-- `/dev sync`: Re-register the slash commands
-- `/dev update`: Show update status or install now
-
-## 🔭 Overseer
-
-Bot-wide, every server: Bot Manager plus inspecting and authorizing servers. Network-ban exceptions are Developer-only. Given with `/setup staff global`.
-
-- `/dev inspect`: Inspect any server the bot knows
-- `/dev server authorize`: Authorize this server
-
-## 🛠️ Bot Manager
-
-Bot-wide, every server: Head Admin everywhere plus bot status, diagnostics and announcements. Given with `/setup staff global`.
-
-- `/dev broadcast`: Announce to every server's log channel
-- `/dev diagnostics`: Show runtime health
-- `/dev server info`: Show this server's authorization
-- `/dev server list`: List authorized servers
-- `/dev status`: Set a custom bot status
-- `/dev status-reset`: Go back to the rotating status
-
-## 🛡️ Head Admin
-
-Server rank: anti-nuke, whitelist, control panel, and backups. Given by linking a role with `/setup staff role`, or directly by user ID with `/setup staff user` (Developer only). Discord's Administrator permission counts as Head Admin, except for actions that weaken protection.
-
-- `/antinuke check`: Check the bot's permissions and role position
 - `/antinuke disable`: Turn anti-nuke off (stays off after restarts)
 - `/antinuke enable`: Turn anti-nuke enforcement on (runs a readiness check first)
-- `/antinuke incidents`: Show recent anti-nuke incidents
-- `/antinuke quarantine`: Strip a member's roles and save them
-- `/antinuke release`: Give a quarantined member their saved roles back
 - `/antinuke reset`: Restore one rule to its default threshold and state
 - `/antinuke rule`: Tune one rule threshold or turn it on/off
 - `/antinuke settings`: Turn the extra protection layers on or off
+- `/antinuke whitelist add`: Whitelist a user or role for some or all rules
+- `/antinuke whitelist admin`: Separate whitelist for granting Administrator and protected permissions
+- `/antinuke whitelist bots`: Let a verification bot give roles without tripping anti-nuke
+- `/antinuke whitelist remove`: Take a user or role off the whitelist
+- `/role blacklist add`: Blacklist a role so only listed people can give it
+- `/role blacklist list`: Show every blacklisted role and who may give it
+- `/role blacklist remove`: Take a role off the blacklist
+- `/role blacklist who-can-give`: Allow or stop one person or role from giving a blacklisted role
+- `/setup config permission-role`: Server owner: give a Discord role a Vanguard rank
+- `/setup history restore`: Undo a setting change
+- `/setup logs cleanup-archive`: Preview and delete channels in the old log archive
+- `/setup panel`: Create or update the staff control panel
+- `/setup permissions discord`: Show roles with Administrator or Manage Roles
+- `/setup security`: Set the security log and Roblox verification options
+
+## 👑 Supreme Leader
+
+Bot-wide, every server: all staff commands, including changing server ranks below their own. No bot management: diagnostics, updates, the database, server authorizations and network bans are Developer-only. Punished by anti-nuke like anyone else. Given with `/setup staff global` or `SUPREME_LEADER_IDS`.
+
+_No extra commands; see the ranks below._
+
+## 🔭 Overseer
+
+Bot-wide, every server: Helper, Moderator, Admin and Head Admin commands plus changing server ranks below their own. No bot management: inspecting servers, authorizations and every bot tool are Developer-only. Given with `/setup staff global`.
+
+_No extra commands; see the ranks below._
+
+## 🛠️ Bot Manager
+
+Bot-wide, every server: staff commands only. No bot management: status, diagnostics, broadcasts, the database and server authorizations are Developer-only. Given with `/setup staff global`.
+
+_No extra commands; see the ranks below._
+
+## 🛡️ Head Admin
+
+Server rank: reading anti-nuke status and incidents, moderation, backups, snapshots, logging and staff reports. Also changes server ranks below their own with `/setup staff role` and `/setup staff user`. Changing protection (anti-nuke rules, the whitelist, the control panel, security config) is Server Owner and Developers only. Discord's Administrator permission counts as Head Admin, except for actions that weaken protection.
+
+- `/antinuke check`: Check the bot's permissions and role position
+- `/antinuke incidents`: Show recent anti-nuke incidents
+- `/antinuke quarantine`: Strip a member's roles and save them
+- `/antinuke release`: Give a quarantined member their saved roles back
 - `/antinuke status`: See whether anti-nuke is on, its rules and the whitelist
 - `/antinuke threats clear`: Clear a member from the threat board _(Head Admin and above; clears the board entry only, cases and bans stay)_
 - `/antinuke threats release`: Undo a strike (unban and clear) _(Head Admin and above; unbans if they were struck)_
 - `/antinuke threats strike`: Strip, revert their damage and ban a member now _(Head Admin and above; manually strips, records and bans)_
-- `/antinuke whitelist add`: Whitelist a user or role for some or all rules
-- `/antinuke whitelist admin`: Separate whitelist for granting Administrator and protected permissions
-- `/antinuke whitelist bots`: Let a verification bot give roles without tripping anti-nuke
 - `/antinuke whitelist check`: See what anti-nuke allows someone and what would strip them
 - `/antinuke whitelist list`: Show the whitelist and when entries expire
-- `/antinuke whitelist remove`: Take a user or role off the whitelist
 - `/mod appeals setup`: Turn ban appeals on or off
 - `/mod cases delete`: Delete a case permanently
 - `/mod warnings pardon`: Clear someone's active warnings
@@ -118,10 +126,9 @@ Server rank: anti-nuke, whitelist, control panel, and backups. Given by linking 
 - `/setup config feature`: Turn moderation, verification, AI or backups on or off
 - `/setup config provider`: Turn a verification provider on or off
 - `/setup history list`: Show recent setting changes
-- `/setup panel`: Create or update the staff control panel
-- `/setup permissions discord`: Show roles with Administrator or Manage Roles
 - `/setup permissions list`: Show roles with bot command access
-- `/setup security`: Set the security log and Roblox verification options
+- `/setup staff role`: Link a Discord role to a server rank, below your own
+- `/setup staff user`: Assign a server rank to one user ID, below your own
 - `/setup status`: Show security health and settings
 
 ## 🔧 Admin
