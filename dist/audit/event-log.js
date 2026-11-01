@@ -420,11 +420,13 @@ export function recordMemberEvent(store, logs, member, joined) {
 }
 /** Voice state changes are recorded only for servers that configured the dedicated channel. */
 export function recordVoiceEvent(store, logs, old, state) {
-    if (old.channelId === state.channelId || !logRoute(store, state.guild.id, 'voice'))
+    const changes = ['serverMute', 'serverDeaf', 'selfMute', 'selfDeaf', 'streaming', 'selfVideo']
+        .filter(key => typeof old[key] === 'boolean' && typeof state[key] === 'boolean' && old[key] !== state[key]).map(key => `**${key}:** ${state[key] ? 'on' : 'off'}`);
+    if (old.channelId === state.channelId && (!state.channelId || !changes.length))
         return;
     if (isExcluded(store, state.guild.id, old.channelId) || isExcluded(store, state.guild.id, state.channelId))
         return;
-    const action = !old.channelId ? 'Voice channel joined' : !state.channelId ? 'Voice channel left' : 'Voice channel changed';
+    const action = old.channelId === state.channelId ? 'Voice state updated' : !old.channelId ? 'Voice channel joined' : !state.channelId ? 'Voice channel left' : 'Voice channel changed';
     const details = [old.channelId ? `**From:** <#${old.channelId}>` : '', state.channelId ? `**To:** <#${state.channelId}>` : ''].filter(Boolean);
-    recordEvent(store, logs, state.guild.id, { category: 'members', route: 'voice', action, targetId: state.id, target: `<@${state.id}>`, channelId: state.channelId ?? old.channelId, details }, { compact: true });
+    recordEvent(store, logs, state.guild.id, { category: 'members', route: 'voice', action, targetId: state.id, target: `<@${state.id}>`, channelId: state.channelId ?? old.channelId, details: [...details, ...changes] }, { compact: true });
 }

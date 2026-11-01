@@ -119,6 +119,8 @@ async function activateLegacyRoutes(store, guild, category, reason) {
                 delete routes[route];
                 skipped.push({ route, check });
             }
+            else
+                continue; // Keep a manually chosen private destination.
         }
         if (!existing)
             continue;

@@ -100,6 +100,20 @@ The script checks the metadata, checksum and integrity, refuses to run while the
 | `LOG_FORMAT`, `LOG_LEVEL` | `pretty`, `info` | `json` is available for log ingestion. |
 | `BOT_OWNER_ID`, `BOT_OWNER_USERNAME` | empty | The bot owner and the default `TRUSTED_DM_IDS`. Nothing is built in: leave it empty and no account holds the owner rank or receives the daily database backup. |
 
+<!-- coderabbit-ai-generated:v1 -->
+
+<!-- coderabbit-ai-generated-section:v1:b736ff13692c5bfb2d902219a997686aa1706d818daf19cb864aa8f80f49b30a -->
+
+## Manual logs and staff levels
+
+Use `/setup logs route type:messages channel:#message-logs` to choose a private destination. Types include joins, voice, commands, anti-nuke, messages, moderation, members, roles, channels and server events. Omit `channel` to reset a route. `/setup logs status` shows routes and category switches. Manual routes do not move channels. Voice logs include mute/deafen, streaming and camera changes.
+
+The server owner can run `/setup logs cleanup-archive` to preview permanent deletion of channels in `Archive - Veil Logs`. Confirmation deletes their message history. Active log destinations and moved channels are skipped; categories with remaining children are retained.
+
+Assign server levels with `/setup staff role role:@Moderators rank:moderator`. Levels: Helper, Moderator, Admin and Head Admin. Only someone above the assigned level can change it. Developers can assign Bot Manager, Overseer and Supreme Leader with `/setup staff global`. Inspect with `/setup staff list` and `/setup staff check`. These commands do not grant Developer access.
+
 ## Limits worth knowing
+
+<!-- /coderabbit-ai-generated:v1 -->
 
 Discord cannot restore deleted object IDs, messages, member-role assignments, managed integrations or unavailable Community and premium features. Member statistics show the cached coverage, and online counts are unavailable without the presence intent.

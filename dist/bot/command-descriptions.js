@@ -102,6 +102,8 @@ export const DESCRIPTIONS = {
     "/setup security": "Set the security log and Roblox verification options",
     "/setup security-admins": "Add, remove or list security admins",
     "/setup logs setup": "Set up log channels and reuse existing event logs",
+    "/setup logs route": "Choose a private channel for a log type, or reset its destination",
+    "/setup logs cleanup-archive": "Preview and delete channels in the old log archive",
     "/setup logs check": "Check the log channels and permissions",
     "/setup logs exclude": "Stop or resume logging a channel",
     "/setup logs bot-changes": "Skip routine bot changes in the logs",

@@ -148,6 +148,7 @@ export const COMMAND_RANK = {
     restart: 8, 'dev/restart': 8, 'dev/alerts': 8, 'database/restore-settings': 8, deauthserver: 8, banserver: 8, unbanserver: 8, unhardban: 8,
     // Giving bot-wide ranks: Developers only.
     'staff/global': 8,
+    'logs/cleanup-archive': RANKS.owner,
 };
 /** Developer-only commands: nothing but the Developer rank unlocks them. */
 export const needsDeveloper = (key) => (requiredRank(key) ?? 0) >= RANKS.developer;

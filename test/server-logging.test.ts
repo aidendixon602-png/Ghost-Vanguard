@@ -387,3 +387,67 @@ test('background errors are reported to staff once per 10 minutes, without secre
         assert.doesNotMatch(JSON.stringify(posted), /at .*\.ts/, 'no stack traces');
     } finally { store.close(); }
 });
+
+test('manual routes validate privacy, persist without moving channels, and reset', async () => {
+    const { default: command } = await import('../src/commands/configuration/logs.js');
+    const store = new Store(':memory:'); authorize(store, G);
+    try {
+        const { guild } = fakeGuild(['bans', 'ghost-vanguard-logging', 'chosen']);
+        const channel = guild.channels.cache.find((c: any) => c.name === 'chosen');
+        let chosen: any = channel;
+        const ctx: any = { store };
+        const i: any = { guildId: G, guild, user: { id: 'owner' }, options: { getSubcommand: () => 'route', getString: () => 'messages', getChannel: () => chosen } };
+        await command.execute(ctx, i);
+        assert.equal(logChannels(store, G).routes?.messages, channel.id);
+        assert.equal(channel.parentId, null);
+        await setupLogChannels(store, guild, 'owner');
+        assert.equal(logChannels(store, G).routes?.messages, channel.id, 'automatic setup retains manual routes');
+        channel.permissionsFor = () => ({ has: () => true });
+        await assert.rejects(command.execute(ctx, i), /private text channel/);
+        chosen = null; await command.execute(ctx, i);
+        assert.equal(logChannels(store, G).routes?.messages, undefined);
+        assert.equal(command.subcommands?.['cleanup-archive']?.access, 'owner');
+    } finally { store.close(); }
+});
+
+test('archive cleanup deletes only previewed inactive children and retains new or moved channels', async () => {
+    const { archivePlan, deleteArchive } = await import('../src/audit/archive-cleanup.js');
+    const store = new Store(':memory:'); authorize(store, G);
+    try {
+        const { guild } = fakeGuild([], { categories: ['Archive - Veil Logs'], legacyChildren: ['old', 'active', 'moved'] });
+        const cache = guild.channels.cache;
+        const old = cache.find((c: any) => c.name === 'old');
+        const active = cache.find((c: any) => c.name === 'active');
+        const moved = cache.find((c: any) => c.name === 'moved');
+        const parent = old.parentId;
+        const deleted: string[] = [];
+        for (const c of cache.values()) c.delete = async () => { deleted.push(c.id); cache.delete(c.id); };
+        const plan = archivePlan(guild, store);
+        setLogChannels(store, G, { routes: { messages: active.id } });
+        moved.parentId = 'elsewhere';
+        cache.set('new', { id: 'new', parentId: parent });
+        await deleteArchive(guild, store, plan, 'owner');
+        assert.deepEqual(deleted, [old.id]);
+        assert.ok(cache.has(active.id) && cache.has(moved.id) && cache.has('new') && cache.has(parent));
+    } finally { store.close(); }
+});
+
+test('voice logs include mute and streaming changes without attributing an unknown moderator', () => {
+    const store = new Store(':memory:'); authorize(store, G);
+    try {
+        configureEventLog(store, G, { enabled: true, channelId: 'log' });
+        setLogChannels(store, G, { routes: { voice: 'voice-log' } });
+        const cards: any[] = [];
+        const logs: any = { push: (_g: string, card: any) => cards.push(card.toJSON()) };
+        const old: any = { guild: { id: G }, id: 'member', channelId: 'voice', serverMute: false, streaming: false };
+        recordVoiceEvent(store, logs, old, { ...old, serverMute: true, streaming: true });
+        assert.equal(cards.length, 1);
+        assert.match(JSON.stringify(cards), /serverMute|streaming/);
+        assert.doesNotMatch(JSON.stringify(cards), /"name":"By"/);
+        setLogChannels(store, G, { routes: {} });
+        recordVoiceEvent(store, logs, old, { ...old, channelId: 'other' });
+        assert.equal(cards.length, 2, 'voice events fall back to combined logging without a route');
+        recordVoiceEvent(store, logs, { ...old, selfMute: null }, { ...old, selfMute: false });
+        assert.equal(cards.length, 2, 'unknown previous values do not create synthetic toggles');
+    } finally { store.close(); }
+});

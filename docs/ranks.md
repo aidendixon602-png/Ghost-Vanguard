@@ -32,6 +32,7 @@ The top rank: the bot owner (`BOT_OWNER_ID`) and anyone in `DEVELOPER_IDS`. Ever
 Whoever owns a Discord server, in that server only. Above Supreme Leader there: everything server-side, including security admins and undoing setting changes. No bot-wide tools (network bans, /dev, the database). Watched by anti-nuke, but never punished.
 
 - `/setup history restore`: Undo a setting change
+- `/setup logs cleanup-archive`: Preview and delete channels in the old log archive
 - `/setup security-admins`: Add, remove or list security admins
 
 ## 👑 Supreme Leader
@@ -180,6 +181,7 @@ Server rank: lifting ordinary bans and accepting appeals, raid tools, automod, s
 - `/setup logs disable`: Turn event logging off
 - `/setup logs enable`: Turn event logging on
 - `/setup logs exclude`: Stop or resume logging a channel
+- `/setup logs route`: Choose a private channel for a log type, or reset its destination
 - `/setup logs setup`: Set up log channels and reuse existing event logs
 - `/setup logs status`: Show logging settings
 - `/setup logs view`: Browse logged events (last 30 days)

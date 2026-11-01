@@ -137,7 +137,7 @@ async function activateLegacyRoutes(store: Store, guild: Guild, category: GuildB
             if (!check.ok || check.publiclyVisible) {
                 delete routes[route];
                 skipped.push({ route, check });
-            }
+            } else continue; // Keep a manually chosen private destination.
         }
         if (!existing) continue;
         const check = await checkChannel(guild, existing.id, name, false);

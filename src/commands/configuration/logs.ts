@@ -1,3 +1,5 @@
+import { confirmDanger } from '../../ui/danger-ui.js';
+import { archivePlan, deleteArchive } from '../../audit/archive-cleanup.js';
 import { ChannelType, Colors, PermissionFlagsBits, SlashCommandBuilder } from 'discord.js';
 import { defineCommand } from '../../bot/registry.js';
 import { AppError } from '../../errors.js';
@@ -20,6 +22,10 @@ export default defineCommand(new SlashCommandBuilder().setName('logs').setDescri
     .addSubcommand(s => s.setName('setup').setDescription('Set up active log channels and reuse matching legacy log channels')
         .addChannelOption(o => o.setName('bans_channel').setDescription(`Use this channel for ban logs instead of #${BANS_CHANNEL}`).addChannelTypes(ChannelType.GuildText))
         .addChannelOption(o => o.setName('logging_channel').setDescription(`Use this channel for server logs instead of #${LOGGING_CHANNEL}`).addChannelTypes(ChannelType.GuildText)))
+    .addSubcommand(s => s.setName('route').setDescription('Choose a channel for one log type, or reset it to the default')
+        .addStringOption(o => o.setName('type').setDescription('Log type').setRequired(true).addChoices(...Object.keys(LEGACY_LOG_ROUTES).map(value => ({ name: value, value }))))
+        .addChannelOption(o => o.setName('channel').setDescription('Destination; omit to use the default log channel').addChannelTypes(ChannelType.GuildText)))
+    .addSubcommand(s => s.setName('cleanup-archive').setDescription('Preview deletion of channels in the old log archive'))
     .addSubcommand(s => s.setName('check').setDescription('Check configured log channels and bot permissions, then send test embeds'))
     .addSubcommand(s => s.setName('exclude').setDescription('Stop (or start again) logging events from a channel')
         .addChannelOption(o => o.setName('channel').setDescription('Channel').setRequired(true))
@@ -39,6 +45,37 @@ export default defineCommand(new SlashCommandBuilder().setName('logs').setDescri
         .addIntegerOption(o => o.setName('page').setDescription('Page number').setMinValue(1))), { category: 'security', access: 'security', requiredPermissions: [PermissionFlagsBits.ManageGuild] }, async (ctx, i) => {
     const guild = i.guildId, sub = i.options.getSubcommand();
     const settings = ctx.store.settings(guild);
+    if (sub === 'route') {
+        const type = i.options.getString('type', true) as LogRoute;
+        if (!Object.hasOwn(LEGACY_LOG_ROUTES, type)) throw new AppError('VALIDATION_ERROR', 'Choose a supported log type.');
+        const channel = i.options.getChannel('channel');
+        if (channel) {
+            const check = await checkChannel(i.guild, channel.id, type, false);
+            if (!check.ok || check.publiclyVisible) throw new AppError('VALIDATION_ERROR', 'Choose a private text channel where Vanguard can view, send embeds and read history.');
+        }
+        const routes = { ...logChannels(ctx.store, guild).routes };
+        if (channel) routes[type] = channel.id; else delete routes[type];
+        setLogChannels(ctx.store, guild, { routes }, i.user.id);
+        return `**${type} logs:** ${channel ? `<#${channel.id}>` : 'default log channel'}. Event logging and category switches still apply; check \`/setup logs status\`.`;
+    }
+    if (sub === 'cleanup-archive') {
+        await i.guild.channels.fetch();
+        const plan = archivePlan(i.guild, ctx.store);
+        if (!plan.categories.length) return 'No archived Veil log categories were found.';
+        return confirmDanger(ctx, i, {
+            title: 'Delete archived channels', label: 'Delete archived channels',
+            summary: `Delete up to ${plan.channels.length} archived channels and ${plan.categories.length} empty archive categories.`,
+            consequences: [
+                ...plan.channels.slice(0, 15).map(c => `<#${c.id}>`),
+                ...(plan.channels.length > 15 ? [`Plus ${plan.channels.length - 15} more archived channels.`] : []),
+                'All channel types in this archive are included, even custom channels with unrelated names.',
+                'All messages in deleted channels are permanently lost.',
+                'Active log destinations and channels moved out of the archive are skipped.',
+            ],
+            reversal: 'Discord channel IDs and message history cannot be restored.',
+            run: async (fresh, click) => deleteArchive(click.guild, fresh.store, plan, click.user.id),
+        });
+    }
     if (sub === 'view') {
         const category = i.options.getString('category') as LogCategory | null;
         const user = i.options.getUser('user');
@@ -148,4 +185,4 @@ export default defineCommand(new SlashCommandBuilder().setName('logs').setDescri
     const name = i.options.getString('name', true) as LogCategory, on = i.options.getBoolean('enabled', true);
     configureEventLog(ctx.store, guild, { category: [name, on] });
     return `${CATEGORY_LABELS[name].split(' (')[0]} events are now **${on ? 'logged' : 'not logged'}**.`;
-});
+}, { subcommands: { 'cleanup-archive': { access: 'owner', botPermissions: [PermissionFlagsBits.ManageChannels] } } });

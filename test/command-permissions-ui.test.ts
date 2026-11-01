@@ -42,3 +42,16 @@ test('anti-nuke buttons honor the parent command disable setting',async()=>{
  await assert.rejects(new Guard(store).check(i,{...defaults},'anpanel/',false),/disabled/);
  }finally{store.close();}
 });
+
+test('archive deletion requires server owner access even for a ranked Admin', async () => {
+ const {store,ctx,member}=fixture();
+ try {
+  const {default:logs}=await import('../src/commands/configuration/logs.js');
+  const policy={...logs.metadata,...logs.subcommands?.['cleanup-archive']};
+  member.permissions=new PermissionsBitField(PermissionFlagsBits.Administrator);
+  const guard=new Guard(store);
+  assert.equal(guard.allowed(policy,'g',member.id,member,'logs','logs/cleanup-archive'),false);
+  member.id='owner';
+  assert.equal(guard.allowed(policy,'g','owner',member,'logs','logs/cleanup-archive'),true);
+ }finally{store.close();}
+});
