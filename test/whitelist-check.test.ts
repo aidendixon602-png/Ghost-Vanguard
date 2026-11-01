@@ -21,7 +21,7 @@ test('whitelist check: owner, full bypass, role-based rules, warnings and quaran
         const ignored = staff.fields!.find(f => f.name === 'Not punished for (still alerted)')!.value;
         assert.match(ignored, /Role Invite\*\* · from <@&staffrole>, permanent/);
         assert.match(ignored, /\*\*Ban\*\* · until <t:\d+:f>/);
-        assert.match(staff.description!, /Administrator\*\* or \*\*Manage Server\*\* is checked; self-assigning either strips immediately/);
+        assert.match(staff.description!, /Handing out Administrator or another protected permission.*still checked.*antinuke whitelist admin/);
 
         store.run('INSERT INTO incidents(guild_id,actor_id,rule,at,mode,result) VALUES(?,?,?,?,?,?)', 'g', 'person', 'timeout', Date.now(), 'warn', 'Warning');
         store.run('INSERT INTO backups(guild_id,user_id,roles,at,active) VALUES(?,?,?,?,1)', 'g', 'person', '[]', Date.now());
@@ -30,6 +30,7 @@ test('whitelist check: owner, full bypass, role-based rules, warnings and quaran
 
         store.grant('g', 'adminrole', 'trust_role', 'owner');
         assert.match(whitelistCheck(store, guild, 'person', ['adminrole'], false).toJSON().description!, /full bypass.*<@&adminrole>/);
+        assert.match(whitelistCheck(store, guild, 'person', ['adminrole'], false).toJSON().description!, /Permission grants are separate/,"a full bypass never allows granting Administrator");
         assert.match(whitelistCheck(store, guild, '426537812993638400', [], true).toJSON().description!, /Bloxlink.*never counted/);
     } finally { store.close(); }
 });

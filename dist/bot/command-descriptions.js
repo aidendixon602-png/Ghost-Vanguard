@@ -14,6 +14,7 @@ export const DESCRIPTIONS = {
     "/antinuke whitelist remove": "Take a user or role off the whitelist",
     "/antinuke whitelist list": "Show the whitelist and when entries expire",
     "/antinuke whitelist check": "See what anti-nuke allows someone and what would strip them",
+    "/antinuke whitelist admin": "Separate whitelist for granting Administrator and protected permissions",
     "/antinuke whitelist bots": "Let a verification bot give roles without tripping anti-nuke",
     "/antinuke incidents": "Show recent anti-nuke incidents",
     "/antinuke quarantine": "Strip a member's roles and save them",

@@ -330,6 +330,55 @@ test('trust panel: save replaces what they had, presets expand, Everything wins,
  }finally{store.close();}
 });
 
+test('/antinuke whitelist admin allows and removes protected permission grants on its own whitelist',async()=>{
+ const {store}=setup();try {
+  const logs:any[]=[];
+  const ctx:any={store,actor:{id:'owner',guild:{ownerId:'owner'},roles:{cache:new Collection()}},logs:{push:(_g:any,e:any)=>logs.push(e)}};
+  const i:any={guildId:'g',guild:{id:'g',ownerId:'owner'},user:{id:'owner'},roles:{cache:new Collection()},options:{
+   getSubcommand:()=>'admin',getUser:()=>null,getRole:()=>({id:'staffrole'}),getBoolean:()=>true,getInteger:()=>null}};
+  const reply=await store.withAuthorized('g',()=>trust.execute(ctx,i));
+  assert.match(String(reply),/Administrator/);
+  assert.equal(store.hasGrant('g','staffrole','trust_role:dangerous_grant'),true);
+  assert.equal(store.hasGrant('g','staffrole','trust_role'),false,'it never becomes a full bypass');
+  assert.match(JSON.stringify(logs.at(-1)),/Permission-grant whitelist/);
+
+  i.options.getRole=()=>null;i.options.getUser=()=>({id:'someone'});i.options.getInteger=()=>7;
+  await store.withAuthorized('g',()=>trust.execute(ctx,i));
+  const row=store.get("SELECT expires FROM grants WHERE guild_id='g' AND user_id='someone' AND kind='trust:dangerous_grant'")!;
+  assert.ok(Number(row.expires)-Date.now()>6*24*3600000,'the entry can expire');
+
+  i.options.getBoolean=()=>false;
+  const removed=await store.withAuthorized('g',()=>trust.execute(ctx,i));
+  assert.match(String(removed),/no longer hand out protected permissions/);
+  assert.equal(store.hasGrant('g','someone','trust:dangerous_grant'),false);
+
+  // Granting it to yourself is what a hijacked admin account would do first, so someone else must do it.
+  const self:any={...ctx,actor:{id:'admin2',guild:{ownerId:'owner'},roles:{cache:new Collection()}}};
+  i.options.getBoolean=()=>true;i.options.getUser=()=>({id:'admin2'});
+  await assert.rejects(()=>store.withAuthorized('g',()=>trust.execute(self,i)),/Another security administrator/);
+ }finally{store.close();}
+});
+
+test('the panel keeps permission grants separate from Everything, and status lists them apart',async()=>{
+ const {store}=setup();try {
+  const ctx:any={store,actor:{id:'owner',guild:{ownerId:'owner'},roles:{cache:new Collection()}},logs:{push:()=>{}}};
+  const T='444444444444444444';
+  assert.deepEqual(kindsFor(['all','dangerous_grant'],false),['trust','trust:dangerous_grant'],'Everything never implies permission grants');
+  assert.deepEqual(kindsFor(['all','mass_ban'],false),['trust'],'Everything still wins over ordinary ticks');
+  saveTrust(ctx,'g',T,false,['all','dangerous_grant'],0);
+  assert.equal(store.hasGrant('g',T,'trust'),true);assert.equal(store.hasGrant('g',T,'trust:dangerous_grant'),true);
+  const panel=trustPanel(ctx,'g','555555555555555555',panelFor(ctx,'g',T,false));
+  const allow=(panel.components[2]!.toJSON() as any).components[0];
+  assert.deepEqual(allow.options.filter((o:any)=>o.default).map((o:any)=>o.value).sort(),['all','dangerous_grant']);
+
+  store.grant('g','granter','trust:dangerous_grant','owner');
+  const {antinukeStatus}=await import('../src/ui/antinuke-status.js');
+  const section=antinukeStatus(store,'g').toJSON().description!.split('**Whitelisted**')[1]!.split('-#')[0]!;
+  assert.match(section,/\*\*All rules:\*\* <@444444444444444444>/);
+  assert.match(section,/\*\*Permission grants:\*\* .*<@granter>/);
+ }finally{store.close();}
+});
+
 test('whitelisted people are recorded quietly (no cards) unless ALERT_EXEMPT=true; a partial whitelist says what is missing',async()=>{
  const saved=process.env.ALERT_EXEMPT;
  try {

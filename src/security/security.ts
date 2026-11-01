@@ -132,6 +132,20 @@ export class Security {
         return null;
     }
 
+    /**
+     * The separate permission-grant whitelist: who may hand out Administrator and the other protected
+     * permissions through Discord. Deliberately narrower than exemptReason — a full or role bypass and
+     * every other whitelist entry leave this checked. Set it with `/antinuke whitelist admin`.
+     */
+    grantExemptReason(guild: Guild, id: string, ignoreRoles: string[] = []): string | null {
+        if (id === guild.ownerId) return 'the server owner';
+        if (developers.has(id)) return 'a Developer';
+        if (isTrustedBot(id)) return `a trusted bot (${TRUSTED_BOTS.get(id)})`;
+        if (isWhitelistedPerson(id)) return 'whitelisted on Ghost Vanguard';
+        if (this.trustedFor(guild, id, 'dangerous_grant', ignoreRoles)) return 'on the permission-grant whitelist';
+        return null;
+    }
+
     /** Rule-only whitelist: the user (kind "trust:<rule>") or one of their roles ("trust_role:<rule>") skips just that rule. */
     trustedFor(guild: Guild, id: string, rule: string, ignoreRoles: string[] = []): boolean {
         return this.store.hasGrant(guild.id, id, `trust:${rule}`) || [...(guild.members?.cache?.get(id)?.roles.cache.keys() ?? [])].some(role => !ignoreRoles.includes(role) && this.store.hasGrant(guild.id, role, `trust_role:${rule}`));
@@ -154,7 +168,11 @@ export class Security {
             if (entry.action === AuditLogEvent.MemberRoleUpdate && entry.targetId && entry.targetId !== actor) await memberOrNull(guild, entry.targetId).catch(() => null);
             for (const { rule, eventId } of this.rulesFor(entry, guild, actor, newlyAssigned))
                 // A role the actor just gave themselves cannot exempt that same action.
-                await this.evaluate(entry, guild, actor, rule, eventId, exempt ?? (this.trustedFor(guild, actor, rule.key, newlyAssigned) ? 'whitelisted for this action' : null));
+                // Granting protected permissions answers to its own whitelist: a full bypass and every other
+                // whitelist entry leave it checked, so "whitelisted" never means "may hand out Administrator".
+                await this.evaluate(entry, guild, actor, rule, eventId, rule.key === 'dangerous_grant'
+                    ? this.grantExemptReason(guild, actor, newlyAssigned)
+                    : exempt ?? (this.trustedFor(guild, actor, rule.key, newlyAssigned) ? 'whitelisted for this action' : null));
         });
     }
 
@@ -173,12 +191,9 @@ export class Security {
         const addsRole = entry.action !== AuditLogEvent.MemberRoleUpdate || changesOf(entry).some(c => c.key === '$add' && c.new?.length);
         if (primary && !verificationBot && addsRole)
             found.push({ rule: primary, eventId: entry.id });
-        let escalation = escalationBits(entry, guild);
-        // Staff whitelisted to manage roles can hand out moderator-level roles (ban, kick, channels, webhooks);
-        // Administrator and Manage Server are still checked for everyone without a full bypass.
-        const roleRule = entry.action === AuditLogEvent.MemberRoleUpdate ? 'role_grant' : entry.action === AuditLogEvent.RoleCreate ? 'role_create' : 'role_update';
-        if (escalation && this.trustedFor(guild, actor, roleRule, newlyAssigned))
-            escalation &= ALWAYS_STRICT;
+        // Handing out or creating a role with protected permissions is always the Permission Grant rule,
+        // however the actor is whitelisted for role work: that is what /antinuke whitelist admin is for.
+        const escalation = escalationBits(entry, guild);
         if (escalation)
             found.push({ rule: ruleByKey('dangerous_grant'), eventId: `${entry.id}:dangerous_grant` });
         if (disablesAutoMod(entry))
@@ -344,7 +359,10 @@ export class Security {
         const kinds = this.store.all(`SELECT kind FROM grants WHERE guild_id=? AND user_id IN (${marks}) AND (kind LIKE 'trust:%' OR kind LIKE 'trust_role:%') AND (expires IS NULL OR expires>?)`, guild.id, ...ids, Date.now())
             .map(r => String(r.kind).split(':')[1]!).filter(Boolean);
         if (!kinds.length) return null;
-        return `Whitelisted for **${scopeName([...new Set(kinds)])}**, but not for **${rule.title}**. If they should be allowed to do this, add it with \`/antinuke whitelist add\` (or pick "Everything").`;
+        const where = rule.key === 'dangerous_grant'
+            ? '`/antinuke whitelist admin` (a full bypass does not cover permission grants)'
+            : '`/antinuke whitelist add` (or pick "Everything")';
+        return `Whitelisted for **${scopeName([...new Set(kinds)])}**, but not for **${rule.title}**. If they should be allowed to do this, add it with ${where}.`;
     }
 
     private readonly headsUps = new Map<string, number>();
