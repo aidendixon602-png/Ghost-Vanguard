@@ -6,7 +6,7 @@
 - **[Security Controls](user/security-controls.md)** — how anti-nuke decides, warns, strips and reverts
 - **[Threat Board](user/threat-board.md)** — scoring, staff triage, manual controls and reversibility
 - **[Dashboard](user/dashboard.md)** — running, securing and reading the dashboard
-- **[Anti-Nuke Locked Rules](user/antinuke-locked.md)** — the 17 rules and limits
+- **[Anti-Nuke Locked Rules](user/antinuke-locked.md)** — the 19 rules and limits
 - **[Recovery](user/recovery.md)** — snapshots, backups and restores
 - **[Server Lifecycle](user/server-lifecycle.md)** — invites, authorization and removal
 - **[Hosting](user/hosting.md)** — persistence and health endpoint

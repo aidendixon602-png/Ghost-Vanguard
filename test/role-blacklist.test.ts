@@ -81,7 +81,9 @@ test('a blacklisted role can only be given by the people listed for it, with no 
 function commandOptions(group: string, sub: string, extra: Record<string, any> = {}) {
     return {
         getSubcommandGroup: () => group, getSubcommand: () => sub,
-        getRole: () => extra.role ?? null, getMentionable: () => extra.who ?? null, getBoolean: () => extra.remove ?? null,
+        getRole: () => extra.role ?? null, getBoolean: () => extra.remove ?? null,
+        // discord.js hands back a CommandInteractionOption: .user (and .member when they are in the server) or .role.
+        get: (name: string) => (name === 'who' && extra.who ? extra.who : null),
     };
 }
 
@@ -99,16 +101,32 @@ test('/role blacklist add and who-can-give write the list, and list shows it', a
         assert.match(added, /is blacklisted/);
         assert.equal(isBlacklisted(store, G, ROLE), true);
         assert.match(await run(store, OWNER, commandOptions('blacklist', 'list')), /nobody\*\* \(nobody can give it\)/);
-        assert.match(await run(store, OWNER, commandOptions('blacklist', 'who-can-give', { role, who: { id: MOD, user: { id: MOD } } })), /can now give/);
+        assert.match(await run(store, OWNER, commandOptions('blacklist', 'who-can-give', { role, who: { user: { id: MOD }, member: { id: MOD }, value: MOD } })), /can now give/);
         assert.deepEqual(assignersOf(store, G, ROLE).map(a => [a.grantor_type, a.grantor_id]), [['user', MOD]]);
         assert.match(await run(store, OWNER, commandOptions('blacklist', 'list')), new RegExp(`<@${MOD}>`));
-        assert.match(await run(store, OWNER, commandOptions('blacklist', 'who-can-give', { role, who: { id: MOD, user: { id: MOD } }, remove: true })), /no longer/);
+        assert.match(await run(store, OWNER, commandOptions('blacklist', 'who-can-give', { role, who: { user: { id: MOD }, value: MOD }, remove: true })), /no longer/);
         assert.equal(assignersOf(store, G, ROLE).length, 0);
         assert.match(await run(store, OWNER, commandOptions('blacklist', 'remove', { role })), /no longer blacklisted/);
         assert.equal(blacklistAll(store, G).length, 0);
         // A Head Admin never reaches the handler.
         store.grant(G, ADMIN, 'admin', OWNER);
         await assert.rejects(run(store, ADMIN, commandOptions('blacklist', 'list')), /server owner or a Developer/);
+    } finally { store.close(); }
+});
+
+test('/role blacklist who-can-give keeps a person who is not in the server as a person, and a role as a role', async () => {
+    const store = fixture();
+    try {
+        const role: any = fakeRole();
+        role.members = new Collection();
+        await run(store, OWNER, commandOptions('blacklist', 'add', { role }));
+        const OUTSIDER = '888888888888888888', COUNCIL = '900000000000000555';
+        // discord.js sets only .user (no .member) for someone who is not in the server right now.
+        assert.match(await run(store, OWNER, commandOptions('blacklist', 'who-can-give', { role, who: { user: { id: OUTSIDER }, value: OUTSIDER } })), new RegExp(`<@${OUTSIDER}> can now give`));
+        assert.match(await run(store, OWNER, commandOptions('blacklist', 'who-can-give', { role, who: { role: { id: COUNCIL }, value: COUNCIL } })), new RegExp(`Anyone with <@&${COUNCIL}> can now give`));
+        assert.deepEqual(assignersOf(store, G, ROLE).map(a => `${a.grantor_type}:${a.grantor_id}`).sort(), [`role:${COUNCIL}`, `user:${OUTSIDER}`]);
+        // Pick nobody and it says so instead of guessing.
+        await assert.rejects(run(store, OWNER, commandOptions('blacklist', 'who-can-give', { role })), /Pick who may give it/);
     } finally { store.close(); }
 });
 
@@ -184,3 +202,45 @@ test('deleting a blacklisted role puts it back unless the owner, a Developer or 
 function addNewHolder(store: Store) {
     store.run('INSERT OR IGNORE INTO role_blacklist_holders(guild_id,role_id,user_id) VALUES(?,?,?)', G, ROLE, TARGET);
 }
+
+// ------------------------------------------------------------ what people read
+
+const text = (e: any): string => String(e?.toJSON?.().description ?? e?.data?.description ?? '');
+const captureLogs = () => { const logged: any[] = []; return { logged, logs: { push: (_guild: string, e: any) => { logged.push(e); } } as any }; };
+
+test('the staff card and the DM for a blocked grant use real line breaks, not a literal backslash-n', async () => {
+    const store = fixture();
+    try {
+        addBlacklisted(store, G, fakeRole(), OWNER);
+        const f = enforcementFixture(store);
+        const { logged, logs } = captureLogs();
+        const entry: any = { action: AuditLogEvent.MemberRoleUpdate, id: 'e-text', executorId: ADMIN, targetId: TARGET, createdTimestamp: Date.now(), changes: [{ key: '$add', new: [{ id: ROLE }] }] };
+        await enforceRoleBlacklist(store, logs, entry, f.guild);
+
+        const card = text(logged[0]);
+        assert.match(card, /may give it\.\nIt was \*\*taken back off\*\* them\.\n-# Allowed for this role: /, card);
+        assert.doesNotMatch(card, /\\n/, 'no literal backslash-n in the staff card');
+
+        const dm = text(f.dms[0].embeds[0]);
+        assert.match(dm, /You gave \*\*High Council\*\* to <@777777777777777777> in \*\*Test\*\*\.\n\nThat role is blacklisted in this server/, dm);
+        assert.match(dm, /do not override that\.\n\nIt was taken back off them\.$/, dm);
+        assert.doesNotMatch(dm, /\\n/, 'no literal backslash-n in the DM');
+    } finally { store.close(); }
+});
+
+test('the DM after an unauthorised delete reads as separate paragraphs', async () => {
+    const store = fixture();
+    try {
+        addBlacklisted(store, G, fakeRole(), OWNER);
+        addNewHolder(store);
+        const f = enforcementFixture(store);
+        const { logged, logs } = captureLogs();
+        const entry: any = { action: AuditLogEvent.RoleDelete, id: 'd-text', executorId: ADMIN, targetId: ROLE, createdTimestamp: Date.now(), changes: [] };
+        await enforceRoleBlacklist(store, logs, entry, f.guild);
+
+        const dm = text(f.dms[0].embeds[0]);
+        assert.match(dm, /^You deleted \*\*High Council\*\* in \*\*Test\*\*\.\n\nThat role is blacklisted, so only the people and roles listed for it can delete or hand it out\. Vanguard put it back\.\n\nIt was given back to 1 member\.$/, dm);
+        assert.doesNotMatch(dm, /\\n/);
+        assert.doesNotMatch(logged.map(text).join('\n'), /\\n/, 'nor in the staff card');
+    } finally { store.close(); }
+});

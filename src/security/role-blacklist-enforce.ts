@@ -69,7 +69,7 @@ async function enforceMemberRoles(store: Store, logs: LogQueue, entry: GuildAudi
         : '**Vanguard could not remove it.** Move its role above the blacklisted role and remove it by hand.';
     const allowed = blocked.map(id => describeAssigners(assignersOf(store, guild.id, id))).join('; ');
     logs.push(guild.id, embed('Blacklisted role blocked',
-        `<@${actor}> gave ${names} to <@${entry.targetId}>. Only the people listed for a blacklisted role may give it.\\n${outcome}\\n-# Allowed for this role: ${allowed || 'nobody'}`, Colors.Red)
+        `<@${actor}> gave ${names} to <@${entry.targetId}>. Only the people listed for a blacklisted role may give it.\n${outcome}\n-# Allowed for this role: ${allowed || 'nobody'}`, Colors.Red)
         .setFooter({ text: `Given by: ${actor} · Member: ${entry.targetId}` }).setTimestamp());
     const dm = await dmActor(guild.client, actor, 'Blacklisted role blocked', [
         `You gave **${blocked.map(id => guild.roles.cache.get(id)?.name ?? id).join('**, **')}** to <@${entry.targetId}> in **${guild.name}**.`,
@@ -77,7 +77,7 @@ async function enforceMemberRoles(store: Store, logs: LogQueue, entry: GuildAudi
         'That role is blacklisted in this server, so only the people and roles listed for it can hand it out. Your staff rank or Discord permissions do not override that.',
         '',
         outcome.replace(/\*\*/g, ''),
-    ].join('\\n'));
+    ].join('\n'));
     if (!dm) logs.push(guild.id, embed('Blacklist DM not delivered', `Vanguard could not DM <@${actor}>. Their DMs are probably closed.`, Colors.DarkButNotBlack));
 }
 
@@ -123,8 +123,8 @@ async function enforceRoleDelete(store: Store, logs: LogQueue, entry: GuildAudit
         `You deleted **${name}** in **${guild.name}**.`,
         '',
         'That role is blacklisted, so only the people and roles listed for it can delete or hand it out. Vanguard put it back.',
-        given ? `It was given back to ${given} member${given === 1 ? '' : 's'}.` : '',
-    ].filter(Boolean).join('\\n'));
+        ...(given ? ['', `It was given back to ${given} member${given === 1 ? '' : 's'}.`] : []),
+    ].join('\n'));
 }
 
 /** Called when a role becomes blacklisted: remember who already has it. */

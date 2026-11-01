@@ -79,6 +79,36 @@ test('self-assignment of Administrator or Manage Server is contained but never c
     }
 });
 
+test('in observe mode a self-assignment is recorded for staff, but nothing is removed', async () => {
+    const f = fixture();
+    try {
+        const settings = f.store.settings('g'); settings.mode = 'observe'; f.store.save(settings);
+        const cards: any[] = [];
+        (f.security as any).logs = { push: (_guild: string, card: any) => { cards.push(card); } };
+        addPrivilegedRole(f, PermissionFlagsBits.Administrator);
+        await f.security.audit(selfAssignment(PermissionFlagsBits.Administrator), f.guild);
+        assert.equal(f.calls.punished, 0, 'observe mode changes nothing');
+        assert.equal(f.store.get('SELECT COUNT(*) AS n FROM incidents')!.n, 0, 'still not an anti-nuke incident');
+        assert.equal(f.store.get('SELECT COUNT(*) AS n FROM observations')!.n, 0, 'and not counted toward any rule');
+        assert.match(String(f.store.get('SELECT result FROM self_escalations')!.result), /^Observed only/);
+        assert.equal(cards.length, 1, 'staff get one quiet card');
+        assert.match(cards[0].toJSON().title, /observe mode/);
+        assert.match(cards[0].toJSON().description, /gave themselves <@&privileged>\.\nObserved only: .*\n-# Handled separately from anti-nuke/);
+    } finally { f.store.close(); }
+});
+
+test('with anti-nuke switched off for the server a self-assignment is left entirely alone', async () => {
+    const f = fixture();
+    try {
+        const settings = f.store.settings('g'); settings.enabled = false; f.store.save(settings);
+        addPrivilegedRole(f, PermissionFlagsBits.Administrator);
+        await f.security.audit(selfAssignment(PermissionFlagsBits.Administrator), f.guild);
+        assert.equal(f.calls.punished, 0);
+        assert.equal(f.store.get('SELECT COUNT(*) AS n FROM self_escalations')!.n, 0);
+        assert.equal(f.store.get('SELECT COUNT(*) AS n FROM incidents')!.n, 0);
+    } finally { f.store.close(); }
+});
+
 test('only the separate permission-grant whitelist is an exception to self-admin enforcement', async () => {
     // A full bypass never allows handing out Administrator: that is its own whitelist.
     const full = fixture();

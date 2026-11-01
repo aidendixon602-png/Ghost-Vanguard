@@ -36,7 +36,7 @@ Additional rule checks, each using disposable targets and a fresh incident windo
 | Channel Delete | Delete two disposable channels within 120s | Executor banned; snapshot recovery needs review |
 | Kick | Kick three test members within 120s | Executor banned; kicked users are not auto-rejoined |
 | Permission Grant | Add one of the six listed dangerous permissions to another role/member | First event reverted and warned; repeat within an hour strips the executor and reverts again |
-| Self-admin protection | Self-assign Administrator or Manage Server while unwhitelisted | Executor stripped and newly assigned role removed immediately; repeat with an explicit anti-nuke whitelist to confirm the exemption |
+| Self-admin protection | Self-assign Administrator or Manage Server while not on the permission-grant whitelist | Executor stripped and the new role removed immediately. A *Self-escalation blocked* card appears; `/antinuke incidents` stays empty and the threat board gets no points. Repeat with an `/antinuke whitelist admin` entry to confirm the exemption; a regular whitelist entry must not exempt it |
 | Role Create | Create five regular roles within 120s | Executor stripped; created editable roles deleted |
 | Role Delete | Delete five disposable roles within 120s | Executor stripped; restore needs review |
 | Role Invite | Assign one ordinary role to a test member | Executor stripped; assigned editable role removed |

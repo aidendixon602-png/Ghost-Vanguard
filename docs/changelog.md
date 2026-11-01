@@ -1,3 +1,10 @@
+## Unreleased: role blacklist and self-escalation fixes
+
+- **Blacklist messages now have real line breaks.** The staff card, and the DMs sent when someone tries to give or delete a blacklisted role, printed a literal `\n` where each new line should start. They read as separate lines now, and the delete notice keeps its blank line between paragraphs.
+- **`/role blacklist who-can-give` no longer files a person as a role.** Someone who is not in the server at that moment (or whom Discord could not resolve as a member) was saved as a role, so the entry never worked. The command now goes by what you actually picked, a person or a role.
+- **Observe mode records a self-assigned Administrator or Manage Server.** It posts a quiet *Self-escalation seen (observe mode)* card and saves the row in `self_escalations`. Nothing is removed, and there is still no incident and no threat score. Before this it said nothing at all.
+- The shipped-defaults page, the anti-nuke preset page, the live-test notes and the docs index now describe self-assignment as handled outside anti-nuke, and the index says 19 rules instead of 17.
+
 ## Unreleased: one rank ladder, a role blacklist, and self-grants outside anti-nuke
 
 - **One permission ladder, enforced everywhere.** Helper → Moderator → Admin → Head Admin → Bot Manager → Overseer → Supreme Leader → Server Owner → Developer. Nobody can give or take a Vanguard rank that is equal to or above their own; only the Server Owner and Developers are exempt. A Head Admin can hand out Helper, Moderator and Admin — never Head Admin or higher — with `/setup staff role` and `/setup staff user`, which no longer need a Developer. Discord's Administrator permission never counts for these.
@@ -15,7 +22,7 @@
 - **No duplicate `#vanguard-security`.** Automatic scam setup reuses an existing `#vanguard-security` (with an empty topic, or the one Vanguard marked) instead of creating a second channel, and never adopts a channel whose topic shows it belongs to another bot.
 - Removed comma-prefix command dispatch, parsing, aliases, cleanup jobs and their configuration. Slash/application commands and their permissions remain, including `/restart`.
 - Threat scores and history remain, but automatic threat-board containment, strikes and "Threat board acted" posts are disabled. The minute timer only decays/expires scores; manual staff controls remain.
-- Dangerous permission grants are reverted with a first warning and strip on a repeat within an hour. Unwhitelisted self-assignment of Administrator or Manage Server still strips and reverts immediately; explicit whitelist entries remain exempt.
+- Dangerous permission grants are reverted with a first warning and strip on a repeat within an hour. Unwhitelisted self-assignment of Administrator or Manage Server still strips and reverts immediately; explicit whitelist entries remain exempt. (Superseded: that case is now handled outside anti-nuke, see the self-assigned entry in the section above.)
 - Genreban and hardban are separate records: either can be issued while the other is active, and neither silently revokes the other. The hardban still takes enforcement priority until a Developer revokes it.
 - The shared global/DM anti-nuke card now has Ghost Vanguard branding, incident/status/response fields, role history, rollback details and an **Open server log** button. DM delivery policy is unchanged.
 - Restored standalone `/genreban`, `/ungenreban`, `/hardban` and `/unhardban` commands; removed the `/network` command group. Every network-ban action—including ban-log lifts and one-server genreban exceptions—is Developer-only; `/netexception` is also Developer-only.

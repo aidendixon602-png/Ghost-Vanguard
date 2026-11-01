@@ -20,7 +20,7 @@ The 19-rule baseline loads for authorized servers and survives restarts. Each se
 
 ### Self-assigned Administrator or Manage Server
 
-Giving yourself a role that carries Administrator or Manage Server still has the role taken straight back off and still contains the member, but it is **not an anti-nuke incident**: no threat-board points, no global alert, no DM to trusted people, and no counting toward the Role Invite threshold. It is recorded in the security log as *Self-escalation blocked*, saved in `self_escalations` for staff review, and the member is DMed. In observe mode it is watched and nothing is changed. Handing those permissions to **someone else**, or creating or editing a role with them, is still a full Permission Grant incident.
+Giving yourself a role that carries Administrator or Manage Server still has the role taken straight back off and still contains the member, but it is **not an anti-nuke incident**: no threat-board points, no global alert, no DM to trusted people, and no counting toward the Role Invite threshold. It is recorded in the security log as *Self-escalation blocked*, saved in `self_escalations` for staff review, and the member is DMed. In observe mode the card says *Self-escalation seen* and what would have happened, and nothing is changed. With anti-nuke switched off for the server, nothing is recorded. Handing those permissions to **someone else**, or creating or editing a role with them, is still a full Permission Grant incident.
 
 ## Everyone is watched
 
