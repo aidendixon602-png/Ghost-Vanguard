@@ -72,9 +72,9 @@ export const RULES: Rule[] = [
 /**
  * Routine or ambiguous actions: first threshold hit alerts and warns without containment; the change is
  * reverted only where the rule supports a safe revert. A repeat of the same rule within WARNING_MEMORY_MS
- * gets the normal response. Dangerous permission grants have their own first-warning path, except
- * self-assigned Administrator or Manage Server, which always strips and reverts immediately. Bots do not
- * get warnings for these routine rules.
+ * gets the normal response. Dangerous permission grants have their own first-warning path. A member giving
+ * themselves Administrator or Manage Server is not one of these rules at all: Security.audit answers it
+ * straight away as a self-escalation, outside anti-nuke. Bots do not get warnings for these routine rules.
  */
 /**
  * Well-known verification and role bots. They give ordinary roles all day (verified, level and reaction roles),

@@ -210,12 +210,13 @@ async function roleBlacklist(ctx, i) {
     // who-can-give
     if (!isBlacklisted(ctx.store, guildId, role.id))
         throw new AppError('VALIDATION_ERROR', `<@&${role.id}> is not blacklisted. Blacklist it first with \`/role blacklist add\`.`);
-    const who = i.options.getMentionable('who');
+    // The option says what was picked: .role for a role, .user for a person (also one who is not in the server).
+    const who = i.options.get('who');
     const remove = i.options.getBoolean('remove') ?? false;
     if (!who)
         throw new AppError('VALIDATION_ERROR', 'Pick who may give it: a person or a role.');
-    const type = 'user' in who ? 'user' : 'role';
-    const id = who.id;
+    const type = who.role ? 'role' : 'user';
+    const id = String((who.role ?? who.user)?.id ?? who.value);
     if (remove) {
         removeAssigner(ctx.store, guildId, role.id, type, id);
         ctx.store.history(guildId, 'role/blacklist', null, { role: role.id, giver: `${type}:${id}`, allowed: false }, i.user.id);

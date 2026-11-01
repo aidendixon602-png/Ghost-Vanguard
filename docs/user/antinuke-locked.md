@@ -13,7 +13,7 @@ Every authorized server starts with the same baseline rules. Servers can tune ea
 | Channel Create | 6 in 120s | Human first hit: warn + revert; same-rule repeat: strip + revert |
 | Channel Delete | 3 in 120s | Human first hit: warn (no automatic restore); same-rule repeat: strip |
 | Kick | 5 in 120s | Human first hit: warn; same-rule repeat: strip |
-| Permission Grant (Administrator, Ban/Kick, Manage Channels/Server/Roles/Webhooks) | 1 in 60s | First event: revert + warn; repeat within an hour: strip + revert. Self-assigned Administrator or Manage Server: immediate strip + revert |
+| Permission Grant (Administrator, Ban/Kick, Manage Channels/Server/Roles/Webhooks) | 1 in 60s | First event: revert + warn; repeat within an hour: strip + revert. Giving yourself Administrator or Manage Server is not counted here (see below) |
 | Role Create | 8 in 120s | Human first hit: warn + revert; same-rule repeat: strip + revert |
 | Role Delete | 5 in 120s | Human first hit: warn (no automatic restore); same-rule repeat: strip |
 | Role Invite | 8 in 60s | Human first hit: warn + revert; same-rule repeat: strip + revert |
@@ -28,7 +28,7 @@ Every authorized server starts with the same baseline rules. Servers can tune ea
 | Unban | 5 in 60s | Strip + re-ban the unbanned users |
 | Emoji Delete (emojis and stickers) | 5 in 60s | Human first hit: warn; same-rule repeat: strip |
 
-First-hit warnings apply to human actors; bots get the normal response without a warning. A safe revert is attempted only for rules with a revert handler. Self-assigned Administrator/Manage Server grants are immediate even if other dangerous grants warn first. Explicit whitelist exemptions still apply. During an enforcement incident cooldown, supported reversals continue for new matching events. Each audit event is attempted once; failed or interrupted reversals need staff review. Continuation alerts are limited to one every five seconds per actor and rule, while outcomes remain saved with the audit evidence.
+First-hit warnings apply to human actors; bots get the normal response without a warning. A safe revert is attempted only for rules with a revert handler. Giving yourself Administrator or Manage Server is not an anti-nuke event: the role comes straight back off and the member is stripped, but nothing is counted (no incident, no threat-board points, no global alert). Details are in [security-controls.md](security-controls.md#self-assigned-administrator-or-manage-server). Explicit whitelist exemptions still apply. During an enforcement incident cooldown, supported reversals continue for new matching events. Each audit event is attempted once; failed or interrupted reversals need staff review. Continuation alerts are limited to one every five seconds per actor and rule, while outcomes remain saved with the audit evidence.
 
 ## Raid protection
 

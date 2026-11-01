@@ -190,15 +190,23 @@ export class Security {
      * Self-assigned Administrator/Manage Server. The roles come straight back off and the member is
      * contained exactly as anti-nuke would have done, but this is not counted as a nuke: no observation,
      * no incident, no threat-board points, no repeat window and no global alert. Staff get one quiet card
-     * and the member is told why. Works in enforce mode only; observe mode still watches and does nothing.
+     * and the member is told why. Observe mode only records what would have happened, like every other
+     * rule, and changes nothing. With anti-nuke switched off for the server there is nothing to report.
      */
     private async selfEscalation(guild: Guild, actor: string, assigned: string[]) {
         const s = this.store.settings(guild.id);
-        if (!s.enabled || s.mode !== 'enforce') return;
+        if (!s.enabled) return;
         const member = await memberOrNull(guild, actor).catch(() => null);
+        const roles = member ? [...member.roles.cache.values()].filter(r => assigned.includes(r.id) && r.id !== guild.id && !r.managed && dangerous(r.permissions.bitfield)) : [];
+        const names = (roles.length ? roles.map(r => `<@&${r.id}>`) : assigned.map(id => `<@&${id}>`)).join(', ');
+        if (s.mode !== 'enforce') {
+            const seen = 'Observed only: this server is in observe mode, so nothing was removed.';
+            this.store.run('INSERT INTO self_escalations(guild_id,user_id,roles,result,at) VALUES(?,?,?,?,?)', guild.id, actor, JSON.stringify(assigned), seen, Date.now());
+            this.incidentLog(guild.id, embed('Self-escalation seen (observe mode)', `<@${actor}> gave themselves ${names}.\n${seen}\n-# Handled separately from anti-nuke: no incident, no threat-board score, no alert.`, Colors.DarkButNotBlack));
+            return;
+        }
         if (!member) return;
         const me = guild.members.me ?? (typeof guild.members.fetchMe === 'function' ? await guild.members.fetchMe().catch(() => null) : null);
-        const roles = [...member.roles.cache.values()].filter(r => assigned.includes(r.id) && r.id !== guild.id && !r.managed && dangerous(r.permissions.bitfield));
         const removable = me ? roles.filter(r => me.roles.highest.comparePositionTo(r) > 0) : [];
         let removed: string[] = [];
         if (removable.length) {
@@ -208,7 +216,6 @@ export class Security {
         }
         let containment: string;
         try { containment = await this.punish(guild, actor, 'strip', assigned); } catch { containment = 'Containment failed. Check role hierarchy and Manage Roles.'; }
-        const names = (roles.length ? roles.map(r => `<@&${r.id}>`) : assigned.map(id => `<@&${id}>`)).join(', ');
         const answer = `${removed.length ? `Removed the self-assigned role${removed.length === 1 ? '' : 's'}.` : 'The self-assigned role could not be removed; move Vanguard\'s role above it.'} ${containment}`;
         this.store.run('INSERT INTO self_escalations(guild_id,user_id,roles,result,at) VALUES(?,?,?,?,?)', guild.id, actor, JSON.stringify(removed.length ? removed : assigned), answer, Date.now());
         this.incidentLog(guild.id, embed('Self-escalation blocked', `<@${actor}> gave themselves ${names}.\n${answer}\n-# Handled separately from anti-nuke: no incident, no threat-board score, no alert.`, Colors.Orange));
@@ -286,7 +293,8 @@ export class Security {
         }
         if (exempt) return this.alertExempt(guild, actor, active, count, exempt, entry.targetId ?? null, s.logChannelId);
         // Most dangerous grants are reverted with a warning first; a repeat within an hour strips.
-        // Self-assigning Administrator or Manage Server remains an immediate strip-and-revert.
+        // Self-assigned Administrator or Manage Server is normally answered earlier, in audit(), as a
+        // self-escalation. This stays as a backstop so it can never be downgraded to a first warning.
         const immediateSelfAdmin = rule.key === 'dangerous_grant' && isSelfAdminAssignment(entry, guild, actor);
         const canWarn = rule.key === 'dangerous_grant' ? !immediateSelfAdmin : WARN_FIRST.has(rule.key);
         // Escalate only a repeat of the same rule. A warning for a legitimate channel edit must
