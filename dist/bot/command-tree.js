@@ -41,7 +41,7 @@ export const UMBRELLAS = [
             { child: 'authserver', mode: 'single', in: 'server', as: 'authorize' }, { child: 'deauthserver', mode: 'single', in: 'server', as: 'deauthorize' },
             { child: 'serverauth', mode: 'single', in: 'server', as: 'info' }, { child: 'authorizedservers', mode: 'single', in: 'server', as: 'list' },
             { child: 'banserver', mode: 'single', in: 'server', as: 'ban' }, { child: 'unbanserver', mode: 'single', in: 'server', as: 'unban' },
-            { child: 'database', mode: 'group' }, { child: 'autoreact', mode: 'group' }
+            { child: 'database', mode: 'group' }
         ] },
 ];
 /** Shown on their own: used often or by everyone. */

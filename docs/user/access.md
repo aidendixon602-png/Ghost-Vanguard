@@ -8,7 +8,7 @@ The bot ranks run, lowest to highest: **Helper → Moderator → Admin → Head 
 
 **Nobody can give or take a Vanguard rank that is equal to or above their own.** Only the **Server Owner** and **Developers** are exempt. A Head Admin can hand out Helper, Moderator and Admin; they cannot give Head Admin, Bot Manager, Overseer, Supreme Leader or anything higher. Discord's Administrator permission never counts for these assignments, so an Administrator with no Vanguard rank cannot change ranks at all.
 
-**Only Developers manage the bot itself.** Bot Manager, Overseer, Supreme Leader and the Server Owner get staff commands — never bot management. `/dev` (status, diagnostics, inspect, broadcast, update, restart), `/dev database`, `/dev autoreact`, server authorizations, `/setup staff global` (bot-wide ranks) and security-admin grants are Developer-only, as is every network-ban action.
+**Only Developers manage the bot itself.** Bot Manager, Overseer, Supreme Leader and the Server Owner get staff commands — never bot management. `/dev` (status, diagnostics, inspect, broadcast, update, restart), `/dev database`, server authorizations, `/setup staff global` (bot-wide ranks) and security-admin grants are Developer-only, as is every network-ban action.
 
 ## Server-only ranks by user ID
 
@@ -44,6 +44,25 @@ A role that carries a rank can be given with `/role add` only by someone above t
 - If someone who is not listed gives it, **through `/role` or straight in Discord**, the role is removed immediately, the refusal is logged, and the person is DMed with the role name and the reason. Through `/role`, the command reply also refuses and explains it.
 - **Deleting a blacklisted role** is limited to the same people. Anyone else's deletion is undone: Vanguard recreates the role with its saved name, colour, permissions and position, gives it back to the members it recorded as holding it, and moves the blacklist entry to the new role.
 - Automatic restores (`/role restore`, quarantine release, rejoin roles, Roblox bindings) and layout pruning never re-grant or delete a blacklisted role.
+
+## Automatic reactions (source only)
+
+Auto-reactions are built into the bot, not a command: there is no `/dev autoreact` and nothing is saved in the database. List members in `src/bot/access-ids.ts`, then rebuild (`npm run build`) and restart.
+
+```ts
+/** Every server the bot is in. */
+export const AUTOREACT_IDS: Record<string, string> = {
+    'YOUR_USER_ID': '🐐',
+    'ANOTHER_USER_ID': '🔥',
+};
+
+/** One server only; a server entry wins over a global one. */
+export const SERVER_AUTOREACT_IDS: Record<string, Record<string, string>> = {
+    'YOUR_SERVER_ID': { 'YOUR_USER_ID': '👀' },
+};
+```
+
+Use a unicode emoji or a custom one (`<:name:id>`); leave the value empty for the default 🐐. Webhook, system and bot messages are ignored, and a missing permission or an unusable emoji is skipped silently. Because it is source, changing the list needs a rebuild and restart — exactly like `BOT_STAFF_IDS` and `SERVER_STAFF_IDS`.
 
 ## Source-controlled ID assignments
 

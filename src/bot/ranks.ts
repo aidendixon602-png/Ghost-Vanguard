@@ -98,7 +98,7 @@ export function botRank(store: Store, userId: string): number {
  * Commands that act on the bot itself or on every server at once. Only bot ranks unlock them, so a Server
  * Owner (above Supreme Leader in their own server) still cannot restart the bot, network-ban or touch the database.
  */
-const BOT_WIDE = new Set(['dev', 'restart', 'database', 'autoreact', 'authserver', 'deauthserver', 'serverauth', 'authorizedservers', 'banserver', 'unbanserver',
+const BOT_WIDE = new Set(['dev', 'restart', 'database', 'authserver', 'deauthserver', 'serverauth', 'authorizedservers', 'banserver', 'unbanserver',
     'genreban', 'ungenreban', 'hardban', 'unhardban', 'netexception', 'staff/global']);
 export const isBotWide = (key?: string) => !!key && (BOT_WIDE.has(key.replace(/\/$/, '')) || BOT_WIDE.has(key.split('/')[0]!));
 
@@ -164,7 +164,7 @@ export const COMMAND_RANK: Record<string, number> = {
     // Bot management: Developer only. Bot Manager, Overseer, Supreme Leader and the Server Owner get
     // staff commands, never the bot's own tools.
     dev: 8, 'dev/status': 8, 'dev/status-reset': 8, 'dev/diagnostics': 8, 'dev/inspect': 8, 'dev/broadcast': 8, 'dev/update': 8,
-    database: 8, autoreact: 8, authorizedservers: 8, serverauth: 8, authserver: 8,
+    database: 8, authorizedservers: 8, serverauth: 8, authserver: 8,
     // Every network-ban action is Developer-only: issue, revoke, exceptions and ban-log lifts.
     genreban: 8, ungenreban: 8, hardban: 8, netexception: 8,
     // Developer only (the bot owner and DEVELOPER_IDS): anything that can take the bot down, rewrite its data or

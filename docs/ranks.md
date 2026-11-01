@@ -14,9 +14,6 @@ Generated from the bot itself (`npm run docs`). Every rank can also use everythi
 The top rank: the bot owner (`BOT_OWNER_ID`) and anyone in `DEVELOPER_IDS`. Everything, including the tools that can take the bot down or reach every server at once: restarts, installing updates, restoring database settings, removing or banning servers, giving bot-wide ranks and managing network bans. Watched by anti-nuke, but never punished. Set in the existing bot configuration or `BOT_STAFF_IDS.developer` in `src/bot/access-ids.ts`. Only Developers manage the bot itself: bot-wide ranks, permission-role mappings and every bot tool. Bot Manager, Overseer and Supreme Leader get staff commands only. Restart additionally requires an exact ID in `DEVELOPER_IDS`.
 
 - `/dev alerts`: Set up the global anti-nuke feed and DMs
-- `/dev autoreact add`: Auto-react to a member's messages
-- `/dev autoreact list`: List auto-react members
-- `/dev autoreact remove`: Stop auto-reacting to a member
 - `/dev broadcast`: Announce to every server's log channel
 - `/dev database backup`: Back up the database now
 - `/dev database backups`: List database backups

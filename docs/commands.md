@@ -232,9 +232,6 @@ Manage bot diagnostics, updates, servers and data
 |---|---|---|
 | `/dev server list` | List authorized servers | Developer |
 | `/dev server authorize` | Authorize this server | Developer |
-| `/dev autoreact add` | Auto-react to a member's messages | Developer |
-| `/dev autoreact remove` | Stop auto-reacting to a member | Developer |
-| `/dev autoreact list` | List auto-react members | Developer |
 | `/dev server ban` | Ban a server from the bot | Developer |
 | `/dev database status` | Show database health | Developer |
 | `/dev database backup` | Back up the database now | Developer |

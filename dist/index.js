@@ -281,7 +281,7 @@ client.on(Events.MessageCreate, m => {
     if (m.guild)
         protectedTask('staff mentions', m.guild.id, () => processStaffMention({ store, security, logs, client }, m));
     if (m.guild)
-        protectedTask('auto reactions', m.guild.id, () => autoReact(store, m));
+        protectedTask('auto reactions', m.guild.id, () => autoReact(m));
     // Only ticket channels are tracked, so ordinary chat costs one Set lookup.
     if (m.guild && isTicketChannel(m.channelId))
         protectedTask('ticket activity', m.guild.id, async () => { markTicketActivity(store, m.channelId); });
