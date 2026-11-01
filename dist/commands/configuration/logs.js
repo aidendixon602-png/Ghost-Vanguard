@@ -5,7 +5,7 @@ import { defineCommand } from '../../bot/registry.js';
 import { AppError } from '../../errors.js';
 import { configureEventLog, eventLogConfig, LOG_CATEGORIES, LOG_RETENTION_DAYS, recentEvents } from '../../audit/event-log.js';
 import { embed } from '../../ui/ui.js';
-import { BANS_CHANNEL, checkChannel, describeCheck, LEGACY_LOG_ROUTES, LOGGING_CHANNEL, logChannels, serverPermissionGaps, setLogChannels, setupLogChannels } from '../../audit/log-setup.js';
+import { applyLogMerge, BANS_CHANNEL, checkChannel, describeCheck, describeMerge, LEGACY_LOG_ROUTES, LOG_CATEGORY, LOGGING_CHANNEL, logChannels, planLogMerge, serverPermissionGaps, setLogChannels, setupLogChannels } from '../../audit/log-setup.js';
 const CATEGORY_LABELS = {
     moderation: 'Moderation (bans, kicks, timeouts, prunes)',
     members: 'Members (joins, leaves, role and nickname changes)',
@@ -22,6 +22,7 @@ export default defineCommand(new SlashCommandBuilder().setName('logs').setDescri
     .addSubcommand(s => s.setName('route').setDescription('Choose a channel for one log type, or reset it to the default')
     .addStringOption(o => o.setName('type').setDescription('Log type').setRequired(true).addChoices(...Object.keys(LEGACY_LOG_ROUTES).map(value => ({ name: value, value }))))
     .addChannelOption(o => o.setName('channel').setDescription('Destination; omit to use the default log channel').addChannelTypes(ChannelType.GuildText)))
+    .addSubcommand(s => s.setName('merge').setDescription('Group Vanguard log channels under Ghost Vanguard Logs, leaving other bots’ logs alone'))
     .addSubcommand(s => s.setName('cleanup-archive').setDescription('Preview deletion of channels in the old log archive'))
     .addSubcommand(s => s.setName('check').setDescription('Check configured log channels and bot permissions, then send test embeds'))
     .addSubcommand(s => s.setName('exclude').setDescription('Stop (or start again) logging events from a channel')
@@ -59,6 +60,34 @@ export default defineCommand(new SlashCommandBuilder().setName('logs').setDescri
             delete routes[type];
         setLogChannels(ctx.store, guild, { routes }, i.user.id);
         return `**${type} logs:** ${channel ? `<#${channel.id}>` : 'default log channel'}. Event logging and category switches still apply; check \`/setup logs status\`.`;
+    }
+    if (sub === 'merge') {
+        await i.guild.channels.fetch();
+        const plan = planLogMerge(ctx.store, i.guild);
+        const leftAlone = plan.untouched.slice(0, 15).map(u => `• <#${u.channelId}> — ${u.why}`);
+        if (!plan.categoryId && !plan.moves.length)
+            return 'Log channels are not set up here yet. Run `/setup logs setup` first; `/setup logs merge` then tidies up any channel that ends up in the wrong category.';
+        if (!plan.moves.length && !plan.renames.length)
+            return ['**Every Vanguard log channel is already grouped under Ghost Vanguard Logs.**',
+                ...(leftAlone.length || plan.untouched.length > 15 ? ['', '**Left alone:**', ...leftAlone,
+                    ...(plan.untouched.length > 15 ? [`• Plus ${plan.untouched.length - 15} more channels.`] : [])] : [])].join('\n');
+        const rename = plan.renames[0];
+        return confirmDanger(ctx, i, {
+            title: 'Merge log channels',
+            label: 'Merge channels',
+            summary: `Move ${plan.moves.length} Ghost Vanguard log channel(s) into **${LOG_CATEGORY}**${rename ? ` and rename **#${rename.from}** to **#${rename.to}**` : ''}.`,
+            consequences: [
+                ...plan.moves.slice(0, 15).map(m => `<#${m.channelId}> moves from ${m.from ? `**${m.from}**` : 'no category'} · ${m.why}`),
+                ...(plan.moves.length > 15 ? [`Plus ${plan.moves.length - 15} more Vanguard channels.`] : []),
+                ...(rename ? [`**#${rename.from}** is the same channel after the rename: same ID, permissions and messages.`] : []),
+                ...leftAlone,
+                'Channels that are not Vanguard\'s own log destinations are never moved, renamed, reused or deleted.',
+                'No message history, permission override or webhook is changed; the channels are only regrouped.',
+            ],
+            reversal: 'Drag each channel back to its old category; nothing is deleted and the settings keep working either way.',
+            working: { title: 'Merging log channels', detail: 'Grouping Vanguard\'s channels under Ghost Vanguard Logs.' },
+            run: async (c, b) => describeMerge(await applyLogMerge(c.store, b.guild, b.userId)),
+        });
     }
     if (sub === 'cleanup-archive') {
         await i.guild.channels.fetch();

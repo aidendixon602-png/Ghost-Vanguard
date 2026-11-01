@@ -59,6 +59,8 @@ Turn categories on or off with `/setup logs category`, and browse with `/setup l
 
 When `/setup logs setup` finds recognized Veil log channels in the old or archived category, it reuses them under Ghost Vanguard Logs. Messages and permission overrides remain intact. Channels that are public or missing the bot's required permissions are skipped and reported; fix their permissions and run setup again. `/setup logs check` checks configured channels.
 
+`/setup logs merge` cleans up a server whose log channels ended up in different categories. It previews the change, then groups Vanguard's own log channels — ban logs, server logs, the security log and any log channel Vanguard is configured to post in — under **Ghost Vanguard Logs** and renames the old default `#midtown-vanguard-logging` to `#ghost-vanguard-logging` (same channel, same ID, same history). It never moves, renames, reuses or deletes another bot's channels, including look-alike names such as `#modlogs`, `#join-logs`, `#honeypot` or `#veil-utilities-logging`, and it reports duplicate log channels for a human to archive. This works the same in servers that never had Veil.
+
 Join and leave events go to `#join-logs`; member, role, channel, message, server and moderation events go to their matching channels. `#voice-logs` records voice joins, moves and leaves. `#command-logs` records successful Ghost Vanguard slash command names and users, without arguments or replies. Anti-nuke alerts are also copied to `#antinuke-logs`. Event logging and category settings still apply. If a matching channel is not configured, events use the existing combined log channel.
 <!-- /coderabbit-ai-generated:v1 -->
 

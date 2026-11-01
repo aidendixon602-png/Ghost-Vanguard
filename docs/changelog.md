@@ -1,5 +1,7 @@
 ## Unreleased: Developer-only network bans, application commands and clearer alerts
 
+- `/setup logs merge` groups Vanguard's own log channels under **Ghost Vanguard Logs** after a preview, including the private security log and any channel Vanguard is configured to post in. It renames an old `#midtown-vanguard-logging` to `#ghost-vanguard-logging` (same channel and history) and reports duplicates instead of deleting them. Channels it cannot prove are its own — another bot's `#modlogs`, `#join-logs`, `#honeypot`, `#veil-utilities-logging` or anything in a staff category — are never moved, renamed or reused, and the command works the same in servers that never had Veil.
+- **No duplicate `#vanguard-security`.** Automatic scam setup reuses an existing `#vanguard-security` (with an empty topic, or the one Vanguard marked) instead of creating a second channel, and never adopts a channel whose topic shows it belongs to another bot.
 - Removed comma-prefix command dispatch, parsing, aliases, cleanup jobs and their configuration. Slash/application commands and their permissions remain, including `/restart`.
 - Threat scores and history remain, but automatic threat-board containment, strikes and "Threat board acted" posts are disabled. The minute timer only decays/expires scores; manual staff controls remain.
 - Dangerous permission grants are reverted with a first warning and strip on a repeat within an hour. Unwhitelisted self-assignment of Administrator or Manage Server still strips and reverts immediately; explicit whitelist entries remain exempt.

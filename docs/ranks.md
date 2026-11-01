@@ -182,6 +182,7 @@ Server rank: lifting ordinary bans and accepting appeals, raid tools, automod, s
 - `/setup logs disable`: Turn event logging off
 - `/setup logs enable`: Turn event logging on
 - `/setup logs exclude`: Stop or resume logging a channel
+- `/setup logs merge`: Group Vanguard's log channels, leaving other bots' logs alone
 - `/setup logs route`: Choose a private channel for a log type, or reset its destination
 - `/setup logs setup`: Set up log channels and reuse existing event logs
 - `/setup logs status`: Show logging settings

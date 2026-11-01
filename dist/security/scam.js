@@ -1,5 +1,6 @@
 import { ChannelType, Colors, EmbedBuilder, GatewayIntentBits, PermissionFlagsBits } from 'discord.js';
 import { readFile } from 'node:fs/promises';
+import { DEFAULT_CHANNELS, SECURITY_LOG_TOPIC } from '../branding.js';
 import { logEvent } from '../errors.js';
 import { config } from '../config.js';
 import { clip, Cooldowns, KeyedQueue } from '../core.js';
@@ -67,10 +68,25 @@ export class ScamProtection {
                 const channels = await guild.channels.fetch();
                 if (!active())
                     return false;
-                channel = channels.find(c => c?.type === ChannelType.GuildText && c.topic === 'Ghost Vanguard • managed security log') ?? null;
+                const canPost = (c) => c?.type === ChannelType.GuildText && c.isSendable?.() !== false
+                    && !!c.permissionsFor?.(me)?.has([PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.EmbedLinks]);
+                // The channel Vanguard marked, then an existing #vanguard-security someone made for it (a
+                // restored backup, an older release, or staff). Either way no second channel is created.
+                channel = channels.find((c) => canPost(c) && c.topic === SECURITY_LOG_TOPIC) ?? null;
                 if (!channel) {
-                    channel = await guild.channels.create({ name: 'vanguard-security', type: ChannelType.GuildText,
-                        topic: 'Ghost Vanguard • managed security log', reason: 'Automatic scam protection setup',
+                    const named = channels.find((c) => canPost(c) && c.name === DEFAULT_CHANNELS.security && !c.topic) ?? null;
+                    if (named) {
+                        channel = named;
+                        // Mark it as Vanguard's so later restarts find it here instead of looking again.
+                        try {
+                            await named.setTopic?.(SECURITY_LOG_TOPIC, 'Ghost Vanguard security log');
+                        }
+                        catch { /* the topic is only a convenience; the channel is still reused */ }
+                    }
+                }
+                if (!channel) {
+                    channel = await guild.channels.create({ name: DEFAULT_CHANNELS.security, type: ChannelType.GuildText,
+                        topic: SECURITY_LOG_TOPIC, reason: 'Automatic scam protection setup',
                         permissionOverwrites: [{ id: guild.id, deny: [PermissionFlagsBits.ViewChannel] },
                             { id: me.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.EmbedLinks, PermissionFlagsBits.ReadMessageHistory] }] });
                 }
