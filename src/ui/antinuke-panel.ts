@@ -21,7 +21,7 @@ export function statusPanel(ctx:CommandContext,guild:string,user:string) {
  */
 export const TRUST_PRESETS: Record<string, { title: string; description: string; rules: string[] }> = {
     moderation: { title: 'Basic moderation', description: 'bans, unbans, kicks and timeouts', rules: ['mass_ban', 'mass_unban', 'mass_kick', 'timeout'] },
-    roles: { title: 'Role manager', description: 'give ordinary roles, create, edit and delete roles (protected permissions need the permission-grant whitelist)', rules: ['role_grant', 'role_create', 'role_update', 'role_delete'] },
+    roles: { title: 'Role manager', description: 'give ordinary roles, create, edit and delete roles; protected permissions need their own whitelist', rules: ['role_grant', 'role_create', 'role_update', 'role_delete'] },
     channels: { title: 'Channel manager', description: 'create, edit and delete channels and webhooks', rules: ['channel_create', 'channel_update', 'channel_delete', 'webhook_change'] },
     administrator: { title: 'Administrator', description: 'everything incl. promoting mods; not Administrator grants, bots or prunes',
         rules: ['mass_ban', 'mass_unban', 'mass_kick', 'timeout', 'role_grant', 'role_create', 'role_update', 'role_delete', 'channel_create', 'channel_update', 'channel_delete', 'webhook_change', 'guild_update', 'automod_tamper', 'emoji_delete'] },
