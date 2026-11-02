@@ -1,3 +1,4 @@
+import { startup } from './startup.js';
 import { accessSummary } from './bot/access-summary.js';
 import { dmTrusted } from './bot/trusted-dm.js';
 import { onRejoin, saveLeftRoles } from './features/rejoin-roles.js';
@@ -66,6 +67,7 @@ if (errors.length) {
     process.exit(1);
 }
 const healthUrl = `http://${config.host}:${config.port}/healthz`;
+startup.step('Opening the database');
 const store = new Store(config.dbPath);
 const owner = randomUUID();
 if (!store.acquireLease('bot', owner)) {
@@ -86,6 +88,7 @@ const scam = new ScamProtection(store, logs);
 snapshots.onAudit = (guildId, title, detail) => logs.push(guildId, recoveryEmbed(title, detail, client.user?.id, Colors.Blurple));
 registerBanLogRenderer(store, logs);
 const registry = new Registry();
+startup.step('Loading commands and checking the database');
 try {
     await registry.load();
     registerComponents(registry);
@@ -184,19 +187,25 @@ client.once(Events.ClientReady, async (c) => {
     try {
         if (c.user.id !== config.clientId)
             throw new Error('DISCORD_CLIENT_ID does not match the token application');
+        startup.step(`Connected as ${c.user.tag}. Starting servers`);
+        const total = client.guilds.cache.size;
+        let started = 0;
         for (const guild of client.guilds.cache.values()) {
+            startup.detail(`${++started} of ${total}`);
             await lifecycle.joined(guild);
         }
         for (const row of store.all('SELECT guild_id,name FROM guild_data WHERE active=1'))
             if (!client.guilds.cache.has(row.guild_id))
                 store.markGuild(row.guild_id, row.name, false);
         // Register the current application-command tree. The bulk sync also removes stale commands.
+        startup.step('Registering slash commands');
         const commandsUpdated = await syncCommands(client.rest, config.clientId, treeJson(registry));
         for (const guild of client.guilds.cache.values())
             if (['AUTHORIZED', 'PENDING_AUTHORIZATION'].includes(store.authorization(guild.id)?.state))
                 await cleanLegacyGuildCommands(client.rest, config.clientId, guild.id, store);
         readyAt = Date.now();
         startupReady = true;
+        startup.done();
         logEvent('ready', { bot: c.user.tag, version: VERSION, commands: registry.commands.size, servers: client.guilds.cache.size, health: healthUrl });
         logEvent('integrations', { rover: config.roverKey ? 'configured' : 'disabled', bloxlink: config.bloxlinkKey ? 'configured' : 'disabled', ai: config.aiEnabled ? 'configured' : 'disabled' });
         if (config.logFormat !== 'json')
@@ -506,6 +515,7 @@ process.on('unhandledRejection', error => {
     logEvent('unhandled_rejection', failure(error));
     task('shutdown', shutdown(1));
 });
+startup.step('Connecting to Discord', 'The bot is running; Discord has not answered yet. If this repeats, the host may not be reaching Discord.');
 try {
     await client.login(config.token);
 }

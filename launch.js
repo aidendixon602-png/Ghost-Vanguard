@@ -151,6 +151,7 @@ function depsCurrent() {
 function installDeps() {
     const fresh = !existsSync(join(root, 'node_modules', 'discord.js'));
     const started = Date.now();
+    say('Installing dependencies. This can take a few minutes on a small host...', '  📦');
     // npm's spinner and progress bars turn into garbage in a host panel, so run it quietly and print one summary line.
     const npm = args => spawnSync('npm', [...args, '--omit=dev', '--no-audit', '--no-fund', '--no-progress', '--loglevel=error'], { cwd: root, encoding: 'utf8', shell: process.platform === 'win32' });
     let result = npm(['ci']);
@@ -341,6 +342,7 @@ for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, async () => {
     process.exit(0);
 });
 
+say(`Starting the bot${lastGood ? ` · ${lastGood.slice(0, 7)}` : ''}`);
 startBot();
 if (updatesOn && existsSync(join(root, '.git'))) setInterval(() => { void checkForUpdate(); }, CHECK_MS).unref?.();
 // Keep the launcher alive while the bot runs.
