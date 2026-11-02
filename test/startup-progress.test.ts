@@ -118,11 +118,19 @@ test('index.ts imports the start-up notice first and reports each step in the or
 });
 
 test('the first line is printed before anything else, even when the settings are wrong and the bot cannot start', () => {
-    const result = spawnSync(process.execPath, ['--import', 'tsx', 'src/index.ts'], {
-        cwd: resolve('.'), encoding: 'utf8', timeout: 90_000,
-        env: { ...process.env, DISCORD_TOKEN: '', DISCORD_CLIENT_ID: '', DEVELOPER_IDS: '', NO_COLOR: '1' },
-    });
-    assert.equal(result.status, 1, `${result.stdout}${result.stderr}`);
-    assert.match(result.stdout, /^› Starting Ghost Vanguard v\d+\.\d+\.\d+$/m, 'the console says the bot is starting');
-    assert.match(result.stderr, /Ghost Vanguard cannot start/);
+    const dir = mkdtempSync(join(tmpdir(), 'gv-boot-'));
+    try {
+        const result = spawnSync(process.execPath, ['--import', 'tsx', 'src/index.ts'], {
+            cwd: resolve('.'), encoding: 'utf8', timeout: 90_000,
+            env: { ...process.env, DISCORD_TOKEN: '', DISCORD_CLIENT_ID: '', DEVELOPER_IDS: '', NO_COLOR: '1', DATABASE_PATH: join(dir, 'vanguard.db') },
+        });
+        assert.equal(result.status, 1, `${result.stdout}${result.stderr}`);
+        assert.match(result.stdout, /^› Starting Ghost Vanguard v\d+\.\d+\.\d+$/m, 'the console says the bot is starting');
+        assert.match(result.stderr, /Ghost Vanguard cannot start/);
+        // The same two messages are in the console log next to the database, for a host whose console tab stays empty.
+        const saved = readFileSync(join(dir, 'console.log'), 'utf8');
+        assert.match(saved, /^===== Ghost Vanguard v\d+\.\d+\.\d+ started .* UTC, process \d+ =====$/m);
+        assert.match(saved, /^\S+ \S+ › Starting Ghost Vanguard v\d+\.\d+\.\d+$/m);
+        assert.match(saved, /^\S+ \S+ ✖ Ghost Vanguard cannot start\. Fix these settings in \.env:$/m);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
 });

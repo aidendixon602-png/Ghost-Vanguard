@@ -175,6 +175,7 @@ export const DESCRIPTIONS = {
     "/netexception list": "List genreban exceptions",
     "/netexception revoke": "Cancel a genreban exception",
     "/dev diagnostics": "Show runtime health",
+    "/dev logs": "Show the bot's recent console output",
     "/dev inspect": "Inspect any server the bot knows",
     "/dev broadcast": "Announce to every server's log channel",
     "/dev status": "Set a custom bot status",

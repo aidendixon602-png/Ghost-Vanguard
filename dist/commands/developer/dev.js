@@ -1,4 +1,4 @@
-import { ActivityType, ChannelType, PermissionFlagsBits, SlashCommandBuilder } from 'discord.js';
+import { ActivityType, AttachmentBuilder, ChannelType, PermissionFlagsBits, SlashCommandBuilder } from 'discord.js';
 import { config, VERSION } from '../../config.js';
 import { defineCommand } from '../../bot/registry.js';
 import { confirmDanger } from '../../ui/danger-ui.js';
@@ -6,6 +6,8 @@ import { AppError } from '../../errors.js';
 import { broadcast, broadcastTargets, clearPresenceOverride, inspectGuild, setPresenceOverride } from '../../bot/dev-tools.js';
 import { presenceLines } from '../../security/protection-stats.js';
 import { spawnSync } from 'node:child_process';
+import { relative } from 'node:path';
+import { currentConsoleLog, formatTail } from '../../console-log.js';
 import { askLauncher, describeUpdate } from '../../bot/updater-link.js';
 import { DEVELOPER_ONLY_MESSAGE, botRank, RANKS } from '../../bot/ranks.js';
 import { dmSetting, globalAlertCard, globalAlertTarget, setDmSetting, setGlobalAlertTarget } from '../../security/global-alert.js';
@@ -19,8 +21,28 @@ function codeVersion() {
     const updates = process.env.UPDATE_REPO && process.env.UPDATE_TOKEN ? `on (${process.env.UPDATE_REPO})` : 'off';
     return `${sha ? ` · commit \`${sha}\`` : ''}\n**Automatic updates:** ${updates}`;
 }
+/** The newest console lines, in the reply when they fit and as a file when they do not. */
+async function consoleReply(i, wanted) {
+    const log = currentConsoleLog();
+    if (!log)
+        return 'This run is not keeping a copy of its console, so there is nothing to show.';
+    const lines = log.tail(wanted);
+    if (!lines.length)
+        return 'The bot has not printed anything yet.';
+    const up = Math.floor(process.uptime());
+    const head = `**Last ${lines.length} console line${lines.length === 1 ? '' : 's'}** · up ${up < 3600 ? `${Math.floor(up / 60)} min` : `${Math.floor(up / 3600)} h ${Math.floor(up % 3600 / 60)} min`} · times are UTC`;
+    const file = log.filePath ? relative(process.cwd(), log.filePath) : '';
+    const saved = file ? `\n-# Older lines are in \`${file.startsWith('..') ? log.filePath : file}\`. Open it in your host's file manager.` : '';
+    // A line that holds three backticks would end the code block early.
+    const body = formatTail(lines).replaceAll('```', "'''");
+    if (body.length <= 3300)
+        return `${head}\n\`\`\`\n${body}\n\`\`\`${saved}`;
+    await i.editReply({ content: `${head}\nToo long for one message, so it is attached.${saved}`, files: [new AttachmentBuilder(Buffer.from(body, 'utf8'), { name: 'console.txt' })] });
+}
 export default defineCommand(new SlashCommandBuilder().setName('dev').setDescription('Developer tools: diagnostics, server lookup, announcements and bot status')
     .addSubcommand(s => s.setName('diagnostics').setDescription('Inspect runtime health without secrets'))
+    .addSubcommand(s => s.setName('logs').setDescription('Show what the bot printed to its console, for when the host console is empty')
+    .addIntegerOption(o => o.setName('lines').setDescription('How many of the newest lines to show (default 40)').setMinValue(5).setMaxValue(300)))
     .addSubcommand(s => s.setName('inspect').setDescription('Read-only overview of any server Vanguard knows')
     .addStringOption(o => o.setName('guild_id').setDescription('Server ID').setRequired(true).setMinLength(17).setMaxLength(20)))
     .addSubcommand(s => s.setName('broadcast').setDescription("Post an announcement to every authorized server's log channel")
@@ -42,6 +64,8 @@ export default defineCommand(new SlashCommandBuilder().setName('dev').setDescrip
     .addSubcommand(s => s.setName('sync').setDescription('Re-register commands globally and clear duplicate guild-scoped copies in this server')
     .addStringOption(o => o.setName('guild_id').setDescription('Optional: instant test-sync to this server ID (creates temporary guild+global duplicates there)').setMinLength(17).setMaxLength(20))), { responseKind: 'info', category: 'developer', developerOnly: true, requiresAuthorization: false }, async (ctx, i) => {
     const sub = i.options.getSubcommand();
+    if (sub === 'logs')
+        return consoleReply(i, i.options.getInteger('lines') ?? 40);
     if (sub === 'update') {
         const op = (i.options.getString('action') ?? 'status');
         // Anyone with /dev may look; installing a new version is for Developers.
