@@ -1,3 +1,9 @@
+## Unreleased: the console shows each start-up step
+
+- **No more blank console while the bot starts.** The first line used to appear only after the bot had logged in to Discord, started every server and registered its commands, so a slow start, or a connection to Discord that never answers, looked like a bot that was not running. The bot now prints `› Starting Ghost Vanguard v3.2.1` as soon as it loads, then a line for each step: opening the database, loading commands, connecting to Discord, starting servers and registering slash commands. A step that takes longer than 30 seconds repeats `⚠ Still waiting after 30 s on "<step>"` every 30 seconds, so the last step printed is the one that is stuck. With `LOG_FORMAT=json` the same information is one JSON object per line.
+- **The launcher says what it is doing too.** `launch.js` prints `› Starting the bot · <commit>` right before it starts the bot, and `📦 Installing dependencies…` before an install that runs quietly and can take minutes on a small host. The running launcher keeps the code it started with, so these two lines appear after the next Restart in the panel.
+- Nothing else changed. The banner, the log lines and what the bot does at start-up are the same, and `docs/user/hosting.md` now lists what a healthy start looks like and what a stall at each step means.
+
 ## Unreleased: log setup waits half a second between changes
 
 - **A pause between changes.** A first-time `/setup logs setup` makes 16 changes to the server: it creates `#bans`, `#ghost-vanguard-logging` and the **Ghost Vanguard Logs** category, moves the category to the top, moves the first two channels into it, and creates the ten log type channels. They went out back to back, and a burst like that is what Discord rate limits. Setup and `/setup logs merge` now wait half a second between one change and the next, whether the change creates, moves or renames a channel or pins the category to the top.

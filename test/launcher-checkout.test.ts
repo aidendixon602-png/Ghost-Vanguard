@@ -99,3 +99,37 @@ exit 0
         rmSync(dir, { recursive: true, force: true });
     }
 });
+
+test('the launcher says when it starts installing dependencies and which version it is starting, so the console is never blank', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'vanguard-launch-'));
+    let child: ReturnType<typeof spawn> | undefined;
+    try {
+        mkdirSync(join(dir, 'bin'));
+        mkdirSync(join(dir, 'dist'));
+        copyFileSync(new URL('../launch.js', import.meta.url), join(dir, 'launch.js'));
+        writeFileSync(join(dir, 'package.json'), '{"type":"module"}');
+        writeFileSync(join(dir, 'dist', 'index.js'), 'setInterval(() => {}, 1000);');
+        // There is no node_modules, so the launcher installs dependencies. The fake npm answers at once.
+        writeFileSync(join(dir, 'bin', 'npm'), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+        writeFileSync(join(dir, 'bin', 'git'), '#!/bin/sh\ncase "$1" in\n  rev-parse) echo 0123456789abcdef0123456789abcdef01234567 ;;\nesac\nexit 0\n', { mode: 0o755 });
+        child = spawn(process.execPath, ['launch.js'], { cwd: dir, env: { ...process.env, PATH: `${join(dir, 'bin')}:${process.env.PATH}`, UPDATE_REPO: '', UPDATE_TOKEN: '' }, stdio: ['ignore', 'pipe', 'pipe'] });
+        const output = await new Promise<string>((resolve, reject) => {
+            let text = '';
+            const timer = setTimeout(() => reject(new Error(`launcher timed out: ${text}`)), 10000);
+            child!.stdout!.on('data', chunk => {
+                text += chunk.toString();
+                if (text.includes('Starting the bot')) { clearTimeout(timer); resolve(text); }
+            });
+            child!.once('exit', code => { clearTimeout(timer); reject(new Error(`launcher exited ${code}: ${text}`)); });
+        });
+        const at = ['Installing dependencies. This can take a few minutes', 'Dependencies installed', 'Starting the bot · 0123456'].map(part => output.indexOf(part));
+        assert.ok(at.every(position => position !== -1), `all three lines are printed:\n${output}`);
+        assert.deepEqual([...at].sort((a, b) => a - b), at, 'the install is announced before it runs, and the bot is announced after it');
+    } finally {
+        if (child && child.exitCode === null && child.signalCode === null) {
+            child.kill('SIGTERM');
+            await once(child, 'exit');
+        }
+        rmSync(dir, { recursive: true, force: true });
+    }
+});
