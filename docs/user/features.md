@@ -82,6 +82,8 @@ Setup reuses a channel with the right name when it sits in Ghost Vanguard Logs o
 
 If Discord refuses to create a channel (usually because Vanguard lacks Manage Channels, or the category is full), setup keeps the channels it already made, lists the log types still missing and stops. Fix the problem and run setup again to finish.
 
+Setup waits half a second between one change to the server and the next, which makes it less likely that Discord rate limits the bot. A server with no log channels yet takes 10 seconds or more. Running setup again when everything exists finishes at once. While setup runs, most other Vanguard commands in that server wait their turn. `/setup logs merge` pauses the same way between the channels it moves.
+
 Run `/setup logs setup separate_channels:false` if you only want `#bans` and `#ghost-vanguard-logging`. An event type with no channel of its own goes to `#ghost-vanguard-logging`. Voice and command activity is the exception: it is only recorded once `#voice-logs` and `#command-logs` exist. Event logging and the category switches still apply everywhere.
 
 `/setup logs check` sends a test message to every log channel and lists the log types that still have no channel. `/setup logs status` shows the same list.

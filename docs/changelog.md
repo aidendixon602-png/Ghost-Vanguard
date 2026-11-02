@@ -1,3 +1,11 @@
+## Unreleased: log setup waits half a second between changes
+
+- **A pause between changes.** A first-time `/setup logs setup` makes 16 changes to the server: it creates `#bans`, `#ghost-vanguard-logging` and the **Ghost Vanguard Logs** category, moves the category to the top, moves the first two channels into it, and creates the ten log type channels. They went out back to back, and a burst like that is what Discord rate limits. Setup and `/setup logs merge` now wait half a second between one change and the next, whether the change creates, moves or renames a channel or pins the category to the top.
+- **Nothing to change, nothing to wait for.** There is no pause before the first change or after the last. Running setup again once everything exists makes one change (the category goes back to the top) and does not wait.
+- **Removing the server stops the run.** Authorization is checked again after each pause, right before the change, so `/dev server deauthorize` during a run stops it before the next channel is touched.
+- **What it costs.** A server with no log channels takes 7.5 seconds longer, so 10 to 15 seconds in all, and the message `/setup logs setup` posts while it works says so. Most other commands used in that server meanwhile wait for setup to finish, because commands run one at a time per server.
+- **It lowers the chance of a rate limit but cannot rule one out.** Discord does not publish how many channels a server may create in a row. If it answers with a rate limit anyway, discord.js waits and carries on, and running setup again finishes whatever is left.
+
 ## Unreleased: `/setup logs setup` makes a channel for every log type
 
 - **Setup builds the whole set.** It used to create only `#bans` and `#ghost-vanguard-logging`. Every other log type went to the combined channel unless an old Veil channel with the right name already existed (in one server that was only `#message-logs`). Setup now also creates a private channel for each type inside **Ghost Vanguard Logs**: `#mod-logs`, `#join-logs`, `#member-logs`, `#role-logs`, `#channel-logs`, `#server-logs`, `#message-logs`, `#voice-logs`, `#command-logs` and `#antinuke-logs`. A server that was set up before gets them the next time `/setup logs setup` runs.

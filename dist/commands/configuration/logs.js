@@ -127,7 +127,8 @@ export default defineCommand(new SlashCommandBuilder().setName('logs').setDescri
         return;
     }
     if (sub === 'setup' || sub === 'check') {
-        await i.editReply({ embeds: [embed(sub === 'setup' ? 'Setting up log channels…' : 'Checking log channels…', 'Checking channels and permissions, then sending a test embed.', Colors.Blurple)] }).catch(() => undefined);
+        await i.editReply({ embeds: [embed(sub === 'setup' ? 'Setting up log channels…' : 'Checking log channels…', sub === 'setup' ? 'Missing channels are made one at a time, half a second apart, so a new server takes 10 seconds or more. Each channel then gets a test embed.'
+                    : 'Checking channels and permissions, then sending a test embed.', Colors.Blurple)] }).catch(() => undefined);
         const lines = [];
         let skippedRoutes = false;
         let bansId, loggingId;

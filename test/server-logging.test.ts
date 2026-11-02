@@ -6,11 +6,16 @@ import { Store } from '../src/database/db.js';
 import { FAST_ATTEMPTS, LogQueue, SLOW_RETRY_MS } from '../src/logging.js';
 import { redact } from '../src/audit/redact.js';
 import { configureEventLog, describeAudit, eventLogConfig, LOG_CATEGORIES, recordEvent, recordMemberEvent, recordVoiceEvent } from '../src/audit/event-log.js';
-import { applyLogMerge, checkChannel, describeRouteSetup, LEGACY_LOG_ROUTES, logChannels, planLogMerge, routesWithoutChannel, setLogChannels, setupLogChannels } from '../src/audit/log-setup.js';
+import { applyLogMerge, checkChannel, describeRouteSetup, LEGACY_LOG_ROUTES, logChannels, pacing, planLogMerge, routesWithoutChannel, setLogChannels, setupLogChannels } from '../src/audit/log-setup.js';
 import { reportBotError } from '../src/audit/bot-errors.js';
 import { Security } from '../src/security/security.js';
 
 const G = '500000000000000001', BOT = '600000000000000001';
+
+// Setup waits half a second between its changes to the server. The tests do not sit through that:
+// the wait is skipped here, and the tests that check it record the pauses (see recordingPauses).
+const realSleep = pacing.sleep;
+pacing.sleep = async () => { };
 
 // ------------------------------------------------------------ delivery
 
@@ -159,7 +164,7 @@ test('nickname changes, roles and kicks have clear titles and verified actors', 
 
 // ------------------------------------------------------------ setup
 
-function fakeGuild(existing: string[] = [], o: { everyoneCanView?: boolean; botPerms?: bigint[]; categories?: string[]; legacyChildren?: string[]; failCreate?: (name: string) => string | undefined; slowCreate?: boolean } = {}) {
+function fakeGuild(existing: string[] = [], o: { everyoneCanView?: boolean; botPerms?: bigint[]; categories?: string[]; legacyChildren?: string[]; failCreate?: (name: string) => string | undefined; slowCreate?: boolean; timeline?: string[] } = {}) {
     const channels = new Collection<string, any>();
     const created: any[] = [];
     const sentTo: string[] = [];
@@ -168,8 +173,8 @@ function fakeGuild(existing: string[] = [], o: { everyoneCanView?: boolean; botP
             id, name, type: ChannelType.GuildText, parentId, isTextBased: () => true,
             permissionsFor: (who: any) => ({ has: (bit: bigint) => who === 'everyone' ? !!o.everyoneCanView : (o.botPerms ?? [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.EmbedLinks, PermissionFlagsBits.ReadMessageHistory]).includes(bit) }),
             send: async () => { sentTo.push(id); },
-            setParent: async (parent: string) => { channel.parentId = parent; return channel; },
-            edit: async (change: any) => { Object.assign(channel, change); return channel; },
+            setParent: async (parent: string) => { o.timeline?.push(`move ${channel.name}`); channel.parentId = parent; return channel; },
+            edit: async (change: any) => { o.timeline?.push(`rename ${channel.name}`); Object.assign(channel, change); return channel; },
         };
         channels.set(id, channel);
         return channel;
@@ -177,8 +182,8 @@ function fakeGuild(existing: string[] = [], o: { everyoneCanView?: boolean; botP
     const makeCategory = (id: string, name: string) => {
         const category: any = {
             id, name, type: ChannelType.GuildCategory, position: 10,
-            setPosition: async (position: number) => { category.position = position; return category; },
-            edit: async (change: any) => { Object.assign(category, change); return category; },
+            setPosition: async (position: number) => { o.timeline?.push(`position ${category.name}`); category.position = position; return category; },
+            edit: async (change: any) => { o.timeline?.push(`rename ${category.name}`); Object.assign(category, change); return category; },
         };
         channels.set(id, category);
         return category;
@@ -195,6 +200,7 @@ function fakeGuild(existing: string[] = [], o: { everyoneCanView?: boolean; botP
             cache: channels,
             fetch: async (id: string) => channels.get(id) ?? null,
             create: async (opts: any) => {
+                o.timeline?.push(`create ${opts.name}`);
                 const failure = o.failCreate?.(opts.name);
                 if (failure) throw new Error(failure);
                 if (o.slowCreate) await new Promise(resolve => setTimeout(resolve, 2));
@@ -546,6 +552,141 @@ test('an interrupted setup is resumed by name, so channels made before the inter
     } finally { store.close(); }
 });
 
+// ------------------------------------------------------------ pauses between changes
+
+/** Run `work` with the setup pauses written into `timeline`, in order with the changes the fake guild records there. */
+async function recordingPauses<T>(timeline: string[], work: () => Promise<T>): Promise<T> {
+    const skipped = pacing.sleep;
+    pacing.sleep = async ms => { timeline.push(`pause ${ms}`); };
+    try { return await work(); } finally { pacing.sleep = skipped; }
+}
+
+/** One half-second pause between every two changes, and none before the first or after the last. */
+function assertPausedBetweenChanges(timeline: string[]) {
+    const shown = timeline.join(' | ');
+    assert.ok(timeline.length >= 3, `expected several changes: ${shown}`);
+    timeline.forEach((entry, n) => assert.equal(entry.startsWith('pause'), n % 2 === 1, `entry ${n} is "${entry}": ${shown}`));
+    assert.equal(timeline.length % 2, 1, `it should end on a change, not a pause: ${shown}`);
+    for (const entry of timeline.filter(e => e.startsWith('pause'))) assert.equal(entry, 'pause 500');
+}
+
+test('the pause between changes is half a second, and the built-in sleep really waits', async () => {
+    assert.equal(pacing.pauseMs, 500);
+    const started = Date.now();
+    await realSleep(40);
+    assert.ok(Date.now() - started >= 35, 'the built-in pause waits for the time it is given');
+});
+
+test('setup waits half a second between its changes, and not before the first or after the last', async () => {
+    const store = new Store(':memory:'); authorize(store, G);
+    try {
+        const timeline: string[] = [];
+        const { guild } = fakeGuild([], { timeline });
+        await recordingPauses(timeline, () => store.withAuthorized(G, () => setupLogChannels(store, guild, 'admin')));
+        const changes = timeline.filter(entry => !entry.startsWith('pause'));
+        assert.deepEqual(changes, ['create bans', 'create ghost-vanguard-logging', 'create Ghost Vanguard Logs', 'position Ghost Vanguard Logs',
+            'move bans', 'move ghost-vanguard-logging', ...TYPE_CHANNELS.map(name => `create ${name}`)]);
+        assert.equal(timeline.length, changes.length * 2 - 1, 'one pause between each two changes');
+        assertPausedBetweenChanges(timeline);
+    } finally { store.close(); }
+});
+
+test('moving reused channels and archiving the old Veil category are paced the same way', async () => {
+    const store = new Store(':memory:'); authorize(store, G);
+    try {
+        const timeline: string[] = [];
+        const { guild } = fakeGuild(['bans', 'ghost-vanguard-logging'], { categories: ['VEIL LOGS'], legacyChildren: ['join-logs', 'message-logs'], timeline });
+        await recordingPauses(timeline, () => store.withAuthorized(G, () => setupLogChannels(store, guild, 'admin')));
+        for (const change of ['move join-logs', 'move message-logs', 'rename VEIL LOGS'])
+            assert.ok(timeline.includes(change), `${change} happened: ${timeline.join(' | ')}`);
+        assertPausedBetweenChanges(timeline);
+    } finally { store.close(); }
+});
+
+test('a setup run with nothing to create or move does not wait', async () => {
+    const store = new Store(':memory:'); authorize(store, G);
+    try {
+        const timeline: string[] = [];
+        const { guild } = fakeGuild([], { timeline });
+        await recordingPauses(timeline, async () => {
+            await store.withAuthorized(G, () => setupLogChannels(store, guild, 'admin'));
+            timeline.length = 0;
+            await store.withAuthorized(G, () => setupLogChannels(store, guild, 'admin'));
+        });
+        assert.deepEqual(timeline, ['position Ghost Vanguard Logs'], 'the second run only puts the category back at the top, so there is nothing to wait between');
+    } finally { store.close(); }
+});
+
+test('setup does not wait again after a channel Discord refused to create', async () => {
+    const store = new Store(':memory:'); authorize(store, G);
+    try {
+        const timeline: string[] = [];
+        const { guild } = fakeGuild([], { timeline, failCreate: name => name === 'role-logs' ? 'Missing Permissions' : undefined });
+        const result = await recordingPauses(timeline, () => store.withAuthorized(G, () => setupLogChannels(store, guild, 'admin')));
+        assert.equal(result.failed?.route, 'roles');
+        assert.equal(timeline.at(-1), 'create role-logs', 'the refused channel was the last thing setup tried');
+        assert.equal(timeline.filter(entry => entry === 'create role-logs').length, 1, 'it did not try again');
+        assertPausedBetweenChanges(timeline);
+    } finally { store.close(); }
+});
+
+test('merging waits half a second between the channels it moves and renames', async () => {
+    const store = new Store(':memory:'); authorize(store, G);
+    try {
+        const timeline: string[] = [];
+        const { guild } = fakeGuild(['bans', 'midtown-vanguard-logging', 'vanguard-security'], { timeline });
+        configureEventLog(store, G, { enabled: true, channelId: channelNamed(guild, 'midtown-vanguard-logging').id });
+        setLogChannels(store, G, { bansChannelId: channelNamed(guild, 'bans').id });
+        const settings = store.settings(G); settings.logChannelId = channelNamed(guild, 'vanguard-security').id; store.save(settings);
+        const result = await recordingPauses(timeline, () => applyLogMerge(store, guild, 'admin'));
+        assert.deepEqual([result.moved, result.renamed], [3, 1]);
+        assert.deepEqual(timeline.filter(entry => !entry.startsWith('pause')), ['create Ghost Vanguard Logs', 'position Ghost Vanguard Logs',
+            'move bans', 'move midtown-vanguard-logging', 'move vanguard-security', 'rename midtown-vanguard-logging']);
+        assertPausedBetweenChanges(timeline);
+    } finally { store.close(); }
+});
+
+test('a server removed while setup or merge is paused gets no further change', async () => {
+    // `/dev server deauthorize` lands during the nth wait between two changes.
+    const removeDuringPause = async (store: Store, timeline: string[], work: () => Promise<unknown>, nth = 1) => {
+        const waited = pacing.sleep;
+        let pauses = 0;
+        pacing.sleep = async ms => {
+            timeline.push(`pause ${ms}`);
+            if (++pauses === nth) store.run("UPDATE guild_authorization SET state='DEAUTHORIZED',generation=generation+1 WHERE guild_id=?", G);
+        };
+        try { await assert.rejects(work(), /requires developer authorization/); } finally { pacing.sleep = waited; }
+    };
+    const setupStore = new Store(':memory:'); authorize(setupStore, G);
+    const mergeStore = new Store(':memory:'); authorize(mergeStore, G);
+    try {
+        const setupTimeline: string[] = [];
+        const fresh = fakeGuild([], { timeline: setupTimeline });
+        // Removed before the category is moved to the top. That change reads nothing from the database, so only the
+        // check after the pause can stop it (creating a channel reads the staff roles first and would throw anyway).
+        await removeDuringPause(setupStore, setupTimeline, () => setupStore.withAuthorized(G, () => setupLogChannels(setupStore, fresh.guild, 'admin')), 3);
+        assert.deepEqual(setupTimeline, ['create bans', 'pause 500', 'create ghost-vanguard-logging', 'pause 500', 'create Ghost Vanguard Logs', 'pause 500'], 'setup changed nothing once the server was removed');
+        assert.equal(fresh.guild.channels.cache.size, 3);
+
+        // Removed while the log type channels are being made: the run stops with that error, it is not reported as a refused channel.
+        const typesStore = new Store(':memory:'); authorize(typesStore, G);
+        try {
+            const typesTimeline: string[] = [];
+            const partway = fakeGuild([], { timeline: typesTimeline });
+            await removeDuringPause(typesStore, typesTimeline, () => typesStore.withAuthorized(G, () => setupLogChannels(typesStore, partway.guild, 'admin')), 7);
+            assert.equal(typesTimeline.at(-1), 'pause 500', 'the last thing setup did was wait');
+            assert.deepEqual([...partway.guild.channels.cache.values()].map((c: any) => c.name), ['bans', 'ghost-vanguard-logging', 'Ghost Vanguard Logs', 'mod-logs'], 'no channel was made after the server was removed');
+        } finally { typesStore.close(); }
+
+        const mergeTimeline: string[] = [];
+        const scattered = fakeGuild(['bans', 'ghost-vanguard-logging'], { timeline: mergeTimeline });
+        setLogChannels(mergeStore, G, { bansChannelId: channelNamed(scattered.guild, 'bans').id });
+        await removeDuringPause(mergeStore, mergeTimeline, () => applyLogMerge(mergeStore, scattered.guild, 'admin'));
+        assert.deepEqual(mergeTimeline, ['create Ghost Vanguard Logs', 'pause 500'], 'merge moved nothing once the server was removed');
+        assert.equal(channelNamed(scattered.guild, 'bans').parentId, null);
+    } finally { setupStore.close(); mergeStore.close(); }
+});
+
 test('the setup summary says what was created, reused, replaced and left undone', () => {
     const check = { channelId: 'old', ok: false, missing: ['Send Messages'], publiclyVisible: true, test: 'skipped' as const };
     const summary = describeRouteSetup({
@@ -573,6 +714,7 @@ test('/setup logs setup lists the channels it made, tests each one and stays wel
         const options = (separate: boolean | null) => ({ getSubcommand: () => 'setup', getChannel: () => null, getBoolean: (name: string) => name === 'separate_channels' ? separate : null });
         const i: any = { guildId: G, guild, user: { id: 'owner' }, options: options(null), editReply: async (reply: any) => { replies.push(reply); } };
         await store.withAuthorized(G, () => command.execute({ store } as any, i));
+        assert.match(replies[0].embeds[0].toJSON().description, /one at a time, half a second apart, so a new server takes 10 seconds or more/, 'the first message says why a new server takes a while');
         const card = replies.at(-1).embeds[0].toJSON();
         assert.equal(card.title, '✅ Log channels ready');
         const routes = logChannels(store, G).routes as Record<string, string>;
@@ -587,6 +729,7 @@ test('/setup logs setup lists the channels it made, tests each one and stays wel
         replies.length = 0;
         const check: any = { ...i, options: { getSubcommand: () => 'check' } };
         await store.withAuthorized(G, () => command.execute({ store } as any, check));
+        assert.doesNotMatch(replies[0].embeds[0].toJSON().description, /half a second/, 'a check makes no channels, so it does not talk about pauses');
         const checked = replies.at(-1).embeds[0].toJSON();
         assert.equal(checked.title, '✅ Log channels ready');
         assert.doesNotMatch(checked.description, /Without their own channel/);
