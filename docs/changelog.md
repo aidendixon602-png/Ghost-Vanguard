@@ -1,3 +1,11 @@
+## Unreleased: the console shows commands and stops
+
+- **Each slash command is one console line.** After the banner the console used to print nothing at all unless something failed, so a working bot and a dead one looked the same. A typed command now prints `/setup staff global · someone · Server name · 142 ms`: what was typed, who ran it, where, and how long it took. Buttons, menus and autocomplete are still left out. `LOG_LEVEL=warn` hides the lines again. The same lines are in `/dev logs` and `console.log`.
+- **The bot says when it stops.** `› Stopping: <reason>` comes first, before anything is closed, and `› Stopped · exit code N` last. The reason names the cause: the host panel, an update or `/restart` (SIGTERM), Ctrl+C, an uncaught exception, a lost database lease, a failed Discord login. A kill from outside, such as the host ending the process or running out of memory, prints neither line.
+- **The start-up Access list names people.** Each ID is followed by the person's name when the bot has seen them, and when someone was given a rank with `/setup staff global` a line says that running it again with rank **Remove rank** takes it back.
+- With `LOG_FORMAT=json` the stop lines are `shutdown_started` and `shutdown_finished`, and commands are `command_activity` events as before, now printed at the default level.
+- `docs/user/hosting.md` describes what the console shows while the bot runs. A sentence about `LOG_FORMAT=json` that had ended up under the wrong heading is back where it belongs.
+
 ## Unreleased: `/dev logs` and a console log file
 
 - **The bot keeps a copy of everything it prints.** A console tab that stays at 0 lines, and a Pull output that stops a few seconds after the start, left no way to see what the bot was doing. `/dev logs` shows the newest lines in Discord (40 by default, up to 300, sent as `console.txt` when they do not fit in a message). The same lines go to `console.log` next to the database with a date and time on each, and the file moves to `console.old.log` at 1 MB.

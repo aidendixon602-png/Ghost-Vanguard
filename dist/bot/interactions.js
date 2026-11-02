@@ -122,7 +122,7 @@ export class Interactions {
             finally {
                 this.depths.set(guildId, Math.max(0, (this.depths.get(guildId) ?? 1) - 1));
             }
-            logEvent('command_activity', { command: name, subcommand: path, user: i.user.tag, userId: i.user.id, guildId, guild: i.inCachedGuild() ? i.guild.name : null, durationMs: Date.now() - start, result: 'success' });
+            logEvent('command_activity', { command: name, subcommand: path, ...(shown && !i.isAutocomplete() ? { typed: shown } : {}), user: i.user.tag, userId: i.user.id, guildId, guild: i.inCachedGuild() ? i.guild.name : null, durationMs: Date.now() - start, result: 'success' });
             // Record the command name and actor, never options or private reply content.
             if (shown && !i.isAutocomplete()) {
                 try {

@@ -1,4 +1,5 @@
 import { startup } from './startup.js';
+import { announceStopped, announceStopping } from './startup-progress.js';
 import { accessSummary } from './bot/access-summary.js';
 import { dmTrusted } from './bot/trusted-dm.js';
 import { onRejoin, saveLeftRoles } from './features/rejoin-roles.js';
@@ -215,7 +216,7 @@ client.once(Events.ClientReady, async (c) => {
         printStartupInvite(client.guilds.cache.size);
         if (config.logFormat !== 'json') {
             console.log('');
-            for (const line of accessSummary(store))
+            for (const line of accessSummary(store, id => client.users.cache.get(id)?.username))
                 console.log(line);
             console.log(closingRule());
         }
@@ -247,7 +248,7 @@ client.once(Events.ClientReady, async (c) => {
     }
     catch (error) {
         logEvent('startup_failure', failure(error));
-        await shutdown(1);
+        await shutdown(1, 'start-up failed, described above');
     }
 });
 client.on(Events.InteractionCreate, i => {
@@ -407,7 +408,7 @@ const server = createServer((req, res) => {
 });
 server.on('error', () => {
     console.error('Health server failed to bind. Check HEALTH_HOST/HEALTH_PORT and stop duplicate processes.');
-    task('shutdown', shutdown(1));
+    task('shutdown', shutdown(1, 'the health server could not start'));
 });
 server.listen(config.port, config.host, () => {
     logEvent('health_listening', {
@@ -473,18 +474,19 @@ timers.push(setInterval(() => {
     try {
         if (!store.acquireLease('bot', owner)) {
             console.error('Database process lease lost. Stopping this instance.');
-            task('shutdown', shutdown(1));
+            task('shutdown', shutdown(1, 'the database lease was lost'));
         }
     }
     catch {
         console.error('Cannot renew database process lease. Stopping.');
-        task('shutdown', shutdown(1));
+        task('shutdown', shutdown(1, 'the database lease could not be renewed'));
     }
 }, 10000));
-async function shutdown(code = 0) {
+async function shutdown(code = 0, reason = 'asked to stop') {
     if (shuttingDown)
         return;
     shuttingDown = true;
+    announceStopping(reason);
     timers.forEach(clearInterval);
     lifecycle.close();
     // Persist buffered role summaries to the outbox before closing the store.
@@ -502,18 +504,19 @@ async function shutdown(code = 0) {
     catch { }
     // Awaiting tasks can still finish; process termination prevents use after database close.
     store.close();
+    announceStopped(code);
     process.exit(code);
 }
-selfRestart.run = code => task('shutdown', shutdown(code));
-process.on('SIGINT', () => task('shutdown', shutdown()));
-process.on('SIGTERM', () => task('shutdown', shutdown()));
+selfRestart.run = code => task('shutdown', shutdown(code, 'restart requested from Discord'));
+process.on('SIGINT', () => task('shutdown', shutdown(0, 'Ctrl+C (SIGINT)')));
+process.on('SIGTERM', () => task('shutdown', shutdown(0, 'asked to stop (SIGTERM) by the host panel, an update or /restart')));
 process.on('uncaughtException', error => {
     logEvent('uncaught_exception', failure(error));
-    task('shutdown', shutdown(1));
+    task('shutdown', shutdown(1, 'an uncaught exception, described above'));
 });
 process.on('unhandledRejection', error => {
     logEvent('unhandled_rejection', failure(error));
-    task('shutdown', shutdown(1));
+    task('shutdown', shutdown(1, 'an unhandled rejection, described above'));
 });
 startup.step('Connecting to Discord', 'The bot is running; Discord has not answered yet. If this repeats, the host may not be reaching Discord.');
 try {
@@ -525,5 +528,5 @@ catch (error) {
             : 'Check your internet connection, VPN or firewall, then try again.';
     console.error(`Discord login failed: ${code || 'error'} — ${String(error?.message ?? error).slice(0, 200)}
 ${why}`);
-    await shutdown(1);
+    await shutdown(1, 'could not log in to Discord, see above');
 }

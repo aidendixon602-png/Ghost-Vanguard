@@ -276,3 +276,23 @@ test('a grouped command (/info ping) runs end to end through the router', async 
     assert.equal(f.replies[0].embeds[0].data.title, '/info ping', 'reply identifies the command as shown in Discord');
     s.close();
 });
+
+test('a typed slash command prints one console line; autocomplete, buttons and menus print none', async () => {
+    const seen = async (kind: string) => {
+        const s = new Store(':memory:'), r = new Registry(), printed: string[] = [], original = console.log;
+        authorize(s, guildId);
+        const def = defineCommand(new SlashCommandBuilder().setName('probe').setDescription('Test'), {}, async () => 'done');
+        def.autocomplete = async () => { };
+        r.add(def, 'probe');
+        r.component({ prefix: 'probe:', kinds: ['button', 'select', 'modal'], metadata: defaults, execute: async () => { } });
+        const f = interaction(kind);
+        console.log = (...args: any[]) => { printed.push(args.join(' ')); };
+        try { await new Interactions(services(s, r)).handle(f.i); } finally { console.log = original; s.close(); }
+        return printed.map(line => line.replace(/\u001b\[[0-9;]*m/g, ''));
+    };
+    const slash = await seen('slash');
+    assert.equal(slash.length, 1, slash.join('\n'));
+    assert.match(slash[0]!, /\/probe · User · Guild · \d+ ms$/, 'what was typed, who ran it, where and how long it took');
+    for (const kind of ['autocomplete', 'button', 'select'])
+        assert.deepEqual(await seen(kind), [], `${kind} stays out of the console`);
+});

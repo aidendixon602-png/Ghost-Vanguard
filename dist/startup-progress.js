@@ -5,6 +5,17 @@ import { config } from './config.js';
  * is on, and a reminder repeats every 30 seconds while one step is still going.
  */
 export const REMINDER_MS = 30_000;
+/**
+ * The bot used to stop without a word, so a restart looked the same whether it was asked to stop,
+ * crashed or was killed. These two lines are the trail: why it is stopping, then that it finished.
+ * A kill (SIGKILL, out of memory) prints neither, which is itself the answer.
+ */
+export function announceStopping(reason, print = line => console.log(line), json = config.logFormat === 'json') {
+    print(json ? JSON.stringify({ timestamp: new Date().toISOString(), event: 'shutdown_started', reason }) : `› Stopping: ${reason}`);
+}
+export function announceStopped(code, print = line => console.log(line), json = config.logFormat === 'json') {
+    print(json ? JSON.stringify({ timestamp: new Date().toISOString(), event: 'shutdown_finished', code }) : `› Stopped · exit code ${code}`);
+}
 export function createStartupProgress(print = line => console.log(line), options = {}) {
     const json = options.json ?? config.logFormat === 'json';
     const reminderMs = options.reminderMs ?? REMINDER_MS;
