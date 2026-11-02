@@ -163,7 +163,7 @@ export const COMMAND_RANK: Record<string, number> = {
     'staff/list': 1, 'staff/check': 1, 'staff/role': 4, 'staff/user': 4, 'role/blacklist': RANKS.owner,
     // Bot management: Developer only. Bot Manager, Overseer, Supreme Leader and the Server Owner get
     // staff commands, never the bot's own tools.
-    dev: 8, 'dev/status': 8, 'dev/status-reset': 8, 'dev/diagnostics': 8, 'dev/inspect': 8, 'dev/broadcast': 8, 'dev/update': 8,
+    dev: 8, 'dev/status': 8, 'dev/status-reset': 8, 'dev/diagnostics': 8, 'dev/logs': 8, 'dev/inspect': 8, 'dev/broadcast': 8, 'dev/update': 8,
     database: 8, authorizedservers: 8, serverauth: 8, authserver: 8,
     // Every network-ban action is Developer-only: issue, revoke, exceptions and ban-log lifts.
     genreban: 8, ungenreban: 8, hardban: 8, netexception: 8,

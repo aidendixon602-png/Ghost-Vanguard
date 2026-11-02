@@ -240,6 +240,7 @@ Manage bot diagnostics, updates, servers and data
 | `/dev database verify` | Verify a database backup | Developer |
 | `/dev server deauthorize` | Remove this server and leave | Developer |
 | `/dev diagnostics` | Show runtime health | Developer |
+| `/dev logs` | Show the bot's recent console output | Developer |
 | `/dev inspect` | Inspect any server the bot knows | Developer |
 | `/dev broadcast` | Announce to every server's log channel | Developer |
 | `/dev status` | Set a custom bot status | Developer |

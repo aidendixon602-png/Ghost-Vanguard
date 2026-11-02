@@ -1,7 +1,7 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, Colors, RoleSelectMenuBuilder, StringSelectMenuBuilder, UserSelectMenuBuilder } from 'discord.js';
 import { defaults, type CommandContext, type Registry } from '../bot/registry.js';
 import { AppError } from '../errors.js';
-import { RULES } from '../core.js';
+import { clip, RULES } from '../core.js';
 import { embed } from './ui.js';
 import { canManageOwnTrust, RULE_LABELS, scopeName, TRUST_PRESETS, trustListPage } from './antinuke-panel.js';
 
@@ -14,8 +14,8 @@ import { canManageOwnTrust, RULE_LABELS, scopeName, TRUST_PRESETS, trustListPage
 
 /** Everything selectable, in display order. Index = bit in the saved mask. */
 export const ALLOW_OPTIONS: { value: string; label: string; description?: string }[] = [
-    { value: 'all', label: '✅ Everything (full bypass)', description: 'Never punished (you still get alerted), except for granting protected permissions.' },
-    ...Object.entries(TRUST_PRESETS).map(([key, p]) => ({ value: `preset:${key}`, label: `★ ${p.title}`, description: p.description.slice(0, 100) })),
+    { value: 'all', label: 'Everything (full bypass)', description: 'Never punished (you still get alerted), except for granting protected permissions.' },
+    ...Object.entries(TRUST_PRESETS).map(([key, p]) => ({ value: `preset:${key}`, label: `★ ${p.title}`, description: clip(p.description, 100) })),
     ...RULE_LABELS.filter(([key]) => RULES.some(r => r.key === key)).map(([value, label]) => ({ value, label })),
 ];
 
@@ -73,9 +73,9 @@ export function trustPanel(ctx: CommandContext, guild: string, user: string, s: 
     const savedRules = saved ? saved.kinds.map(k => k.split(':')[1]!).filter(Boolean) : [];
     const savedText = !saved ? '' : !saved.kinds.length ? 'nothing (anti-nuke watches them like anyone else)'
         : saved.kinds.some(k => !k.includes(':'))
-            ? `**Everything** (full bypass)${savedRules.length ? ` + **${scopeName(savedRules)}**` : ''}`
+            ? `**Everything** (full bypass)${savedRules.length ? ` + **${scopeName(savedRules).replace(/ only$/, '')}**` : ''}`
             : `**${scopeName(savedRules)}**`;
-    const pending = !selected.length ? '*nothing ticked*' : selected.includes('all') ? '**Everything** (full bypass)' : selected.map(v => ALLOW_OPTIONS.find(o => o.value === v)!.label).join(', ');
+    const pending = !selected.length ? '*nothing ticked*' : selected.includes('all') ? `**Everything** (full bypass)${selected.includes('dangerous_grant') ? ' + **Grant protected permissions**' : ''}` : selected.map(v => ALLOW_OPTIONS.find(o => o.value === v)!.label).join(', ');
     const lines = [
         `**1. Who:** ${who}`,
         `**2. Allowed:** ${pending}`,
@@ -126,7 +126,9 @@ export function saveTrust(ctx: CommandContext, guild: string, target: string, ro
         for (const k of before) ctx.store.revokeGrant(guild, target, k, actor.id);
         for (const k of kinds) ctx.store.grant(guild, target, k, actor.id, hours || undefined);
     });
-    const scope = kinds.some(k => !k.includes(':')) ? 'everything (full bypass)' : scopeName(kinds.map(k => k.split(':')[1]!));
+    const scope = kinds.some(k => !k.includes(':'))
+        ? `everything (full bypass)${kinds.some(k => k.endsWith(':dangerous_grant')) ? ' and permission grants' : ''}`
+        : scopeName(kinds.map(k => k.split(':')[1]!));
     const time = hours ? PANEL_DURATIONS.find(d => d.hours === hours)?.label ?? `${hours} hours` : 'until removed';
     ctx.logs.push(guild, embed('Whitelist changed', `By <@${actor.id}> · <@${role ? '&' : ''}${target}> may now: **${scope}** · ${time.toLowerCase()}${before.length ? ' (replaced their previous bypass)' : ''}`));
     return `Saved: <@${role ? '&' : ''}${target}> may now do **${scope}** (${time.toLowerCase()}).`;
@@ -154,8 +156,9 @@ export function registerTrustPanel(registry: Registry) {
         }
         if (action === 'allow') {
             let values = (i.values ?? []).filter((v: string) => ALLOW_OPTIONS.some(o => o.value === v));
-            // "Everything" already covers the rest, so keep the panel honest.
-            if (values.includes('all')) values = ['all'];
+            // "Everything" already covers every other tick except permission grants. That one is its own
+            // whitelist entry, so it stays ticked when it was picked together with Everything.
+            if (values.includes('all')) values = values.filter((v: string) => v === 'all' || v === 'dangerous_grant');
             return void await i.editReply(trustPanel(ctx, guild, user, { ...s, mask: toMask(values) }));
         }
         if (action === 'time') {

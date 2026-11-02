@@ -1,3 +1,18 @@
+## Unreleased: `/dev logs` and a console log file
+
+- **The bot keeps a copy of everything it prints.** A console tab that stays at 0 lines, and a Pull output that stops a few seconds after the start, left no way to see what the bot was doing. `/dev logs` shows the newest lines in Discord (40 by default, up to 300, sent as `console.txt` when they do not fit in a message). The same lines go to `console.log` next to the database with a date and time on each, and the file moves to `console.old.log` at 1 MB.
+- **Left out of the copy.** Discord tokens, API keys and `password=` values are hidden before a line is stored. Output from `launch.js` is not in it because that is a different process, and neither is anything Node prints before the bot starts.
+- **Developers only.** `/dev logs` is under `/dev`, so no staff rank or Discord permission opens it.
+- **The console is unchanged.** Every write still reaches it as before, colours included. The copy is made on the way past, and the log starts just before the first start-up line so that line is in it too.
+- `docs/user/hosting.md` has a section for hosts whose console tab shows nothing.
+
+## Unreleased: whitelist panel dropdown
+
+- **The Role manager line is no longer cut off.** The *Tick what anti-nuke should let them do* dropdown cut every preset description at 100 characters, which is Discord's limit for one option. Role manager's description was 110 characters, so it stopped inside its brackets at "need the permission-grant". It now reads "give ordinary roles, create, edit and delete roles; protected permissions need their own whitelist", which fits. The same sentence appears in the saved-scope messages, where it no longer has brackets inside brackets.
+- **No check mark in front of Everything.** The option's label started with a green ✅, so it looked ticked while the panel said *nothing ticked*. Discord marks ticked options itself, so the label is now just *Everything (full bypass)*.
+- **Everything plus Grant protected permissions can be saved.** Picking both used to untick the grant entry, although the note under the panel says to tick it. Everything still replaces every other tick, but the grant tick stays. The *Allowed* line, the save confirmation and the whitelist log line now name it, and *Saved right now* reads "Everything (full bypass) + Permission grants" instead of "+ Permission grants only".
+- A test fails if an option text is longer than Discord allows, so a long description cannot be cut quietly again.
+
 ## Unreleased: the console shows each start-up step
 
 - **No more blank console while the bot starts.** The first line used to appear only after the bot had logged in to Discord, started every server and registered its commands, so a slow start, or a connection to Discord that never answers, looked like a bot that was not running. The bot now prints `› Starting Ghost Vanguard v3.2.1` as soon as it loads, then a line for each step: opening the database, loading commands, connecting to Discord, starting servers and registering slash commands. A step that takes longer than 30 seconds repeats `⚠ Still waiting after 30 s on "<step>"` every 30 seconds, so the last step printed is the one that is stuck. With `LOG_FORMAT=json` the same information is one JSON object per line.

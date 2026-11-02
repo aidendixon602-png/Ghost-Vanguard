@@ -59,6 +59,17 @@ The first line comes from `launch.js`, the rest from the bot. If one step takes 
 - **Connected as … Starting servers** names how many servers it has started, such as `(2 of 3)`, in each reminder.
 - Before `Starting the bot`, `launch.js` may print `📦 Installing dependencies…`. That install runs quietly and can take a few minutes on a small host.
 
+## When the console tab stays empty
+
+Some panels show only the lines that arrive while the console tab is open, and the **Output** box under Wispbyte's **Pull** button stops a few seconds after the server starts. Neither shows a bot that finished starting a minute ago. The bot keeps its own copy of what it prints:
+
+- **`/dev logs`** (Developers only) shows the newest 40 lines in Discord. `lines:` takes 5 to 300, and more than fits in a message comes as `console.txt`. Times are UTC.
+- **`console.log`**, next to the database file (`data/console.log` by default), holds the same lines with a date and time on each, from earlier runs too. Open it in the host's file manager. At 1 MB it moves to `console.old.log`, so at most two files are kept.
+
+Both start with the first line of a run, so they hold the start-up steps, the banner, warnings and errors. Discord tokens, API keys and `password=` values are hidden before a line is stored. What `launch.js` prints (git output, update messages) is not in them because it comes from a different process, and neither is anything the host or Node itself prints before the bot is running.
+
+`/dev logs` needs a bot that is online. If it never gets online, read `console.log` instead.
+
 With `LOG_FORMAT=json` each of these is one JSON object per line instead (`startup_progress`, and `startup_slow` for the reminders).
 
 ## Health endpoint

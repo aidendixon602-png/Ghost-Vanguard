@@ -22,6 +22,7 @@ The top rank: the bot owner (`BOT_OWNER_ID`) and anyone in `DEVELOPER_IDS`. Ever
 - `/dev database verify`: Verify a database backup
 - `/dev diagnostics`: Show runtime health
 - `/dev inspect`: Inspect any server the bot knows
+- `/dev logs`: Show the bot's recent console output
 - `/dev server authorize`: Authorize this server
 - `/dev server ban`: Ban a server from the bot
 - `/dev server deauthorize`: Remove this server and leave

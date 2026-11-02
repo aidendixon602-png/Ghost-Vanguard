@@ -61,6 +61,7 @@ test('each rank opens exactly its commands, without needing Discord permissions'
     assert.equal(guard.allowed({ ...defaults, category: 'moderation' }, G, 'u', member('u'), 'moderation', 'moderation/ban'), false, 'switched-off features stay off for every rank');
     assert.equal(requiredRank('help/'), undefined, 'everyday commands are not rank-gated');
     assert.equal(requiredRank('roblox/bloxlink-sync'), RANKS.admin, 'running Bloxlink role updates is Admin-only');
+    assert.equal(requiredRank('dev/logs'), RANKS.developer, 'the console log shows internal details, so only Developers read it');
     store.close();
 });
 

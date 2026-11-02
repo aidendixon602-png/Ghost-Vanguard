@@ -302,7 +302,7 @@ test('the risky tools are Developer only: Supreme Leaders, Overseers and server 
             assert.equal(can(plainMember(OWNER, PermissionFlagsBits.Administrator), key), false, `server owner must not use /${key}`);
         }
         // Nobody but a Developer touches the bot itself, whatever their staff rank.
-        for (const key of ['dev/diagnostics', 'dev/update', 'database/backup', 'authserver', 'authorizedservers', 'dev/status'])
+        for (const key of ['dev/diagnostics', 'dev/logs', 'dev/update', 'database/backup', 'authserver', 'authorizedservers', 'dev/status'])
             assert.equal(can(plainMember(SUPREME), key), false, `a Supreme Leader must not manage the bot with /${key}`);
         // Server ranks are staff work, not bot management: Supreme Leaders and the owner may change them.
         for (const key of ['staff/role', 'staff/user'])
@@ -310,7 +310,7 @@ test('the risky tools are Developer only: Supreme Leaders, Overseers and server 
         for (const key of ['guild-config/permission-role'])
             assert.equal(can(plainMember(OWNER), key), true, `the Server Owner assigns permission roles with /${key}`);
         // The server owner outranks Supreme Leaders in their server, but never gets bot-wide tools.
-        for (const key of [...risky, 'genreban', 'hardban', 'ungenreban', 'dev/diagnostics', 'dev/update', 'database/backup', 'authserver'])
+        for (const key of [...risky, 'genreban', 'hardban', 'ungenreban', 'dev/diagnostics', 'dev/logs', 'dev/update', 'database/backup', 'authserver'])
             assert.equal(can(plainMember(OWNER), key), false, `Server Owner must not use /${key}`);
         for (const key of ['config-history/restore', 'antinuke/disable', 'trust/add'])
             assert.equal(can(plainMember(OWNER), key), true, `Server Owner can use /${key}`);
