@@ -83,13 +83,40 @@ function privateOverwrites(store: Store, guild: Guild): OverwriteResolvable[] {
     ];
 }
 
+/**
+ * Setup and merge change a lot of channels in a row, and Discord rate limits how fast a server can be
+ * written to. A run waits `pauseMs` between its changes: not before the first one, and not at all when
+ * there is nothing to change. `sleep` can be replaced so tests do not have to sit through the pauses.
+ */
+export const pacing = {
+    pauseMs: 500,
+    sleep: (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms)),
+};
+
+/**
+ * One per setup or merge run. `beforeChange` goes in front of every change the run makes to the server.
+ * It waits out the pause after the previous change, then checks that the server is still authorized, so
+ * a server removed during the wait (`/dev server deauthorize`) gets no further change.
+ */
+class Pacer {
+    private started = false;
+
+    constructor(private readonly stillAuthorized: () => void) { }
+
+    async beforeChange() {
+        if (this.started) await pacing.sleep(pacing.pauseMs);
+        this.started = true;
+        this.stillAuthorized();
+    }
+}
+
 type Found = { channel: TextChannel; created: boolean; how: string };
 
 /**
  * Use the chosen channel, the saved one, one with an expected name (the current name or a legacy
  * one), or create a private one. A legacy name is reused as it is: Vanguard never renames channels.
  */
-async function resolveChannel(store: Store, guild: Guild, names: string | string[], chosen: GuildBasedChannel | null, saved: string | null, reason: string): Promise<Found> {
+async function resolveChannel(store: Store, guild: Guild, names: string | string[], chosen: GuildBasedChannel | null, saved: string | null, reason: string, pace: Pacer): Promise<Found> {
     const wanted = Array.isArray(names) ? names : [names];
     const text = (c: GuildBasedChannel | null | undefined) => c && c.type === ChannelType.GuildText ? c as TextChannel : null;
     if (chosen) {
@@ -106,6 +133,7 @@ async function resolveChannel(store: Store, guild: Guild, names: string | string
         .sort((a, b) => Number(inLogArea(guild, b.parentId)) - Number(inLogArea(guild, a.parentId))
             || Number(!!a.parentId) - Number(!!b.parentId))[0]);
     if (named) return { channel: named, created: false, how: named.name === wanted[0] ? 'existing channel reused' : `existing channel reused (still named #${named.name})` };
+    await pace.beforeChange();
     const created = await guild.channels.create({ name: wanted[0]!, type: ChannelType.GuildText, permissionOverwrites: privateOverwrites(store, guild), reason });
     return { channel: created, created: true, how: 'created (private: staff only)' };
 }
@@ -113,26 +141,30 @@ async function resolveChannel(store: Store, guild: Guild, names: string | string
 const normalizedCategoryName = (name: string) => name.trim().toLowerCase().replace(/[_-]+/g, ' ');
 
 /** Find or create the category for active Ghost Vanguard logs. */
-async function resolveLogCategory(store: Store, guild: Guild, reason: string) {
+async function resolveLogCategory(store: Store, guild: Guild, reason: string, pace: Pacer) {
     const category = findLogCategory(guild);
     if (category) return { category, created: false };
+    await pace.beforeChange();
     const created = await guild.channels.create({ name: LOG_CATEGORY, type: ChannelType.GuildCategory, permissionOverwrites: privateOverwrites(store, guild), reason });
     return { category: created as CategoryChannel, created: true };
 }
 
 /** Move only the two active log channels. Keep their channel overrides and every old log message intact. */
-async function placeInLogCategory(channels: Found[], category: any, reason: string) {
-    for (const { channel } of channels)
-        if (channel.parentId !== category.id)
-            await channel.setParent(category.id, { lockPermissions: false, reason });
+async function placeInLogCategory(channels: Found[], category: any, reason: string, pace: Pacer) {
+    for (const { channel } of channels) {
+        if (channel.parentId === category.id) continue;
+        await pace.beforeChange();
+        await channel.setParent(category.id, { lockPermissions: false, reason });
+    }
 }
 
 /** Rename the old Veil category so it is clearly archived; never delete its channels or messages. */
-async function archiveLegacyLogCategories(guild: Guild, reason: string) {
+async function archiveLegacyLogCategories(guild: Guild, reason: string, pace: Pacer) {
     const legacyNames = new Set(LEGACY_CATEGORIES.logs.map(normalizedCategoryName));
     const archived: string[] = [];
     for (const channel of guild.channels.cache.values()) {
         if (channel.type !== ChannelType.GuildCategory || !legacyNames.has(normalizedCategoryName(channel.name))) continue;
+        await pace.beforeChange();
         await channel.edit({ name: ARCHIVED_LOG_CATEGORY, reason });
         archived.push(channel.id);
     }
@@ -140,7 +172,7 @@ async function archiveLegacyLogCategories(guild: Guild, reason: string) {
 }
 
 /** Reuse recognized channels from Veil's old category; preserve their overrides and history. */
-async function activateLegacyRoutes(store: Store, guild: Guild, category: GuildBasedChannel, reason: string) {
+async function activateLegacyRoutes(store: Store, guild: Guild, category: GuildBasedChannel, reason: string, pace: Pacer) {
     const names = new Set([...LEGACY_CATEGORIES.logs, ARCHIVED_LOG_CATEGORY].map(normalizedCategoryName));
     const legacyIds = new Set([...guild.channels.cache.values()].filter(c => c.type === ChannelType.GuildCategory && names.has(normalizedCategoryName(c.name))).map(c => c.id));
     const routes = { ...logChannels(store, guild.id).routes };
@@ -169,8 +201,10 @@ async function activateLegacyRoutes(store: Store, guild: Guild, category: GuildB
             continue;
         }
         store.assertAuthorized(guild.id);
-        if (existing.parentId !== category.id)
+        if (existing.parentId !== category.id) {
+            await pace.beforeChange();
             await (existing as TextChannel).setParent(category.id, { lockPermissions: false, reason });
+        }
         routes[route] = existing.id;
     }
     return { routes, skipped };
@@ -184,12 +218,13 @@ export interface RouteFailure { route: LogRoute; error: string }
  * Channels already made are kept (they sit in the category, so running setup again finds them by
  * name instead of making a second set).
  */
-async function createMissingRoutes(store: Store, guild: Guild, category: CategoryChannel, routes: Partial<Record<LogRoute, string>>, reason: string) {
+async function createMissingRoutes(store: Store, guild: Guild, category: CategoryChannel, routes: Partial<Record<LogRoute, string>>, reason: string, pace: Pacer) {
     const created: LogRoute[] = [];
     let failed: RouteFailure | null = null;
     for (const [route, name] of Object.entries(LEGACY_LOG_ROUTES) as [LogRoute, string][]) {
         if (routes[route]) continue;
-        store.assertAuthorized(guild.id);
+        // Outside the try: a server that lost its authorization stops the whole run, it is not a refused channel.
+        await pace.beforeChange();
         try {
             const channel = await guild.channels.create({ name, type: ChannelType.GuildText, parent: category.id, permissionOverwrites: privateOverwrites(store, guild), reason });
             routes[route] = channel.id;
@@ -262,16 +297,18 @@ export function setupLogChannels(store: Store, guild: Guild, by: string, chosen:
 
 async function runLogSetup(store: Store, guild: Guild, by: string, chosen: { bans?: GuildBasedChannel | null; logging?: GuildBasedChannel | null }, options: { separate?: boolean }) {
     const reason = `Ghost Vanguard log setup by ${by}`;
+    const pace = new Pacer(() => store.assertAuthorized(guild.id));
     const current = logChannels(store, guild.id);
-    const bans = await resolveChannel(store, guild, BANS_CHANNEL, chosen.bans ?? null, current.bansChannelId, reason);
-    const logging = await resolveChannel(store, guild, LOGGING_CHANNEL_NAMES, chosen.logging ?? null, eventLogConfig(store, guild.id).channelId, reason);
+    const bans = await resolveChannel(store, guild, BANS_CHANNEL, chosen.bans ?? null, current.bansChannelId, reason, pace);
+    const logging = await resolveChannel(store, guild, LOGGING_CHANNEL_NAMES, chosen.logging ?? null, eventLogConfig(store, guild.id).channelId, reason, pace);
     if (bans.channel.id === logging.channel.id) throw new Error('Ban logs and server logs need two different channels.');
-    const category = await resolveLogCategory(store, guild, reason);
+    const category = await resolveLogCategory(store, guild, reason, pace);
+    await pace.beforeChange();
     await category.category.setPosition(0, { reason });
-    await placeInLogCategory([bans, logging], category.category, reason);
-    const { routes, skipped } = await activateLegacyRoutes(store, guild, category.category, reason);
-    const { created, failed } = options.separate !== false ? await createMissingRoutes(store, guild, category.category, routes, reason) : { created: [] as LogRoute[], failed: null as RouteFailure | null };
-    const archivedCategories = await archiveLegacyLogCategories(guild, reason);
+    await placeInLogCategory([bans, logging], category.category, reason, pace);
+    const { routes, skipped } = await activateLegacyRoutes(store, guild, category.category, reason, pace);
+    const { created, failed } = options.separate !== false ? await createMissingRoutes(store, guild, category.category, routes, reason, pace) : { created: [] as LogRoute[], failed: null as RouteFailure | null };
+    const archivedCategories = await archiveLegacyLogCategories(guild, reason, pace);
     setLogChannels(store, guild.id, { bansChannelId: bans.channel.id, routes }, by);
     configureEventLog(store, guild.id, { enabled: true, channelId: logging.channel.id });
     // Bot actions (anti-nuke, backups, restores, configuration changes, errors) go to the logging channel too.
@@ -428,9 +465,11 @@ export interface MergeResult { categoryId: string; moved: number; renamed: numbe
 export async function applyLogMerge(store: Store, guild: Guild, by: string): Promise<MergeResult> {
     store.assertAuthorized(guild.id);
     const reason = `Ghost Vanguard log merge by ${by}`;
+    const pace = new Pacer(() => store.assertAuthorized(guild.id));
     const plan = planLogMerge(store, guild);
     const found = plan.categoryId ? guild.channels.cache.get(plan.categoryId) : null;
-    const target = found?.type === ChannelType.GuildCategory ? found : (await resolveLogCategory(store, guild, reason)).category;
+    const target = found?.type === ChannelType.GuildCategory ? found : (await resolveLogCategory(store, guild, reason, pace)).category;
+    await pace.beforeChange();
     await target.setPosition(0, { reason });
     let moved = 0, renamed = 0;
     const skipped: string[] = [];
@@ -438,6 +477,7 @@ export async function applyLogMerge(store: Store, guild: Guild, by: string): Pro
         store.assertAuthorized(guild.id);
         const channel = guild.channels.cache.get(move.channelId);
         if (channel?.type !== ChannelType.GuildText || channel.parentId === target.id) continue;
+        await pace.beforeChange();
         try {
             await channel.setParent(target.id, { lockPermissions: false, reason });
             moved++;
@@ -448,6 +488,7 @@ export async function applyLogMerge(store: Store, guild: Guild, by: string): Pro
         const channel = guild.channels.cache.get(rename.channelId);
         // Only rename the exact legacy default Vanguard created; a custom name is never touched.
         if (channel?.type !== ChannelType.GuildText || channel.name !== rename.from) continue;
+        await pace.beforeChange();
         try { await channel.edit({ name: rename.to, reason }); renamed++; }
         catch (e) { skipped.push(`<#${rename.channelId}>: ${e instanceof Error ? e.message : String(e)}`); }
     }
