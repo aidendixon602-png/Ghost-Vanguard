@@ -155,7 +155,8 @@ test('nothing is saved while the server looks like it is under attack, locked do
     try {
         w.store.incident('g', 'owner', 'channel_delete', 'exempt', 'Not punished: the server owner');
         const old = w.store.incident('g', 'nuker', 'channel_delete', 'enforce', 'Contained');
-        w.store.run('UPDATE incidents SET at=? WHERE id=?', Date.now() - CALM_MS - 1000, old);
+        // A full minute past the cutoff, so a slow machine cannot bring it back inside the window.
+        w.store.run('UPDATE incidents SET at=? WHERE id=?', Date.now() - CALM_MS - 60_000, old);
         w.store.observe('d0', 'g', 'someone', 'channel_delete', 'x0', Date.now() - 1000);
         w.store.observe('d1', 'g', 'someone', 'channel_delete', 'x1', Date.now() - 1000);
         w.store.observe('d2', 'g', 'someone', 'channel_delete', 'x2', Date.now() - 11 * 60_000);
@@ -262,16 +263,19 @@ test('the gap between two backups survives a restart, and an ordinary look asks 
     const w = world();
     try {
         assert.equal(await w.settle(), 'saved');
+        // The save is stamped with real time; line it up with the test clock so no assertion sits on a boundary.
+        w.store.run("UPDATE snapshots SET at=? WHERE guild_id='g'", w.now());
         const asked = { ...w.fetches };
         w.addChannel('new', 'new', 3, 'cat');
+        // A new process has no memory of this run; the gap has to come from the database.
         const restarted = new LayoutSync({ store: w.store, snapshots: w.snapshots, post: () => { }, now: () => w.now() });
         w.advance(SYNC_EVERY_MS);
-        assert.equal(await restarted.check(w.guild, w.now()), 'waiting');
+        assert.equal(await restarted.check(w.guild, w.now()), 'waiting', 'the new layout is seen for the first time');
         assert.deepEqual(w.fetches, asked, 'comparing the layout with the newest backup uses the cache only');
         w.advance(SYNC_EVERY_MS);
-        assert.equal(await restarted.check(w.guild, w.now()), 'waiting', 'a fresh process still knows a backup was saved 10 minutes ago');
-        w.advance(SYNC_EVERY_MS);
-        assert.equal(await restarted.check(w.guild, w.now()), 'saved');
+        assert.equal(await restarted.check(w.guild, w.now()), 'waiting', 'the same layout twice, but the newest backup is only 10 minutes old');
+        w.advance(SYNC_MIN_GAP_MS);
+        assert.equal(await restarted.check(w.guild, w.now()), 'saved', 'and it is saved once 15 minutes have passed');
         assert.ok(w.fetches.roles > asked.roles && w.fetches.channels > asked.channels, 'saving does read the server');
     } finally { w.store.close(); }
 });
