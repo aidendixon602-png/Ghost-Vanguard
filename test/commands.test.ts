@@ -6,7 +6,7 @@ import { normalizeCommands, syncCommands, cleanLegacyGuildCommands } from '../sr
 import { Store } from '../src/database/db.js';
 import { Guard } from '../src/bot/guard.js';
 import { Interactions } from '../src/bot/interactions.js';
-import { failure, redact, logEvent } from '../src/errors.js';
+import { AppError, failure, redact, logEvent } from '../src/errors.js';
 import { config } from '../src/config.js';
 import { authorize } from './helpers.js';
 import { setLogChannels } from '../src/audit/log-setup.js';
@@ -275,4 +275,33 @@ test('a grouped command (/info ping) runs end to end through the router', async 
     assert.match(text, /42/);
     assert.equal(f.replies[0].embeds[0].data.title, '/info ping', 'reply identifies the command as shown in Discord');
     s.close();
+});
+
+test('a typed slash command prints one console line; autocomplete, buttons and menus print none', async () => {
+    const seen = async (kind: string, run: () => string | Promise<string> = () => 'done') => {
+        const s = new Store(':memory:'), r = new Registry(), printed: string[] = [], original = console.log, level = config.logLevel, format = config.logFormat;
+        authorize(s, guildId);
+        // The shipped defaults, whatever .env says.
+        config.logLevel = 'info'; config.logFormat = 'pretty';
+        const def = defineCommand(new SlashCommandBuilder().setName('probe').setDescription('Test'), {}, async () => run());
+        def.autocomplete = async () => { };
+        r.add(def, 'probe');
+        r.component({ prefix: 'probe:', kinds: ['button', 'select', 'modal'], metadata: defaults, execute: async () => { } });
+        const f = interaction(kind);
+        console.log = (...args: any[]) => { printed.push(args.join(' ')); };
+        try { await new Interactions(services(s, r)).handle(f.i); } finally { console.log = original; config.logLevel = level; config.logFormat = format; s.close(); }
+        return printed.map(line => line.replace(/\u001b\[[0-9;]*m/g, ''));
+    };
+    const slash = await seen('slash');
+    assert.equal(slash.length, 1, slash.join('\n'));
+    assert.match(slash[0]!, /\/probe · User · Guild · \d+ ms$/, 'what was typed, who ran it, where and how long it took');
+    for (const kind of ['autocomplete', 'button', 'select'])
+        assert.deepEqual(await seen(kind), [], `${kind} stays out of the console`);
+    // A command that fails prints its own error line, and that line says what was typed.
+    const failed = await seen('slash', () => { throw new AppError('VALIDATION_ERROR', 'nope'); });
+    const error = failed.find(line => /Command failure/.test(line));
+    assert.ok(error, failed.join('\n'));
+    assert.match(error!, /command=probe/);
+    assert.match(error!, /typed=probe/);
+    assert.ok(!failed.some(line => /· User · Guild ·/.test(line)), 'a failure is not also listed as a command that ran');
 });

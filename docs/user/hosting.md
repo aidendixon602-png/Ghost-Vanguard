@@ -59,6 +59,29 @@ The first line comes from `launch.js`, the rest from the bot. If one step takes 
 - **Connected as … Starting servers** names how many servers it has started, such as `(2 of 3)`, in each reminder.
 - Before `Starting the bot`, `launch.js` may print `📦 Installing dependencies…`. That install runs quietly and can take a few minutes on a small host.
 
+The **Access** block at the end of the banner lists everyone with bot-wide power. Each ID carries the person's name when the bot has seen them, and a rank given with `/setup staff global` comes off by running that command again with rank **Remove rank**.
+
+## What the console shows while the bot runs
+
+After the banner the console stays quiet unless something happens. Each slash command someone types is one line: the command, who ran it, in which server and how long it took.
+
+```
+/setup staff global · aidendixon602 · Midtown HQ · 142 ms
+```
+
+Buttons, menus and autocomplete are not listed. Failures, warnings and database backups have their own lines. `LOG_LEVEL=warn` in `.env` hides the command lines and the other routine event lines and keeps warnings and errors.
+
+When the bot stops it says why, then that it finished:
+
+```
+› Stopping: asked to stop (SIGTERM) by the host panel, an update or /restart
+› Stopped · exit code 0
+```
+
+If the bot is killed from outside, because the host ended the process or it ran out of memory, neither line appears. The start after a kill can wait up to 35 seconds for the old run's database lease, as described above.
+
+With `LOG_FORMAT=json` each of these is one JSON object per line instead: `startup_progress` and `startup_slow` while it starts, `command_activity` for commands, `shutdown_started` and `shutdown_finished` when it stops.
+
 ## When the console tab stays empty
 
 Some panels show only the lines that arrive while the console tab is open, and the **Output** box under Wispbyte's **Pull** button stops a few seconds after the server starts. Neither shows a bot that finished starting a minute ago. The bot keeps its own copy of what it prints:
@@ -69,8 +92,6 @@ Some panels show only the lines that arrive while the console tab is open, and t
 Both start with the first line of a run, so they hold the start-up steps, the banner, warnings and errors. Discord tokens, API keys and `password=` values are hidden before a line is stored. What `launch.js` prints (git output, update messages) is not in them because it comes from a different process, and neither is anything the host or Node itself prints before the bot is running.
 
 `/dev logs` needs a bot that is online. If it never gets online, read `console.log` instead.
-
-With `LOG_FORMAT=json` each of these is one JSON object per line instead (`startup_progress`, and `startup_slow` for the reminders).
 
 ## Health endpoint
 

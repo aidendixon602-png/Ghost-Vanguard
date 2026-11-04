@@ -65,7 +65,8 @@ const SPECIAL_LINES = {
 };
 export function logEvent(event, fields = {}) {
     const sanitized = sanitize({ timestamp: new Date().toISOString(), event, ...fields });
-    const level = /fail|error|exception/.test(event) ? 'ERROR' : /unavailable|unverified|retry|pending|warning/.test(event) ? 'WARN' : event === 'command_activity' ? 'DEBUG' : 'INFO';
+    // A slash command someone typed is worth a line; autocomplete, buttons and menus (no `typed`) stay at debug.
+    const level = /fail|error|exception/.test(event) ? 'ERROR' : /unavailable|unverified|retry|pending|warning/.test(event) ? 'WARN' : event === 'command_activity' ? (typeof fields.typed === 'string' ? 'INFO' : 'DEBUG') : 'INFO';
     const ranks = { debug: 0, info: 1, warn: 2, error: 3 };
     // The trusted-bot report is a startup access audit, including warnings that must stay visible.
     if (!(config.logFormat !== 'json' && event === 'trusted_bots') && (ranks[level.toLowerCase()] ?? 1) < (ranks[config.logLevel] ?? 1))
@@ -84,6 +85,12 @@ export function logEvent(event, fields = {}) {
     }
     // Under launch.js the host panel already stamps every line, so a second (differently zoned) clock only confuses.
     const time = typeof process.send === 'function' ? '' : `${style.dim(new Date().toLocaleTimeString('en-US', { hour12: false }))}  `;
+    if (event === 'command_activity' && typeof sanitized.typed === 'string') {
+        // "/setup staff global · someone · Server name · 142 ms"
+        const parts = [`/${sanitized.typed}`, sanitized.user, sanitized.guild, typeof sanitized.durationMs === 'number' ? `${sanitized.durationMs} ms` : null].filter(Boolean).map(String);
+        console.log(`${time || '  '}${style.bold(parts[0])}${parts.length > 1 ? style.dim(' · ') + parts.slice(1).join(style.dim(' · ')) : ''}`);
+        return;
+    }
     const { timestamp, details, error, ...values } = sanitized;
     const shown = (key, value) => key === 'size' && typeof value === 'number' ? readableSize(value)
         : typeof value === 'object' ? JSON.stringify(value) : String(value);

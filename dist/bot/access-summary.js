@@ -8,23 +8,26 @@ import { antinukeLocked, blacklistSize, envGlobalAlertChannel, protectedRoleAssi
  * Printed at every start: who holds bot-wide power and where it comes from.
  * Includes source IDs in access-ids.ts, BOT_OWNER_ID, DEVELOPER_IDS,
  * SUPREME_LEADER_IDS and `/setup staff global`. The separately restricted `/restart` command also checks exact DEVELOPER_IDS membership.
- * An unexpected ID here is the first sign of trouble.
+ * An unexpected ID here is the first sign of trouble, so each ID carries the person's name when
+ * the bot has seen them (`nameOf`), and a rank given with `/setup staff global` says how to take it away.
  */
-export function accessSummary(store) {
+export function accessSummary(store, nameOf = () => undefined) {
     const fromEnv = supremeLeaders();
     const granted = store.all('SELECT user_id, level FROM bot_staff ORDER BY level').map(r => ({ id: String(r.user_id), level: String(r.level) }));
     const developers = [...new Set([config.ownerId, ...config.developers, ...(BOT_STAFF_IDS.developer ?? [])].filter(Boolean))];
     const supreme = [...new Set([...fromEnv, ...(BOT_STAFF_IDS.supreme ?? []), ...granted.filter(g => g.level === 'supreme').map(g => g.id)])].filter(id => !developers.includes(id));
     const others = [...granted.filter(g => g.level !== 'supreme'), ...['overseer', 'botmanager'].flatMap(level => (BOT_STAFF_IDS[level] ?? []).map(id => ({ id, level })))];
     const row = (label, value) => `    ${style.dim(label.padEnd(13))} ${value}`;
-    const ids = (list) => list.length ? list.join(', ') : style.dim('none');
+    const who = (id, level) => `${id}${level ? ` (${level})` : ''}${nameOf(id) ? style.dim(` · ${nameOf(id)}`) : ''}`;
+    const ids = (list) => list.length ? list.map(id => who(id)).join(', ') : style.dim('none');
     return [
         `  ${style.bold('Access')} ${style.dim('(check these are all people you trust)')}`,
-        row('Owner', config.ownerId || style.yellow('not set: set BOT_OWNER_ID')),
+        row('Owner', config.ownerId ? who(config.ownerId) : style.yellow('not set: set BOT_OWNER_ID')),
         row('Developers', ids(developers)),
         row('Developer IDs', ids([...config.developers])),
         row('Supreme', ids(supreme)),
-        row('Bot-wide', others.length ? others.map(o => `${o.id} (${o.level})`).join(', ') : style.dim('none')),
+        row('Bot-wide', others.length ? others.map(o => who(o.id, o.level)).join(', ') : style.dim('none')),
+        ...(granted.length ? [row('', style.dim('To take back a rank given with /setup staff global, run it again with rank "Remove rank".'))] : []),
         row('Bot DMs to', ids(trustedRecipients())),
         row('Blacklisted', blacklistSize() ? `${blacklistSize()} user(s) (COMMAND_BLACKLIST)` : style.dim('none')),
         row('Prot. roles', protectedRoles().size ? `${protectedRoles().size} role(s); assigners: ${ids([...protectedRoleAssigners()])} + Developers` : style.dim('none')),
