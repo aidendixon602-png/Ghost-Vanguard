@@ -7,9 +7,19 @@ import { RANKS, rankOf, isSupreme } from '../bot/ranks.js';
 import { developers } from '../bot/developers.js';
 import { isTrustedBot } from '../bot/trusted-bots.js';
 import { raidState, setRaidMode } from '../security/raidmode.js';
-import { getFeature } from './settings.js';
-export const PLUS_DEFAULTS = { raidAuto: true, raidAutoHours: 1, settingsLock: true, botQuarantine: true, joinGate: true, messageWaves: true };
-export const plusConfig = (store, guild) => getFeature(store, guild, 'antinukeplus', PLUS_DEFAULTS);
+import { plusConfig } from './plus-settings.js';
+/**
+ * Extra anti-nuke layers on top of the rule preset:
+ *  - Raid auto-trigger: a join flood switches raid mode on by itself (for an hour by default).
+ *  - Server settings lock: changes to the server name, icon, banner, verification level, content
+ *    filter, notification default and system/rules channels by anyone who is not whitelisted are
+ *    put back straight away (the anti-nuke rule still punishes the person).
+ *  - Bot quarantine: a new bot with powerful permissions, added by anyone other than the server
+ *    owner or a Supreme Leader/Developer, has those permissions removed until a Head Admin approves.
+ *  - Permission audit: who can do damage, at a glance.
+ */
+// The switches live in plus-settings.ts so code that anti-nuke itself imports can read them without a cycle.
+export { PLUS_DEFAULTS, plusConfig } from './plus-settings.js';
 const DANGEROUS_MASK = DANGEROUS.reduce((all, bit) => all | BigInt(bit), 0n);
 // ---- Raid auto-trigger ----
 /** Called when anti-nuke records a join-flood incident. Returns a line for the alert. */

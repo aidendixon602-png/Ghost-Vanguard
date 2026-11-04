@@ -144,3 +144,24 @@ test('clearing one guild cooldown keeps other guilds and overlapping IDs blocked
     assert.equal(c.take('1234:u:ban', 100, 1), false);
     assert.equal(c.take('456:u:ban', 100, 1), false);
 });
+
+test('KeyedQueue.drained waits for what is queued under that key, however it ends, and not for other keys', async () => {
+    const queue = new KeyedQueue(), order: string[] = [];
+    await queue.drained('g');
+    order.push('idle key resolves at once');
+    let release!: () => void;
+    const slow = queue.run('g', () => new Promise<void>(resolve => { release = () => { order.push('slow done'); resolve(); }; }));
+    const other = queue.run('h', () => new Promise<void>(() => { /* never finishes */ }));
+    void other;
+    let drained = false;
+    const waiting = queue.drained('g').then(() => { drained = true; order.push('drained'); });
+    await new Promise(resolve => setTimeout(resolve, 10));
+    assert.equal(drained, false, 'still waiting while the task runs');
+    release();
+    await slow;
+    await waiting;
+    assert.deepEqual(order, ['idle key resolves at once', 'slow done', 'drained']);
+    const failing = queue.run('f', async () => { throw new Error('boom'); });
+    failing.catch(() => { });
+    await queue.drained('f');
+});

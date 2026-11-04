@@ -112,6 +112,10 @@ export class KeyedQueue {
         }).catch(() => { });
         return current;
     }
+    /** Resolves once everything queued under `key` so far has finished, however it ended. */
+    async drained(key) {
+        await (this.tails.get(key) ?? Promise.resolve()).catch(() => { });
+    }
 }
 export class Cooldowns {
     until = new Map();

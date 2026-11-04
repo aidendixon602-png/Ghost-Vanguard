@@ -1,7 +1,7 @@
 import type { Store } from '../database/db.js';
 import type { Snapshots } from './snapshots.js';
 
-export const CLEANUP_TYPES = ['all', 'snapshots', 'baselines', 'backups', 'scheduled', 'rollback', 'copies'] as const;
+export const CLEANUP_TYPES = ['all', 'snapshots', 'baselines', 'backups', 'scheduled', 'synced', 'rollback', 'copies'] as const;
 
 export type CleanupType = typeof CLEANUP_TYPES[number];
 
@@ -11,6 +11,7 @@ export const CLEANUP_LABELS: Record<CleanupType, string> = {
     baselines: 'Anti-nuke baselines (taken when protection turns on)',
     backups: 'Manual backups (/recovery backup create)',
     scheduled: 'Scheduled backups',
+    synced: 'Synced backups (saved automatically as the server changes)',
     rollback: 'Automatic backups taken before restores',
     copies: 'Layout-copy templates (/recovery copylayout)',
 };
@@ -35,6 +36,7 @@ function matches(type: CleanupType, row: Row): boolean {
         case 'baselines': return row.purpose === 'baseline';
         case 'backups': return row.kind === 'backup' && row.purpose === 'manual';
         case 'scheduled': return row.purpose === 'scheduled';
+        case 'synced': return row.purpose === 'synced';
         case 'rollback': return row.purpose === 'rollback';
         case 'copies': return row.kind === 'copy';
     }

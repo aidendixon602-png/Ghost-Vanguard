@@ -22,6 +22,17 @@ The 19-rule baseline loads for authorized servers and survives restarts. Each se
 
 Giving yourself a role that carries Administrator or Manage Server still has the role taken straight back off and still contains the member, but it is **not an anti-nuke incident**: no threat-board points, no global alert, no DM to trusted people, and no counting toward the Role Invite threshold. It is recorded in the security log as *Self-escalation blocked*, saved in `self_escalations` for staff review, and the member is DMed. In observe mode the card says *Self-escalation seen* and what would have happened, and nothing is changed. With anti-nuke switched off for the server, nothing is recorded. Handing those permissions to **someone else**, or creating or editing a role with them, is still a full Permission Grant incident.
 
+### New accounts and powerful roles
+
+A role that carries Administrator, Manage Server, Manage Roles, Manage Channels, Manage Webhooks, Ban Members or Kick Members is taken straight back off anyone whose Discord account is under 7 days old, or who joined this server less than 24 hours ago. It does not matter who gave it, the owner included. This is the case the other checks miss: a trusted admin's account is taken over and hands Administrator to a throwaway account that joined seconds earlier.
+
+- The person who gave the role is not punished or contained. The card in the security log says who gave what to whom and why it came back off, and the new account gets a DM.
+- Staff can allow a person by whitelisting them (`/antinuke whitelist add`), by waiting until the account or the membership is old enough, or by switching the guard off with `/antinuke settings new_account_guard:false`.
+- The server owner, Developers, trusted bots and bots in general are never held back. The role being handed over cannot whitelist the person receiving it.
+- A role change someone approved through `/role` is not second-guessed. In observe mode the card says what it would have done and removes nothing, and with anti-nuke off for the server the guard does nothing.
+- An account's age is part of its Discord ID, so it cannot be faked.
+- It looks at roles given to a person. A role someone already holds that is later edited to carry these permissions is the Permission Grant rule's job, and so is a bot added with powerful permissions (Bot Add and new-bot quarantine).
+
 ## Everyone is watched
 
 Anti-nuke watches **everyone**. Nobody's actions are skipped, except Vanguard's own, which count against the staff member who asked for them.
@@ -79,7 +90,7 @@ Nobody can change these from Discord. Restart after editing.
 | `/antinuke disable` | Turn protection off with confirmation; the staff opt-out stays off after restarts |
 | `/antinuke check` | Vanguard's permissions, log-channel access and role position |
 | `/antinuke scan` | Powerful roles, roles above Vanguard, bots with Administrator |
-| `/antinuke settings` | Extra protection layers (all on by default) |
+| `/antinuke settings` | Extra protection layers, all on by default: raid auto-trigger, join gate, message waves, server settings lock, new bot quarantine, new-account guard, backup sync and auto-restore |
 | `/antinuke whitelist add` | Panel: pick who, what they may do and for how long |
 | `/antinuke whitelist admin` | Separate whitelist for granting Administrator and the other protected permissions (user or role, optional expiry) |
 | `/antinuke whitelist remove` · `list` · `check` · `bots` | Remove, list, explain one person's coverage, verification-bot exemptions |

@@ -33,6 +33,8 @@ import { indexTree, treeJson } from './bot/command-tree.js';
 import { Roblox } from './integrations/roblox.js';
 import { Security } from './security/security.js';
 import { Snapshots } from './recovery/snapshots.js';
+import { AutoRestore } from './recovery/auto-restore.js';
+import { LayoutSync } from './recovery/sync.js';
 import { embed } from './ui/ui.js';
 import { flushPendingRoleChangeLogs, logsCategory, recordAuditEvent, recordMemberEvent, recordVoiceEvent } from './audit/event-log.js';
 import { logRoute } from './audit/log-setup.js';
@@ -97,6 +99,11 @@ const logs = new LogQueue(store, client), security = new Security(store, logs), 
 const scam = new ScamProtection(store, logs);
 
 snapshots.onAudit = (guildId, title, detail) => logs.push(guildId, recoveryEmbed(title, detail, client.user?.id, Colors.Blurple));
+// Backups follow the server, and when anti-nuke stops someone who deleted channels or roles, those come back from them.
+const post = (guildId: string, card: Parameters<typeof security.incidentLog>[1]) => security.incidentLog(guildId, card);
+const autoRestore = new AutoRestore({ store, snapshots, post, settled: id => security.queue.drained(id) });
+security.onDeletions = ({ guild, actor, incident }) => { void autoRestore.schedule(guild, actor, incident); };
+const layoutSync = new LayoutSync({ store, snapshots, post });
 registerBanLogRenderer(store, logs);
 
 const registry = new Registry();
@@ -123,6 +130,7 @@ const confirmations = new Map();
 
 const lifecycle = new GuildLifecycle(store, client, id => {
     router.clearGuild(id);
+    layoutSync.forget(id);
     scam.clearGuild(id);
     clearAutomod(id);
     roblox.clearGuild(id);
@@ -460,6 +468,7 @@ timers.push(setInterval(() => {
 timers.push(setInterval(() => task('member roster refresh', stats.refreshMembers()), 60000));
 timers.push(setInterval(() => task('database backups', databaseBackups.scheduled()), 60000));
 timers.push(setInterval(() => task('layout backups', scheduledLayouts()), 60000));
+timers.push(setInterval(() => { if (startupReady) task('layout sync', layoutSync.tick(client.guilds.cache.values(), id => lifecycle.isReady(id))); }, 60000));
 timers.push(setInterval(() => { if (startupReady) task('schedules', runSchedules({ store, logs, client, ready: id => lifecycle.isReady(id), locks: snapshots.locks })); }, 60000));
 timers.push(setInterval(() => task('heartbeat', heartbeat()), 60000));
 timers.push(setInterval(() => { if (startupReady) task('daily backup DM', dailyBackupDm(store, client, kind => databaseBackups.create(kind))); }, 600000));

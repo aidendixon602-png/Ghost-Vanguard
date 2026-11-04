@@ -9,6 +9,10 @@ export const COMPONENTS = ['roles', 'categories', 'channels', 'permissions', 'se
 
 export type Component = typeof COMPONENTS[number];
 
+/** The server owner turned backups off (`/setup config feature snapshots`): nothing may save or restore one for them. */
+export const backupsDisabled = (store: Store, guildId: string) =>
+    store.get('SELECT enabled FROM feature_settings WHERE guild_id=? AND feature=?', guildId, 'snapshots')?.enabled === 0;
+
 export function selectComponents(values: readonly string[] = ['all']): Component[] {
     if (!values.length || values.some(v => v !== 'all' && !COMPONENTS.includes(v as Component)))
         throw new AppError('VALIDATION_ERROR', 'Select supported restore components.');
