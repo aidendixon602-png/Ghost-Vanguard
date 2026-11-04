@@ -33,7 +33,8 @@ test('someone is new when the account is under 7 days old or they joined under 2
     assert.equal(freshness(member(90 * DAY, FRESH_MEMBER_HOURS * HOUR), now), null, 'exactly 24 hours is long enough');
     assert.equal(freshness(member(90 * DAY, null), now), null, 'an unknown join time is not treated as new');
     assert.equal(freshness(member(1000, 1000, true), now), null, 'a bot is never new here; Bot Add handles bots');
-    assert.equal(freshness(member(1000, 1000), now)!.kind, 'account', 'the account age is reported first when both apply');
+    // Both windows can apply at once; waiting out only one of them would leave the guard in place, so both are named.
+    assert.deepEqual(freshness(member(2 * DAY, 3 * HOUR), now), { kind: 'both', text: 'their Discord account is 2 days old and they joined the server 3 hours ago', wait: 'until the account is 7 days old and they have been in the server for 24 hours' });
 });
 
 interface Options { mode?: 'enforce' | 'observe'; accountMs?: number; joinedMs?: number; bot?: boolean; editable?: boolean; permission?: bigint; managed?: boolean }
@@ -101,6 +102,16 @@ test('the server owner and a whitelisted admin are not exempt as the giver: a ta
             assert.equal(f.store.get("SELECT COUNT(*) AS n FROM incidents WHERE mode='enforce'")!.n, 0);
         } finally { f.store.close(); }
     }
+});
+
+test('when the account is young and they only just joined, the card names both things to wait for', async () => {
+    const f = fixture({ accountMs: 6 * DAY + 22 * HOUR, joinedMs: 2 * HOUR });
+    try {
+        await f.security.audit(f.grant('both', 'owner'), f.guild);
+        const card = f.cards.find(c => c.title === 'New account got a powerful role');
+        assert.match(card.description, /Since their Discord account is 6 days old and they joined the server 2 hours ago, Vanguard took the role back\./);
+        assert.match(card.description, /wait until the account is 7 days old and they have been in the server for 24 hours,/);
+    } finally { f.store.close(); }
 });
 
 test('a member who joined 3 hours ago on an old account is held back too, and the card says why', async () => {

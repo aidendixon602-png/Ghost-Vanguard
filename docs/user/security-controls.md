@@ -27,7 +27,7 @@ Giving yourself a role that carries Administrator or Manage Server still has the
 A role that carries Administrator, Manage Server, Manage Roles, Manage Channels, Manage Webhooks, Ban Members or Kick Members is taken straight back off anyone whose Discord account is under 7 days old, or who joined this server less than 24 hours ago. It does not matter who gave it, the owner included. This is the case the other checks miss: a trusted admin's account is taken over and hands Administrator to a throwaway account that joined seconds earlier.
 
 - The person who gave the role is not punished or contained. The card in the security log says who gave what to whom and why it came back off, and the new account gets a DM.
-- Staff can allow a person by whitelisting them (`/antinuke whitelist add`), by waiting until the account or the membership is old enough, or by switching the guard off with `/antinuke settings new_account_guard:false`.
+- Staff can allow a person by whitelisting them (`/antinuke whitelist add`), by waiting until the account is 7 days old and they have been in the server for 24 hours (the card names whichever of the two still applies, or both), or by switching the guard off with `/antinuke settings new_account_guard:false`.
 - The server owner, Developers, trusted bots and bots in general are never held back. The role being handed over cannot whitelist the person receiving it.
 - A role change someone approved through `/role` is not second-guessed. In observe mode the card says what it would have done and removes nothing, and with anti-nuke off for the server the guard does nothing.
 - An account's age is part of its Discord ID, so it cannot be faked.

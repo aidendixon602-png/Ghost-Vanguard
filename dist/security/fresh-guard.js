@@ -29,10 +29,16 @@ export function freshness(member, now = Date.now()) {
     if (member.user.bot)
         return null;
     const account = now - member.user.createdTimestamp;
-    if (account < FRESH_ACCOUNT_DAYS * DAY)
-        return { kind: 'account', text: `their Discord account is ${age(account)} old`, wait: `until the account is ${FRESH_ACCOUNT_DAYS} days old` };
     const here = member.joinedTimestamp ? now - member.joinedTimestamp : Infinity;
-    if (here < FRESH_MEMBER_HOURS * HOUR)
-        return { kind: 'member', text: `they joined the server ${age(here)} ago`, wait: `until they have been in the server for ${FRESH_MEMBER_HOURS} hours` };
+    const youngAccount = account < FRESH_ACCOUNT_DAYS * DAY, justJoined = here < FRESH_MEMBER_HOURS * HOUR;
+    const accountText = `their Discord account is ${age(account)} old`, joinedText = `they joined the server ${age(here)} ago`;
+    const accountWait = `the account is ${FRESH_ACCOUNT_DAYS} days old`, joinedWait = `they have been in the server for ${FRESH_MEMBER_HOURS} hours`;
+    // Both can apply at once, and then waiting out only one of them would leave the guard in place.
+    if (youngAccount && justJoined)
+        return { kind: 'both', text: `${accountText} and ${joinedText}`, wait: `until ${accountWait} and ${joinedWait}` };
+    if (youngAccount)
+        return { kind: 'account', text: accountText, wait: `until ${accountWait}` };
+    if (justJoined)
+        return { kind: 'member', text: joinedText, wait: `until ${joinedWait}` };
     return null;
 }
