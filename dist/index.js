@@ -1,5 +1,5 @@
 import { startup } from './startup.js';
-import { announceStopped, announceStopping } from './startup-progress.js';
+import { announceStopped, announceStopping, drained } from './startup-progress.js';
 import { accessSummary } from './bot/access-summary.js';
 import { dmTrusted } from './bot/trusted-dm.js';
 import { onRejoin, saveLeftRoles } from './features/rejoin-roles.js';
@@ -505,6 +505,8 @@ async function shutdown(code = 0, reason = 'asked to stop') {
     // Awaiting tasks can still finish; process termination prevents use after database close.
     store.close();
     announceStopped(code);
+    // process.exit() drops writes still queued on a pipe, so wait (at most a second) for the last line to go out.
+    await drained();
     process.exit(code);
 }
 selfRestart.run = code => task('shutdown', shutdown(code, 'restart requested from Discord'));

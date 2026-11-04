@@ -16,6 +16,31 @@ export function announceStopping(reason, print = line => console.log(line), json
 export function announceStopped(code, print = line => console.log(line), json = config.logFormat === 'json') {
     print(json ? JSON.stringify({ timestamp: new Date().toISOString(), event: 'shutdown_finished', code }) : `› Stopped · exit code ${code}`);
 }
+/**
+ * Resolves once what was already written to the given streams has been handed over, or after `timeoutMs`,
+ * whichever comes first. process.exit() drops writes that are still queued, and on a POSIX pipe the
+ * reader may be slow to empty it, so the last line could go missing. Never rejects.
+ */
+export function drained(streams = [process.stdout, process.stderr], timeoutMs = 1000) {
+    return new Promise(resolve => {
+        let waiting = streams.length;
+        if (!waiting)
+            return resolve();
+        const timer = setTimeout(resolve, timeoutMs);
+        const one = () => { if (--waiting === 0) {
+            clearTimeout(timer);
+            resolve();
+        } };
+        for (const stream of streams) {
+            try {
+                stream.write('', one);
+            }
+            catch {
+                one();
+            }
+        }
+    });
+}
 export function createStartupProgress(print = line => console.log(line), options = {}) {
     const json = options.json ?? config.logFormat === 'json';
     const reminderMs = options.reminderMs ?? REMINDER_MS;

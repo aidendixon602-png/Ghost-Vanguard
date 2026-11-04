@@ -4,16 +4,16 @@ import { readFileSync } from 'node:fs';
 import { config } from '../src/config.js';
 import { logEvent } from '../src/errors.js';
 import { accessSummary } from '../src/bot/access-summary.js';
-import { announceStopped, announceStopping } from '../src/startup-progress.js';
+import { announceStopped, announceStopping, drained } from '../src/startup-progress.js';
 import { Store } from '../src/database/db.js';
 
 const plain = (text: string) => text.replace(/\u001b\[[0-9;]*m/g, '');
 
-/** What logEvent prints, with the settings it should be printed under. */
+/** What logEvent prints under the given settings. Both default to the shipped defaults, whatever .env says. */
 function printed(work: () => void, settings: { logLevel?: string; logFormat?: string } = {}) {
     const original = console.log, level = config.logLevel, format = config.logFormat, lines: string[] = [];
-    if (settings.logLevel) config.logLevel = settings.logLevel;
-    if (settings.logFormat) config.logFormat = settings.logFormat;
+    config.logLevel = settings.logLevel ?? 'info';
+    config.logFormat = settings.logFormat ?? 'pretty';
     console.log = (...args: any[]) => { lines.push(plain(args.join(' '))); };
     try { work(); } finally { console.log = original; config.logLevel = level; config.logFormat = format; }
     return lines;
@@ -64,11 +64,25 @@ test('the bot says why it is stopping and then that it stopped, in plain text or
     assert.ok(json.every(l => !Number.isNaN(Date.parse(JSON.parse(l).timestamp))));
 });
 
+test('drained waits for what is already queued, gives up after its limit, and never fails', async () => {
+    const writes: string[] = [];
+    const answers = (after: number | null) => ({ write(chunk: string, callback: () => void) { writes.push(chunk); if (after !== null) setTimeout(callback, after); return true; } });
+    const t0 = Date.now();
+    await drained([answers(30), answers(60)], 2000);
+    assert.ok(Date.now() - t0 >= 55 && Date.now() - t0 < 1500, 'waited for the slower stream, not for the limit');
+    assert.deepEqual(writes, ['', ''], 'an empty write queues behind everything already written');
+    const t1 = Date.now();
+    await drained([answers(null)], 80);
+    assert.ok(Date.now() - t1 >= 75 && Date.now() - t1 < 1500, 'a stream that never answers costs only the limit');
+    await drained([{ write() { throw new Error('closed'); } }], 2000);
+    await drained([], 2000);
+});
+
 test('index.ts announces the stop before it closes anything, and the exit code last, and every cause gives a reason', () => {
     const source = readFileSync('src/index.ts', 'utf8');
     const body = source.slice(source.indexOf('async function shutdown('), source.indexOf('selfRestart.run ='));
     assert.match(body, /shuttingDown = true;\n\s+announceStopping\(reason\);\n\s+timers\.forEach\(clearInterval\);/, 'said first, before any timer or connection is closed');
-    assert.match(body, /store\.close\(\);\n\s+announceStopped\(code\);\n\s+process\.exit\(code\);/, 'said last, with the code the launcher will see');
+    assert.match(body, /store\.close\(\);\n\s+announceStopped\(code\);\n\s+\/\/[^\n]*\n\s+await drained\(\);\n\s+process\.exit\(code\);/, 'said last, with the code the launcher will see, and given a moment to leave a busy pipe');
     assert.doesNotMatch(source, /\bshutdown\((\d+)?\)/, 'every shutdown( call says why');
     for (const [signal, reason] of [['SIGINT', 'Ctrl\\+C'], ['SIGTERM', 'asked to stop \\(SIGTERM\\)']])
         assert.match(source, new RegExp(`process\\.on\\('${signal}', \\(\\) => task\\('shutdown', shutdown\\(0, '${reason}`), `${signal} says why`);
@@ -80,8 +94,10 @@ test('index.ts announces the stop before it closes anything, and the exit code l
 test('the access list names people the bot has seen, and says how to take back a rank given with a command', () => {
     const owner = '1277709272041394187', overseer = '1446573101142769847', supreme = '843909457616044092';
     const was = { ownerId: config.ownerId, developers: new Set(config.developers) };
-    const store = new Store(':memory:');
+    const store = new Store(':memory:'), supremeBefore = new Set(config.supremeExtra);
     try {
+        // SUPREME_LEADER_IDS in .env would add IDs to the same line, so this test sets it.
+        config.supremeExtra.clear();
         config.ownerId = owner; config.developers.clear(); config.developers.add(owner);
         const names: Record<string, string> = { [owner]: 'aiden', [overseer]: 'jane' };
         assert.ok(!accessSummary(store).join('\n').includes('Remove rank'), 'no rank given with the command, nothing to take back');
@@ -95,5 +111,5 @@ test('the access list names people the bot has seen, and says how to take back a
         assert.match(text, /Bot-wide.*\n +To take back a rank given with \/setup staff global, run it again with rank "Remove rank"\.\n +Bot DMs to/);
         // Without a name lookup the lines are what they were before.
         assert.match(plain(accessSummary(store).join('\n')), new RegExp(`Bot-wide +${overseer} \\(overseer\\)\\n`));
-    } finally { config.ownerId = was.ownerId; config.developers.clear(); for (const id of was.developers) config.developers.add(id); store.close(); }
+    } finally { config.ownerId = was.ownerId; config.developers.clear(); for (const id of was.developers) config.developers.add(id); config.supremeExtra.clear(); for (const id of supremeBefore) config.supremeExtra.add(id); store.close(); }
 });

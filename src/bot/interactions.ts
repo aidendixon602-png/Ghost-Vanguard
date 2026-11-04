@@ -129,7 +129,7 @@ export class Interactions {
                 } catch (error) { logEvent('command_log_failure', { guildId, ...failure(error) }); }
             }
         } catch (error) {
-            await commandFailure(i, error, name, { subcommand: path, user: i.user.tag, guild: i.inCachedGuild() ? i.guild.name : null, durationMs: Date.now() - start, result: 'failure' }, privateReply);
+            await commandFailure(i, error, name, { subcommand: path, ...(shown && !i.isAutocomplete() ? { typed: shown } : {}), user: i.user.tag, guild: i.inCachedGuild() ? i.guild.name : null, durationMs: Date.now() - start, result: 'failure' }, privateReply);
         }
     }
 
