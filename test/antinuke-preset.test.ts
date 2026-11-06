@@ -313,7 +313,7 @@ test('a brand-new role created with Administrator counts as a Permission Grant s
   const ageOut=()=>{store.run('UPDATE incidents SET at=?',Date.now()-2*3600_000);store.run('UPDATE observations SET at=?',Date.now()-2*3600_000);};
   ageOut();store.grant('g','actor','trust','owner');
   await security.audit(entry('trusted','r3',AuditLogEvent.RoleCreate,[{key:'permissions',new:String(PermissionFlagsBits.Administrator)}]),guild);
-  assert.notEqual(lastMode(),'exempt','a full bypass never covers granting Administrator');
+  assert.equal(lastMode(),'exempt','a full bypass covers granting Administrator');
   ageOut();store.grant('g','actor','trust:dangerous_grant','owner');
   await security.audit(entry('admin-ok','r4',AuditLogEvent.RoleCreate,[{key:'permissions',new:String(PermissionFlagsBits.Administrator)}]),guild);
   assert.equal(lastMode(),'exempt','the separate permission-grant whitelist does');
@@ -357,7 +357,7 @@ function staffGuild() {
  return {...f,member,give,incidents};
 }
 
-test('role whitelist covers role work but never the protected permissions inside a role',async()=>{
+test('role-work entries stay narrow; permission-grant and full bypasses allow protected grants',async()=>{
  const {store,member,give,incidents}=staffGuild();
  try {
   member('actor',['plain']);member('newmod',['plain','mod']);member('newadmin',['plain','admin']);
@@ -365,10 +365,14 @@ test('role whitelist covers role work but never the protected permissions inside
   await give('p1','newmod','mod');
   assert.equal(incidents(),1,'handing out a Ban/Kick role grants protected permissions, so it is Permission Grant');
   await give('p2','newadmin','admin');
-  assert.equal(incidents(),2,'a full role bypass never covers Administrator grants');
+  assert.equal(incidents(),2,'role-work entries alone do not cover Administrator grants');
   store.grant('g','actor','trust:dangerous_grant','owner');
   await give('p3','newadmin','admin');
-  assert.equal(incidents(),2,'only the permission-grant whitelist allows it');
+  assert.equal(incidents(),2,'the narrower permission-grant whitelist allows it');
+  store.revokeGrant('g','actor','trust:dangerous_grant','owner');
+  store.grant('g','actor','trust','owner');
+  await give('p4','newadmin','admin');
+  assert.equal(incidents(),2,'a full bypass allows it too');
  }finally{store.close();}
 });
 

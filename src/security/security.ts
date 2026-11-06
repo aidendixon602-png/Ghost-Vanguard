@@ -134,15 +134,13 @@ export class Security {
     }
 
     /**
-     * The separate permission-grant whitelist: who may hand out Administrator and the other protected
-     * permissions through Discord. Deliberately narrower than exemptReason — a full or role bypass and
-     * every other whitelist entry leave this checked. Set it with `/antinuke whitelist admin`.
+     * Who may hand out Administrator and the other protected permissions through Discord.
+     * A full user/role bypass works here too, just like the other rules. The narrower
+     * `/antinuke whitelist admin` entry allows only these grants without giving a full bypass.
      */
     grantExemptReason(guild: Guild, id: string, ignoreRoles: string[] = []): string | null {
-        if (id === guild.ownerId) return 'the server owner';
-        if (developers.has(id)) return 'a Developer';
-        if (isTrustedBot(id)) return `a trusted bot (${TRUSTED_BOTS.get(id)})`;
-        if (isWhitelistedPerson(id)) return 'whitelisted on Ghost Vanguard';
+        const full = this.exemptReason(guild, id, ignoreRoles);
+        if (full) return full;
         if (this.trustedFor(guild, id, 'dangerous_grant', ignoreRoles)) return 'on the permission-grant whitelist';
         return null;
     }
@@ -169,17 +167,14 @@ export class Security {
             if (entry.action === AuditLogEvent.MemberRoleUpdate && entry.targetId && entry.targetId !== actor) await memberOrNull(guild, entry.targetId).catch(() => null);
             // Giving yourself Administrator or Manage Server is not a nuke: it is handled as self-escalation,
             // so it never creates an incident, scores on the threat board, alerts or counts toward a threshold.
-            // Exempt people (owner, Developers, the permission-grant whitelist) are left alone entirely.
+            // Exempt people (owner, Developers, a full bypass or the permission-grant whitelist) are left alone entirely.
             if (entry.action === AuditLogEvent.MemberRoleUpdate && entry.targetId === actor && isSelfAdminAssignment(entry, guild, actor)) {
-                // Only the permission-grant whitelist (and the owner/Developers) counts here: a full trust
-                // bypass never covers handing out Administrator.
                 if (!this.grantExemptReason(guild, actor, newlyAssigned)) await this.selfEscalation(guild, actor, newlyAssigned);
                 return;
             }
             for (const { rule, eventId } of this.rulesFor(entry, guild, actor, newlyAssigned))
-                // A role the actor just gave themselves cannot exempt that same action.
-                // Granting protected permissions answers to its own whitelist: a full bypass and every other
-                // whitelist entry leave it checked, so "whitelisted" never means "may hand out Administrator".
+                // A role the actor just gave themselves cannot exempt that same action. Protected grants
+                // accept either a full bypass or their narrower permission-grant whitelist entry.
                 await this.evaluate(entry, guild, actor, rule, eventId, rule.key === 'dangerous_grant'
                     ? this.grantExemptReason(guild, actor, newlyAssigned)
                     : exempt ?? (this.trustedFor(guild, actor, rule.key, newlyAssigned) ? 'whitelisted for this action' : null));
@@ -413,7 +408,7 @@ export class Security {
             .map(r => String(r.kind).split(':')[1]!).filter(Boolean);
         if (!kinds.length) return null;
         const where = rule.key === 'dangerous_grant'
-            ? '`/antinuke whitelist admin` (a full bypass does not cover permission grants)'
+            ? '`/antinuke whitelist admin` (or pick "Everything" for a full bypass)'
             : '`/antinuke whitelist add` (or pick "Everything")';
         return `Whitelisted for **${scopeName([...new Set(kinds)])}**, but not for **${rule.title}**. If they should be allowed to do this, add it with ${where}.`;
     }

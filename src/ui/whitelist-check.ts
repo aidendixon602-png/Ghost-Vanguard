@@ -15,7 +15,7 @@ export function whitelistCheck(store: Store, guild: Guild, userId: string, roleI
     const full = live('trust');
     const fullRole = roleIds.find(r => live('trust_role', r));
     if (full || fullRole)
-        return e.setColor(Colors.Green).setDescription(`<@${userId}> has a **full bypass** (${full ? when(full.expires) : `from the role <@&${fullRole}>, ${when(live('trust_role', fullRole!)!.expires)}`}). They are never punished, but still watched: if they hit a limit, you get an alert.\n\n**Permission grants are separate:** the full bypass does not allow handing out Administrator or other protected permissions through Discord. Allow that with \`/antinuke whitelist admin\`.`);
+        return e.setColor(Colors.Green).setDescription(`<@${userId}> has a **full bypass** (${full ? when(full.expires) : `from the role <@&${fullRole}>, ${when(live('trust_role', fullRole!)!.expires)}`}). They are never punished, but still watched: if they hit a limit, you get an alert.\n\nThat **includes Administrator and the other protected-permission grants** through Discord, just like the other anti-nuke rules.`);
 
     const skips: string[] = [];
     const checked: string[] = [];

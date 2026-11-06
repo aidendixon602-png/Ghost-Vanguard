@@ -1,3 +1,10 @@
+## Unreleased: familiar full anti-nuke whitelists
+
+- **Everything now means everything.** A full user or role bypass also allows protected-permission grants and self-assignment, matching the straightforward whitelist behavior server staff expect from mainstream anti-nuke bots. Previously those grants still warned and reverted unless a second, easy-to-miss whitelist entry was added.
+- **The narrower exception is still available.** `/antinuke whitelist admin` allows protected-permission grants without exempting the other rules. Role-work presets still do not include that power, and unwhitelisted actors keep the existing warn/revert/strip policy.
+- **Approved bots stay approved.** A bot with a full bypass, including one granted through its managed bot role, is no longer held or warned by new-bot quarantine. The ordinary verification-bot exemption remains limited to harmless role assignments.
+- **The panel is simpler.** Everything drops every redundant tick, saves one full-bypass entry, and clearly says that protected grants are included. Older redundant grant entries are cleaned up the next time the whitelist is saved.
+
 ## Unreleased: the console shows commands and stops
 
 - **Each slash command is one console line.** After the banner the console used to print nothing at all unless something failed, so a working bot and a dead one looked the same. A typed command now prints `/setup staff global · someone · Server name · 142 ms`: what was typed, who ran it, where, and how long it took. Buttons, menus and autocomplete are still left out. `LOG_LEVEL=warn` hides the lines again. The same lines are in `/dev logs` and `console.log`. A command that fails keeps its usual error line, which now also says what was typed (`typed=setup staff global`).

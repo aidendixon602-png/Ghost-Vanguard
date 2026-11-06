@@ -16,7 +16,7 @@ export default defineCommand(new SlashCommandBuilder().setName('trust').setDescr
     .addSubcommand(s => s.setName('list').setDescription('Show everyone on the whitelist, what they skip and when it expires')
     .addIntegerOption(o => o.setName('page').setDescription('Page number').setMinValue(1).setMaxValue(100000))
     .addBooleanOption(o => o.setName('expired').setDescription('Include expired entries')))
-    .addSubcommand(s => s.setName('admin').setDescription('Separate whitelist: who may hand out Administrator and other protected permissions')
+    .addSubcommand(s => s.setName('admin').setDescription('Allow protected-permission grants without giving a full bypass')
     .addUserOption(o => o.setName('user').setDescription('User'))
     .addRoleOption(o => o.setName('role').setDescription('Or a role'))
     .addBooleanOption(o => o.setName('allowed').setDescription('True (default): they may grant protected permissions · False: stop allowing'))
@@ -48,8 +48,7 @@ export default defineCommand(new SlashCommandBuilder().setName('trust').setDescr
         return `${user ? `<@${id}>` : `<@&${id}>`} is off the whitelist. Anti-nuke now treats them like everyone else.`;
     }
     if (sub === 'admin') {
-        // A second, narrower whitelist: being on the regular whitelist (even "Everything") never allows
-        // handing out Administrator or the other protected permissions through Discord.
+        // A narrower alternative to Everything: allow protected grants without exempting every other rule.
         const user = i.options.getUser('user'), role = i.options.getRole('role');
         if (!!user === !!role)
             throw new AppError('VALIDATION_ERROR', 'Pick exactly one: a user or a role.');
@@ -75,7 +74,7 @@ export default defineCommand(new SlashCommandBuilder().setName('trust').setDescr
         ctx.logs.push(i.guildId, embed('Permission-grant whitelist changed', `By <@${actor.id}> · ${allowed ? 'allowed' : 'removed'} ${who} · ${allowed && days ? `${days} day(s)` : 'until removed'}`, allowed ? Colors.Orange : Colors.Green));
         if (!allowed)
             return `${who} can no longer hand out protected permissions. Anti-nuke checks those grants like anyone else's again.`;
-        return `${who} can now hand out **Administrator, Manage Server, Manage Roles, Manage Channels, Manage Webhooks, Ban Members and Kick Members** through Discord without anti-nuke stepping in${days ? `, for ${days} day(s)` : ''}. This is the permission-grant whitelist only: their other whitelist entries do not allow this, and this entry does not skip any other rule. A first-time grant still warns first and is reverted.`;
+        return `${who} can now hand out **Administrator, Manage Server, Manage Roles, Manage Channels, Manage Webhooks, Ban Members and Kick Members** through Discord without anti-nuke stepping in${days ? `, for ${days} day(s)` : ''}. This entry allows only protected-permission grants and skips no other rule. An **Everything** full bypass also covers these grants.`;
     }
     if (sub === 'check') {
         const user = i.options.getUser('user', true);
