@@ -31,7 +31,7 @@ test('whitelist check: owner, full bypass, role-based rules, warnings and quaran
 
         store.grant('g', 'adminrole', 'trust_role', 'owner');
         assert.match(whitelistCheck(store, guild, 'person', ['adminrole'], false).toJSON().description!, /full bypass.*<@&adminrole>/);
-        assert.match(whitelistCheck(store, guild, 'person', ['adminrole'], false).toJSON().description!, /Permission grants are separate/,"a full bypass never allows granting Administrator");
+        assert.match(whitelistCheck(store, guild, 'person', ['adminrole'], false).toJSON().description!, /includes Administrator and the other protected-permission grants/,"a full bypass also allows granting Administrator");
         assert.match(whitelistCheck(store, guild, '426537812993638400', [], true).toJSON().description!, /Bloxlink.*never counted/);
     } finally { store.close(); }
 });

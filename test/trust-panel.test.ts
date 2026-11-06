@@ -63,48 +63,48 @@ test('whitelist dropdown: every option reads in full, fits Discord, and nothing 
     } finally { store.close(); }
 });
 
-test('whitelist dropdown: Everything keeps the permission-grant tick, and drops the other ticks', async () => {
+test('whitelist dropdown: Everything drops every other tick, including permission grants', async () => {
     const { store, ctx, press } = setup();
     try {
         const start = trustPanel(ctx, GUILD, USER, panelFor(ctx, GUILD, TARGET, false));
 
         const both = await press(start, 2, 0, ['all', 'dangerous_grant', 'mass_ban', 'preset:moderation']);
-        assert.deepEqual(ticked(both), ['all', 'dangerous_grant']);
-        assert.match(text(both), /\*\*2\. Allowed:\*\* \*\*Everything\*\* \(full bypass\) \+ \*\*Grant protected permissions\*\*\n/);
+        assert.deepEqual(ticked(both), ['all']);
+        assert.match(text(both), /\*\*2\. Allowed:\*\* \*\*Everything\*\* \(full bypass\)\n/);
 
         const everythingOnly = await press(start, 2, 0, ['all', 'mass_ban', 'preset:moderation']);
         assert.deepEqual(ticked(everythingOnly), ['all']);
-        assert.match(text(everythingOnly), /\*\*2\. Allowed:\*\* \*\*Everything\*\* \(full bypass\)\n/);
 
-        // Ticking the grant entry next to Everything that is already ticked, in either order.
-        assert.deepEqual(ticked(await press(everythingOnly, 2, 0, ['all', 'dangerous_grant'])), ['all', 'dangerous_grant']);
-        assert.deepEqual(ticked(await press(everythingOnly, 2, 0, ['dangerous_grant', 'all'])), ['all', 'dangerous_grant']);
+        // Permission grants need no extra tick beside Everything, in either selection order.
+        assert.deepEqual(ticked(await press(everythingOnly, 2, 0, ['all', 'dangerous_grant'])), ['all']);
+        assert.deepEqual(ticked(await press(everythingOnly, 2, 0, ['dangerous_grant', 'all'])), ['all']);
 
-        // Without Everything nothing is dropped.
+        // Without Everything, the narrower entries can be combined normally.
         const some = await press(start, 2, 0, ['dangerous_grant', 'mass_ban']);
         assert.deepEqual(ticked(some).sort(), ['dangerous_grant', 'mass_ban']);
     } finally { store.close(); }
 });
 
-test('whitelist dropdown: saving Everything with the grant entry stores both and says so', async () => {
+test('whitelist dropdown: Everything saves one full bypass with no redundant grant entry', async () => {
     const { store, ctx, logs, press } = setup();
     try {
         const start = trustPanel(ctx, GUILD, USER, panelFor(ctx, GUILD, TARGET, false));
         const picked = await press(start, 2, 0, ['all', 'dangerous_grant']);
         const saved = await press(picked, 4, 0);
         assert.equal(store.hasGrant(GUILD, TARGET, 'trust'), true);
-        assert.equal(store.hasGrant(GUILD, TARGET, 'trust:dangerous_grant'), true);
-        assert.match(text(saved), /✅ Saved: <@444444444444444444> may now do \*\*everything \(full bypass\) and permission grants\*\* \(until removed\)\./);
-        assert.match(text(saved), /\*\*Saved right now:\*\* \*\*Everything\*\* \(full bypass\) \+ \*\*Permission grants\*\*\n/, 'no stray "only" after the plus sign');
-        assert.deepEqual(ticked(saved), ['all', 'dangerous_grant'], 'the saved choice comes back ticked');
-        assert.match(JSON.stringify(logs.at(-1).toJSON()), /may now: \*\*everything \(full bypass\) and permission grants\*\*/);
+        assert.equal(store.hasGrant(GUILD, TARGET, 'trust:dangerous_grant'), false);
+        assert.match(text(saved), /✅ Saved: <@444444444444444444> may now do \*\*everything \(full bypass\)\*\* \(until removed\)\./);
+        assert.match(text(saved), /\*\*Saved right now:\*\* \*\*Everything\*\* \(full bypass\)\n/);
+        assert.deepEqual(ticked(saved), ['all'], 'the full bypass comes back as the only tick needed');
+        assert.match(JSON.stringify(logs.at(-1).toJSON()), /may now: \*\*everything \(full bypass\)\*\*/);
 
-        // Everything alone must not turn into a grant entry, and replaces the old pair.
-        const justAll = await press(saved, 2, 0, ['all']);
-        const savedAll = await press(justAll, 4, 0);
+        // Legacy redundant rows are cleaned up the next time Everything is saved.
+        store.grant(GUILD, TARGET, 'trust:dangerous_grant', 'owner');
+        const legacy = trustPanel(ctx, GUILD, USER, panelFor(ctx, GUILD, TARGET, false));
+        assert.deepEqual(ticked(legacy), ['all']);
+        const savedAll = await press(legacy, 4, 0);
         assert.equal(store.hasGrant(GUILD, TARGET, 'trust'), true);
         assert.equal(store.hasGrant(GUILD, TARGET, 'trust:dangerous_grant'), false);
         assert.match(text(savedAll), /may now do \*\*everything \(full bypass\)\*\* \(until removed\)/);
-        assert.doesNotMatch(text(savedAll), /permission grants/);
     } finally { store.close(); }
 });

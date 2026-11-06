@@ -53,7 +53,7 @@ Whoever owns a Discord server, in that server only. Above Supreme Leader there: 
 - `/antinuke rule`: Tune one rule threshold or turn it on/off
 - `/antinuke settings`: Turn the extra protection layers on or off
 - `/antinuke whitelist add`: Whitelist a user or role for some or all rules
-- `/antinuke whitelist admin`: Separate whitelist for granting Administrator and protected permissions
+- `/antinuke whitelist admin`: Allow protected-permission grants without a full bypass
 - `/antinuke whitelist bots`: Let a verification bot give roles without tripping anti-nuke
 - `/antinuke whitelist remove`: Take a user or role off the whitelist
 - `/role blacklist add`: Blacklist a role so only listed people can give it
