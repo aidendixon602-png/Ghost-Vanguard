@@ -580,3 +580,23 @@ test('a long list of duplicates is previewed up to fifteen channels and the rest
         assert.match(preview, /Plus 1 more\./);
     } finally { store.close(); }
 });
+
+test('twins are only reported among the per-type log channels; a doubled #bans is left to merge', async () => {
+    const store = fresh();
+    try {
+        const w = world();
+        const own = w.category(OWN);
+        const bans = w.text('bans', own.id, { madeByVanguard: true });
+        w.text('bans', own.id, { madeByVanguard: true });
+        const logging = w.text('ghost-vanguard-logging', own.id, { madeByVanguard: true });
+        w.text('midtown-vanguard-logging', own.id, { madeByVanguard: true });
+        setLogChannels(store, G, { bansChannelId: bans.id });
+        configureEventLog(store, G, { enabled: true, channelId: logging.id });
+        assert.deepEqual(logTwins(store, w.guild), [], 'setup and check say nothing about them');
+        const plan = await planOf(store, w.guild);
+        assert.deepEqual([plan.remove, plan.keep], [[], []], 'and cleanup does not touch them');
+        // Merge still names the second #bans, so a person hears about it.
+        const merge = planLogMerge(store, w.guild);
+        assert.ok(merge.untouched.some(u => u.name === 'bans' && /another bans channel next to/.test(u.why)));
+    } finally { store.close(); }
+});

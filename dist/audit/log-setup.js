@@ -46,6 +46,11 @@ export const ownRouteName = (name) => `vanguard-${name}`;
 export const RECOGNIZED_LOG_NAMES = new Set([
     BANS_CHANNEL, SECURITY_CHANNEL, ...LOGGING_CHANNEL_NAMES, ...Object.values(LEGACY_LOG_ROUTES), ...Object.values(LEGACY_LOG_ROUTES).map(ownRouteName),
 ]);
+/**
+ * The names of the per-type log channels, plain and with the `vanguard-` prefix. Twins are reported and cleaned
+ * up among these only: a doubled #bans, server log or security log is for a person to sort out (merge lists them).
+ */
+export const ROUTE_CHANNEL_NAMES = new Set([...Object.values(LEGACY_LOG_ROUTES), ...Object.values(LEGACY_LOG_ROUTES).map(ownRouteName)]);
 const DEFAULTS = { bansChannelId: null, excludedChannels: [], ignoreBotRoutine: true };
 export const logChannels = (store, guild) => getFeature(store, guild, 'log_channels', DEFAULTS);
 export const setLogChannels = (store, guild, change, by) => setFeature(store, guild, 'log_channels', DEFAULTS, change, by);
@@ -385,7 +390,7 @@ export function configuredLogIds(store, guild) {
     return new Set([saved.bansChannelId, eventLogConfig(store, guild).channelId, store.settings(guild).logChannelId, ...Object.values(saved.routes ?? {})].filter((id) => !!id));
 }
 /**
- * Channels in Ghost Vanguard Logs that share a name. Vanguard no longer makes these, but earlier releases
+ * Per-type log channels in Ghost Vanguard Logs that share a name. Vanguard no longer makes these, but earlier releases
  * and merges could, and Discord lists them as two identical entries. This only reports: it never changes
  * a channel.
  */
@@ -396,7 +401,7 @@ export function logTwins(store, guild) {
     const configured = configuredLogIds(store, guild.id);
     const byName = new Map();
     for (const c of guild.channels.cache.values()) {
-        if (c.type !== ChannelType.GuildText || c.parentId !== category.id || !RECOGNIZED_LOG_NAMES.has(c.name))
+        if (c.type !== ChannelType.GuildText || c.parentId !== category.id || !ROUTE_CHANNEL_NAMES.has(c.name))
             continue;
         byName.set(c.name, [...(byName.get(c.name) ?? []), c.id]);
     }

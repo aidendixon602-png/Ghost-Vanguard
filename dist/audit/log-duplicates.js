@@ -1,13 +1,5 @@
 import { AuditLogEvent, ChannelType } from 'discord.js';
-import { configuredLogIds, findLogCategory, LEGACY_LOG_ROUTES, ownRouteName, pacing } from './log-setup.js';
-/**
- * Clearing out log channels that exist twice under one name in Ghost Vanguard Logs.
- *
- * Only a channel that the audit log shows this bot created, that Vanguard is not logging to, and that has a
- * same-named twin Vanguard does log to can ever be deleted, and only after the owner has seen the list and
- * confirmed. Anything else with the same name (another bot's, or staff's) is reported and left alone.
- */
-const ROUTE_NAMES = new Set([...Object.values(LEGACY_LOG_ROUTES), ...Object.values(LEGACY_LOG_ROUTES).map(ownRouteName)]);
+import { configuredLogIds, findLogCategory, pacing, ROUTE_CHANNEL_NAMES } from './log-setup.js';
 /**
  * The IDs of channels this bot created, from the audit log (Discord keeps 45 days, and the bot's 100 newest
  * creations are asked for). A permission overwrite proves nothing, since anyone can add one. `null` when the
@@ -35,7 +27,7 @@ export async function duplicatePlan(store, guild) {
     const configured = configuredLogIds(store, guild.id);
     const groups = new Map();
     for (const c of guild.channels.cache.values()) {
-        if (c.type !== ChannelType.GuildText || c.parentId !== category.id || !ROUTE_NAMES.has(c.name))
+        if (c.type !== ChannelType.GuildText || c.parentId !== category.id || !ROUTE_CHANNEL_NAMES.has(c.name))
             continue;
         groups.set(c.name, [...(groups.get(c.name) ?? []), c]);
     }

@@ -1,16 +1,16 @@
 import { AuditLogEvent, ChannelType, type Guild, type TextChannel } from 'discord.js';
 import type { Store } from '../database/db.js';
-import { configuredLogIds, findLogCategory, LEGACY_LOG_ROUTES, ownRouteName, pacing } from './log-setup.js';
+import { configuredLogIds, findLogCategory, pacing, ROUTE_CHANNEL_NAMES } from './log-setup.js';
 
 /**
- * Clearing out log channels that exist twice under one name in Ghost Vanguard Logs.
+ * Clearing out per-type log channels (#mod-logs, #join-logs and the rest, plain or with the vanguard- prefix)
+ * that exist twice under one name in Ghost Vanguard Logs. A doubled #bans, server log or security log is not
+ * handled here.
  *
  * Only a channel that the audit log shows this bot created, that Vanguard is not logging to, and that has a
  * same-named twin Vanguard does log to can ever be deleted, and only after the owner has seen the list and
  * confirmed. Anything else with the same name (another bot's, or staff's) is reported and left alone.
  */
-
-const ROUTE_NAMES: ReadonlySet<string> = new Set([...Object.values(LEGACY_LOG_ROUTES), ...Object.values(LEGACY_LOG_ROUTES).map(ownRouteName)]);
 
 export interface DuplicatePlan {
     /** Unused channels Vanguard made itself, next to a same-named one it logs to. */
@@ -44,7 +44,7 @@ export async function duplicatePlan(store: Store, guild: Guild): Promise<Duplica
     const configured = configuredLogIds(store, guild.id);
     const groups = new Map<string, TextChannel[]>();
     for (const c of guild.channels.cache.values()) {
-        if (c.type !== ChannelType.GuildText || c.parentId !== category.id || !ROUTE_NAMES.has(c.name)) continue;
+        if (c.type !== ChannelType.GuildText || c.parentId !== category.id || !ROUTE_CHANNEL_NAMES.has(c.name)) continue;
         groups.set(c.name, [...(groups.get(c.name) ?? []), c]);
     }
     let made: Set<string> | null | undefined;

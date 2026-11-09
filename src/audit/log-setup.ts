@@ -53,6 +53,12 @@ export const RECOGNIZED_LOG_NAMES: ReadonlySet<string> = new Set([
     BANS_CHANNEL, SECURITY_CHANNEL, ...LOGGING_CHANNEL_NAMES, ...Object.values(LEGACY_LOG_ROUTES), ...Object.values(LEGACY_LOG_ROUTES).map(ownRouteName),
 ]);
 
+/**
+ * The names of the per-type log channels, plain and with the `vanguard-` prefix. Twins are reported and cleaned
+ * up among these only: a doubled #bans, server log or security log is for a person to sort out (merge lists them).
+ */
+export const ROUTE_CHANNEL_NAMES: ReadonlySet<string> = new Set([...Object.values(LEGACY_LOG_ROUTES), ...Object.values(LEGACY_LOG_ROUTES).map(ownRouteName)]);
+
 export interface LogChannels {
     bansChannelId: string | null;
     excludedChannels: string[];
@@ -401,11 +407,11 @@ export function configuredLogIds(store: Store, guild: string): Set<string> {
     return new Set([saved.bansChannelId, eventLogConfig(store, guild).channelId, store.settings(guild).logChannelId, ...Object.values(saved.routes ?? {})].filter((id): id is string => !!id));
 }
 
-/** Two or more channels with one name in Vanguard's log category, at least one of them not in use. */
+/** Two or more per-type log channels with one name in Vanguard's log category, at least one of them not in use. */
 export interface LogTwin { name: string; used: string[]; unused: string[] }
 
 /**
- * Channels in Ghost Vanguard Logs that share a name. Vanguard no longer makes these, but earlier releases
+ * Per-type log channels in Ghost Vanguard Logs that share a name. Vanguard no longer makes these, but earlier releases
  * and merges could, and Discord lists them as two identical entries. This only reports: it never changes
  * a channel.
  */
@@ -415,7 +421,7 @@ export function logTwins(store: Store, guild: Guild): LogTwin[] {
     const configured = configuredLogIds(store, guild.id);
     const byName = new Map<string, string[]>();
     for (const c of guild.channels.cache.values()) {
-        if (c.type !== ChannelType.GuildText || c.parentId !== category.id || !RECOGNIZED_LOG_NAMES.has(c.name)) continue;
+        if (c.type !== ChannelType.GuildText || c.parentId !== category.id || !ROUTE_CHANNEL_NAMES.has(c.name)) continue;
         byName.set(c.name, [...(byName.get(c.name) ?? []), c.id]);
     }
     return [...byName].filter(([, ids]) => ids.length > 1).map(([name, ids]) => ({ name, used: ids.filter(id => configured.has(id)), unused: ids.filter(id => !configured.has(id)) }))
