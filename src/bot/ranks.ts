@@ -174,6 +174,7 @@ export const COMMAND_RANK: Record<string, number> = {
     'staff/global': 8,
     'security/admin': 8,
     'logs/cleanup-archive': RANKS.owner,
+    'logs/cleanup-duplicates': RANKS.owner,
 };
 
 /** Developer-only commands: nothing but the Developer rank unlocks them. */

@@ -1,6 +1,7 @@
 import { ChannelType, Colors, EmbedBuilder, OverwriteType, PermissionFlagsBits } from 'discord.js';
 import { DEFAULT_CATEGORIES, DEFAULT_CHANNELS, LEGACY_CATEGORIES, LEGACY_CHANNELS } from '../branding.js';
 import { getFeature, setFeature } from '../features/settings.js';
+import { logEvent } from '../errors.js';
 import { configureEventLog, eventLogConfig } from './event-log.js';
 /**
  * Where Vanguard's logs go in each server:
@@ -32,13 +33,24 @@ export const LEGACY_LOG_ROUTES = {
     commands: 'command-logs', antinuke: 'antinuke-logs',
 };
 /**
+ * What Vanguard calls a log channel when the plain name is already taken in its category by a channel it
+ * cannot use (another bot's, or one it has lost access to). Two channels with the same name side by side
+ * cannot be told apart in Discord's channel list, so the new one says whose it is.
+ */
+export const ownRouteName = (name) => `vanguard-${name}`;
+/**
  * Every name Vanguard has ever given one of its own log channels. A matching name alone never makes a
  * channel Vanguard's: another bot (or staff) can run a `join-logs`, `bans` or `vanguard-security` of its
  * own, so a channel outside Vanguard's log area is only ever reported, never moved, renamed or reused.
  */
 export const RECOGNIZED_LOG_NAMES = new Set([
-    BANS_CHANNEL, SECURITY_CHANNEL, ...LOGGING_CHANNEL_NAMES, ...Object.values(LEGACY_LOG_ROUTES),
+    BANS_CHANNEL, SECURITY_CHANNEL, ...LOGGING_CHANNEL_NAMES, ...Object.values(LEGACY_LOG_ROUTES), ...Object.values(LEGACY_LOG_ROUTES).map(ownRouteName),
 ]);
+/**
+ * The names of the per-type log channels, plain and with the `vanguard-` prefix. Twins are reported and cleaned
+ * up among these only: a doubled #bans, server log or security log is for a person to sort out (merge lists them).
+ */
+export const ROUTE_CHANNEL_NAMES = new Set([...Object.values(LEGACY_LOG_ROUTES), ...Object.values(LEGACY_LOG_ROUTES).map(ownRouteName)]);
 const DEFAULTS = { bansChannelId: null, excludedChannels: [], ignoreBotRoutine: true };
 export const logChannels = (store, guild) => getFeature(store, guild, 'log_channels', DEFAULTS);
 export const setLogChannels = (store, guild, change, by) => setFeature(store, guild, 'log_channels', DEFAULTS, change, by);
@@ -152,7 +164,14 @@ async function archiveLegacyLogCategories(guild, reason, pace) {
     }
     return archived;
 }
-/** Reuse recognized channels from Veil's old category; preserve their overrides and history. */
+/**
+ * Reuse a recognized channel for each log type instead of making a new one: the destination already chosen,
+ * a channel of that name in Vanguard's own category, or one in Veil's old category. Their overrides and
+ * history are preserved. The first one Vanguard can use and nobody can read is taken.
+ *
+ * Vanguard's own category is looked at before Veil's: a channel Vanguard already has there must not be
+ * passed over for another bot's, and another bot's channel is not moved in beside one of the same name.
+ */
 async function activateLegacyRoutes(store, guild, category, reason, pace) {
     const names = new Set([...LEGACY_CATEGORIES.logs, ARCHIVED_LOG_CATEGORY].map(normalizedCategoryName));
     const legacyIds = new Set([...guild.channels.cache.values()].filter(c => c.type === ChannelType.GuildCategory && names.has(normalizedCategoryName(c.name))).map(c => c.id));
@@ -160,37 +179,37 @@ async function activateLegacyRoutes(store, guild, category, reason, pace) {
     const skipped = [];
     for (const [route, name] of Object.entries(LEGACY_LOG_ROUTES)) {
         store.assertAuthorized(guild.id);
-        const matches = (c) => c.type === ChannelType.GuildText && c.name === name;
-        // Also find a channel already moved by a setup that failed before saving its routes.
-        const existing = guild.channels.cache.find(c => matches(c) && !!c.parentId && legacyIds.has(c.parentId))
-            ?? guild.channels.cache.find(c => matches(c) && c.parentId === category.id);
-        const saved = routes[route];
-        // A renamed or moved channel can still be the saved destination; check it even if another
-        // legacy channel is found, so an unsafe saved destination cannot survive a failed reuse.
-        if (saved && saved !== existing?.id) {
-            const check = await checkChannel(guild, saved, name, false);
-            if (!check.ok || check.publiclyVisible) {
-                delete routes[route];
-                skipped.push({ route, check });
+        const text = [...guild.channels.cache.values()].filter((c) => c.type === ChannelType.GuildText);
+        const own = text.filter(c => c.parentId === category.id && (c.name === name || c.name === ownRouteName(name)))
+            .sort((a, b) => Number(b.name === name) - Number(a.name === name));
+        const legacy = own.some(c => c.name === name) ? [] : text.filter(c => c.name === name && !!c.parentId && legacyIds.has(c.parentId));
+        const foundByName = new Set([...own, ...legacy].map(c => c.id));
+        // A destination chosen earlier comes first, even if it was renamed or moved; the others follow in order of preference.
+        const candidates = [...new Set([routes[route], ...own.map(c => c.id), ...legacy.map(c => c.id)].filter((id) => !!id))];
+        let adopted = null, failure = null;
+        for (const id of candidates) {
+            const check = await checkChannel(guild, id, name, false);
+            if (check.ok && !check.publiclyVisible) {
+                adopted = id;
+                break;
             }
-            else
-                continue; // Keep a manually chosen private destination.
+            failure ??= check;
         }
-        if (!existing)
-            continue;
-        const check = await checkChannel(guild, existing.id, name, false);
-        if (!check.ok || check.publiclyVisible) {
-            if (routes[route] === existing.id)
-                delete routes[route];
-            skipped.push({ route, check });
+        if (!adopted) {
+            // An unsafe or vanished saved destination cannot survive a failed reuse.
+            delete routes[route];
+            if (failure)
+                skipped.push({ route, check: failure });
             continue;
         }
         store.assertAuthorized(guild.id);
-        if (existing.parentId !== category.id) {
+        const channel = guild.channels.cache.get(adopted);
+        // A destination somebody chose stays where it is; a channel found by its name is grouped with the rest.
+        if (channel && foundByName.has(adopted) && channel.parentId !== category.id) {
             await pace.beforeChange();
-            await existing.setParent(category.id, { lockPermissions: false, reason });
+            await channel.setParent(category.id, { lockPermissions: false, reason });
         }
-        routes[route] = existing.id;
+        routes[route] = adopted;
     }
     return { routes, skipped };
 }
@@ -199,18 +218,29 @@ async function activateLegacyRoutes(store, guild, category, reason, pace) {
  * at the first failure, because the same missing permission or full category would stop the rest too.
  * Channels already made are kept (they sit in the category, so running setup again finds them by
  * name instead of making a second set).
+ *
+ * A channel is never made next to one with the same name: when the plain name is taken by a channel
+ * Vanguard cannot use, its own gets a `vanguard-` prefix, and when both are taken nothing is made.
  */
 async function createMissingRoutes(store, guild, category, routes, reason, pace) {
-    const created = [];
+    const created = [], blocked = [];
+    const names = {};
     let failed = null;
-    for (const [route, name] of Object.entries(LEGACY_LOG_ROUTES)) {
+    const taken = (name) => [...guild.channels.cache.values()].some(c => c.type === ChannelType.GuildText && c.parentId === category.id && c.name === name);
+    for (const [route, plain] of Object.entries(LEGACY_LOG_ROUTES)) {
         if (routes[route])
             continue;
+        const name = !taken(plain) ? plain : !taken(ownRouteName(plain)) ? ownRouteName(plain) : null;
+        if (!name) {
+            blocked.push(route);
+            continue;
+        }
         // Outside the try: a server that lost its authorization stops the whole run, it is not a refused channel.
         await pace.beforeChange();
         try {
             const channel = await guild.channels.create({ name, type: ChannelType.GuildText, parent: category.id, permissionOverwrites: privateOverwrites(store, guild), reason });
             routes[route] = channel.id;
+            names[route] = name;
             created.push(route);
         }
         catch (error) {
@@ -218,7 +248,7 @@ async function createMissingRoutes(store, guild, category, routes, reason, pace)
             break;
         }
     }
-    return { created, failed };
+    return { created, failed, blocked, names };
 }
 /** Check one channel: Vanguard's permissions, whether everyone can read it, and send a test embed. */
 export async function checkChannel(guild, channelId, label, sendTest = true) {
@@ -282,6 +312,9 @@ export function setupLogChannels(store, guild, by, chosen = {}, options = {}) {
 async function runLogSetup(store, guild, by, chosen, options) {
     const reason = `Ghost Vanguard log setup by ${by}`;
     const pace = new Pacer(() => store.assertAuthorized(guild.id));
+    // The whole channel list first: the cache only holds what the gateway sent, and a channel it missed
+    // would be made a second time.
+    await guild.channels.fetch().catch(() => undefined);
     const current = logChannels(store, guild.id);
     const bans = await resolveChannel(store, guild, BANS_CHANNEL, chosen.bans ?? null, current.bansChannelId, reason, pace);
     const logging = await resolveChannel(store, guild, LOGGING_CHANNEL_NAMES, chosen.logging ?? null, eventLogConfig(store, guild.id).channelId, reason, pace);
@@ -292,7 +325,8 @@ async function runLogSetup(store, guild, by, chosen, options) {
     await category.category.setPosition(0, { reason });
     await placeInLogCategory([bans, logging], category.category, reason, pace);
     const { routes, skipped } = await activateLegacyRoutes(store, guild, category.category, reason, pace);
-    const { created, failed } = options.separate !== false ? await createMissingRoutes(store, guild, category.category, routes, reason, pace) : { created: [], failed: null };
+    const { created, failed, blocked, names: createdNames } = options.separate !== false ? await createMissingRoutes(store, guild, category.category, routes, reason, pace)
+        : { created: [], failed: null, blocked: [], names: {} };
     const archivedCategories = await archiveLegacyLogCategories(guild, reason, pace);
     setLogChannels(store, guild.id, { bansChannelId: bans.channel.id, routes }, by);
     configureEventLog(store, guild.id, { enabled: true, channelId: logging.channel.id });
@@ -303,7 +337,10 @@ async function runLogSetup(store, guild, by, chosen, options) {
         settings.logChannelId = logging.channel.id;
         store.save(settings, by);
     }
-    return { bans, logging, category: category.category, categoryCreated: category.created, archivedCategories, routes, skipped, created, failed, previousAlerts: previousAlerts !== logging.channel.id ? previousAlerts : null };
+    const twins = logTwins(store, guild);
+    // One line a Developer can read in /dev logs when someone asks why a channel was or was not made.
+    logEvent('log_setup', { guildId: guild.id, created, reused: Object.keys(routes).filter(route => !created.includes(route)), notUsable: skipped.map(s => s.route), blocked, twins: twins.length });
+    return { bans, logging, category: category.category, categoryCreated: category.created, archivedCategories, routes, skipped, created, createdNames, blocked, twins, failed, previousAlerts: previousAlerts !== logging.channel.id ? previousAlerts : null };
 }
 /** Log types that still post to the combined log (or, for voice and commands, nowhere) for lack of a channel. */
 export function routesWithoutChannel(store, guild) {
@@ -324,8 +361,14 @@ export function describeRouteSetup(result) {
     for (const { route, check } of result.skipped) {
         const replaced = result.created.includes(route);
         attention ||= !replaced;
-        lines.push(`**${replaced ? `Not reused (a new private #${LEGACY_LOG_ROUTES[route]} was created instead)` : 'Not activated'}:** ${describeCheck(`#${LEGACY_LOG_ROUTES[route]}`, check)}`);
+        lines.push(`**${replaced ? `Not reused (a new private #${result.createdNames?.[route] ?? LEGACY_LOG_ROUTES[route]} was created instead)` : 'Not activated'}:** ${describeCheck(`#${LEGACY_LOG_ROUTES[route]}`, check)}`);
     }
+    if (result.blocked?.length) {
+        attention = true;
+        lines.push(`**Not created:** ${result.blocked.map(route => `#${LEGACY_LOG_ROUTES[route]}`).join(', ')}. A channel with that name and one named #vanguard-… are both in the category already, and Vanguard cannot use either. Fix or remove them, then run \`/setup logs setup\` again.`);
+    }
+    if (result.twins?.length)
+        lines.push(...describeTwins(result.twins));
     if (result.failed) {
         const left = Object.keys(LEGACY_LOG_ROUTES).filter(route => !result.routes[route]);
         lines.push(`**Could not create #${LEGACY_LOG_ROUTES[result.failed.route]}:** ${result.failed.error}`, `**Still without a channel:** ${left.join(', ')}. Check that Vanguard has Manage Channels and that the category has room, then run \`/setup logs setup\` again. The channels made so far are kept.`);
@@ -338,8 +381,41 @@ export function describeRouteSetup(result) {
  * inherited. A channel outside this area is never claimed on a name match alone — another bot's
  * `join-logs`, `modlogs` or `veil-utilities-logging` must keep working exactly as it does now.
  */
-function findLogCategory(guild) {
+export function findLogCategory(guild) {
     return [...guild.channels.cache.values()].find((c) => c.type === ChannelType.GuildCategory && normalizedCategoryName(c.name) === normalizedCategoryName(LOG_CATEGORY)) ?? null;
+}
+/** Every channel Vanguard is set up to post in: ban logs, server logs, the security log and the log type routes. */
+export function configuredLogIds(store, guild) {
+    const saved = logChannels(store, guild);
+    return new Set([saved.bansChannelId, eventLogConfig(store, guild).channelId, store.settings(guild).logChannelId, ...Object.values(saved.routes ?? {})].filter((id) => !!id));
+}
+/**
+ * Per-type log channels in Ghost Vanguard Logs that share a name. Vanguard no longer makes these, but earlier releases
+ * and merges could, and Discord lists them as two identical entries. This only reports: it never changes
+ * a channel.
+ */
+export function logTwins(store, guild) {
+    const category = findLogCategory(guild);
+    if (!category)
+        return [];
+    const configured = configuredLogIds(store, guild.id);
+    const byName = new Map();
+    for (const c of guild.channels.cache.values()) {
+        if (c.type !== ChannelType.GuildText || c.parentId !== category.id || !ROUTE_CHANNEL_NAMES.has(c.name))
+            continue;
+        byName.set(c.name, [...(byName.get(c.name) ?? []), c.id]);
+    }
+    return [...byName].filter(([, ids]) => ids.length > 1).map(([name, ids]) => ({ name, used: ids.filter(id => configured.has(id)), unused: ids.filter(id => !configured.has(id)) }))
+        .filter(twin => twin.unused.length > 0);
+}
+/** What to tell staff about twins: which one Vanguard logs to and which it ignores. */
+export function describeTwins(twins) {
+    const mention = (ids) => ids.map(id => `<#${id}>`).join(' and ');
+    const lines = twins.slice(0, 6).map(t => `**Two channels named #${t.name}:** ${t.used.length ? `Vanguard logs to ${mention(t.used)}` : 'Vanguard logs to neither'}; ${mention(t.unused)} ${t.unused.length === 1 ? 'is' : 'are'} not used.`);
+    if (twins.length > 6)
+        lines.push(`…and ${twins.length - 6} more names that appear twice.`);
+    lines.push('Vanguard never deletes a channel on its own. `/setup logs cleanup-duplicates` shows the unused ones it made itself and deletes them if you confirm.');
+    return lines;
 }
 function logAreaCategoryNames() {
     return new Set([LOG_CATEGORY, ...LEGACY_CATEGORIES.logs, ARCHIVED_LOG_CATEGORY].map(normalizedCategoryName));
@@ -373,6 +449,8 @@ export function planLogMerge(store, guild) {
     const category = findLogCategory(guild);
     const moves = [], renames = [];
     const untouched = new Map();
+    /** Channels left in place because moving them in would make a twin; their explanation is the specific one. */
+    const explained = new Set();
     const describeParent = (parentId) => (parentId ? guild.channels.cache.get(parentId)?.name ?? 'another category' : null);
     for (const channel of guild.channels.cache.values()) {
         if (channel.type !== ChannelType.GuildText)
@@ -390,6 +468,14 @@ export function planLogMerge(store, guild) {
         }
         if (category?.id && channel.parentId === category.id)
             continue; // already grouped
+        // Moving it in would put two channels with one name side by side, which Discord shows as identical entries.
+        const twin = category ? [...guild.channels.cache.values()].find(c => c.type === ChannelType.GuildText && c.parentId === category.id && c.name === channel.name) : undefined;
+        if (twin) {
+            explained.add(channel.id);
+            untouched.set(channel.id, { channelId: channel.id, name: channel.name,
+                why: `Vanguard already has <#${twin.id}> in **${LOG_CATEGORY}**; moving this one in would make a second #${channel.name}, so it stays${channel.parentId ? ` in **${describeParent(channel.parentId)}**` : ' where it is'}` });
+            continue;
+        }
         moves.push({ channelId: channel.id, name: channel.name, from: describeParent(channel.parentId),
             why: why ?? 'old Veil log channel' });
     }
@@ -410,7 +496,7 @@ export function planLogMerge(store, guild) {
             continue;
         const keeper = found.find(c => configured.has(c.id)) ?? found.find(c => inLogArea(guild, guild.channels.cache.get(c.id)?.parentId ?? null)) ?? found[0];
         for (const extra of found) {
-            if (extra.id === keeper.id)
+            if (extra.id === keeper.id || explained.has(extra.id))
                 continue;
             // A same-named channel in another category (staff, or another bot's logs) keeps its own
             // explanation above: it is not a leftover of Vanguard's, so nobody is told to remove it.

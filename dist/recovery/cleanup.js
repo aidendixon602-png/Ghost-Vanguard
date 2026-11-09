@@ -1,10 +1,11 @@
-export const CLEANUP_TYPES = ['all', 'snapshots', 'baselines', 'backups', 'scheduled', 'rollback', 'copies'];
+export const CLEANUP_TYPES = ['all', 'snapshots', 'baselines', 'backups', 'scheduled', 'synced', 'rollback', 'copies'];
 export const CLEANUP_LABELS = {
     all: 'All recovery points',
     snapshots: 'Manual snapshots (/recovery snapshot create)',
     baselines: 'Anti-nuke baselines (taken when protection turns on)',
     backups: 'Manual backups (/recovery backup create)',
     scheduled: 'Scheduled backups',
+    synced: 'Synced backups (saved automatically as the server changes)',
     rollback: 'Automatic backups taken before restores',
     copies: 'Layout-copy templates (/recovery copylayout)',
 };
@@ -15,6 +16,7 @@ function matches(type, row) {
         case 'baselines': return row.purpose === 'baseline';
         case 'backups': return row.kind === 'backup' && row.purpose === 'manual';
         case 'scheduled': return row.purpose === 'scheduled';
+        case 'synced': return row.purpose === 'synced';
         case 'rollback': return row.purpose === 'rollback';
         case 'copies': return row.kind === 'copy';
     }

@@ -12,16 +12,21 @@ export default defineCommand(new SlashCommandBuilder().setName('antinuke-plus').
     .addBooleanOption(o => o.setName('settings_lock').setDescription('Put back server name/icon/settings changed by non-whitelisted people'))
     .addBooleanOption(o => o.setName('bot_quarantine').setDescription('New powerful bots lose their permissions until a Head Admin approves'))
     .addBooleanOption(o => o.setName('join_gate').setDescription('Automatic raid mode raises the verification level to High until it ends'))
-    .addBooleanOption(o => o.setName('message_waves').setDescription('Stop the same message from several new accounts (delete, time out, raid mode)'))), { category: 'antinuke', access: 'security', cooldown: 3000 }, async (ctx, i) => {
+    .addBooleanOption(o => o.setName('message_waves').setDescription('Stop the same message from several new accounts (delete, time out, raid mode)'))
+    .addBooleanOption(o => o.setName('backup_sync').setDescription('Keep a recent backup of the roles and channels, saved as they change'))
+    .addBooleanOption(o => o.setName('auto_restore').setDescription('Put back channels and roles a contained attacker deleted, from the newest earlier backup'))
+    .addBooleanOption(o => o.setName('new_account_guard').setDescription('Take powerful roles back from accounts under 7 days old and members under 24 hours in'))), { category: 'antinuke', access: 'security', cooldown: 3000 }, async (ctx, i) => {
     if (i.options.getSubcommand() === 'scan')
         return permissionAudit(i.guild);
     const cur = plusConfig(ctx.store, i.guildId);
     const next = setFeature(ctx.store, i.guildId, 'antinukeplus', PLUS_DEFAULTS, {
         raidAuto: i.options.getBoolean('raid_auto') ?? cur.raidAuto, raidAutoHours: i.options.getInteger('raid_hours') ?? cur.raidAutoHours,
         settingsLock: i.options.getBoolean('settings_lock') ?? cur.settingsLock, botQuarantine: i.options.getBoolean('bot_quarantine') ?? cur.botQuarantine,
-        joinGate: i.options.getBoolean('join_gate') ?? cur.joinGate ?? true, messageWaves: i.options.getBoolean('message_waves') ?? cur.messageWaves ?? true
+        joinGate: i.options.getBoolean('join_gate') ?? cur.joinGate ?? true, messageWaves: i.options.getBoolean('message_waves') ?? cur.messageWaves ?? true,
+        backupSync: i.options.getBoolean('backup_sync') ?? cur.backupSync ?? true, autoRestore: i.options.getBoolean('auto_restore') ?? cur.autoRestore ?? true,
+        freshGuard: i.options.getBoolean('new_account_guard') ?? cur.freshGuard ?? true
     }, i.user.id);
-    const text = `**Raid auto-trigger:** ${onOff(next.raidAuto)} (${next.raidAutoHours}h)\n**Join gate:** ${onOff(next.joinGate !== false)}\n**Message waves:** ${onOff(next.messageWaves !== false)}\n**Server settings lock:** ${onOff(next.settingsLock)}\n**New bot quarantine:** ${onOff(next.botQuarantine)}`;
+    const text = `**Raid auto-trigger:** ${onOff(next.raidAuto)} (${next.raidAutoHours}h)\n**Join gate:** ${onOff(next.joinGate !== false)}\n**Message waves:** ${onOff(next.messageWaves !== false)}\n**Server settings lock:** ${onOff(next.settingsLock)}\n**New bot quarantine:** ${onOff(next.botQuarantine)}\n**New-account guard:** ${onOff(next.freshGuard !== false)}\n**Backup sync:** ${onOff(next.backupSync !== false)}\n**Auto-restore:** ${onOff(next.autoRestore !== false)}`;
     ctx.logs.push(i.guildId, embed('Anti-nuke extras changed', `By <@${i.user.id}>\n${text}`, Colors.Orange));
     return `${text}\n-# These work while anti-nuke is enabled.`;
 }, { subcommands: { scan: { responseKind: 'info' } } });

@@ -98,6 +98,20 @@ export interface Plan {
     blockedChannels: string[];
 }
 
+/**
+ * "Put back only these": the IDs, as the backup knows them, of the roles and channels to re-create.
+ * Every other role and channel is left exactly as it is, which is what an automatic restore after a
+ * nuke wants: bring back what was deleted, never touch what is there.
+ */
+export interface Recreate { roles: string[]; channels: string[] }
+type Only = { roles: Set<string>; channels: Set<string> };
+const onlyOf = (recreate?: Recreate): Only | null => recreate ? { roles: new Set(recreate.roles), channels: new Set(recreate.channels) } : null;
+
+/** Fingerprint of just the roles and channels (names, order, permissions), to tell whether two backups hold the same layout. */
+export function layoutHash(data: Pick<Snapshot, 'roles' | 'channels'>): string {
+    return createHash('sha256').update(JSON.stringify([data.roles, data.channels])).digest('hex');
+}
+
 const mapped = (map: Record<string, string>, id: string) => map[id] ?? id;
 /** Ranges such as 1-20 may include numbers that were already deleted; single numbers must exist. */
 const range0 = (value: string) => /\d-\d/.test(value);
@@ -105,6 +119,7 @@ export function recoveryLabel(kind: string, purpose: string | null): string {
     if (kind === 'copy') return 'Layout copy';
     if (purpose === 'baseline') return 'Anti-nuke baseline';
     if (purpose === 'scheduled') return 'Scheduled backup';
+    if (purpose === 'synced') return 'Synced backup';
     if (purpose === 'rollback') return 'Pre-restore backup';
     return kind === 'backup' ? 'Backup' : 'Snapshot';
 }
@@ -120,10 +135,12 @@ export class Snapshots {
     readonly locks: RecoveryLocks;
     onAudit?: (guildId: string, title: string, detail: string) => void;
 
-    audit(guildId: string, actor: string, event: string, snapshotId: number | null, detail: string) {
+    /** `quiet` records the event but posts no card in the server's log: used for the automatic synced backups. */
+    audit(guildId: string, actor: string, event: string, snapshotId: number | null, detail: string, quiet = false) {
         // Audit records remain available even when authorization is revoked during an operation.
         this.store.db.prepare('INSERT INTO recovery_events(guild_id,actor_id,event,snapshot_id,at,detail) VALUES(?,?,?,?,?,?)').run(guildId, actor, event, snapshotId, Date.now(), detail);
         logEvent('recovery_activity', { guildId, actor, event, snapshotId });
+        if (quiet) return;
         try {
             this.onAudit?.(guildId, event.replaceAll('_', ' '), `Actor: ${actor}\n${detail}`);
         } catch (error) {
@@ -222,16 +239,24 @@ export class Snapshots {
         this.locks = new RecoveryLocks(store);
     }
 
-    async capture(guild: Guild): Promise<Snapshot> {
+    /**
+     * What the server looks like now. `cached` reads the gateway cache instead of asking Discord, which is what
+     * the backup sync uses to compare layouts every few minutes without spending API calls.
+     */
+    async capture(guild: Guild, options: { cached?: boolean } = {}): Promise<Snapshot> {
         this.store.assertAuthorized(guild.id);
-        const [liveRoles, liveChannels] = await Promise.all([guild.roles.fetch(), guild.channels.fetch()]);
-        // Full fetches add to discord.js caches but do not evict deleted objects.
-        for (const id of guild.roles.cache.keys())
-            if (!liveRoles.has(id))
-                guild.roles.cache.delete(id);
-        for (const [id, c] of guild.channels.cache)
-            if (!c.isThread() && !liveChannels.has(id))
-                guild.channels.cache.delete(id);
+        const [liveRoles, liveChannels] = options.cached
+            ? [guild.roles.cache, guild.channels.cache] as const
+            : await Promise.all([guild.roles.fetch(), guild.channels.fetch()]);
+        if (!options.cached) {
+            // Full fetches add to discord.js caches but do not evict deleted objects.
+            for (const id of guild.roles.cache.keys())
+                if (!liveRoles.has(id))
+                    guild.roles.cache.delete(id);
+            for (const [id, c] of guild.channels.cache)
+                if (!c.isThread() && !liveChannels.has(id))
+                    guild.channels.cache.delete(id);
+        }
         const roles = liveRoles.map(r => ({ id: r.id, name: r.name, color: r.color, hoist: r.hoist,
             mentionable: r.mentionable, permissions: r.permissions.bitfield.toString(), position: r.rawPosition, managed: r.managed })).sort((a, b) => b.position - a.position || a.id.localeCompare(b.id));
         const channels: ChannelData[] = [], unsupported: string[] = [];
@@ -277,7 +302,7 @@ export class Snapshots {
         return createHash('sha256').update(JSON.stringify(snapshot)).digest('hex');
     }
 
-    async save(guild: Guild, actor: string, kind: 'snapshot' | 'backup' = 'snapshot', purpose: 'manual' | 'scheduled' | 'rollback' | 'baseline' = 'manual'): Promise<number> {
+    async save(guild: Guild, actor: string, kind: 'snapshot' | 'backup' = 'snapshot', purpose: 'manual' | 'scheduled' | 'rollback' | 'baseline' | 'synced' = 'manual', quiet = purpose === 'synced'): Promise<number> {
         const data = await this.capture(guild);
         this.validate(data, guild.id);
         const id = this.store.transaction(() => {
@@ -286,7 +311,7 @@ export class Snapshots {
             this.load(guild.id, id);
             return id;
         });
-        this.audit(guild.id, actor, kind === 'backup' ? 'backup_created' : 'snapshot_created', id, `Saved ${recoveryLabel(kind, purpose).toLowerCase()} #${this.numberOf(guild.id, id)}: ${data.roles.length} roles, ${data.channels.length} categories/channels; ${data.unsupported.length} unsupported channels skipped.`);
+        this.audit(guild.id, actor, kind === 'backup' ? 'backup_created' : 'snapshot_created', id, `Saved ${recoveryLabel(kind, purpose).toLowerCase()} #${this.numberOf(guild.id, id)}: ${data.roles.length} roles, ${data.channels.length} categories/channels; ${data.unsupported.length} unsupported channels skipped.`, quiet);
         return id;
     }
 
@@ -352,7 +377,7 @@ export class Snapshots {
                 fail();
     }
 
-    private matches(guild: Guild, data: Snapshot) {
+    private matches(guild: Guild, data: Snapshot, only: Only | null = null) {
         const source = data.sourceGuildId ?? data.guildId;
         const roles: Record<string, string> = {}, channels: Record<string, string> = {};
         const blockedRoles = new Set<string>(), blockedChannels = new Set<string>(), skipped: string[] = [];
@@ -381,7 +406,8 @@ export class Snapshots {
                 skipped.push(`Managed/integration/bot role: ${r.name}`);
                 continue;
             }
-            if (!found) {
+            // A role asked for by ID is known to be gone, so a look-alike by name is never adopted in its place.
+            if (!found && !only?.roles.has(r.id)) {
                 const candidates = [...guild.roles.cache.values()].filter(v => !v.managed && v.id !== guild.id && v.name === r.name);
                 // Name alone is insufficient: require an exact property signature and a unique candidate.
                 const snapshotDuplicates = data.roles.filter(v => !v.managed && roleSignature(v) === roleSignature(r)).length;
@@ -418,7 +444,7 @@ export class Snapshots {
             if (c.parent && (blockedChannels.has(c.parent) || !channels[c.parent])) {
                 // If the category is to be created, matching its children waits until the next matching pass.
                 const parentNames = [...guild.channels.cache.values()].filter(v => !v.isThread() && v.type === ChannelType.GuildCategory && v.name === data.channels.find(p => p.id === c.parent)?.name);
-                if (blockedChannels.has(c.parent) || parentNames.length) {
+                if (blockedChannels.has(c.parent) || (parentNames.length && !only?.channels.has(c.parent))) {
                     blockedChannels.add(c.id);
                     skipped.push(`Unresolved parent category: ${c.name}`);
                     continue;
@@ -431,7 +457,7 @@ export class Snapshots {
                 skipped.push(`Mapped channel type mismatch: ${c.name}`);
                 continue;
             }
-            if (!found) {
+            if (!found && !only?.channels.has(c.id)) {
                 const candidates = [...guild.channels.cache.values()].filter(v => !v.isThread() && v.name === c.name && v.type === c.type);
                 const expectedParent = c.parent ? channels[c.parent] : null;
                 const matches = candidates.filter(v => v.parentId === expectedParent);
@@ -463,12 +489,23 @@ export class Snapshots {
         return { roles, channels, blockedRoles, blockedChannels, skipped };
     }
 
-    async plan(guild: Guild, data: Snapshot, prune = false, components: Component[] = selectComponents()): Promise<Plan> {
+    /** In "re-create only" mode the report names just the objects that were asked for and could not be put back. */
+    private onlySkipped(data: Snapshot, match: { blockedRoles: Set<string>; blockedChannels: Set<string> }, only: Only): string[] {
+        return [
+            ...data.roles.filter(r => only.roles.has(r.id) && match.blockedRoles.has(r.id)).map(r => `Role ${r.name} was not put back: it belongs to an integration.`),
+            ...data.channels.filter(c => only.channels.has(c.id) && match.blockedChannels.has(c.id)).map(c => `Channel ${c.name} was not put back because its category could not be restored.`),
+            ...data.unsupported.filter(v => only.channels.has(v.split(':')[0]!)).map(v => `Channel ${v.split(':').slice(1).join(':')} was not put back: Vanguard cannot create that type of channel.`),
+        ];
+    }
+
+    async plan(guild: Guild, data: Snapshot, prune = false, components: Component[] = selectComponents(), recreate?: Recreate): Promise<Plan> {
         this.validate(data, guild.id);
-        const live = await this.capture(guild), match = this.matches(guild, data);
-        const p: Plan = { fingerprint: this.fingerprint(live), roleCreate: 0, roleUpdate: 0, channelCreate: 0, channelUpdate: 0, settingsUpdate: 0, roleUpdates: [], channelUpdates: [], roleDelete: [], channelDelete: [], skipped: [...data.unsupported.map(v => `Unsupported channel ${v}`), ...match.skipped], roleMap: match.roles, channelMap: match.channels, blockedRoles: [...match.blockedRoles], blockedChannels: [...match.blockedChannels] };
+        const only = onlyOf(recreate);
+        const live = await this.capture(guild), match = this.matches(guild, data, only);
+        const skippedNotes = only ? this.onlySkipped(data, match, only) : [...data.unsupported.map(v => `Unsupported channel ${v}`), ...match.skipped];
+        const p: Plan = { fingerprint: this.fingerprint(live), roleCreate: 0, roleUpdate: 0, channelCreate: 0, channelUpdate: 0, settingsUpdate: 0, roleUpdates: [], channelUpdates: [], roleDelete: [], channelDelete: [], skipped: skippedNotes, roleMap: match.roles, channelMap: match.channels, blockedRoles: [...match.blockedRoles], blockedChannels: [...match.blockedChannels] };
         for (const r of data.roles) {
-            if (match.blockedRoles.has(r.id))
+            if (match.blockedRoles.has(r.id) || only && !only.roles.has(r.id))
                 continue;
             const current = guild.roles.cache.get(match.roles[r.id] ?? '');
             if (!current) {
@@ -476,6 +513,8 @@ export class Snapshots {
                     p.roleCreate++;
                 continue;
             }
+            if (only)
+                continue;
             const propsChanged = components.includes('roles') && current.id !== guild.id && JSON.stringify(roleProps(current)) !== JSON.stringify(roleProps(r));
             const permissionsChanged = components.includes('permissions') && current.permissions.bitfield.toString() !== r.permissions;
             if (propsChanged || permissionsChanged || components.includes('roles') && current.rawPosition !== r.position) {
@@ -484,7 +523,7 @@ export class Snapshots {
             }
         }
         for (const c of data.channels) {
-            if (match.blockedChannels.has(c.id))
+            if (match.blockedChannels.has(c.id) || only && !only.channels.has(c.id))
                 continue;
             const selected = components.includes(c.type === ChannelType.GuildCategory ? 'categories' : 'channels');
             const current = guild.channels.cache.get(match.channels[c.id] ?? '');
@@ -493,7 +532,7 @@ export class Snapshots {
                     p.channelCreate++;
                 continue;
             }
-            if (current.isThread())
+            if (only || current.isThread())
                 continue;
             const changed = selected && (JSON.stringify(channelProps(current)) !== JSON.stringify(channelProps(c)) || current.parentId !== (c.parent ? match.channels[c.parent] : null) || current.rawPosition !== c.position);
             const overwriteChanged = components.includes('permissions') && overwriteKey(current.permissionOverwrites.cache.map(o => ({ id: o.id, type: o.type, allow: o.allow.bitfield.toString(), deny: o.deny.bitfield.toString() }))) !== overwriteKey(c.overwrites.map(o => ({ ...o, id: o.type === OverwriteType.Role ? match.roles[o.id] ?? o.id : o.id })));
@@ -502,14 +541,14 @@ export class Snapshots {
                 p.channelUpdates.push(current.id);
             }
         }
-        if (components.includes('settings') && data.settings) {
+        if (!only && components.includes('settings') && data.settings) {
             for (const [key, value] of Object.entries(data.settings)) {
                 const desired = key.endsWith('ChannelId') && value !== null ? match.channels[String(value)] : value;
                 if (desired !== undefined && (guild as any)[key] !== desired)
                     p.settingsUpdate++;
             }
         }
-        if (prune) {
+        if (prune && !only) {
             const settings = this.store.settings(guild.id), me = await guild.members.fetchMe();
             const knownRoles = new Set(Object.values(match.roles)), knownChannels = new Set(Object.values(match.channels));
             const log = settings.logChannelId ? guild.channels.cache.get(settings.logChannelId) : undefined;
@@ -527,11 +566,11 @@ export class Snapshots {
     async restore(guild: Guild, snapshotId: number, prune: boolean, expectedFingerprint: string, options: RestoreOptions = {}): Promise<string> {
         try {
             return await this.locks.run([guild.id], async (check) => {
-                this.audit(guild.id, options.actor ?? 'recovery', 'restore_started', snapshotId, `Components: ${(options.components ?? selectComponents()).join(', ')}; prune: ${prune}`);
+                this.audit(guild.id, options.actor ?? 'recovery', 'restore_started', snapshotId, `Components: ${(options.components ?? selectComponents()).join(', ')}; prune: ${prune}`, options.quiet);
                 return withRecoveryApi(guild.id, options.progress, () => this.performRestore(guild, snapshotId, prune, expectedFingerprint, options, check));
             });
         } catch (error) {
-            this.audit(guild.id, options.actor ?? 'recovery', 'restore_failed', snapshotId, `Recovery aborted: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            this.audit(guild.id, options.actor ?? 'recovery', 'restore_failed', snapshotId, `Recovery aborted: ${error instanceof Error ? error.message : 'Unknown error'}`, options.quiet);
             throw error;
         }
     }
@@ -571,6 +610,7 @@ export class Snapshots {
 
     private async performRestore(guild: Guild, snapshotId: number, prune: boolean, expectedFingerprint: string, options: RestoreOptions, checkLock: () => void): Promise<string> {
         const { data } = this.load(guild.id, snapshotId), components = options.components ?? selectComponents();
+        const only = onlyOf(options.recreate);
         const check = () => {
             checkLock();
             this.store.assertAuthorized(guild.id);
@@ -585,11 +625,11 @@ export class Snapshots {
             } catch { /* Progress delivery must not abort recovery. */ }
         };
         await progress('Preparing restore...');
-        const plan = await this.plan(guild, data, prune, components);
+        const plan = await this.plan(guild, data, prune, components, options.recreate);
         if (plan.fingerprint !== expectedFingerprint)
             throw new AppError('VALIDATION_ERROR', 'The server changed after the preview. Run /recovery snapshot restore again to review a fresh plan.');
         check();
-        const backup = await this.save(guild, options.actor ?? 'recovery', 'backup', 'rollback');
+        const backup = await this.save(guild, options.actor ?? 'recovery', 'backup', 'rollback', options.quiet);
         // Backup is read back and validated before any mutation; failures abort recovery.
         this.load(guild.id, backup);
         const source = data.sourceGuildId ?? data.guildId;
@@ -603,16 +643,17 @@ export class Snapshots {
             });
         };
         await progress('Matching existing objects...');
-        const m = this.matches(guild, data);
+        const m = this.matches(guild, data, only);
         details.push(...plan.skipped);
         counts.Skipped = plan.skipped.length;
         data.roleMap = { ...m.roles };
         data.channelMap = { ...m.channels };
-        for (const [from, to] of Object.entries(m.roles)) {
+        // "Re-create only" leaves everything it was not asked about alone, mappings included.
+        for (const [from, to] of Object.entries(m.roles).filter(([from]) => !only || only.roles.has(from))) {
             saveMap('role', from, to);
             existing.add(`role:${to}`);
         }
-        for (const [from, to] of Object.entries(m.channels)) {
+        for (const [from, to] of Object.entries(m.channels).filter(([from]) => !only || only.channels.has(from))) {
             saveMap('channel', from, to);
             existing.add(`channel:${to}`);
         }
@@ -636,7 +677,7 @@ export class Snapshots {
                     const retryAt = new Date(Date.now() + waitMs(error)).toISOString();
                     const report = `Snapshot #${this.numberOf(guild.id, snapshotId)} recovery stopped at ${label}.\nBackup: #${this.numberOf(guild.id, backup)}.\nDiscord requires ${Math.ceil(waitMs(error) / 1000)} seconds; retry after ${retryAt}.\n${Object.entries(counts).map(([key, n]) => `${key}: ${n}`).join('\n')}\nCompleted changes and object mappings were saved. Run the restore again after Discord's wait; existing objects will be reused.\n${details.join('\n')}`;
                     this.store.run('INSERT INTO recovery_history(guild_id,source_guild,snapshot_id,actor_id,backup_id,at,report) VALUES(?,?,?,?,?,?,?)', guild.id, source, snapshotId, options.actor ?? 'recovery', backup, Date.now(), report);
-                    this.audit(guild.id, options.actor ?? 'recovery', 'recovery_api_stopped', snapshotId, report);
+                    this.audit(guild.id, options.actor ?? 'recovery', 'recovery_api_stopped', snapshotId, report, options.quiet);
                     await progress('Recovery stopped: Discord imposed a long API wait. Completed mappings saved; operation locks are being released.');
                     throw new AppError('RATE_LIMIT_ERROR', report, { cause: error });
                 }
@@ -655,8 +696,9 @@ export class Snapshots {
         const me = await guild.members.fetchMe();
         if (components.includes('roles')) {
             let done = 0;
-            for (const r of roles) {
-                await progress(`Restoring roles... ${++done}/${roles.length}`);
+            const pass = only ? roles.filter(r => only.roles.has(r.id)) : roles;
+            for (const r of pass) {
+                await progress(`Restoring roles... ${++done}/${pass.length}`);
                 if (m.blockedRoles.has(r.id) || r.id === source)
                     continue;
                 let current = guild.roles.cache.get(data.roleMap[r.id] ?? '');
@@ -666,7 +708,7 @@ export class Snapshots {
                         current = await guild.roles.create({ ...roleProps(r), permissions: 0n, reason });
                         saveMap('role', r.id, current.id);
                     });
-                } else if (current.editable && JSON.stringify(roleProps(current)) !== JSON.stringify(roleProps(r))) {
+                } else if (!only && current.editable && JSON.stringify(roleProps(current)) !== JSON.stringify(roleProps(r))) {
                     await action(`Update role ${r.name}`, `role:${current.id}`, 'Updated', () => current!.edit({ ...roleProps(r), reason }));
                 }
             }
@@ -674,7 +716,7 @@ export class Snapshots {
             // Reserve fixed/managed slots and assign descending positions so clamping never reverses roles.
             const movable = roles.flatMap(r => {
                 const current = guild.roles.cache.get(data.roleMap[r.id] ?? '');
-                return r.id !== source && !m.blockedRoles.has(r.id) && current?.editable && !current.managed ? [{ r, current }] : [];
+                return r.id !== source && !m.blockedRoles.has(r.id) && current?.editable && !current.managed && (!only || touched.has(`source-role:${r.id}`)) ? [{ r, current }] : [];
             });
             const fixed = new Set([...guild.roles.cache.values()].filter(r => !movable.some(v => v.current.id === r.id)).map(r => r.position));
             let ceiling = me.roles.highest.position - 1;
@@ -703,7 +745,7 @@ export class Snapshots {
         for (const phase of ['categories', 'channels'] as const) {
             if (!components.includes(phase))
                 continue;
-            const list = ordered.filter(c => (c.type === ChannelType.GuildCategory) === (phase === 'categories'));
+            const list = ordered.filter(c => (c.type === ChannelType.GuildCategory) === (phase === 'categories') && (!only || only.channels.has(c.id)));
             let done = 0;
             for (const c of list) {
                 await progress(`Restoring ${phase}... ${++done}/${list.length}`);
@@ -715,7 +757,7 @@ export class Snapshots {
                 }
                 const parent = c.parent ? data.channelMap[c.parent] : null;
                 if (c.parent && (!parent || guild.channels.cache.get(parent)?.type !== ChannelType.GuildCategory)) {
-                    skipped(`Missing category for ${c.name}; select Categories as well.`);
+                    skipped(only ? `Missing category for ${c.name}.` : `Missing category for ${c.name}; select Categories as well.`);
                     continue;
                 }
                 const current = guild.channels.cache.get(data.channelMap[c.id] ?? '');
@@ -725,7 +767,7 @@ export class Snapshots {
                         const created = await guild.channels.create({ ...channelProps(c), type: c.type, parent, permissionOverwrites: [{ id: guild.id, deny: ['ViewChannel'] }, { id: me.id, allow: ['ViewChannel', 'ManageChannels'] }], reason } as GuildChannelCreateOptions);
                         saveMap('channel', c.id, created.id);
                     });
-                } else if (!current.isThread() && (JSON.stringify(channelProps(current)) !== JSON.stringify(channelProps(c)) || current.parentId !== parent)) {
+                } else if (!only && !current.isThread() && (JSON.stringify(channelProps(current)) !== JSON.stringify(channelProps(c)) || current.parentId !== parent)) {
                     if (c.availableTags && 'availableTags' in current && c.availableTags.some(t => (current as any).availableTags.filter((v: any) => v.name === t.name).length > 1)) {
                         skipped(`Ambiguous forum/media tags on ${c.name}; channel settings preserved.`);
                         continue;
@@ -736,7 +778,7 @@ export class Snapshots {
         }
         await progress('Reordering server layout...');
         const channelPositions = ordered.flatMap(c => {
-            if (!components.includes(c.type === ChannelType.GuildCategory ? 'categories' : 'channels') || m.blockedChannels.has(c.id))
+            if (!components.includes(c.type === ChannelType.GuildCategory ? 'categories' : 'channels') || m.blockedChannels.has(c.id) || only && !touched.has(`source-channel:${c.id}`))
                 return [];
             const current = guild.channels.cache.get(data.channelMap[c.id] ?? '');
             return current && !current.isThread() && current.rawPosition !== c.position ? [{ channel: current.id, position: c.position }] : [];
@@ -746,7 +788,7 @@ export class Snapshots {
         await progress('Applying permissions...');
         if (components.includes('permissions')) {
             for (const r of roles) {
-                if (m.blockedRoles.has(r.id))
+                if (m.blockedRoles.has(r.id) || only && !only.roles.has(r.id))
                     continue;
                 const current = guild.roles.cache.get(data.roleMap[r.id] ?? '');
                 if (!current) {
@@ -757,7 +799,7 @@ export class Snapshots {
                     await action(`Role permissions ${r.name}`, `role:${current.id}`, 'Updated', () => current.edit({ permissions: BigInt(r.permissions), reason }));
             }
             for (const c of ordered) {
-                if (m.blockedChannels.has(c.id))
+                if (m.blockedChannels.has(c.id) || only && !only.channels.has(c.id))
                     continue;
                 const current = guild.channels.cache.get(data.channelMap[c.id] ?? '');
                 if (!current || current.isThread()) {
@@ -792,7 +834,7 @@ export class Snapshots {
             details.push('New channels/categories were created private because Permissions was not selected.');
         }
         await progress('Restoring settings...');
-        if (components.includes('settings')) {
+        if (!only && components.includes('settings')) {
             if (!data.settings)
                 skipped('This older snapshot does not contain supported guild settings.');
             else if (!me.permissions?.has('ManageGuild'))
@@ -817,7 +859,7 @@ export class Snapshots {
             }
         }
         // Retain the existing explicit prune option; do not prune after any skipped or failed object.
-        if (prune) {
+        if (prune && !only) {
             if (counts.Failed || counts.Skipped)
                 skipped('Deletion of extras withheld because restoration had skipped objects or failures.');
             else {
@@ -836,9 +878,9 @@ export class Snapshots {
         }
         await progress('Verifying restore...');
         // Fresh fetches verify Discord's actual layout rather than trusting local mutation results.
-        const final = await this.plan(guild, data, false, components);
+        const final = await this.plan(guild, data, false, components, options.recreate);
         const differences = final.roleCreate + final.roleUpdate + final.channelCreate + final.channelUpdate + final.settingsUpdate;
-        for (const key of existing) {
+        for (const key of only ? [] : existing) {
             const [kind, id] = key.split(':');
             const selected = kind === 'role' ? components.includes('roles') || components.includes('permissions') : components.includes('permissions') || components.includes(guild.channels.cache.get(id!)?.type === ChannelType.GuildCategory ? 'categories' : 'channels');
             if (selected) {
@@ -847,9 +889,9 @@ export class Snapshots {
                     counts.Unchanged++;
             }
         }
-        for (const [from, to] of Object.entries(data.roleMap))
+        for (const [from, to] of Object.entries(data.roleMap).filter(([from]) => !only || only.roles.has(from)))
             saveMap('role', from, to);
-        for (const [from, to] of Object.entries(data.channelMap))
+        for (const [from, to] of Object.entries(data.channelMap).filter(([from]) => !only || only.channels.has(from)))
             saveMap('channel', from, to);
         if (source === guild.id) {
             const settings = this.store.settings(guild.id);
@@ -876,7 +918,7 @@ export class Snapshots {
         for (const id of final.channelUpdates)
             details.push(`Verification: channel/category ${guild.channels.cache.get(id)?.name ?? id} still differs from the snapshot.`);
         const report = `Snapshot #${this.numberOf(guild.id, snapshotId)} restoration ${counts.Failed || differences || counts.Skipped ? 'finished with items to review' : 'complete'}.\n**Backup:** #${backup}\n**Components:** ${components.join(', ')}\n${Object.entries(counts).map(([key, n]) => `**${key}:** ${n}`).join('\n')}\n**Failures:** ${counts.Failed}\n**Remaining structural differences:** ${differences}\n${details.join('\n') || 'No reported failures or skipped objects.'}`;
-        this.audit(guild.id, options.actor ?? 'recovery', data.sourceGuildId ? 'layout_copy_finished' : 'restore_finished', snapshotId, report);
+        this.audit(guild.id, options.actor ?? 'recovery', data.sourceGuildId ? 'layout_copy_finished' : 'restore_finished', snapshotId, report, options.quiet);
         this.store.run('INSERT INTO recovery_history(guild_id,source_guild,snapshot_id,actor_id,backup_id,at,report) VALUES(?,?,?,?,?,?,?)', guild.id, source, snapshotId, options.actor ?? 'recovery', backup, Date.now(), report);
         await progress(counts.Failed || differences || counts.Skipped ? 'Restore finished with items to review.' : 'Restore complete.');
         return report;
@@ -887,6 +929,10 @@ export interface RestoreOptions {
     components?: Component[];
     actor?: string;
     progress?: (message: string) => Promise<void>;
+    /** Re-create only these roles and channels and touch nothing else (see Recreate). */
+    recreate?: Recreate;
+    /** Record everything in the audit trail but post no cards in the server's log; the caller reports instead. */
+    quiet?: boolean;
 }
 
 export function orderedChannels(channels: ChannelData[]) {

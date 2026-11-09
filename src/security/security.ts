@@ -1,12 +1,14 @@
 import { isBotPermissionRole } from './role-policy.js';
 import { isBlacklisted } from './role-blacklist.js';
 import { consumeApprovedRoleChange } from './role-authorizations.js';
-import { ActionRowBuilder, AuditLogEvent, PermissionFlagsBits, ButtonBuilder, ButtonStyle, Colors, Guild, GuildAuditLogsEntry, GuildMember, type EmbedBuilder } from 'discord.js';
+import { ActionRowBuilder, AuditLogEvent, PermissionFlagsBits, PermissionsBitField, ButtonBuilder, ButtonStyle, Colors, Guild, GuildAuditLogsEntry, GuildMember, type EmbedBuilder } from 'discord.js';
 import { dangerous, escalationAdded, KeyedQueue, overrideRule, ruleFor, RULES, WARN_FIRST, WARNING_MEMORY_MS, KNOWN_ROLE_BOTS, type Rule } from '../core.js';
 import type { Store } from '../database/db.js';
 import { developers } from '../bot/developers.js';
 import { isTrustedBot, isWhitelistedPerson, TRUSTED_BOTS } from '../bot/trusted-bots.js';
-import { AppError } from '../errors.js';
+import { AppError, failure, logEvent } from '../errors.js';
+import { plusConfig } from '../features/plus-settings.js';
+import { FRESH_ACCOUNT_DAYS, FRESH_MEMBER_HOURS, freshness } from './fresh-guard.js';
 import type { LogQueue } from '../logging.js';
 import { noteThreat } from './threat-board.js';
 import { embed, memberOrNull } from '../ui/ui.js';
@@ -108,7 +110,14 @@ export class Security {
 
     constructor(readonly store: Store, readonly logs: LogQueue) { }
 
-    private incidentLog(guildId: string, card: EmbedBuilder, rows: ActionRowBuilder<ButtonBuilder>[] = []) {
+    /**
+     * Called after anti-nuke has contained someone who deleted channels or roles (enforce mode, not a first warning).
+     * The automatic restore listens here; anti-nuke itself knows nothing about backups.
+     */
+    onDeletions?: (info: { guild: Guild; actor: string; incident: number }) => void;
+
+    /** A card in the security log, and in the anti-nuke log when that is a separate channel. */
+    incidentLog(guildId: string, card: EmbedBuilder, rows: ActionRowBuilder<ButtonBuilder>[] = []) {
         this.logs.push(guildId, card, rows);
         const channel = logRoute(this.store, guildId, 'antinuke');
         if (channel && channel !== this.store.settings(guildId).logChannelId)
@@ -172,6 +181,8 @@ export class Security {
                 if (!this.grantExemptReason(guild, actor, newlyAssigned)) await this.selfEscalation(guild, actor, newlyAssigned);
                 return;
             }
+            // Before the rules, and whoever gave the role: a trusted account that was taken over passes every rule below.
+            await this.freshGuard(entry, guild, actor).catch(error => logEvent('fresh_guard_failure', { guildId: guild.id, ...failure(error) }));
             for (const { rule, eventId } of this.rulesFor(entry, guild, actor, newlyAssigned))
                 // A role the actor just gave themselves cannot exempt that same action. Protected grants
                 // accept either a full bypass or their narrower permission-grant whitelist entry.
@@ -179,6 +190,54 @@ export class Security {
                     ? this.grantExemptReason(guild, actor, newlyAssigned)
                     : exempt ?? (this.trustedFor(guild, actor, rule.key, newlyAssigned) ? 'whitelisted for this action' : null));
         });
+    }
+
+    /**
+     * New-account guard. A role that carries Administrator, Manage Roles or another escalation permission, given to
+     * someone whose Discord account is under 7 days old or who joined under 24 hours ago, comes straight back off,
+     * whoever gave it. That is the case every other check misses: the owner's or a trusted admin's account is taken
+     * over and hands a powerful role to a throwaway account that joined seconds ago. The person who gave the role is
+     * left alone; they may be legitimate, and the card tells staff who it was. Switch it off with /antinuke settings.
+     */
+    private async freshGuard(entry: GuildAuditLogsEntry, guild: Guild, actor: string): Promise<void> {
+        if (entry.action !== AuditLogEvent.MemberRoleUpdate || !entry.targetId) return;
+        const s = this.store.settings(guild.id);
+        if (!s.enabled || plusConfig(this.store, guild.id).freshGuard === false) return;
+        const { roles: ids, bits } = memberEscalation(entry, guild);
+        if (!ids.length) return;
+        // null means they left the server. Any other failure (a rate limit, an outage) is thrown on purpose: the
+        // caller logs it, so a guard that could not do its job is never mistaken for one that found nothing to do.
+        const target = await memberOrNull(guild, entry.targetId);
+        if (!target || target.user?.bot) return;
+        // A role handed over in this very change cannot be what makes them trusted.
+        if (this.trusted(guild, target.id, ids)) return;
+        const fresh = freshness(target);
+        if (!fresh) return;
+        const roles = ids.map(id => guild.roles?.cache?.get(id)).filter((role): role is NonNullable<typeof role> => !!role);
+        const given = roles.length ? roles.map(r => `<@&${r.id}>`).join(', ') : ids.map(id => `<@&${id}>`).join(', ');
+        const perms = new PermissionsBitField(bits).toArray().map(name => name.replace(/([a-z])([A-Z])/g, '$1 $2')).join(', ');
+        const how = `<@${actor}> gave <@${target.id}> ${given}. It carries ${perms}.\nSince ${fresh.text}`;
+        const override = `-# To allow it: whitelist them with \`/antinuke whitelist add\`, wait ${fresh.wait}, or turn the guard off with \`/antinuke settings\`.`;
+        if (s.mode !== 'enforce') {
+            this.incidentLog(guild.id, embed('New-account guard (observe mode)', `${how}, Vanguard would have taken the role back.\nObserved only: nothing was removed.\n${override}`, Colors.DarkButNotBlack));
+            return;
+        }
+        const removable = roles.filter(r => !r.managed && r.editable);
+        let removed: string[] = [];
+        if (removable.length) {
+            this.store.assertAuthorized(guild.id);
+            removed = await target.roles.remove(removable.map(r => r.id), 'Ghost Vanguard: new-account guard').then(() => removable.map(r => r.id), () => []);
+        }
+        const outcome = removed.length ? 'Vanguard took the role back.' : 'Vanguard could not take the role back. Move its role above that role and check that it has Manage Roles.';
+        this.incidentLog(guild.id, embed('New account got a powerful role', `${how}, ${outcome}\n${override}`, removed.length ? Colors.Orange : Colors.Red));
+        if (removed.length)
+            void target.send({ embeds: [embed('A role was removed', [
+                `In **${guild.name ?? 'this server'}** you were given ${given}, and Vanguard took it back.`,
+                '',
+                `Roles with permissions like ${perms} are held back from accounts under ${FRESH_ACCOUNT_DAYS} days old and from members who joined less than ${FRESH_MEMBER_HOURS} hours ago. This is automatic.`,
+                'If it is a mistake, ask a server admin.',
+            ].join('\n'), Colors.Orange)] }).catch(() => 0);
+        logEvent('fresh_guard', { guildId: guild.id, actor, target: target.id, roles: ids, removed: removed.length });
     }
 
     /**
@@ -341,6 +400,10 @@ export class Security {
             buttons.push(new ButtonBuilder().setCustomId(`incident:restore:${incident}`).setLabel('Review restore').setStyle(ButtonStyle.Secondary));
         const rows = buttons.length ? [new ActionRowBuilder<ButtonBuilder>().addComponents(...buttons)] : [];
         this.incidentLog(guild.id, incidentCard({ incident, actor, rule: active, mode: warnOnly ? 'warn' : s.mode, count, result, progress, deleted, targetId: entry.targetId ?? null, whitelistNote: this.partialWhitelist(guild, actor, active) }), rows);
+        // The person is contained and the deletions are on record: let the automatic restore put them back.
+        if (s.mode === 'enforce' && !warnOnly && (deleted.channels || deleted.roles)) {
+            try { this.onDeletions?.({ guild, actor, incident }); } catch (error) { logEvent('auto_restore_failure', { guildId: guild.id, actor, ...failure(error) }); }
+        }
         try {
             const info: GlobalAlertInfo = {
                 guild: { id: guild.id, name: guild.name }, actor, snapshot, rule: active, mode: warnOnly ? 'warn' : s.mode, incident,

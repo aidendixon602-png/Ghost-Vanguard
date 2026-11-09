@@ -1,11 +1,12 @@
 import { confirmDanger } from '../../ui/danger-ui.js';
 import { archivePlan, deleteArchive } from '../../audit/archive-cleanup.js';
+import { deleteDuplicates, duplicatePlan } from '../../audit/log-duplicates.js';
 import { ChannelType, Colors, PermissionFlagsBits, SlashCommandBuilder } from 'discord.js';
 import { defineCommand } from '../../bot/registry.js';
 import { AppError } from '../../errors.js';
 import { configureEventLog, eventLogConfig, LOG_CATEGORIES, LOG_RETENTION_DAYS, recentEvents } from '../../audit/event-log.js';
 import { embed } from '../../ui/ui.js';
-import { applyLogMerge, BANS_CHANNEL, checkChannel, describeCheck, describeMerge, describeRouteSetup, LEGACY_LOG_ROUTES, LOG_CATEGORY, LOGGING_CHANNEL, logChannels, planLogMerge, routesWithoutChannel, serverPermissionGaps, setLogChannels, setupLogChannels } from '../../audit/log-setup.js';
+import { applyLogMerge, BANS_CHANNEL, checkChannel, describeCheck, describeMerge, describeRouteSetup, describeTwins, LEGACY_LOG_ROUTES, LOG_CATEGORY, LOGGING_CHANNEL, logChannels, logTwins, planLogMerge, routesWithoutChannel, serverPermissionGaps, setLogChannels, setupLogChannels } from '../../audit/log-setup.js';
 const CATEGORY_LABELS = {
     moderation: 'Moderation (bans, kicks, timeouts, prunes)',
     members: 'Members (joins, leaves, role and nickname changes)',
@@ -25,6 +26,7 @@ export default defineCommand(new SlashCommandBuilder().setName('logs').setDescri
     .addChannelOption(o => o.setName('channel').setDescription('Destination; omit to use the default log channel').addChannelTypes(ChannelType.GuildText)))
     .addSubcommand(s => s.setName('merge').setDescription('Group Vanguard log channels under Ghost Vanguard Logs, leaving other bots’ logs alone'))
     .addSubcommand(s => s.setName('cleanup-archive').setDescription('Preview deletion of channels in the old log archive'))
+    .addSubcommand(s => s.setName('cleanup-duplicates').setDescription('Preview deleting unused log channels Vanguard made that share a name with one it uses'))
     .addSubcommand(s => s.setName('check').setDescription('Check configured log channels and bot permissions, then send test embeds'))
     .addSubcommand(s => s.setName('exclude').setDescription('Stop (or start again) logging events from a channel')
     .addChannelOption(o => o.setName('channel').setDescription('Channel').setRequired(true))
@@ -111,6 +113,29 @@ export default defineCommand(new SlashCommandBuilder().setName('logs').setDescri
             run: async (fresh, click) => deleteArchive(click.guild, fresh.store, plan, click.user.id),
         });
     }
+    if (sub === 'cleanup-duplicates') {
+        await i.guild.channels.fetch();
+        const plan = await duplicatePlan(ctx.store, i.guild);
+        if (!plan.remove.length) {
+            if (!plan.keep.length)
+                return 'No duplicate log channels were found.';
+            return ['Nothing was deleted. Vanguard cannot remove these channels, each of which shares its name with another log channel:',
+                ...plan.keep.slice(0, 10).map(k => `• <#${k.id}> (#${k.name}): ${k.why}`)].join('\n');
+        }
+        return confirmDanger(ctx, i, {
+            title: 'Delete duplicate log channels', label: 'Delete duplicates',
+            summary: `Delete ${plan.remove.length} log channel${plan.remove.length === 1 ? '' : 's'} that Vanguard made and is not using.`,
+            consequences: [
+                ...plan.remove.slice(0, 15).map(r => `<#${r.id}> · ${r.empty ? 'nothing posted in it' : 'has messages'} · Vanguard logs to <#${r.keeper}> instead`),
+                ...(plan.remove.length > 15 ? [`Plus ${plan.remove.length - 15} more.`] : []),
+                ...(plan.keep.length ? [`${plan.keep.length} more channel${plan.keep.length === 1 ? '' : 's'} with a shared name stay, because Vanguard cannot show it made ${plan.keep.length === 1 ? 'it' : 'them'}.`] : []),
+                'All messages in the deleted channels are permanently lost.',
+                'Only channels the audit log shows this bot created are included. A channel Vanguard logs to is never touched.',
+            ],
+            reversal: 'Discord channel IDs and message history cannot be restored. `/setup logs setup` makes a missing log channel again.',
+            run: async (fresh, click) => deleteDuplicates(click.guild, fresh.store, plan, click.user.id),
+        });
+    }
     if (sub === 'view') {
         const category = i.options.getString('category');
         const user = i.options.getUser('user');
@@ -175,6 +200,9 @@ export default defineCommand(new SlashCommandBuilder().setName('logs').setDescri
         }
         if (healthy.length)
             lines.push(`**Log type channels:** ✅ ${healthy.join(' ')} · test embed sent to each`);
+        const twins = logTwins(ctx.store, i.guild);
+        if (twins.length)
+            lines.push(...describeTwins(twins));
         const unrouted = routesWithoutChannel(ctx.store, guild);
         if (sub === 'check' && unrouted.length)
             lines.push(`**Without their own channel:** ${unrouted.join(', ')} · run \`/setup logs setup\` to create them.`);
@@ -242,4 +270,4 @@ export default defineCommand(new SlashCommandBuilder().setName('logs').setDescri
     const name = i.options.getString('name', true), on = i.options.getBoolean('enabled', true);
     configureEventLog(ctx.store, guild, { category: [name, on] });
     return `${CATEGORY_LABELS[name].split(' (')[0]} events are now **${on ? 'logged' : 'not logged'}**.`;
-}, { subcommands: { 'cleanup-archive': { access: 'owner', botPermissions: [PermissionFlagsBits.ManageChannels] } } });
+}, { subcommands: { 'cleanup-archive': { access: 'owner', botPermissions: [PermissionFlagsBits.ManageChannels] }, 'cleanup-duplicates': { access: 'owner', botPermissions: [PermissionFlagsBits.ManageChannels, PermissionFlagsBits.ViewAuditLog] } } });

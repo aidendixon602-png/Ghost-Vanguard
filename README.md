@@ -34,6 +34,7 @@ Use `/roblox sharing` to manage blacklist sharing with partner servers.
 
 - **Anti-nuke:** watches dangerous server changes across 19 rules. New or unconfigured servers begin in observe mode; enforcement starts only after readiness checks and an explicit confirmation.
 - **Measured response:** routine or ambiguous activity is alert-first and can warn before escalation. High-confidence takeover signals retain immediate safeguards. Tune thresholds and controls per rule and per server.
+- **New-account guard:** a role with Administrator, Manage Roles or similar permissions is taken back from accounts under 7 days old and members who joined under 24 hours ago, whoever gave it.
 - **Raid response:** lockdown and emergency controls, new-account holds, join-flood detection, lookalike-name waves, and coordinated message-wave handling.
 - **Content protection:** spam, link and invite controls, scam-link and scam-image detection, staff anti-ping, and optional AI moderation.
 - **Whitelist:** exempt people or roles globally or per rule, with optional expiry and verification-bot recognition.
@@ -57,7 +58,7 @@ The **threat board** combines confirmed incidents into Watch, High, and Critical
 ### Runs the operations around your community
 
 - Panel-driven tickets with claims, transcripts, member ratings, staff reminders, and weekly reports.
-- Server-layout snapshots, verified database backups, previewed restores, and recovery tools.
+- Server-layout snapshots, backups that keep up with the server, automatic restore of channels and roles a contained attacker deleted, verified database backups, previewed restores, and recovery tools.
 - Audit logging, a private staff control panel, and a read-only dashboard with server, protection, ticket, and incident views.
 - A supervised launcher, health endpoint, and optional CI-gated updates with rollback.
 

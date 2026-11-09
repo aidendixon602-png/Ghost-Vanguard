@@ -37,6 +37,13 @@ First-hit warnings apply to human actors; bots get the normal response without a
 - **Message waves:** the same message from 4 or more accounts that joined in the last 30 minutes, within 30 seconds, is deleted, the accounts are handled like raid mode, and raid mode switches on. In observe mode it is only reported.
 - `/antinuke settings join_gate:false message_waves:false` switches either off.
 
+## Backups and new accounts
+
+- **Backup sync** keeps a recent backup of the roles and channels ([details](recovery.md#synced-backups)).
+- **Auto-restore** puts back channels and roles a contained attacker deleted, from the newest backup saved before the first deletion ([details](recovery.md#automatic-restore)).
+- **New-account guard** takes powerful roles back from accounts under 7 days old and members who joined under 24 hours ago, whoever gave them ([details](security-controls.md#new-accounts-and-powerful-roles)).
+- `/antinuke settings backup_sync:false auto_restore:false new_account_guard:false` switches them off.
+
 ## Observe-first rollout and readiness
 
 At startup and after authorization, a new or unconfigured server loads its default rules in **observe** mode. It records incidents but does not strip people or automatically revert changes. Run `/setup logs setup`, then `/antinuke check`; readiness requires the bot permissions and an accessible security-log channel. When ready, `/antinuke enable` opens a confirmation that describes enforcement consequences, the baseline snapshot, and any roles at or above Vanguard. Confirming rechecks the security log, permissions, and hierarchy before enabling enforcement. A hierarchy warning does not block the choice, but Vanguard cannot contain members whose roles are above it.

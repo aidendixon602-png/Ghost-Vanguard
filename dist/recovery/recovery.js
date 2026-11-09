@@ -4,6 +4,8 @@ import { AppError } from '../errors.js';
 import { MAX_RATE_LIMIT_WAIT_MS } from './limits.js';
 export const BUSY_MESSAGE = 'A server recovery operation is already running.\nPlease wait for it to finish before starting another one.';
 export const COMPONENTS = ['roles', 'categories', 'channels', 'permissions', 'settings'];
+/** The server owner turned backups off (`/setup config feature snapshots`): nothing may save or restore one for them. */
+export const backupsDisabled = (store, guildId) => store.get('SELECT enabled FROM feature_settings WHERE guild_id=? AND feature=?', guildId, 'snapshots')?.enabled === 0;
 export function selectComponents(values = ['all']) {
     if (!values.length || values.some(v => v !== 'all' && !COMPONENTS.includes(v)))
         throw new AppError('VALIDATION_ERROR', 'Select supported restore components.');

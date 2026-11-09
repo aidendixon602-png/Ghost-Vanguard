@@ -9,7 +9,7 @@ import { RANKS, rankOf, isSupreme } from '../bot/ranks.js';
 import { developers } from '../bot/developers.js';
 import { isTrustedBot } from '../bot/trusted-bots.js';
 import { raidState, setRaidMode } from '../security/raidmode.js';
-import { getFeature } from './settings.js';
+import { plusConfig } from './plus-settings.js';
 
 /**
  * Extra anti-nuke layers on top of the rule preset:
@@ -21,9 +21,8 @@ import { getFeature } from './settings.js';
  *    owner or a Supreme Leader/Developer, has those permissions removed until a Head Admin approves.
  *  - Permission audit: who can do damage, at a glance.
  */
-export interface PlusConfig { raidAuto: boolean; raidAutoHours: number; settingsLock: boolean; botQuarantine: boolean; joinGate?: boolean; messageWaves?: boolean }
-export const PLUS_DEFAULTS: PlusConfig = { raidAuto: true, raidAutoHours: 1, settingsLock: true, botQuarantine: true, joinGate: true, messageWaves: true };
-export const plusConfig = (store: Store, guild: string) => getFeature(store, guild, 'antinukeplus', PLUS_DEFAULTS);
+// The switches live in plus-settings.ts so code that anti-nuke itself imports can read them without a cycle.
+export { PLUS_DEFAULTS, plusConfig, type PlusConfig } from './plus-settings.js';
 const DANGEROUS_MASK = DANGEROUS.reduce((all, bit) => all | BigInt(bit), 0n);
 
 // ---- Raid auto-trigger ----

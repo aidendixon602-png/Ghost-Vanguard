@@ -63,6 +63,7 @@ Whoever owns a Discord server, in that server only. Above Supreme Leader there: 
 - `/setup config permission-role`: Server owner: give a Discord role a Vanguard rank
 - `/setup history restore`: Undo a setting change
 - `/setup logs cleanup-archive`: Preview and delete channels in the old log archive
+- `/setup logs cleanup-duplicates`: Preview and delete unused log channels Vanguard made that repeat a name
 - `/setup panel`: Create or update the staff control panel
 - `/setup permissions discord`: Show roles with Administrator or Manage Roles
 - `/setup security`: Set the security log and Roblox verification options
