@@ -7,6 +7,7 @@ import { age, freshness, FRESH_ACCOUNT_DAYS, FRESH_MEMBER_HOURS } from '../src/s
 import { approveRoleChange } from '../src/security/role-authorizations.js';
 import { PLUS_DEFAULTS } from '../src/features/plus-settings.js';
 import { setFeature } from '../src/features/settings.js';
+import { config } from '../src/config.js';
 import { authorize } from './helpers.js';
 
 const HOUR = 3600000, DAY = 24 * HOUR;
@@ -251,5 +252,28 @@ test('a failure inside the guard never stops the anti-nuke rules from running', 
         assert.equal(f.store.get("SELECT COUNT(*) AS n FROM incidents WHERE rule='dangerous_grant'")!.n, 1);
         const card = f.cards.find(c => c.title === 'New account got a powerful role');
         assert.match(card.description, /could not take the role back/);
+    } finally { f.store.close(); }
+});
+
+test('when the member lookup fails for a reason other than having left, the failure is logged and the anti-nuke rules still run', async () => {
+    const f = fixture();
+    const original = console.log, level = config.logLevel, format = config.logFormat, lines: string[] = [];
+    try {
+        config.logLevel = 'info';
+        config.logFormat = 'json';
+        console.log = (line: unknown) => { lines.push(String(line)); };
+        // Discord is unavailable: the lookup fails with no "unknown member" code.
+        f.guild.members.fetch = async () => { throw new Error('Service Unavailable'); };
+        await f.security.audit(f.grant('outage', GRANTER), f.guild);
+    } finally {
+        console.log = original; config.logLevel = level; config.logFormat = format;
+    }
+    try {
+        const events = lines.flatMap(line => { try { return [JSON.parse(line)]; } catch { return []; } });
+        const failure = events.find(e => e.event === 'fresh_guard_failure');
+        assert.ok(failure, `a failed guard says so in the log: ${lines.join(' | ')}`);
+        assert.equal(failure.guildId, 'g');
+        assert.deepEqual(f.removed, [], 'nothing could be removed without the member');
+        assert.equal(f.store.get("SELECT COUNT(*) AS n FROM incidents WHERE rule='dangerous_grant'")!.n, 1, 'the Permission Grant rule still ran');
     } finally { f.store.close(); }
 });

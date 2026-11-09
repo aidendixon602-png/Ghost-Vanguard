@@ -205,7 +205,9 @@ export class Security {
         if (!s.enabled || plusConfig(this.store, guild.id).freshGuard === false) return;
         const { roles: ids, bits } = memberEscalation(entry, guild);
         if (!ids.length) return;
-        const target = await memberOrNull(guild, entry.targetId).catch(() => null);
+        // null means they left the server. Any other failure (a rate limit, an outage) is thrown on purpose: the
+        // caller logs it, so a guard that could not do its job is never mistaken for one that found nothing to do.
+        const target = await memberOrNull(guild, entry.targetId);
         if (!target || target.user?.bot) return;
         // A role handed over in this very change cannot be what makes them trusted.
         if (this.trusted(guild, target.id, ids)) return;
