@@ -143,6 +143,7 @@ Set up logs, staff roles, welcome messages and controls
 | `/setup logs route` | Choose a private channel for a log type, or reset its destination | Admin+ |
 | `/setup logs merge` | Group Vanguard's log channels, leaving other bots' logs alone | Admin+ |
 | `/setup logs cleanup-archive` | Preview and delete channels in the old log archive | Server Owner |
+| `/setup logs cleanup-duplicates` | Preview and delete unused log channels Vanguard made that repeat a name | Server Owner |
 | `/setup logs check` | Check the log channels and permissions | Admin+ |
 | `/setup logs exclude` | Stop or resume logging a channel | Admin+ |
 | `/setup logs bot-changes` | Skip routine bot changes in the logs | Admin+ |

@@ -175,6 +175,7 @@ export const COMMAND_RANK = {
     'staff/global': 8,
     'security/admin': 8,
     'logs/cleanup-archive': RANKS.owner,
+    'logs/cleanup-duplicates': RANKS.owner,
 };
 /** Developer-only commands: nothing but the Developer rank unlocks them. */
 export const needsDeveloper = (key) => (requiredRank(key) ?? 0) >= RANKS.developer;

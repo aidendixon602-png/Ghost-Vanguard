@@ -106,6 +106,7 @@ export const DESCRIPTIONS = {
     "/setup logs route": "Choose a private channel for a log type, or reset its destination",
     "/setup logs merge": "Group Vanguard's log channels, leaving other bots' logs alone",
     "/setup logs cleanup-archive": "Preview and delete channels in the old log archive",
+    "/setup logs cleanup-duplicates": "Preview and delete unused log channels Vanguard made that repeat a name",
     "/setup logs check": "Check the log channels and permissions",
     "/setup logs exclude": "Stop or resume logging a channel",
     "/setup logs bot-changes": "Skip routine bot changes in the logs",

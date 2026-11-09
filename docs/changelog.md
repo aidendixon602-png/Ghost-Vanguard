@@ -1,3 +1,14 @@
+## Unreleased: log channels no longer repeat a name
+
+- **Two of every log channel.** A server could end up with two `#mod-logs`, `#join-logs` and so on inside Ghost Vanguard Logs, which Discord lists as identical entries. Three things could cause it, and each is fixed:
+  - `/setup logs merge` moved a recognized channel out of the old Veil category into Ghost Vanguard Logs without looking at what was already there. It now leaves that channel where it is and says why when Vanguard's category already has one with the same name.
+  - Setup looked at the old Veil category before Vanguard's own. If its saved routes were missing, for example after a run cut short by a restart, it took Veil's `#mod-logs` and left its own behind. Its own category now comes first, and a Veil channel is only taken when Vanguard's category has no channel of that name.
+  - A channel in Ghost Vanguard Logs that Vanguard could not post in got a second channel with the identical name. The new one is now named `#vanguard-mod-logs` (and so on), later runs find it, and if both names are taken nothing is made and setup says so.
+- **Setup asks Discord for the whole channel list first**, because the bot only knows the channels Discord sent it at start-up, and one it never heard of would be made a second time.
+- **Duplicates that already exist are listed.** `/setup logs setup` and `/setup logs check` name each pair and say which channel Vanguard logs to and which it ignores.
+- **`/setup logs cleanup-duplicates` (Server Owner).** Previews the unused log channels to delete, then deletes them after a confirmation. A channel is only listed when the audit log shows this bot created it, Vanguard does not log to it, and a same-named twin that Vanguard does log to exists. Everything else with a repeated name is named in the reply and left alone. The audit log keeps 45 days, and an unreadable one means nothing is deleted. Deletions are half a second apart, and each channel is checked again at confirmation.
+- Setup writes one `log_setup` line to the console (visible in `/dev logs`) with what it created, reused and could not use, so a question about a channel can be answered from it.
+
 ## Unreleased: synced backups, automatic restore and a new-account guard
 
 - **Backups now follow the server.** A backup used to be a picture of the day somebody took it, so after a nuke the newest one could be weeks old. With backup sync on, which is the default, Vanguard compares each server's roles and channels with its newest backup every five minutes and saves a *Synced backup* when they differ and have held still for two checks. Two are at least 15 minutes apart, the newest five are kept, and manual, scheduled and baseline backups are never deleted by it. Saving is quiet: it shows in the audit history and posts no card.
