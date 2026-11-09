@@ -14,7 +14,7 @@ import { canManageOwnTrust, RULE_LABELS, scopeName, TRUST_PRESETS, trustListPage
 
 /** Everything selectable, in display order. Index = bit in the saved mask. */
 export const ALLOW_OPTIONS: { value: string; label: string; description?: string }[] = [
-    { value: 'all', label: 'Everything (full bypass)', description: 'Never punished (you still get alerted), except for granting protected permissions.' },
+    { value: 'all', label: 'Everything (full bypass)', description: 'Never punished (you still get alerted), including protected permission grants.' },
     ...Object.entries(TRUST_PRESETS).map(([key, p]) => ({ value: `preset:${key}`, label: `★ ${p.title}`, description: clip(p.description, 100) })),
     ...RULE_LABELS.filter(([key]) => RULES.some(r => r.key === key)).map(([value, label]) => ({ value, label })),
 ];
@@ -29,16 +29,15 @@ const toMask = (values: string[]) => values.reduce((m, v) => { const i = ALLOW_O
 const fromMask = (mask: number) => ALLOW_OPTIONS.filter((_, i) => mask & (1 << i)).map(o => o.value);
 
 /**
- * The grant kinds a selection stands for. "Everything" is the full bypass, which never covers handing
- * out protected permissions — those stay a separate, explicitly ticked entry (Permission grants).
+ * The grant kinds a selection stands for. "Everything" is one full bypass, including protected
+ * permission grants. The separate Permission grants option remains for a narrower exception.
  */
 export function kindsFor(values: string[], role: boolean): string[] {
     const base = role ? 'trust_role' : 'trust';
     const rules = new Set<string>();
     for (const v of values) for (const r of v.startsWith('preset:') ? TRUST_PRESETS[v.slice(7)]?.rules ?? [] : [v]) rules.add(r);
-    // "Everything" is the full bypass and wins over the other ticks, except for permission grants:
-    // handing out Administrator and the other protected permissions is its own whitelist entry.
-    if (values.includes('all')) return [base, ...[...rules].filter(r => r === 'dangerous_grant').map(r => `${base}:${r}`)];
+    // "Everything" covers every rule, so all other ticks are redundant.
+    if (values.includes('all')) return [base];
     return [...rules].map(r => `${base}:${r}`);
 }
 
@@ -51,9 +50,9 @@ function currentSelection(ctx: CommandContext, guild: string, target: string, ro
     const left = Math.max(...rows.map(r => r.expires ? Number(r.expires) - Date.now() : Infinity));
     const hours = Number.isFinite(left) ? PANEL_DURATIONS.reduce((best, d) => d.hours && Math.abs(d.hours * 3600000 - left) < Math.abs(best * 3600000 - left) ? d.hours : best, 24) : 0;
     const rules = kinds.map(k => k.split(':')[1]!).filter(Boolean);
-    // The full bypass and explicit single rules can both be saved: the bypass never implies the
-    // permission-grant entry, so it stays ticked on its own.
-    if (kinds.includes(base)) return { mask: toMask(['all', ...rules]), hours, kinds };
+    // Older panels may have saved redundant rule entries beside a full bypass. Keep them in `kinds`
+    // so Save/Remove all can clean them up, but show only Everything because that is their effect.
+    if (kinds.includes(base)) return { mask: toMask(['all']), hours, kinds };
     const values: string[] = [];
     const left2 = new Set(rules);
     for (const [key, p] of Object.entries(TRUST_PRESETS)) if (p.rules.every(r => rules.includes(r)) && p.rules.length > 1) { values.push(`preset:${key}`); }
@@ -72,10 +71,9 @@ export function trustPanel(ctx: CommandContext, guild: string, user: string, s: 
     const saved = s.target ? currentSelection(ctx, guild, s.target, s.role) : null;
     const savedRules = saved ? saved.kinds.map(k => k.split(':')[1]!).filter(Boolean) : [];
     const savedText = !saved ? '' : !saved.kinds.length ? 'nothing (anti-nuke watches them like anyone else)'
-        : saved.kinds.some(k => !k.includes(':'))
-            ? `**Everything** (full bypass)${savedRules.length ? ` + **${scopeName(savedRules).replace(/ only$/, '')}**` : ''}`
+        : saved.kinds.some(k => !k.includes(':')) ? '**Everything** (full bypass)'
             : `**${scopeName(savedRules)}**`;
-    const pending = !selected.length ? '*nothing ticked*' : selected.includes('all') ? `**Everything** (full bypass)${selected.includes('dangerous_grant') ? ' + **Grant protected permissions**' : ''}` : selected.map(v => ALLOW_OPTIONS.find(o => o.value === v)!.label).join(', ');
+    const pending = !selected.length ? '*nothing ticked*' : selected.includes('all') ? '**Everything** (full bypass)' : selected.map(v => ALLOW_OPTIONS.find(o => o.value === v)!.label).join(', ');
     const lines = [
         `**1. Who:** ${who}`,
         `**2. Allowed:** ${pending}`,
@@ -83,7 +81,7 @@ export function trustPanel(ctx: CommandContext, guild: string, user: string, s: 
         saved ? `\n**Saved right now:** ${savedText}` : '',
         '',
         '-# **Save** replaces what they had with what is ticked. **Remove all** clears every bypass they have. This never gives command permissions; use `/setup staff role` for that.',
-        '-# **Everything** never allows handing out Administrator or other protected permissions. Tick **⚠ Danger · Grant protected permissions** for that (or use `/antinuke whitelist admin`).',
+        '-# **Everything** includes Administrator and other protected-permission grants. To allow only those grants without a full bypass, tick **⚠ Danger · Grant protected permissions** instead.',
         notice ? `\n${notice}` : '',
     ].filter(l => l !== null);
     const danger = selected.some(v => ['all', 'bot_add', 'dangerous_grant', 'member_prune'].includes(v));
@@ -126,9 +124,7 @@ export function saveTrust(ctx: CommandContext, guild: string, target: string, ro
         for (const k of before) ctx.store.revokeGrant(guild, target, k, actor.id);
         for (const k of kinds) ctx.store.grant(guild, target, k, actor.id, hours || undefined);
     });
-    const scope = kinds.some(k => !k.includes(':'))
-        ? `everything (full bypass)${kinds.some(k => k.endsWith(':dangerous_grant')) ? ' and permission grants' : ''}`
-        : scopeName(kinds.map(k => k.split(':')[1]!));
+    const scope = kinds.some(k => !k.includes(':')) ? 'everything (full bypass)' : scopeName(kinds.map(k => k.split(':')[1]!));
     const time = hours ? PANEL_DURATIONS.find(d => d.hours === hours)?.label ?? `${hours} hours` : 'until removed';
     ctx.logs.push(guild, embed('Whitelist changed', `By <@${actor.id}> · <@${role ? '&' : ''}${target}> may now: **${scope}** · ${time.toLowerCase()}${before.length ? ' (replaced their previous bypass)' : ''}`));
     return `Saved: <@${role ? '&' : ''}${target}> may now do **${scope}** (${time.toLowerCase()}).`;
@@ -156,9 +152,8 @@ export function registerTrustPanel(registry: Registry) {
         }
         if (action === 'allow') {
             let values = (i.values ?? []).filter((v: string) => ALLOW_OPTIONS.some(o => o.value === v));
-            // "Everything" already covers every other tick except permission grants. That one is its own
-            // whitelist entry, so it stays ticked when it was picked together with Everything.
-            if (values.includes('all')) values = values.filter((v: string) => v === 'all' || v === 'dangerous_grant');
+            // "Everything" covers every other tick, including protected permission grants.
+            if (values.includes('all')) values = ['all'];
             return void await i.editReply(trustPanel(ctx, guild, user, { ...s, mask: toMask(values) }));
         }
         if (action === 'time') {

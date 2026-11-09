@@ -109,15 +109,15 @@ test('with anti-nuke switched off for the server a self-assignment is left entir
     } finally { f.store.close(); }
 });
 
-test('only the separate permission-grant whitelist is an exception to self-admin enforcement', async () => {
-    // A full bypass never allows handing out Administrator: that is its own whitelist.
+test('full bypasses and the narrower permission-grant whitelist are exceptions to self-admin enforcement', async () => {
     const full = fixture();
     try {
         full.store.grant('g', ACTOR, 'trust', 'owner');
         addPrivilegedRole(full, PermissionFlagsBits.Administrator);
         await full.security.audit(selfAssignment(PermissionFlagsBits.Administrator), full.guild);
-        assert.equal(full.calls.punished, 1, 'a full bypass does not cover granting Administrator');
-        assert.equal(full.store.get('SELECT COUNT(*) AS n FROM incidents')!.n, 0, 'still handled outside anti-nuke');
+        assert.equal(full.calls.punished, 0, 'a full bypass covers granting Administrator too');
+        assert.equal(full.store.get('SELECT COUNT(*) AS n FROM incidents')!.n, 0);
+        assert.equal(full.store.get('SELECT COUNT(*) AS n FROM self_escalations')!.n, 0, 'fully trusted self-assignment is left alone');
     } finally { full.store.close(); }
 
     // Neither does a bypass for other rules.
@@ -129,7 +129,7 @@ test('only the separate permission-grant whitelist is an exception to self-admin
         assert.equal(other.calls.punished, 1);
     } finally { other.store.close(); }
 
-    // The permission-grant whitelist, for a user or for a role they hold, does.
+    // The narrower permission-grant whitelist, for a user or for a role they hold, does too.
     for (const role of [false, true]) {
         const f = fixture();
         try {
@@ -144,6 +144,18 @@ test('only the separate permission-grant whitelist is an exception to self-admin
             assert.equal(f.store.get('SELECT COUNT(*) AS n FROM self_escalations')!.n, 0);
         } finally { f.store.close(); }
     }
+});
+
+test('a full role bypass also covers protected self-assignment', async () => {
+    const f = fixture();
+    try {
+        f.guild.members.cache.get(ACTOR)!.roles.cache.set('trustedstaff', { id: 'trustedstaff' });
+        f.store.grant('g', 'trustedstaff', 'trust_role', 'owner');
+        addPrivilegedRole(f, PermissionFlagsBits.Administrator);
+        await f.security.audit(selfAssignment(PermissionFlagsBits.Administrator), f.guild);
+        assert.equal(f.calls.punished, 0, 'an existing fully trusted role exempts the actor');
+        assert.equal(f.store.get('SELECT COUNT(*) AS n FROM self_escalations')!.n, 0);
+    } finally { f.store.close(); }
 });
 
 test('the server owner and Developers may grant protected permissions without any whitelist entry', async () => {

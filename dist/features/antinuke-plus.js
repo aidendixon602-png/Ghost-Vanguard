@@ -168,6 +168,10 @@ export async function quarantineNewBot(store, logs, member) {
         await new Promise(r => setTimeout(r, 3000));
         role = (await member.guild.members.fetch({ user: member.id, force: true }).catch(() => null))?.roles.botRole ?? null;
     }
+    // An explicitly fully whitelisted bot is approved already, including through its managed bot role.
+    // The narrower verification-bot exemption still covers ordinary role assignments only.
+    if (store.hasGrant(member.guild.id, member.id, 'trust') || role?.id && store.hasGrant(member.guild.id, role.id, 'trust_role'))
+        return;
     if (!role || !dangerous(role.permissions.bitfield))
         return;
     const before = role.permissions.bitfield, held = before & DANGEROUS_MASK;

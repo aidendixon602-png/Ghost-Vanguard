@@ -67,6 +67,26 @@ test('a powerful new bot added by an admin is held until approved; the owner\'s 
     } finally { store.close(); }
 });
 
+test('a fully whitelisted bot is already approved and keeps its powerful permissions', async () => {
+    const { store, queue, logs } = setup();
+    try {
+        let perms = BigInt(PermissionFlagsBits.Administrator) | BigInt(PermissionFlagsBits.SendMessages);
+        const role: any = { id: 'managed-bot-role', get permissions() { return new PermissionsBitField(perms); }, editable: true, setPermissions: async (p: bigint) => { perms = p; } };
+        const member: any = { id: NEWBOT, user: { bot: true }, roles: { botRole: role }, guild: { id: G, ownerId: 'owner', fetchAuditLogs: async () => ({ entries: new Collection() }) } };
+        store.grant(G, NEWBOT, 'trust', 'owner');
+        await quarantineNewBot(store, queue, member);
+        assert.equal(perms & BigInt(PermissionFlagsBits.Administrator), BigInt(PermissionFlagsBits.Administrator));
+        assert.equal(logs.length, 0, 'no hold or hierarchy warning for an approved bot');
+        assert.equal(store.get('SELECT value FROM runtime_meta WHERE key=?', `botq:${G}:${NEWBOT}`), undefined);
+
+        store.revokeGrant(G, NEWBOT, 'trust', 'owner');
+        store.grant(G, role.id, 'trust_role', 'owner');
+        await quarantineNewBot(store, queue, member);
+        assert.equal(perms & BigInt(PermissionFlagsBits.Administrator), BigInt(PermissionFlagsBits.Administrator), 'the managed bot role can carry the full approval too');
+        assert.equal(logs.length, 0);
+    } finally { store.close(); }
+});
+
 test('AI sensitivity, ignored kinds (never minors) and what each mode does', () => {
     const result = { flagged: true, categories: { harassment: true, 'sexual/minors': true, violence: false }, category_scores: { harassment: 0.7, 'sexual/minors': 0.9, violence: 0.5 } };
     assert.deepEqual(readVerdict(result, 'normal').categories.sort(), ['harassment', 'sexual/minors']);

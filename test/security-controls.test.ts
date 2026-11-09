@@ -365,17 +365,17 @@ test('/antinuke whitelist admin allows and removes protected permission grants o
  }finally{store.close();}
 });
 
-test('the panel keeps permission grants separate from Everything, and status lists them apart',async()=>{
+test('Everything subsumes permission grants, and narrower grant entries are listed apart',async()=>{
  const {store}=setup();try {
   const ctx:any={store,actor:{id:'owner',guild:{ownerId:'owner'},roles:{cache:new Collection()}},logs:{push:()=>{}}};
   const T='444444444444444444';
-  assert.deepEqual(kindsFor(['all','dangerous_grant'],false),['trust','trust:dangerous_grant'],'Everything never implies permission grants');
-  assert.deepEqual(kindsFor(['all','mass_ban'],false),['trust'],'Everything still wins over ordinary ticks');
+  assert.deepEqual(kindsFor(['all','dangerous_grant'],false),['trust'],'Everything includes permission grants');
+  assert.deepEqual(kindsFor(['all','mass_ban'],false),['trust'],'Everything wins over ordinary ticks');
   saveTrust(ctx,'g',T,false,['all','dangerous_grant'],0);
-  assert.equal(store.hasGrant('g',T,'trust'),true);assert.equal(store.hasGrant('g',T,'trust:dangerous_grant'),true);
+  assert.equal(store.hasGrant('g',T,'trust'),true);assert.equal(store.hasGrant('g',T,'trust:dangerous_grant'),false,'no redundant narrow entry');
   const panel=trustPanel(ctx,'g','555555555555555555',panelFor(ctx,'g',T,false));
   const allow=(panel.components[2]!.toJSON() as any).components[0];
-  assert.deepEqual(allow.options.filter((o:any)=>o.default).map((o:any)=>o.value).sort(),['all','dangerous_grant']);
+  assert.deepEqual(allow.options.filter((o:any)=>o.default).map((o:any)=>o.value).sort(),['all']);
 
   store.grant('g','granter','trust:dangerous_grant','owner');
   const {antinukeStatus}=await import('../src/ui/antinuke-status.js');

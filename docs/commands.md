@@ -27,7 +27,7 @@ Protect your server, review incidents and manage trusted users
 | `/antinuke whitelist add` | Whitelist a user or role for some or all rules | Server Owner |
 | `/antinuke whitelist remove` | Take a user or role off the whitelist | Server Owner |
 | `/antinuke whitelist list` | Show the whitelist and when entries expire | Head Admin+ |
-| `/antinuke whitelist admin` | Separate whitelist for granting Administrator and protected permissions | Server Owner |
+| `/antinuke whitelist admin` | Allow protected-permission grants without a full bypass | Server Owner |
 | `/antinuke whitelist check` | See what anti-nuke allows someone and what would strip them | Head Admin+ |
 | `/antinuke whitelist bots` | Let a verification bot give roles without tripping anti-nuke | Server Owner |
 

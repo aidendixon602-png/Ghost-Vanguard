@@ -13,7 +13,7 @@ The 19-rule baseline loads for authorized servers and survives restarts. Each se
 3. **At the limit:**
    - Routine or ambiguous actions (including mass bans/kicks, channel or role changes/deletions, AutoMod edits and emoji/sticker deletion) warn human actors on the first hit. The bot removes no roles; it attempts a safe revert only when that rule supports one. The alert reports the result. Repeating that same rule within an hour gets the rule's normal response.
    - A warning for one rule does not escalate an unrelated rule. This avoids punishing normal staff work because of an earlier, different action.
-   - High-confidence takeover signals (adding a bot, mass unbanning, member pruning and dangerous permission grants) retain stronger defaults. Dangerous grants include newly granted Manage Roles, Administrator, Manage Server, Ban/Kick Members, Manage Channels and Manage Webhooks. They warn first, except self-assigned Administrator or Manage Server: those are stripped and reverted immediately, and handled **outside** anti-nuke entirely (see below). A repeat dangerous grant within an hour strips and reverts; bots receive the warning path for dangerous grants. The only way to allow these grants is the separate permission-grant whitelist (`/antinuke whitelist admin`): a full or role whitelist entry, a preset and a per-rule entry for role work all leave them checked.
+   - High-confidence takeover signals (adding a bot, mass unbanning, member pruning and dangerous permission grants) retain stronger defaults. Dangerous grants include newly granted Manage Roles, Administrator, Manage Server, Ban/Kick Members, Manage Channels and Manage Webhooks. They warn first, except self-assigned Administrator or Manage Server: those are stripped and reverted immediately, and handled **outside** anti-nuke entirely (see below). A repeat dangerous grant within an hour strips and reverts; bots receive the warning path for dangerous grants. A full user/role bypass (**Everything**) allows these grants too. For a narrower exception, `/antinuke whitelist admin` allows only protected-permission grants; presets and per-rule entries for role work leave them checked.
    - Bots do not get first-hit warnings for routine rules; their normal configured response applies.
 4. When a rule's normal response is a strip, staff and admin roles are removed and saved, and damage is reverted only where the rule has a supported revert handler. Rule limits can be customized per server, so review the current values with `/antinuke status`.
 5. The alert in the security log has an **Undo strip** button (owner or developer) and, after deletions, **Review restore**.
@@ -42,15 +42,15 @@ Some people are **never punished**. When they hit a limit it is recorded quietly
 | Who | Not punished for |
 |---|---|
 | Server owner, Developers | Everything, including granting protected permissions (no entry needed) |
-| Full whitelist entries (user or role) | Everything except handing out protected permissions |
+| Full whitelist entries (user or role) | Everything, including handing out protected permissions |
 | Rule-specific whitelist entries | Only the chosen rules |
 | Permission-grant whitelist entries (`/antinuke whitelist admin`) | Only granting Administrator and the other protected permissions |
 
-### Two whitelists
+### Full and rule-specific whitelists
 
-`/antinuke whitelist add` covers ordinary anti-nuke rules: bans, kicks, channel and role work, server settings, and so on. `/antinuke whitelist admin` is a **separate** whitelist for handing out the permissions that take a server over — Administrator, Manage Server, Manage Roles, Manage Channels, Manage Webhooks, Ban Members and Kick Members — through Discord.
+`/antinuke whitelist add` can exempt a user or role from one rule, a preset, or **Everything**. Everything is a genuine full bypass: it covers bans, kicks, channel and role work, server settings, bot additions, and handing out Administrator or the other protected permissions. Use it only for people and bots whose normal work should not be contained. A fully whitelisted bot is also considered already approved by new-bot quarantine, whether the bypass is on the bot or its managed bot role.
 
-Being on the regular whitelist never allows that, not even with **Everything** ticked, and not with a preset. The reverse also holds: the permission-grant entry skips only that check and no other rule. Handling it that way means one compromised "trusted" account cannot quietly make itself Administrator or hand that to someone else; it needs the entry that says so, and another security administrator (or the server owner) must grant it, since you cannot give it to yourself. Entries can expire. The server owner, Developers and network-whitelisted people are granted the permission-grant whitelist automatically: they never need an entry and `/antinuke whitelist admin` says so when you try to add one for the owner. Verification bots and protected roles keep their existing limits. The `/antinuke whitelist add` panel can set both at once: tick **⚠ Danger · Grant protected permissions** along with whatever else you tick.
+`/antinuke whitelist admin` is the narrower alternative for handing out Administrator, Manage Server, Manage Roles, Manage Channels, Manage Webhooks, Ban Members and Kick Members through Discord **without** exempting any other rule. Presets and role-work entries do not implicitly allow those grants. The server owner, Developers and network-whitelisted people are allowed automatically. Entries can expire, and someone cannot grant a bypass to themselves or a role they hold unless they are the owner or a Developer. Verification bots keep their ordinary-role exemption; give one a full bypass only if it is also approved for protected grants and powerful permissions. Environment-protected roles and the role blacklist keep their own separate assigner rules.
 
 Supreme Leaders and every other rank are punished like anyone else. If someone is whitelisted for some rules but sets off another one, they are punished, and the alert has a **Whitelist** line saying what they are covered for and what was missing.
 
@@ -92,7 +92,7 @@ Nobody can change these from Discord. Restart after editing.
 | `/antinuke scan` | Powerful roles, roles above Vanguard, bots with Administrator |
 | `/antinuke settings` | Extra protection layers, all on by default: raid auto-trigger, join gate, message waves, server settings lock, new bot quarantine, new-account guard, backup sync and auto-restore |
 | `/antinuke whitelist add` | Panel: pick who, what they may do and for how long |
-| `/antinuke whitelist admin` | Separate whitelist for granting Administrator and the other protected permissions (user or role, optional expiry) |
+| `/antinuke whitelist admin` | Allow only protected-permission grants without a full bypass (user or role, optional expiry) |
 | `/antinuke whitelist remove` · `list` · `check` · `bots` | Remove, list, explain one person's coverage, verification-bot exemptions |
 | `/antinuke quarantine` · `release` | Strip and save someone's roles by hand, or give them back |
 | `/setup panel` | Private control channel with Restore / Strip / Revert / Logs buttons |
