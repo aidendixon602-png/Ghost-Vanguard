@@ -1,3 +1,7 @@
+## Unreleased: Website Roblox verification
+
+- **Verify with Roblox.** When `ROBLOX_OAUTH_CLIENT_ID`, `ROBLOX_OAUTH_CLIENT_SECRET` and an https `PUBLIC_BASE_URL` are set, `/verify` shows a button that signs the member in on Roblox's site (OAuth with PKCE, one-time state, 10-minute expiry). The account is linked and roles are synced the same way as code verification. Code-in-bio verification still works, and nothing changes until the settings are added. See [hosting](user/hosting.md#website-verification-optional).
+
 ## Unreleased: Signal log theme
 
 - **Bot permission roles are no longer fought over with Veil Utilities.** Vanguard reverted role changes made by trusted bots to bot permission roles (such as Head Admin), so a Veil removal and Vanguard's revert looped. Trusted bots are now exempt from that revert, the same as the protected-role guard already was. Other actors are still reverted.

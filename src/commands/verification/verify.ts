@@ -2,6 +2,7 @@ import { ActionRowBuilder, ButtonBuilder, ButtonStyle, Colors, PermissionFlagsBi
 import { defineCommand } from '../../bot/registry.js';
 import { embed } from '../../ui/ui.js';
 import { createPending, confirmPending, getLink, getPending, clearPending, PENDING_TTL_MS } from '../../integrations/custom-verification.js';
+import { createOAuthRequest, oauthConfig } from '../../integrations/roblox-oauth.js';
 
 export default defineCommand(
     new SlashCommandBuilder()
@@ -85,9 +86,14 @@ export default defineCommand(
                 return await ctx.roblox.sync(actor);
             }
 
-            // No pending, no link → help
+            // No pending, no link → help. With website sign-in configured, offer the Roblox sign-in button first.
+            const oauth = oauthConfig();
+            const signIn = oauth ? new ActionRowBuilder<ButtonBuilder>().addComponents(
+                new ButtonBuilder().setLabel('Verify with Roblox').setStyle(ButtonStyle.Link).setURL(createOAuthRequest(ctx.store, oauth, guildId, i.user.id)).setEmoji('🔗')) : null;
             return {
+                components: signIn ? [signIn] : [],
                 embeds: [embed('How to verify',
+                    (signIn ? `Press **Verify with Roblox** to sign in on Roblox (no code needed), or follow the steps below.\n\n` : '') +
                     `Run **\`/verify username: YourRobloxName\`** to start.\n\n` +
                     `**What happens:**\n` +
                     `• Bot gives you a code like \`VG-ABC123\`\n` +

@@ -17,6 +17,16 @@ Server authorization lives in this database. An ephemeral filesystem, or a delet
 
 To copy the database by hand, stop the bot first, or use the online backup tool. Do not copy only the main file while WAL writes are active.
 
+## Website verification (optional)
+
+`/verify` can offer a **Verify with Roblox** button that signs members in on Roblox's own site, like Bloxlink. It needs three settings:
+
+1. Create a Roblox OAuth app at https://create.roblox.com/dashboard/credentials (your Roblox account must be ID-verified). Add the `openid` and `profile` scopes and the redirect URL `<PUBLIC_BASE_URL>/oauth/roblox/callback`.
+2. Set `ROBLOX_OAUTH_CLIENT_ID`, `ROBLOX_OAUTH_CLIENT_SECRET` and `PUBLIC_BASE_URL` (an `https://` address). Keep the client secret out of Git and out of chat.
+3. Make `PUBLIC_BASE_URL` reach the bot's health port (`HEALTH_PORT`, default 7475) through your host's proxy. The callback route is `/oauth/roblox/callback` and does not need the dashboard token.
+
+Until all three are set, the button is hidden and members use the code-in-bio steps. Sign-ins expire after 10 minutes and each one works only once.
+
 ## Running
 
 ```bash
