@@ -21,8 +21,13 @@ The top rank: the bot owner (`BOT_OWNER_ID`) and anyone in `DEVELOPER_IDS`. Ever
 - `/dev database status`: Show database health
 - `/dev database verify`: Verify a database backup
 - `/dev diagnostics`: Show runtime health
+- `/dev genreban`: Developer: ban a user from every authorized server until `/ungenreban`
+- `/dev hardban`: Developer: permanently ban a user from every authorized server until `/unhardban`
 - `/dev inspect`: Inspect any server the bot knows
 - `/dev logs`: Show the bot's recent console output
+- `/dev netexception list`: Active genreban exceptions, newest first
+- `/dev netexception revoke`: Cancel an exception: the genreban applies in that server again
+- `/dev restart`: Gracefully restart the bot and update this message with downtime
 - `/dev server authorize`: Authorize this server
 - `/dev server ban`: Ban a server from the bot
 - `/dev server deauthorize`: Remove this server and leave
@@ -32,16 +37,11 @@ The top rank: the bot owner (`BOT_OWNER_ID`) and anyone in `DEVELOPER_IDS`. Ever
 - `/dev status`: Set a custom bot status
 - `/dev status-reset`: Go back to the rotating status
 - `/dev sync`: Re-register the slash commands
+- `/dev ungenreban`: Developer: revoke a genreban and lift it in every authorized server
+- `/dev unhardban`: Developer: revoke a hardban and lift it in every authorized server
 - `/dev update`: Show update status or install now
-- `/genreban`: Ban a user from every server
-- `/hardban`: Permanently ban a user from every server
-- `/netexception list`: List genreban exceptions
-- `/netexception revoke`: Cancel a genreban exception
-- `/restart`: Restart the bot
 - `/setup security-admins`: Developer: add, remove or list security admins
 - `/setup staff global`: Developer: give a bot-wide rank in every server
-- `/ungenreban`: Lift a genreban everywhere
-- `/unhardban`: Lift a hardban everywhere
 
 ## 🏠 Server Owner
 
@@ -166,7 +166,6 @@ Server rank: lifting ordinary bans and accepting appeals, raid tools, automod, s
 - `/automod status`: Show what automod is doing here
 - `/automod word-list`: Manage blocked words and phrases
 - `/automod words`: Turn blocked phrase filtering on or off
-- `/mod massban`: Ban up to 200 user IDs at once _(must also be on the anti-nuke whitelist)_
 - `/mod unban`: Lift a ban (not genrebans or hardbans) _(Admins may lift ordinary bans here; ban-log buttons are server-owner/Developer only (500 ms cooldown; successful actions post who clicked in #bans); genreban and hardban lifts, and genreban exceptions, are Developer only)_
 - `/raid emergency panel`: Post Emergency and All clear buttons here
 - `/raid emergency start`: Lock down, pause invites, turn on raid mode, ping Admins
@@ -174,6 +173,7 @@ Server rank: lifting ordinary bans and accepting appeals, raid tools, automod, s
 - `/raid emergency stop`: All clear: undo emergency mode
 - `/raid health`: Check protection, permissions and backups
 - `/raid lockdown`: Lock every channel and post a notice
+- `/raid massban`: Raid cleanup: ban up to 200 user IDs at once (whitelisted staff only)
 - `/raid mode off`: Turn raid mode off
 - `/raid mode on`: Turn raid mode on
 - `/raid mode status`: Show raid mode and how many joins it handled

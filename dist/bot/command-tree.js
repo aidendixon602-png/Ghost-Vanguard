@@ -10,11 +10,11 @@ export const UMBRELLAS = [
             { child: 'automod', mode: 'flat' }, { child: 'scam', mode: 'group' }, { child: 'antiping', mode: 'group' }
         ] },
     { name: 'raid', description: 'Respond to raids, lock channels and inspect server health', entries: [
-            { child: 'lockdown', mode: 'single' }, { child: 'unlock', mode: 'single' }, { child: 'health', mode: 'single' }, { child: 'webhooks', mode: 'single' },
+            { child: 'lockdown', mode: 'single' }, { child: 'unlock', mode: 'single' }, { child: 'health', mode: 'single' }, { child: 'webhooks', mode: 'single' }, { child: 'massban', mode: 'single' },
             { child: 'raidmode', mode: 'group', as: 'mode' }, { child: 'emergency', mode: 'group' }, { child: 'newaccounts', mode: 'group' }
         ] },
     { name: 'mod', description: 'Moderate members and review cases, notes and appeals', entries: [
-            { child: 'moderation', mode: 'flat' }, { child: 'tempban', mode: 'single' }, { child: 'softban', mode: 'single' }, { child: 'massban', mode: 'single' }, { child: 'slowmode', mode: 'single' },
+            { child: 'moderation', mode: 'flat' }, { child: 'tempban', mode: 'single' }, { child: 'softban', mode: 'single' }, { child: 'slowmode', mode: 'single' },
             { child: 'bans', mode: 'group' }, { child: 'case', mode: 'group', as: 'cases' }, { child: 'note', mode: 'group', as: 'notes' }, { child: 'warnings', mode: 'group' }, { child: 'appeals', mode: 'group' }, { child: 'nick', mode: 'group' }
         ] },
     { name: 'setup', description: 'Set up logs, staff roles, welcome messages and controls', entries: [
@@ -36,8 +36,10 @@ export const UMBRELLAS = [
             { child: 'userinfo', mode: 'single', as: 'user' }, { child: 'roleinfo', mode: 'single', as: 'role' }, { child: 'server-info', mode: 'single', as: 'server' },
             { child: 'bot-info', mode: 'single', as: 'bot' }, { child: 'ping', mode: 'single' }
         ] },
-    { name: 'dev', description: 'Manage bot diagnostics, updates, servers and data', entries: [
+    { name: 'dev', description: 'Developer tools: cross-server bans, server access, diagnostics, updates and data', entries: [
             { child: 'dev', mode: 'flat' },
+            { child: 'genreban', mode: 'single' }, { child: 'ungenreban', mode: 'single' }, { child: 'hardban', mode: 'single' }, { child: 'unhardban', mode: 'single' },
+            { child: 'netexception', mode: 'group' }, { child: 'restart', mode: 'single' },
             { child: 'authserver', mode: 'single', in: 'server', as: 'authorize' }, { child: 'deauthserver', mode: 'single', in: 'server', as: 'deauthorize' },
             { child: 'serverauth', mode: 'single', in: 'server', as: 'info' }, { child: 'authorizedservers', mode: 'single', in: 'server', as: 'list' },
             { child: 'banserver', mode: 'single', in: 'server', as: 'ban' }, { child: 'unbanserver', mode: 'single', in: 'server', as: 'unban' },
@@ -45,7 +47,7 @@ export const UMBRELLAS = [
         ] },
 ];
 /** Shown on their own: used often or by everyone. */
-export const STANDALONE = ['help', 'verify', 'roblox', 'ask', 'role', 'restart'];
+export const STANDALONE = ['help', 'verify', 'roblox', 'ask', 'role'];
 /** Old shortcuts that the grouped tree already covers (/antinuke enable, /antinuke disable). */
 export const RETIRED = ['enable', 'disable'];
 const GROUP_DESCRIPTIONS = { server: 'Authorize, inspect, list, ban or unban servers' };
