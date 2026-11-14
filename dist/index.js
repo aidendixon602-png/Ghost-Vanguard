@@ -22,7 +22,7 @@ import { config, validateConfig, VERSION } from './config.js';
 import { presenceLines, ProtectionStats } from './security/protection-stats.js';
 import { DatabaseBackups } from './database/database-backups.js';
 import { Store } from './database/db.js';
-import { endStartupSummary, failure, logEvent } from './errors.js';
+import { AppError, endStartupSummary, failure, logEvent } from './errors.js';
 import { closingRule, startupSummary, style } from './console-ui.js';
 import { Interactions } from './bot/interactions.js';
 import { printStartupInvite } from './bot/invite.js';
@@ -31,6 +31,7 @@ import { LogQueue } from './logging.js';
 import { Registry } from './bot/registry.js';
 import { indexTree, treeJson } from './bot/command-tree.js';
 import { Roblox } from './integrations/roblox.js';
+import { CALLBACK_PATH, completeOAuthRequest, escapeHtml, linkOAuthResult, oauthConfig, page } from './integrations/roblox-oauth.js';
 import { Security } from './security/security.js';
 import { Snapshots } from './recovery/snapshots.js';
 import { AutoRestore } from './recovery/auto-restore.js';
@@ -401,9 +402,42 @@ client.on(Events.GuildDelete, guild => {
 client.on(Events.Error, error => logEvent('discord_error', failure(error)));
 client.on(Events.ShardDisconnect, () => console.warn('[discord] Gateway disconnected. Live protection is unavailable until reconnection.'));
 client.on(Events.ShardResume, () => console.log('[discord] Gateway resumed.'));
-const server = createServer((req, res) => {
+const server = createServer(async (req, res) => {
+    const path = (req.url ?? '').split('?')[0];
+    if (path === CALLBACK_PATH && req.method === 'GET') {
+        // Roblox sign-in return: its own page, outside the dashboard token (the state is the credential).
+        let out;
+        try {
+            const oauth = oauthConfig();
+            if (!oauth)
+                out = { status: 404, html: page('Not available', 'Website verification is not set up on this bot.') };
+            else {
+                const result = await completeOAuthRequest(store, oauth, new URL(req.url ?? '', 'http://vanguard.local').searchParams);
+                if (!store.isAuthorized(result.guildId))
+                    throw new AppError('VALIDATION_ERROR', 'This server is not authorized for Ghost Vanguard.');
+                linkOAuthResult(store, result);
+                let note = '';
+                try {
+                    const guild = await client.guilds.fetch(result.guildId);
+                    const member = await guild.members.fetch(result.userId);
+                    note = await roblox.sync(member, { isInitial: true });
+                }
+                catch {
+                    note = 'Your account is linked. Roles may take a moment to update.';
+                }
+                out = { status: 200, html: page('Verified', `You are linked as <strong>${escapeHtml(result.username)}</strong>. Return to Discord.<br><br><small>${escapeHtml(note.replace(/[*`<>]/g, ''))}</small>`) };
+            }
+        }
+        catch (error) {
+            const message = error instanceof AppError ? error.message : 'Something went wrong. Run /verify again.';
+            out = { status: 400, html: page('Verification failed', escapeHtml(message)) };
+        }
+        res.writeHead(out.status, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' });
+        res.end(out.html);
+        return;
+    }
     // /healthz is the liveness probe uptime monitors use; everything else is the dashboard.
-    if ((req.url ?? '').split('?')[0] !== '/healthz') {
+    if (path !== '/healthz') {
         const result = dashboardAnswer(store, req, { token: config.dashboardToken, enabled: config.dashboardEnabled });
         res.writeHead(result.status, { 'Content-Type': result.type, 'Cache-Control': result.cache, 'X-Robots-Tag': 'noindex', ...DASHBOARD_HEADERS });
         res.end(req.method === 'HEAD' ? undefined : result.encoding === 'base64' ? Buffer.from(result.body, 'base64') : result.body);
