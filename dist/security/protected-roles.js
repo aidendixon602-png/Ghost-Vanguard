@@ -42,7 +42,8 @@ export async function enforceProtectedRoles(store, logs, entry, guild) {
 async function enforceBotPermissionRoles(store, logs, entry, guild) {
     const actor = responsibleActor(entry, guild);
     // Internal containment/restoration has no staff actor; manual bot commands retain their actor ID.
-    if (actor === guild.client.user?.id || actor && developers.has(actor))
+    // Trusted bots (other bots run by the same people) manage their own roles, as enforceProtectedRoles already allows.
+    if (actor === guild.client.user?.id || actor && (developers.has(actor) || isTrustedBot(actor)))
         return [];
     const changes = (entry.changes ?? []);
     const ids = (key) => [...new Set(changes.filter(c => c.key === key).flatMap(c => c.new ?? []).map(r => r.id))]
