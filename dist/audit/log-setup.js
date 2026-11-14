@@ -3,6 +3,7 @@ import { DEFAULT_CATEGORIES, DEFAULT_CHANNELS, LEGACY_CATEGORIES, LEGACY_CHANNEL
 import { getFeature, setFeature } from '../features/settings.js';
 import { logEvent } from '../errors.js';
 import { configureEventLog, eventLogConfig } from './event-log.js';
+import { styleLogEmbed } from '../ui/log-style.js';
 /**
  * Where Vanguard's logs go in each server:
  *   #bans                      one record per ban, with server-owner / Developer Unban and Reban buttons
@@ -262,8 +263,8 @@ export async function checkChannel(guild, channelId, label, sendTest = true) {
     let test = 'skipped', error;
     if (sendTest && !missing.length) {
         try {
-            await channel.send({ embeds: [new EmbedBuilder().setColor(Colors.Green).setTitle('✅ Log channel test')
-                        .setDescription(`Ghost Vanguard can post **${label}** here.`).setFooter({ text: `Channel ID: ${channel.id}` }).setTimestamp()], allowedMentions: { parse: [] } });
+            await channel.send({ embeds: [styleLogEmbed(new EmbedBuilder().setColor(Colors.Green).setTitle('Log channel test')
+                        .setDescription(`Ghost Vanguard can post **${label}** here.`).setFooter({ text: `Channel ID: ${channel.id}` }).setTimestamp(), 'server')], allowedMentions: { parse: [] } });
             test = 'sent';
         }
         catch (e) {

@@ -115,9 +115,9 @@ test('compact log cards show mentions once while stored history keeps full targe
             target: '<@12345678901234567> (andrey)', author: { name: 'andrey' }, details: ['**Roles added:** <@&r1>'] }, { compact: true });
         const card = posted[0]!;
         assert.equal(card.author, undefined);
-        assert.deepEqual(card.fields.map((f: any) => f.name), ['Target', 'By', 'Roles added']);
-        assert.equal(card.fields[0].value, '<@12345678901234567>');
-        assert.equal(card.fields[1].value, '<@mod1>');
+        assert.match(card.description, /^\*\*<@12345678901234567>\*\*\n-# By <@mod1>$/);
+        assert.deepEqual(card.fields.map((f: any) => f.name), ['Roles added']);
+        assert.equal(card.fields[0].value, '<@&r1>');
         assert.equal(card.footer.text, 'Ghost Vanguard');
         const stored = store.get('SELECT target,summary FROM event_log WHERE guild_id=?', G)!;
         assert.equal(stored.target, '<@12345678901234567> (andrey)');

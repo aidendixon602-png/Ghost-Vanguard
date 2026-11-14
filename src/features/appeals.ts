@@ -2,6 +2,7 @@ import { ActionRowBuilder, ButtonBuilder, ButtonStyle, Colors, MessageFlags, Mod
 import type { Store } from '../database/db.js';
 import { clip } from '../core.js';
 import { embed } from '../ui/ui.js';
+import { styleLogEmbed } from '../ui/log-style.js';
 import { defaults, type Registry } from '../bot/registry.js';
 import { AppError, logEvent } from '../errors.js';
 import { RANKS, rankOf } from '../bot/ranks.js';
@@ -84,7 +85,7 @@ export async function handleAppealDm(i: Interaction, store: Store, client: Clien
             const cases = store.readGuild(guildId, () => store.all("SELECT number,action,reason,at FROM cases WHERE guild_id=? AND user_id=? ORDER BY id DESC LIMIT 3", guildId, i.user.id));
             let msg;
             try {
-                msg = await channel.send({ embeds: [embed(`Ban appeal #${id}`, `**User:** <@${i.user.id}> (${i.user.tag}) · \`${i.user.id}\`\n**Ban reason:** ${clip(banned.reason ?? 'none recorded', 300)}\n${cases.length ? `**Recent cases:** ${cases.map(r => `#${r.number} ${r.action}`).join(', ')}\n` : ''}\n**Their appeal:**\n${clip(text, 1500)}`, Colors.Blurple)], components: [staffButtons(guildId, id)], allowedMentions: { parse: [] } });
+                msg = await channel.send({ embeds: [styleLogEmbed(embed(`Ban appeal #${id}`, `**User:** <@${i.user.id}> (${i.user.tag}) · \`${i.user.id}\`\n**Ban reason:** ${clip(banned.reason ?? 'none recorded', 300)}\n${cases.length ? `**Recent cases:** ${cases.map(r => `#${r.number} ${r.action}`).join(', ')}\n` : ''}\n**Their appeal:**\n${clip(text, 1500)}`, Colors.Blurple), 'tickets')], components: [staffButtons(guildId, id)], allowedMentions: { parse: [] } });
             } catch (error) {
                 // Staff never saw it, so do not leave a "pending" appeal that blocks the next try.
                 await store.withAuthorized(guildId, async () => store.run('DELETE FROM appeals WHERE guild_id=? AND id=?', guildId, id)).catch(() => { });
@@ -130,7 +131,7 @@ export function registerAppealControls(registry: Registry) {
         const user = await i.client.users.fetch(row.user_id).catch(() => null);
         const told = user ? await user.send({ embeds: [embed(`Your appeal to ${i.guild.name}`, accept ? 'Your appeal was **accepted** and you have been unbanned. You can rejoin with a new invite.' : 'Your appeal was **denied**. You can appeal again in 7 days.', accept ? Colors.Green : Colors.Red)], allowedMentions: { parse: [] } }).then(() => true, () => false) : false;
         const old = i.message?.embeds?.[0];
-        await i.message?.edit({ embeds: [embed(`${old?.title ?? `Ban appeal #${id}`} · ${accept ? 'ACCEPTED' : 'DENIED'}`, `${old?.description ?? ''}\n\n**${accept ? 'Accepted (unbanned)' : 'Denied'} by** <@${actor.id}> <t:${Math.floor(Date.now() / 1000)}:R>`.slice(0, 4000), accept ? Colors.Green : Colors.Red)], components: [staffButtons(i.guildId, id, true)] }).catch(() => { });
+        await i.message?.edit({ embeds: [styleLogEmbed(embed(`${old?.title ?? `Ban appeal #${id}`} · ${accept ? 'ACCEPTED' : 'DENIED'}`, `${old?.description ?? ''}\n\n**${accept ? 'Accepted (unbanned)' : 'Denied'} by** <@${actor.id}> <t:${Math.floor(Date.now() / 1000)}:R>`.slice(0, 4000), accept ? Colors.Green : Colors.Red), 'tickets')], components: [staffButtons(i.guildId, id, true)] }).catch(() => { });
         return `Appeal #${id} ${accept ? 'accepted: they are unbanned' : 'denied'}.${told ? ' They were told by DM.' : ' Their DMs are closed, so they were not told.'}`;
     } });
 }

@@ -83,6 +83,9 @@ export function logsCategory(store: Store, guildId: string, category: LogCategor
 
 const FIELD = /^\*\*(.+?):\*\*\s?([\s\S]*)$/;
 
+/** Detail fields that read better full-width than squeezed into a column. */
+const WIDE_FIELDS = /^(content|before|after|reason|details|response|role history|rollback|permissions|roles added|roles removed|added|removed|topic|evidence|history|status)$/i;
+
 /** Render a log embed with actor, target, details, and timestamp; compact cards avoid repeated IDs. */
 export function renderEvent(event: LogEvent): EmbedBuilder {
     const at = event.at ?? Date.now();
@@ -90,13 +93,22 @@ export function renderEvent(event: LogEvent): EmbedBuilder {
     if (event.author && !event.compact) e.setAuthor({ name: event.author.name.slice(0, 256), iconURL: event.author.iconURL ?? undefined });
     const fields: { name: string; value: string; inline?: boolean }[] = [];
     const loose: string[] = [];
-    if (event.target) fields.push({ name: event.targetLabel ?? 'Target', value: event.target, inline: true });
-    if (event.actorId) fields.push({ name: event.actorLabel ?? 'By', value: event.compact ? `<@${event.actorId}>` : `<@${event.actorId}> (\`${event.actorId}\`)`, inline: true });
-    else if (event.actorUnverified) fields.push({ name: event.actorLabel ?? 'By', value: 'Unavailable (could not be verified)', inline: true });
+    const actor = event.actorId ? `<@${event.actorId}>${event.compact ? '' : ` (\`${event.actorId}\`)`}`
+        : event.actorUnverified ? 'Unavailable (could not be verified)' : null;
+    if (event.compact) {
+        // Compact cards lead with the target and a small attribution line instead of a two-column grid.
+        if (event.target) loose.push(`**${event.target}**`);
+        if (actor) loose.push(`-# ${event.actorLabel ?? 'By'} ${actor}`);
+    } else {
+        if (event.target) fields.push({ name: event.targetLabel ?? 'Target', value: event.target, inline: true });
+        if (actor) fields.push({ name: event.actorLabel ?? 'By', value: actor, inline: true });
+    }
     for (const line of event.details ?? []) {
         const m = FIELD.exec(line);
-        if (m && fields.length < 24) fields.push({ name: m[1]!.slice(0, 256), value: (m[2]!.trim() || '—').slice(0, 1024), inline: m[2]!.length <= 60 && !m[2]!.includes('\n') });
-        else if (line.trim()) loose.push(line);
+        if (m && fields.length < 24) {
+            const value = (m[2]!.trim() || '—').slice(0, 1024);
+            fields.push({ name: m[1]!.slice(0, 256), value, inline: value.length <= 60 && !value.includes('\n') && !WIDE_FIELDS.test(m[1]!) });
+        } else if (line.trim()) loose.push(line);
     }
     if (loose.length) e.setDescription(loose.join('\n').slice(0, 3900));
     if (fields.length) e.addFields(fields);
@@ -265,6 +277,17 @@ export function overwriteDiff(entry: GuildAuditLogsEntry): string | null {
 
 function changeLines(entry: GuildAuditLogsEntry): string[] {
     const lines: string[] = [];
+    const deleted = entry.action === AuditLogEvent.ChannelDelete || entry.action === AuditLogEvent.RoleDelete || entry.action === AuditLogEvent.ThreadDelete;
+    if (entry.action === AuditLogEvent.ChannelDelete || entry.action === AuditLogEvent.ThreadDelete) {
+        // A deletion is not a rename: show the useful last settings, never "name → none" / "false → none".
+        const old = (key: string) => (entry.changes ?? []).find(c => c.key === key)?.old;
+        const topic = old('topic');
+        if (topic !== undefined && topic !== null && topic !== '') lines.push(`**Topic:** ${shown(topic)}`);
+        const slowmode = Number(old('rate_limit_per_user') ?? 0);
+        if (Number.isFinite(slowmode) && slowmode > 0) lines.push(`**Slowmode:** ${slowmode}s`);
+        if (old('nsfw') === true) lines.push('**NSFW:** yes');
+        return lines;
+    }
     const overwrite = overwriteDiff(entry);
     if (overwrite) lines.push(`🔐 **Permissions:** ${overwrite}`);
     for (const change of (entry.changes ?? []) as {
@@ -272,6 +295,7 @@ function changeLines(entry: GuildAuditLogsEntry): string[] {
         old?: any;
         new?: any;
     }[]) {
+        if (deleted && change.key === 'name') continue;
         if (change.key === '$add' || change.key === '$remove') {
             const roles = (change.new ?? []).map((r: {
                 id: string;
@@ -317,6 +341,8 @@ const ROUTINE_KEYS = new Set(['name', 'topic']);
 const ACTION_COLOR: Record<string, number> = {
     'Member Banned': Colors.Red, 'Member Kicked': Colors.DarkOrange, 'Member Unbanned': Colors.Green,
     'Timeout Added': Colors.Orange, 'Timeout Removed': Colors.Green, 'Nickname Changed': Colors.Blue, 'Roles Updated': Colors.Purple, 'Role Updated': Colors.Orange,
+    'Channel created': Colors.Green, 'Channel deleted': Colors.Red, 'Thread created': Colors.Green, 'Thread deleted': Colors.Red,
+    'Role created': Colors.Green, 'Role deleted': Colors.Red,
 };
 
 export function duration(ms: number): string {
