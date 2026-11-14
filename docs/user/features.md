@@ -47,6 +47,8 @@ Snapshots taken during a lockdown capture the locked permissions, so lift the lo
 
 `/setup logs enable` starts recording server events. Each event shows what happened, who did it, the target, and details such as changed values or the reason. Events go to the security log channel, or the channel given to `/setup logs enable`, and are stored for 30 days.
 
+Log cards use the **Signal** theme: a `GHOST VANGUARD / …` header, a short event title, and a neon accent for the kind of log (cyan activity, violet roles/security, mint success, amber warning, coral deletion/enforcement). Compact cards lead with the target and a small “By …” line instead of a wide field grid. Deleted channels show their last useful settings, not `name → none` or `false → none`. The theme is applied when a card is delivered, so queued alerts, ban records, ticket logs and appeal logs pick it up after a restart without changing what is stored.
+
 | Category | Events |
 |---|---|
 | Moderation | Bans, unbans, kicks, timeouts and prunes |

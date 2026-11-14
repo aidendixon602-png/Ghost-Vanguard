@@ -49,8 +49,8 @@ test('audit cards use compact mentions while full actor and target details remai
     recordAuditEvent(store, logs, entry(AuditLogEvent.MemberKick, { targetId: '12345678901234567', target: { tag: 'andrey' } }, 'mod1'), guild);
     assert.equal(sent.length, 1);
     assert.equal(sent[0]!.author, undefined);
-    assert.equal(sent[0]!.fields.find((field: any) => field.name === 'Target')?.value, '<@12345678901234567>');
-    assert.equal(sent[0]!.fields.find((field: any) => field.name === 'Moderator')?.value, '<@mod1>');
+    assert.match(sent[0]!.description, /^\*\*<@12345678901234567>\*\*\n-# Moderator <@mod1>$/);
+    assert.equal(sent[0]!.fields, undefined);
     assert.equal(sent[0]!.footer.text, 'Ghost Vanguard');
     assert.match(String(store.get('SELECT summary FROM event_log WHERE guild_id=?', 'g')?.summary), /andrey/);
     store.close();
@@ -100,10 +100,11 @@ test('rapid role edits are grouped into one compact message while every audit en
     assert.equal(sent[0]!.channel, 'events');
     assert.equal(sent[0]!.embed.title, 'Role changes · 2 updates');
     const fields = sent[0]!.embed.fields;
-    assert.equal(fields.find((field: any) => field.name === 'Target')?.value, '<@u1>');
+    assert.match(sent[0]!.embed.description, /^\*\*<@u1>\*\*\n-# Changed by <@mod>$/);
     assert.equal(fields.find((field: any) => field.name === 'Added')?.value, '<@&r1>, <@&r2>');
     assert.equal(fields.find((field: any) => field.name === 'Removed')?.value, '<@&r3>');
-    assert.equal(fields.find((field: any) => field.name === 'Changed by')?.value, '<@mod>');
+    assert.equal(fields.find((field: any) => field.name === 'Target'), undefined);
+    assert.equal(fields.find((field: any) => field.name === 'Changed by'), undefined);
     assert.equal(sent[0]!.embed.author, undefined, 'the target is not repeated as the embed author');
     assert.equal(sent[0]!.embed.footer.text, 'Ghost Vanguard', 'raw actor and target IDs are not repeated in the footer');
     assert.equal(recentEvents(store, 'g').total, 2, 'both original audit entries remain searchable');

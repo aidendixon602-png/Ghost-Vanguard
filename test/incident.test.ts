@@ -57,7 +57,9 @@ test('the log outbox delivers alerts with buttons and still delivers older plain
     store.run('INSERT INTO outbox(guild_id,channel_id,json) VALUES(?,?,?)', 'g', 'logs', JSON.stringify({ title: 'Older alert' }));
     logs.push('g', { toJSON: () => ({ title: 'Incident' }) } as any, [{ toJSON: () => ({ type: 1, components: [{ type: 2, custom_id: 'incident:restore:1' }] }) } as any]);
     await logs.flush();
-    assert.deepEqual(sent.map(m => m.embeds[0].title), ['Older alert', 'Incident']);
+    assert.deepEqual(sent.map(m => m.embeds[0].title), ['◈ Older alert', '◆ Incident']);
+    assert.equal(sent[0].embeds[0].author.name, 'GHOST VANGUARD / ACTIVITY');
+    assert.equal(sent[1].embeds[0].author.name, 'GHOST VANGUARD / SECURITY');
     assert.equal(sent[0].components, undefined);
     assert.equal(sent[1].components[0].components[0].custom_id, 'incident:restore:1');
     store.close();

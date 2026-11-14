@@ -4,6 +4,7 @@ import type { Store } from '../database/db.js';
 import { getFeature, setFeature } from '../features/settings.js';
 import { logEvent } from '../errors.js';
 import { configureEventLog, eventLogConfig } from './event-log.js';
+import { styleLogEmbed } from '../ui/log-style.js';
 
 /**
  * Where Vanguard's logs go in each server:
@@ -280,8 +281,8 @@ export async function checkChannel(guild: Guild, channelId: string, label: strin
     let test: ChannelCheck['test'] = 'skipped', error: string | undefined;
     if (sendTest && !missing.length) {
         try {
-            await (channel as TextChannel).send({ embeds: [new EmbedBuilder().setColor(Colors.Green).setTitle('✅ Log channel test')
-                .setDescription(`Ghost Vanguard can post **${label}** here.`).setFooter({ text: `Channel ID: ${channel.id}` }).setTimestamp()], allowedMentions: { parse: [] } });
+            await (channel as TextChannel).send({ embeds: [styleLogEmbed(new EmbedBuilder().setColor(Colors.Green).setTitle('Log channel test')
+                .setDescription(`Ghost Vanguard can post **${label}** here.`).setFooter({ text: `Channel ID: ${channel.id}` }).setTimestamp(), 'server')], allowedMentions: { parse: [] } });
             test = 'sent';
         } catch (e) { test = 'failed'; error = e instanceof Error ? e.message : String(e); }
     }

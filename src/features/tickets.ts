@@ -4,6 +4,7 @@ import type { Store } from '../database/db.js';
 import { AppError } from '../errors.js';
 import { clip } from '../core.js';
 import { embed } from '../ui/ui.js';
+import { styleLogEmbed } from '../ui/log-style.js';
 import { rankOf, RANKS } from '../bot/ranks.js';
 import { buildTranscript } from './ticket-transcript.js';
 
@@ -253,7 +254,8 @@ export async function ticketLog(guild: Guild, config: TicketConfig, payload: { e
     const channel = ticketLogChannel(guild, config);
     if (!channel)
         return false;
-    return channel.send({ ...payload, allowedMentions: { parse: [] } } as any).then(() => true).catch(() => false);
+    const embeds = payload.embeds.map(e => EmbedBuilder.from(styleLogEmbed(e, 'tickets')));
+    return channel.send({ ...payload, embeds, allowedMentions: { parse: [] } } as any).then(() => true).catch(() => false);
 }
 
 // ---- staff ---------------------------------------------------------------------------------
@@ -524,7 +526,7 @@ export async function runTicketMaintenance({ store, client, ready }: Maintenance
             if (config.weeklyReport && (config.lastReportAt === null ? now - (store.get('SELECT MIN(opened_at) t FROM ticket_records WHERE guild_id=?', guild.id)?.t ?? now) >= 7 * 86400000 : now - config.lastReportAt >= 7 * 86400000)) {
                 const channel = ticketLogChannel(guild, config);
                 if (channel) {
-                    await channel.send({ embeds: [reportEmbed(guild, weeklyReport(store, guild.id, now), now)], allowedMentions: { parse: [] } }).catch(() => {});
+                    await channel.send({ embeds: [styleLogEmbed(reportEmbed(guild, weeklyReport(store, guild.id, now), now), 'tickets')], allowedMentions: { parse: [] } }).catch(() => {});
                     updateTicketConfig(store, guild.id, { lastReportAt: now }, client.user?.id ?? 'system');
                     localReports++;
                 }

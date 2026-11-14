@@ -75,8 +75,9 @@ test('a ban made with a Vanguard command is recorded once with the staff member,
         await w.logs.flush();
         assert.equal(w.sent.length, 1, 'posted to #bans exactly once');
         const posted = w.sent[0];
-        assert.equal(posted.embeds[0].author.name, '• urloffy - Banned');
-        assert.equal(posted.embeds[0].author.icon_url, 'https://cdn.discordapp.com/avatar.png');
+        assert.equal(posted.embeds[0].author.name, 'GHOST VANGUARD / MODERATION');
+        assert.equal(posted.embeds[0].title, '⬡ urloffy - Banned');
+        assert.equal(posted.embeds[0].thumbnail.url, 'https://cdn.discordapp.com/avatar.png');
         const f = fieldsOf(posted);
         assert.equal(f.User, `<@${USER}>\n( ${USER} )`);
         assert.equal(f['Moderator (via bot)'], `<@${STAFF}> ( ${STAFF} )`);
@@ -131,7 +132,8 @@ test('tempbans show duration and expiry; when they expire the same record is upd
         f = fieldsOf(w.edits[0].p);
         assert.match(f.Status, /Expired by Ghost Vanguard \(automatic\)/);
         assert.equal(f.Reason, 'spam', 'the original ban details are kept');
-        assert.equal(w.edits[0].p.embeds[0].author.name, '• urloffy - Ban expired');
+        assert.equal(w.edits[0].p.embeds[0].author.name, 'GHOST VANGUARD / MODERATION');
+        assert.equal(w.edits[0].p.embeds[0].title, '⬡ urloffy - Ban expired');
     } finally { w.store.close(); }
 });
 

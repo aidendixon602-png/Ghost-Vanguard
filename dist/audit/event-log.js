@@ -33,6 +33,8 @@ export function logsCategory(store, guildId, category) {
     return config.enabled && config.categories.has(category);
 }
 const FIELD = /^\*\*(.+?):\*\*\s?([\s\S]*)$/;
+/** Detail fields that read better full-width than squeezed into a column. */
+const WIDE_FIELDS = /^(content|before|after|reason|details|response|role history|rollback|permissions|roles added|roles removed|added|removed|topic|evidence|history|status)$/i;
 /** Render a log embed with actor, target, details, and timestamp; compact cards avoid repeated IDs. */
 export function renderEvent(event) {
     const at = event.at ?? Date.now();
@@ -41,16 +43,27 @@ export function renderEvent(event) {
         e.setAuthor({ name: event.author.name.slice(0, 256), iconURL: event.author.iconURL ?? undefined });
     const fields = [];
     const loose = [];
-    if (event.target)
-        fields.push({ name: event.targetLabel ?? 'Target', value: event.target, inline: true });
-    if (event.actorId)
-        fields.push({ name: event.actorLabel ?? 'By', value: event.compact ? `<@${event.actorId}>` : `<@${event.actorId}> (\`${event.actorId}\`)`, inline: true });
-    else if (event.actorUnverified)
-        fields.push({ name: event.actorLabel ?? 'By', value: 'Unavailable (could not be verified)', inline: true });
+    const actor = event.actorId ? `<@${event.actorId}>${event.compact ? '' : ` (\`${event.actorId}\`)`}`
+        : event.actorUnverified ? 'Unavailable (could not be verified)' : null;
+    if (event.compact) {
+        // Compact cards lead with the target and a small attribution line instead of a two-column grid.
+        if (event.target)
+            loose.push(`**${event.target}**`);
+        if (actor)
+            loose.push(`-# ${event.actorLabel ?? 'By'} ${actor}`);
+    }
+    else {
+        if (event.target)
+            fields.push({ name: event.targetLabel ?? 'Target', value: event.target, inline: true });
+        if (actor)
+            fields.push({ name: event.actorLabel ?? 'By', value: actor, inline: true });
+    }
     for (const line of event.details ?? []) {
         const m = FIELD.exec(line);
-        if (m && fields.length < 24)
-            fields.push({ name: m[1].slice(0, 256), value: (m[2].trim() || '—').slice(0, 1024), inline: m[2].length <= 60 && !m[2].includes('\n') });
+        if (m && fields.length < 24) {
+            const value = (m[2].trim() || '—').slice(0, 1024);
+            fields.push({ name: m[1].slice(0, 256), value, inline: value.length <= 60 && !value.includes('\n') && !WIDE_FIELDS.test(m[1]) });
+        }
         else if (line.trim())
             loose.push(line);
     }
@@ -225,10 +238,26 @@ export function overwriteDiff(entry) {
 }
 function changeLines(entry) {
     const lines = [];
+    const deleted = entry.action === AuditLogEvent.ChannelDelete || entry.action === AuditLogEvent.RoleDelete || entry.action === AuditLogEvent.ThreadDelete;
+    if (entry.action === AuditLogEvent.ChannelDelete || entry.action === AuditLogEvent.ThreadDelete) {
+        // A deletion is not a rename: show the useful last settings, never "name → none" / "false → none".
+        const old = (key) => (entry.changes ?? []).find(c => c.key === key)?.old;
+        const topic = old('topic');
+        if (topic !== undefined && topic !== null && topic !== '')
+            lines.push(`**Topic:** ${shown(topic)}`);
+        const slowmode = Number(old('rate_limit_per_user') ?? 0);
+        if (Number.isFinite(slowmode) && slowmode > 0)
+            lines.push(`**Slowmode:** ${slowmode}s`);
+        if (old('nsfw') === true)
+            lines.push('**NSFW:** yes');
+        return lines;
+    }
     const overwrite = overwriteDiff(entry);
     if (overwrite)
         lines.push(`🔐 **Permissions:** ${overwrite}`);
     for (const change of (entry.changes ?? [])) {
+        if (deleted && change.key === 'name')
+            continue;
         if (change.key === '$add' || change.key === '$remove') {
             const roles = (change.new ?? []).map((r) => `<@&${r.id}>`).join(', ');
             lines.push(`**${change.key === '$add' ? 'Roles added' : 'Roles removed'}:** ${roles}`);
@@ -270,6 +299,8 @@ const ROUTINE_KEYS = new Set(['name', 'topic']);
 const ACTION_COLOR = {
     'Member Banned': Colors.Red, 'Member Kicked': Colors.DarkOrange, 'Member Unbanned': Colors.Green,
     'Timeout Added': Colors.Orange, 'Timeout Removed': Colors.Green, 'Nickname Changed': Colors.Blue, 'Roles Updated': Colors.Purple, 'Role Updated': Colors.Orange,
+    'Channel created': Colors.Green, 'Channel deleted': Colors.Red, 'Thread created': Colors.Green, 'Thread deleted': Colors.Red,
+    'Role created': Colors.Green, 'Role deleted': Colors.Red,
 };
 export function duration(ms) {
     const minutes = Math.round(ms / 60000);

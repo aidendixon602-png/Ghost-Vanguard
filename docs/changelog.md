@@ -1,3 +1,9 @@
+## Unreleased: Signal log theme
+
+- **All Ghost Vanguard log embeds get one cooler, calmer look.** Cards delivered to log channels now wear a `GHOST VANGUARD / SECURITY`, `/CHANNELS`, `/ROLES`, `/TICKETS` (and so on) header, a short marked title, a neon accent colour and a consistent footer/timestamp. The outbox still stores the original card; the theme is applied on delivery and on live-record refresh, so older queued alerts and ban records pick it up too.
+- **Channel deletions are compact.** The target and “Changed by …” sit in the description instead of a two-column grid, and the useless `name → none`, `nsfw false → none` and `rate limit 0 → none` fields are gone. A useful last topic, slowmode or NSFW flag is still shown.
+- **Promotion/removal cards lose the repeated username tag** and use clean `+` / `−` role lines. Ticket logs, weekly ticket reports, appeal logs and `/setup logs check` test cards use the same theme. Commands, DMs, control panels and protection behaviour are unchanged.
+
 ## Unreleased: log channels no longer repeat a name
 
 - **Two of every log channel.** A server could end up with two `#mod-logs`, `#join-logs` and so on inside Ghost Vanguard Logs, which Discord lists as identical entries. Three things could cause it, and each is fixed:

@@ -35,6 +35,6 @@ export async function logRankChange(store, logs, before, after) {
     const entry = await after.guild.fetchAuditLogs({ type: AuditLogEvent.MemberRoleUpdate, limit: 5 }).then(l => l.entries.find(e => e.targetId === after.id && Date.now() - e.createdTimestamp < 30000), () => undefined);
     const by = entry?.executorId ?? null;
     const label = (r) => r ? RANK_LABEL[r] : 'no rank';
-    const roles = changed.map(r => `${added.includes(r.role_id) ? '➕' : '➖'} <@&${r.role_id}> (${RANK_LABEL[r.level]})`).join('\n');
-    logs.push(after.guild.id, embed(`${up ? '⬆️' : down ? '⬇️' : '🔁'} ${type}`, `**Member:** <@${after.id}> (${after.user.tag})\n**Rank:** ${label(oldRank)} → **${label(newRank)}**\n${roles}${by ? `\n**By:** <@${by}>` : ''}`, up ? Colors.Green : down ? Colors.Red : Colors.Blurple));
+    const roles = changed.map(r => `${added.includes(r.role_id) ? '+' : '−'} <@&${r.role_id}> · ${RANK_LABEL[r.level]}`).join('\n');
+    logs.push(after.guild.id, embed(type, `**Member:** <@${after.id}>\n**Rank:** ${label(oldRank)} → **${label(newRank)}**\n${roles}${by ? `\n**By:** <@${by}>` : ''}`, up ? Colors.Green : down ? Colors.Red : Colors.Blurple));
 }
