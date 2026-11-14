@@ -72,15 +72,17 @@ test('/dev update talks to launch.js, and explains when it is not available', as
     assert.match(disabled, /Restart in the hosting panel/, 'explains how to apply the fix');
 });
 
-test('/dev update and /restart remain application commands', async () => {
+test('/dev update and /dev restart are both in the developer menu', async () => {
     const subcommands = (dev.data.options ?? []).map(option => option.name);
     assert.ok(subcommands.includes('update'), 'the handler and GitHub updater remain intact');
-    assert.equal(subcommands.includes('restart'), false);
     const registry = new Registry();
     await registry.load();
     const tree = treeJson(registry);
-    assert.ok(tree.some(command => command.name === 'dev'), '/dev is in the slash-command list');
-    assert.ok(tree.some(command => command.name === 'restart'), '/restart is in the slash-command list');
+    const devMenu = tree.find(command => command.name === 'dev');
+    assert.ok(devMenu, '/dev is in the slash-command list');
+    assert.ok(devMenu.options.some((option: any) => option.name === 'restart'), '/dev restart is in the menu');
+    assert.ok(devMenu.options.some((option: any) => option.name === 'genreban'), '/dev genreban is in the menu');
+    assert.equal(tree.some(command => command.name === 'restart'), false, 'restart no longer sits at the top level');
 });
 
 test('launcher restart requests ask launch.js and report when unavailable', async () => {

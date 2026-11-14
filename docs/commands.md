@@ -79,6 +79,7 @@ Respond to raids, lock channels and inspect server health
 | `/raid emergency status` | Show whether emergency mode is on | Admin+ |
 | `/raid health` | Check protection, permissions and backups | Admin+ |
 | `/raid lockdown` | Lock every channel and post a notice | Admin+ |
+| `/raid massban` | Raid cleanup: ban up to 200 user IDs at once (whitelisted staff only) | Admin+ |
 | `/raid newaccounts status` | Show the new-account rule | Admin+ |
 | `/raid newaccounts on` | Turn the new-account rule on or change it | Admin+ |
 | `/raid newaccounts off` | Turn the new-account rule off | Admin+ |
@@ -123,7 +124,6 @@ Moderate members and review cases, notes and appeals
 | `/mod warnings status` | Show warning levels or someone's warnings | Helper+ |
 | `/mod warnings setup` | Change the warning levels | Head Admin+ |
 | `/mod warnings pardon` | Clear someone's active warnings | Head Admin+ |
-| `/mod massban` | Ban up to 200 user IDs at once | Admin+ (must also be on the anti-nuke whitelist) |
 | `/mod slowmode` | Set a channel's slowmode | Moderator+ or Manage Channels |
 
 ## /setup
@@ -227,7 +227,7 @@ Look up members, roles, server information and bot status
 
 ## /dev
 
-Manage bot diagnostics, updates, servers and data
+Developer tools: cross-server bans, server access, diagnostics, updates and data
 
 | Command | What it does | Who |
 |---|---|---|
@@ -249,8 +249,15 @@ Manage bot diagnostics, updates, servers and data
 | `/dev alerts` | Set up the global anti-nuke feed and DMs | Developer |
 | `/dev update` | Show update status or install now | Developer |
 | `/dev sync` | Re-register the slash commands | Developer |
+| `/dev genreban` | Developer: ban a user from every authorized server until `/ungenreban` | Developer |
+| `/dev hardban` | Developer: permanently ban a user from every authorized server until `/unhardban` | Developer |
+| `/dev netexception list` | Active genreban exceptions, newest first | Developer |
+| `/dev netexception revoke` | Cancel an exception: the genreban applies in that server again | Developer |
+| `/dev restart` | Gracefully restart the bot and update this message with downtime | Developer |
 | `/dev server info` | Show this server's authorization | Developer |
 | `/dev server unban` | Unban a server | Developer |
+| `/dev ungenreban` | Developer: revoke a genreban and lift it in every authorized server | Developer |
+| `/dev unhardban` | Developer: revoke a hardban and lift it in every authorized server | Developer |
 
 ## /help
 
@@ -309,52 +316,3 @@ Give or take a role from a member, with role rules and hierarchy enforced
 | `/role blacklist remove` | Take a role off the blacklist | Server Owner |
 | `/role blacklist list` | Show every blacklisted role and who may give it | Server Owner |
 | `/role blacklist who-can-give` | Allow or stop one person or role from giving a blacklisted role | Server Owner |
-
-## /restart
-
-Restart the bot · Developer
-
-| Command | What it does | Who |
-|---|---|---|
-| `/restart` | Restart the bot | Developer |
-
-## /genreban
-
-Ban a user from every server · Developer
-
-| Command | What it does | Who |
-|---|---|---|
-| `/genreban` | Ban a user from every server | Developer |
-
-## /hardban
-
-Permanently ban a user from every server · Developer
-
-| Command | What it does | Who |
-|---|---|---|
-| `/hardban` | Permanently ban a user from every server | Developer |
-
-## /netexception
-
-Developer: servers that let a genrebanned user back in (their server only)
-
-| Command | What it does | Who |
-|---|---|---|
-| `/netexception list` | List genreban exceptions | Developer |
-| `/netexception revoke` | Cancel a genreban exception | Developer |
-
-## /ungenreban
-
-Lift a genreban everywhere · Developer
-
-| Command | What it does | Who |
-|---|---|---|
-| `/ungenreban` | Lift a genreban everywhere | Developer |
-
-## /unhardban
-
-Lift a hardban everywhere · Developer
-
-| Command | What it does | Who |
-|---|---|---|
-| `/unhardban` | Lift a hardban everywhere | Developer |

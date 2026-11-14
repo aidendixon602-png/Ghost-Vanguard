@@ -1,3 +1,9 @@
+## Unreleased: tidier command menu
+
+- **Developer tools now live under `/dev`.** `/genreban`, `/ungenreban`, `/hardban`, `/unhardban`, `/netexception` and `/restart` are now `/dev genreban`, `/dev ungenreban`, `/dev hardban`, `/dev unhardban`, `/dev netexception` and `/dev restart`. Who may use them is unchanged.
+- **Mass bans sit under `/raid`** (`/raid massban`, previously `/mod massban`).
+- The old top-level names are removed, so update any saved shortcuts or notes.
+
 ## Unreleased: Website Roblox verification
 
 - **Verify with Roblox.** When `ROBLOX_OAUTH_CLIENT_ID`, `ROBLOX_OAUTH_CLIENT_SECRET` and an https `PUBLIC_BASE_URL` are set, `/verify` shows a button that signs the member in on Roblox's site (OAuth with PKCE, one-time state, 10-minute expiry). The account is linked and roles are synced the same way as code verification. Code-in-bio verification still works, and nothing changes until the settings are added. See [hosting](user/hosting.md#website-verification-optional).
