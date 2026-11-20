@@ -54,13 +54,25 @@ The console prints a line for each step, so a console that stays blank means the
 › Opening the database
 › Loading commands and checking the database
 › Connecting to Discord
-  Dashboard: 127.0.0.1:7475/  (set DASHBOARD_TOKEN before exposing it)
 › Connected as Ghost Vanguard#0001. Starting servers
 › Registering slash commands
 
   GHOST VANGUARD  v3.2.1
-  SYSTEM ONLINE  ·  Ghost Vanguard#0001
+  SYSTEM ONLINE  ·  Ghost Vanguard#0001  ·  ready in 4.2 s
+  ────────────────────────────────────────────────
+  Servers       3 connected · 3 authorized
+  Members       1,234 across authorized servers
+  Commands      68 registered  ·  up to date
+  Verification  Roblox profile code
+  Integrations  AI moderation off · Rover off · Bloxlink off
+  Database      4.7 MB · data/vanguard.db
+  Backups       every 60 min · data/database-backups
+  Dashboard     http://127.0.0.1:7475/  ·  token required
+  Health        http://127.0.0.1:7475/healthz
+  Runtime       Node v24.22.2 · 128 MB · API 42 ms
 ```
+
+The banner says how long startup took, how many of the connected servers are authorized (a connected server that is not authorized gets no protection, and is flagged), how many members sit in the authorized servers, the database size and path, the backup schedule, the dashboard address with its token status, and the runtime (Node version, memory, Discord API latency). Rover, Bloxlink and the heartbeat join AI moderation in the integrations line.
 
 The first line comes from `launch.js`, the rest from the bot. If one step takes longer than 30 seconds, the bot repeats `⚠ Still waiting after 30 s on "<step>"` every 30 seconds, so the last step printed is the one that is stuck:
 
@@ -69,7 +81,7 @@ The first line comes from `launch.js`, the rest from the bot. If one step takes 
 - **Connected as … Starting servers** names how many servers it has started, such as `(2 of 3)`, in each reminder.
 - Before `Starting the bot`, `launch.js` may print `📦 Installing dependencies…`. That install runs quietly and can take a few minutes on a small host.
 
-The **Access** block at the end of the banner lists everyone with bot-wide power. Each ID carries the person's name when the bot has seen them, and a rank given with `/setup staff global` comes off by running that command again with rank **Remove rank**.
+The **Access** block at the end of the banner lists everyone with bot-wide power, plus whitelisted people (who are immune to all moderation). Each ID carries the person's name when the bot has seen them, and a rank given with `/setup staff global` comes off by running that command again with rank **Remove rank**.
 
 ## What the console shows while the bot runs
 

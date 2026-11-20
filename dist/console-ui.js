@@ -26,22 +26,35 @@ export function readableSize(bytes) {
     }
     return `${value >= 10 ? Math.round(value) : value.toFixed(1)} ${units[unit]}`;
 }
+/** 4200 -> "4.2 s", 350 -> "350 ms". */
+export function readableDuration(ms) {
+    return ms < 1000 ? `${Math.round(ms)} ms` : `${(ms / 1000).toFixed(1)} s`;
+}
 /** A compact status summary printed once the bot is connected and ready. */
 export function startupSummary(info) {
     const integrations = Object.entries(info.integrations)
         .map(([name, on]) => on ? `${name} ${style.green('ON')}` : `${name} ${style.dim('off')}`).join('  ·  ');
     const servers = info.servers > 0 ? `${info.servers} connected` : style.yellow('not in any servers yet');
+    const authorized = info.authorized === undefined ? '' : info.authorized === info.servers
+        ? `  ·  ${info.authorized} authorized`
+        : `  ·  ${info.authorized} authorized  ·  ${style.yellow(`${info.servers - info.authorized} not authorized yet`)}`;
     const commandState = info.commandsUpdated ? style.yellow('updated on Discord') : style.green('up to date');
+    const readyIn = info.startedInMs === undefined ? '' : `  ${style.dim('·')}  ready in ${readableDuration(info.startedInMs)}`;
     return [
         '',
         `  ${style.bold(PRODUCT_NAME_UPPER)}  ${style.dim(`v${info.version}`)}`,
-        `  ${style.green('SYSTEM ONLINE')}  ${style.dim('·')}  ${info.tag}`,
+        `  ${style.green('SYSTEM ONLINE')}  ${style.dim('·')}  ${info.tag}${readyIn}`,
         `  ${style.dim(RULE)}`,
-        detail('Servers', servers),
+        detail('Servers', servers + authorized),
+        ...(info.members ? [detail('Members', `${info.members.toLocaleString('en-US')} across authorized servers`)] : []),
         detail('Commands', `${info.commands} registered  ·  ${commandState}`),
         detail('Verification', info.verification),
         detail('Integrations', integrations),
+        ...(info.database ? [detail('Database', info.database)] : []),
+        ...(info.backups ? [detail('Backups', info.backups)] : []),
+        ...(info.dashboard ? [detail('Dashboard', info.dashboard)] : []),
         detail('Health', info.health),
+        ...(info.runtime ? [detail('Runtime', info.runtime)] : []),
         '',
     ];
 }

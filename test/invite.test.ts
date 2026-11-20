@@ -77,12 +77,35 @@ test('console: roles-above-bot warnings are grouped under one heading and backup
     } finally { console.log = original; }
     const text = lines.join('\n').replace(/\x1b\[[0-9;]*m/g, '');
     assert.equal((text.match(/Roles above the bot/g) ?? []).length, 1, 'one heading for all servers');
-    assert.match(text, /Cafe.*Owner, admin/);
-    assert.match(text, /Bank.*Founder.*ManageWebhooks/);
-    assert.match(text, /Exempt.*bypassed\/exempt: Senior Staff/);
+    assert.match(text, /Cafe.*2 roles: "Owner", "admin"/);
+    assert.match(text, /Bank.*1 role: "Founder".*missing: ManageWebhooks/);
+    assert.match(text, /Exempt.*exempt \(trusted role\): "Senior Staff"/);
     assert.match(text, /Database backup saved.*startup.*1\.1 MB/);
     assert.doesNotMatch(text, /762646f5/, 'no backup UUID noise');
     assert.match(text, /Quarantine retained.*guild-1.*user-1.*retained for rejoin/);
+});
+
+test('console: roles above the bot quotes odd names and caps long lists', async () => {
+    const { logEvent } = await import('../src/errors.js');
+    const original = console.log, lines: string[] = [];
+    console.log = (...args) => lines.push(args.join(' '));
+    try {
+        logEvent('protection_warning', { server: 'Odd', rolesAboveBot: ['$', '.', 'a', 'b', 'c', 'd'] });
+    } finally { console.log = original; }
+    const text = lines.join('\n').replace(/\x1b\[[0-9;]*m/g, '');
+    assert.match(text, /Odd.*6 roles: "\$", "\.", "a", "b" \(\+2 more\)/);
+});
+
+test('console: an empty trusted bot list says none instead of a bare heading', async () => {
+    const { logEvent } = await import('../src/errors.js');
+    const original = console.log, lines: string[] = [];
+    console.log = (...args) => lines.push(args.join(' '));
+    try {
+        logEvent('trusted_bots', { lines: [] });
+    } finally { console.log = original; }
+    const text = lines.join('\n').replace(/\x1b\[[0-9;]*m/g, '');
+    assert.match(text, /Trusted bots\s+none/);
+    assert.equal((text.match(/Trusted bots/g) ?? []).length, 1, 'the heading is the only line');
 });
 
 test('pretty trusted bot report appears once even at warning log level', async () => {

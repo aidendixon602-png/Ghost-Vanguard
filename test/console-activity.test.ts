@@ -108,6 +108,7 @@ test('the access list names people the bot has seen, and says how to take back a
         assert.match(text, new RegExp(`Developers +${owner} · aiden\\n`));
         assert.match(text, new RegExp(`Bot-wide +${overseer} \\(overseer\\) · jane\\n`));
         assert.match(text, new RegExp(`Supreme +${supreme}\\n`), 'someone the bot has not seen is just the ID');
+        assert.match(text, /Whitelisted +843909457616044092/, 'whitelisted people are in the trust audit');
         assert.match(text, /Bot-wide.*\n +To take back a rank given with \/setup staff global, run it again with rank "Remove rank"\.\n +Bot DMs to/);
         // Without a name lookup the lines are what they were before.
         assert.match(plain(accessSummary(store).join('\n')), new RegExp(`Bot-wide +${overseer} \\(overseer\\)\\n`));

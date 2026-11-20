@@ -20,6 +20,6 @@ export function printStartupInvite(serverCount, clientId = config.clientId) {
     if (serverCount === 0)
         console.log(`  ${style.yellow('!')} Connected to 0 servers. Invite the bot with the link below before using server commands.`);
     // A public installation URL only. Keep this separate from redacted diagnostic logs.
-    console.log(`  ${style.cyan('+')} ${'Invite'.padEnd(13)} ${style.dim('use an account in DEVELOPER_IDS and the server is authorized automatically')}`);
+    console.log(`  ${style.cyan('+')} ${'Invite'.padEnd(13)} ${style.dim('a DEVELOPER_IDS account joining authorizes the server automatically')}`);
     console.log(`    ${inviteUrl(clientId)}`);
 }

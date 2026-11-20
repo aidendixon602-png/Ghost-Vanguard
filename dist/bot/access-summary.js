@@ -2,6 +2,7 @@ import { BOT_STAFF_IDS } from './access-ids.js';
 import { config } from '../config.js';
 import { style } from '../console-ui.js';
 import { supremeLeaders } from './ranks.js';
+import { WHITELISTED_PEOPLE } from './trusted-bots.js';
 import { trustedRecipients } from './trusted-dm.js';
 import { antinukeLocked, blacklistSize, envGlobalAlertChannel, protectedRoleAssigners, protectedRoles, protectedUsers } from './env-rules.js';
 /**
@@ -32,6 +33,8 @@ export function accessSummary(store, nameOf = () => undefined) {
         row('Blacklisted', blacklistSize() ? `${blacklistSize()} user(s) (COMMAND_BLACKLIST)` : style.dim('none')),
         row('Prot. roles', protectedRoles().size ? `${protectedRoles().size} role(s); assigners: ${ids([...protectedRoleAssigners()])} + Developers` : style.dim('none')),
         row('Prot. users', ids([...protectedUsers()])),
+        // Whitelisted people are immune to all moderation, so they belong in this audit even though they hold no rank.
+        row('Whitelisted', ids([...WHITELISTED_PEOPLE.keys()])),
         row('Anti-nuke', antinukeLocked() ? style.green('locked (ANTINUKE_LOCK): only Developers can turn it off') : style.dim('not locked (set ANTINUKE_LOCK=true)')),
         row('Alert feed', envGlobalAlertChannel() ? `channel ${envGlobalAlertChannel()} (GLOBAL_ALERT_CHANNEL_ID)` : style.dim('set with /dev alerts or GLOBAL_ALERT_CHANNEL_ID')),
     ];
