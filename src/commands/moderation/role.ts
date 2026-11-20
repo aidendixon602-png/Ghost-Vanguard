@@ -43,6 +43,13 @@ export default defineCommand(new SlashCommandBuilder().setName('role').setDescri
     const guildId = i.guildId;
     if (i.options.getSubcommandGroup?.(false) === 'blacklist') return roleBlacklist(ctx, i);
     if (sub === 'who-can-give') return whoCanGive(ctx.store, i);
+    if (sub === 'restore') {
+        const target = i.options.getUser('user', true);
+        // The same checks as /role add for every remembered role; the reply says what was left and why.
+        const result = await restoreRoles(ctx.store, i.guild, i.user.id, target.id);
+        if (result.given.length) ctx.logs.push(guildId, restoredLog(guildId, i.user.id, target.id, result));
+        return restoreSummary(target.id, result);
+    }
 
     const op = sub === 'add' ? 'add' : 'remove';
     const user = i.options.getUser('user', true), chosen = i.options.getRole('role', true);

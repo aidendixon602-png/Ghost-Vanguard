@@ -1,4 +1,6 @@
 import type { Client } from 'discord.js';
+import '../config.js';
+
 /**
  * Bots Vanguard always trusts, in every server: the other bots in this network, run by the same people.
  *
@@ -6,12 +8,34 @@ import type { Client } from 'discord.js';
  * them, the settings lock and protected-role guards don't undo what they do, and they are not held for approval
  * when they join. Only list bots you run yourself: a trusted bot whose token leaks could act in any server without
  * anti-nuke stepping in.
+ *
+ * Nothing is built in. Set them in .env and restart:
+ *   TRUSTED_BOTS=1563480035493417021:Veil Utilities;1563480035493417022:Other Bot
+ * An entry without a name is reported as "unnamed bot" at startup.
  */
-export const TRUSTED_BOTS: ReadonlyMap<string, string> = new Map([
-    ['1563480035493417021', 'Veil Utilities'],
-]);
+export function parseTrustedBots(raw = ''): Map<string, string> {
+    const out = new Map<string, string>();
+    for (const part of raw.split(/[;,]/)) {
+        const match = /^\s*(\d{17,20})(?:\s*[:=]\s*(.+?))?\s*$/.exec(part);
+        if (!match) continue;
+        out.set(match[1]!, (match[2] ?? 'unnamed bot').slice(0, 80));
+    }
+    return out;
+}
 
-export const isTrustedBot = (id: string | null | undefined): boolean => !!id && TRUSTED_BOTS.has(id);
+let cached: { raw: string; map: Map<string, string> } | null = null;
+
+/** Read from the environment on every call, so a changed .env (or a test) is never served a stale list. */
+export function trustedBots(): ReadonlyMap<string, string> {
+    const raw = process.env.TRUSTED_BOTS ?? '';
+    if (cached?.raw !== raw) cached = { raw, map: parseTrustedBots(raw) };
+    return cached.map;
+}
+
+export const isTrustedBot = (id: string | null | undefined): boolean => !!id && trustedBots().has(id);
+
+/** The name given to a trusted bot in .env, for alerts that name who was left alone. */
+export const trustedBotName = (id: string | null | undefined): string | undefined => id ? trustedBots().get(id) : undefined;
 
 /**
  * Confirm at startup that each trusted ID really is the bot it is named as, and say the account name out
@@ -20,10 +44,10 @@ export const isTrustedBot = (id: string | null | undefined): boolean => !!id && 
  */
 export async function trustedBotReport(client: Client): Promise<string[]> {
     const lines: string[] = [];
-    for (const [id, name] of TRUSTED_BOTS) {
+    for (const [id, name] of trustedBots()) {
         const user = await client.users.fetch(id).catch(() => null);
         if (!user)
-            lines.push(`⚠ Trusted bot **${name}** (${id}) could not be fetched. If that ID is wrong, correct or remove TRUSTED_BOTS; the entry is exempt from anti-nuke.`);
+            lines.push(`⚠ Trusted bot **${name}** (${id}) could not be fetched. If that ID is wrong, fix or remove it in TRUSTED_BOTS; the entry is exempt from anti-nuke.`);
         else if (!user.bot)
             lines.push(`⚠ TRUSTED_BOTS lists ${id} as **${name}**, but that account is a user, not a bot. Remove it: it is exempt from anti-nuke in every server.`);
         else

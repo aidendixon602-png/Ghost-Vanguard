@@ -28,7 +28,7 @@ A role that carries Administrator, Manage Server, Manage Roles, Manage Channels,
 
 - The person who gave the role is not punished or contained. The card in the security log says who gave what to whom and why it came back off, and the new account gets a DM.
 - Staff can allow a person by whitelisting them (`/antinuke whitelist add`), by waiting until the account is 7 days old and they have been in the server for 24 hours (the card names whichever of the two still applies, or both), or by switching the guard off with `/antinuke settings new_account_guard:false`.
-- The server owner, Developers, trusted bots and bots in general are never held back. The role being handed over cannot whitelist the person receiving it.
+- The server owner, Developers, trusted bots (`TRUSTED_BOTS` in `.env`; none are built in) and bots in general are never held back. The role being handed over cannot whitelist the person receiving it.
 - A role change someone approved through `/role` is not second-guessed. In observe mode the card says what it would have done and removes nothing, and with anti-nuke off for the server the guard does nothing.
 - An account's age is part of its Discord ID, so it cannot be faked.
 - It looks at roles given to a person. A role someone already holds that is later edited to carry these permissions is the Permission Grant rule's job, and so is a bot added with powerful permissions (Bot Add and new-bot quarantine).

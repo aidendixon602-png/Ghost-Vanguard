@@ -24,7 +24,8 @@ export const DEFAULT_CATEGORIES = {
     logs: 'Ghost Vanguard Logs',
 } as const;
 
-/** Legacy category names are renamed to an archive during log setup; their channels and history are preserved. */
+/** Category names from before the Ghost Vanguard rename. They are only matched, never created: setup can reuse a
+ *  channel an older release made and renames the category to an archive, keeping its channels and history. */
 export const LEGACY_CATEGORIES = {
     logs: ['veil logs', 'veil-logs', 'veil_logs'],
     archivedLogs: 'Archive - Veil Logs',
