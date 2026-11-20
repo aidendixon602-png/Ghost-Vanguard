@@ -2,7 +2,8 @@ import { ActionRowBuilder, ButtonBuilder, Colors, PermissionFlagsBits } from 'di
 import { developers } from '../bot/developers.js';
 import { confirmDanger } from './danger-ui.js';
 import { embed } from './ui.js';
-import { restoredLog, restoreRoles, restoreSummary } from '../features/rejoin-roles.js';
+import { restoredLog, rejoinCard, restoreRoles, restoreSummary } from '../features/rejoin-roles.js';
+import { styleLogEmbed } from './log-style.js';
 import { AppError } from '../errors.js';
 import { incidentRestorePlan } from '../recovery/incident-plan.js';
 import { addConfirmation, showLayoutReview } from './layout-ui.js';
@@ -38,11 +39,20 @@ export function registerIncidentControls(registry) {
                 throw new AppError('VALIDATION_ERROR', 'Invalid restore button.');
             // Same checks as /role add for every role: the button gives back only what the presser may give.
             const result = await restoreRoles(ctx.store, i.guild, i.user.id, userId);
-            if (result.given.length)
-                ctx.logs.push(i.guildId, restoredLog(i.guildId, i.user.id, userId, result));
             const done = !result.skipped.some(s => s.reason !== 'the role was deleted');
-            if (done && i.message?.components?.length)
-                await i.message.edit({ components: [new ActionRowBuilder().addComponents(ButtonBuilder.from(i.message.components[0].components[0]).setDisabled(true).setLabel('Roles restored'))] }).catch(() => null);
+            // One event, one message: the card itself is rewritten with the outcome instead of posting another.
+            const card = rejoinCard(ctx.store, i.guild, { userId, tag: result.target?.tag, leftAt: result.leftAt, restored: { actorId: i.user.id, result } });
+            const mine = (component) => (component?.customId ?? component?.custom_id ?? component?.data?.custom_id) === i.customId;
+            const button = i.message?.components?.map((row) => row.components?.find(mine)).find(Boolean);
+            const edited = card && i.message && button
+                ? await i.message.edit({
+                    embeds: [styleLogEmbed(card)],
+                    components: [new ActionRowBuilder().addComponents(ButtonBuilder.from(button).setDisabled(done).setLabel(done ? 'Roles restored' : 'Restore the rest'))],
+                }).then(() => true, () => false)
+                : false;
+            // The card could not be rewritten (deleted or missing): the log still gets the record.
+            if (!edited && result.given.length)
+                ctx.logs.push(i.guildId, restoredLog(i.guildId, i.user.id, userId, result));
             return restoreSummary(userId, result);
         } });
     registry.component({ prefix: 'incident:undo:', kinds: ['button'], metadata: { ...defaults, category: 'security', access: 'security', botPermissions: [PermissionFlagsBits.ManageRoles] },

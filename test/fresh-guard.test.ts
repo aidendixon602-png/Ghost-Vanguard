@@ -83,9 +83,9 @@ test('a powerful role given to a 2-day-old account is taken back, and the person
         assert.deepEqual(f.removed, [{ ids: ['privileged'], reason: 'Ghost Vanguard: new-account guard' }]);
         const card = f.cards.find(c => c.title === 'New account got a powerful role');
         assert.ok(card, 'staff get a card');
-        assert.match(card.description, new RegExp(`<@${GRANTER}> gave <@${TARGET}> <@&privileged>\\. It carries Administrator\\.`));
-        assert.match(card.description, /Since their Discord account is 2 days old, Vanguard took the role back\./);
-        assert.match(card.description, /whitelist them with `\/antinuke whitelist add`, wait until the account is 7 days old, or turn the guard off with `\/antinuke settings`/);
+        assert.match(card.description, new RegExp(`<@${GRANTER}> gave <@${TARGET}> <@&privileged>\\.\\nIt carries Administrator\\.`));
+        assert.match(card.description, /Since their Discord account is 2 days old, Vanguard took it back\./);
+        assert.match(card.description, /Allow it: `\/antinuke whitelist add` · wait until the account is 7 days old · or turn the guard off with `\/antinuke settings`/);
         assert.equal(f.dms.length, 1, 'the new account is told why');
         assert.match(f.dms[0].description, /you were given <@&privileged>, and Vanguard took it back/);
         assert.match(f.dms[0].description, /under 7 days old and from members who joined less than 24 hours ago\. This is automatic\./);
@@ -110,8 +110,8 @@ test('when the account is young and they only just joined, the card names both t
     try {
         await f.security.audit(f.grant('both', 'owner'), f.guild);
         const card = f.cards.find(c => c.title === 'New account got a powerful role');
-        assert.match(card.description, /Since their Discord account is 6 days old and they joined the server 2 hours ago, Vanguard took the role back\./);
-        assert.match(card.description, /wait until the account is 7 days old and they have been in the server for 24 hours,/);
+        assert.match(card.description, /Since their Discord account is 6 days old and they joined the server 2 hours ago, Vanguard took it back\./);
+        assert.match(card.description, /wait until the account is 7 days old and they have been in the server for 24 hours ·/);
     } finally { f.store.close(); }
 });
 
@@ -120,7 +120,7 @@ test('a member who joined 3 hours ago on an old account is held back too, and th
     try {
         await f.security.audit(f.grant(), f.guild);
         assert.equal(f.removed.length, 1);
-        assert.match(f.cards.find(c => c.title === 'New account got a powerful role').description, /Since they joined the server 3 hours ago, Vanguard took the role back\..*wait until they have been in the server for 24 hours/s);
+        assert.match(f.cards.find(c => c.title === 'New account got a powerful role').description, /Since they joined the server 3 hours ago, Vanguard took it back\..*wait until they have been in the server for 24 hours/s);
     } finally { f.store.close(); }
 });
 
@@ -200,7 +200,7 @@ test('in observe mode the guard reports what it would have done and removes noth
         assert.deepEqual(f.dms, []);
         const card = f.cards.find(c => /New-account guard/.test(c.title));
         assert.match(card.title, /observe mode/);
-        assert.match(card.description, /Vanguard would have taken the role back\.\nObserved only: nothing was removed\./);
+        assert.match(card.description, /Vanguard would have taken it back\.\nObserve mode: nothing was removed\./);
     } finally { f.store.close(); }
 });
 
@@ -219,7 +219,7 @@ test('a role Vanguard cannot manage is reported as a failure, with no DM to the 
         await f.security.audit(f.grant('high', 'owner'), f.guild);
         assert.deepEqual(f.removed, []);
         const card = f.cards.find(c => c.title === 'New account got a powerful role');
-        assert.match(card.description, /Vanguard could not take the role back\. Move its role above that role and check that it has Manage Roles\./);
+        assert.match(card.description, /Vanguard could not take it back: move its role above that role and check that it has Manage Roles\./);
         assert.deepEqual(f.dms, []);
     } finally { f.store.close(); }
 });
@@ -251,7 +251,7 @@ test('a failure inside the guard never stops the anti-nuke rules from running', 
         await f.security.audit(f.grant('rules-still-run', GRANTER), f.guild);
         assert.equal(f.store.get("SELECT COUNT(*) AS n FROM incidents WHERE rule='dangerous_grant'")!.n, 1);
         const card = f.cards.find(c => c.title === 'New account got a powerful role');
-        assert.match(card.description, /could not take the role back/);
+        assert.match(card.description, /could not take it back/);
     } finally { f.store.close(); }
 });
 

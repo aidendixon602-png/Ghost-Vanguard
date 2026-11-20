@@ -4,7 +4,7 @@ import { consumeApprovedRoleChange } from './role-authorizations.js';
 import { ActionRowBuilder, AuditLogEvent, PermissionFlagsBits, PermissionsBitField, ButtonBuilder, ButtonStyle, Colors } from 'discord.js';
 import { dangerous, escalationAdded, KeyedQueue, overrideRule, ruleFor, RULES, WARN_FIRST, WARNING_MEMORY_MS, KNOWN_ROLE_BOTS } from '../core.js';
 import { developers } from '../bot/developers.js';
-import { isTrustedBot, isWhitelistedPerson, TRUSTED_BOTS } from '../bot/trusted-bots.js';
+import { isTrustedBot, isWhitelistedPerson, trustedBotName } from '../bot/trusted-bots.js';
 import { AppError, failure, logEvent } from '../errors.js';
 import { plusConfig } from '../features/plus-settings.js';
 import { FRESH_ACCOUNT_DAYS, FRESH_MEMBER_HOURS, freshness } from './fresh-guard.js';
@@ -130,7 +130,7 @@ export class Security {
         if (developers.has(id))
             return 'a Developer';
         if (isTrustedBot(id))
-            return `a trusted bot (${TRUSTED_BOTS.get(id)})`;
+            return `a trusted bot (${trustedBotName(id)})`;
         if (isWhitelistedPerson(id))
             return 'whitelisted on Ghost Vanguard';
         if (this.store.hasGrant(guild.id, id, 'trust'))
@@ -222,10 +222,10 @@ export class Security {
         const roles = ids.map(id => guild.roles?.cache?.get(id)).filter((role) => !!role);
         const given = roles.length ? roles.map(r => `<@&${r.id}>`).join(', ') : ids.map(id => `<@&${id}>`).join(', ');
         const perms = new PermissionsBitField(bits).toArray().map(name => name.replace(/([a-z])([A-Z])/g, '$1 $2')).join(', ');
-        const how = `<@${actor}> gave <@${target.id}> ${given}. It carries ${perms}.\nSince ${fresh.text}`;
-        const override = `-# To allow it: whitelist them with \`/antinuke whitelist add\`, wait ${fresh.wait}, or turn the guard off with \`/antinuke settings\`.`;
+        const how = `<@${actor}> gave <@${target.id}> ${given}.\nIt carries ${perms}.\nSince ${fresh.text}`;
+        const override = `-# Allow it: \`/antinuke whitelist add\` · wait ${fresh.wait} · or turn the guard off with \`/antinuke settings\``;
         if (s.mode !== 'enforce') {
-            this.incidentLog(guild.id, embed('New-account guard (observe mode)', `${how}, Vanguard would have taken the role back.\nObserved only: nothing was removed.\n${override}`, Colors.DarkButNotBlack));
+            this.incidentLog(guild.id, embed('New-account guard (observe mode)', `${how}, Vanguard would have taken it back.\nObserve mode: nothing was removed.\n${override}`, Colors.DarkButNotBlack));
             return;
         }
         const removable = roles.filter(r => !r.managed && r.editable);
@@ -234,7 +234,7 @@ export class Security {
             this.store.assertAuthorized(guild.id);
             removed = await target.roles.remove(removable.map(r => r.id), 'Ghost Vanguard: new-account guard').then(() => removable.map(r => r.id), () => []);
         }
-        const outcome = removed.length ? 'Vanguard took the role back.' : 'Vanguard could not take the role back. Move its role above that role and check that it has Manage Roles.';
+        const outcome = removed.length ? 'Vanguard took it back.' : 'Vanguard could not take it back: move its role above that role and check that it has Manage Roles.';
         this.incidentLog(guild.id, embed('New account got a powerful role', `${how}, ${outcome}\n${override}`, removed.length ? Colors.Orange : Colors.Red));
         if (removed.length)
             void target.send({ embeds: [embed('A role was removed', [

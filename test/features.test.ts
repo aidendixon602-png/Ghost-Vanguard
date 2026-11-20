@@ -164,7 +164,7 @@ test('returning members with cases or notes are flagged to staff', () => {
         assert.equal(logs.length, 0);
         store.recordCase(G, U, M, 'ban', 'raiding');
         historyOnJoin(store, queue, member);
-        assert.match(logs[0].e.description, /Cases:\*\* 1/); assert.match(logs[0].e.description, /raiding/);
+        assert.match(logs[0].e.description, /\*\*History · 1 case\*\*/); assert.match(logs[0].e.description, /raiding/);
     } finally { store.close(); }
 });
 

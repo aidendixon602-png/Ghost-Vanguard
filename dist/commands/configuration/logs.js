@@ -98,7 +98,7 @@ export default defineCommand(new SlashCommandBuilder().setName('logs').setDescri
         await i.guild.channels.fetch();
         const plan = archivePlan(i.guild, ctx.store);
         if (!plan.categories.length)
-            return 'No archived Veil log categories were found.';
+            return 'No archived log categories were found.';
         return confirmDanger(ctx, i, {
             title: 'Delete archived channels', label: 'Delete archived channels',
             summary: `Delete up to ${plan.channels.length} archived channels and ${plan.categories.length} empty archive categories.`,
@@ -172,7 +172,7 @@ export default defineCommand(new SlashCommandBuilder().setName('logs').setDescri
             lines.push(...routeSetup.lines);
             skippedRoutes = routeSetup.attention;
             if (result.archivedCategories.length)
-                lines.push('**Other old Veil channels:** kept in the archive; no channels or messages were deleted.');
+                lines.push('**Other old channels:** kept in the archive; no channels or messages were deleted.');
             if (result.previousAlerts)
                 lines.push(`Bot actions (anti-nuke, backups, restores, configuration changes, errors) now go to <#${loggingId}> instead of <#${result.previousAlerts}>.`);
         }

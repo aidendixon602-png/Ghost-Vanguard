@@ -34,16 +34,35 @@ export async function checkAltAccount(store, logs, roblox, member, trusted) {
     lines.push('', blocked ? 'This is very likely a banned member on a new Discord account.' : 'Could be an alt, or someone who moved to a new Discord account.');
     logs.push(member.guild.id, embed(blocked ? 'Alt account · banned member\'s Roblox' : 'Alt account · shared Roblox account', lines.join('\n'), blocked ? Colors.Red : Colors.Orange), [banButtons(member.id)]);
 }
+/** Past cases and staff notes for a member, or null when there are none. */
+export function historySummary(store, guildId, userId) {
+    const total = Number(store.get('SELECT COUNT(*) AS n FROM cases WHERE guild_id=? AND user_id=?', guildId, userId)?.n ?? 0);
+    const notes = Number(store.get('SELECT COUNT(*) AS n FROM member_notes WHERE guild_id=? AND user_id=?', guildId, userId)?.n ?? 0);
+    if (!total && !notes)
+        return null;
+    const cases = store.all('SELECT number,action,reason,at FROM cases WHERE guild_id=? AND user_id=? ORDER BY id DESC LIMIT 3', guildId, userId);
+    return { total, notes, cases };
+}
+/** The history part of a join card: what they have on record, the last few cases, and where to read the rest. */
+export function historyLines(history) {
+    const counts = [
+        history.total ? `${history.total} case${history.total === 1 ? '' : 's'}` : '',
+        history.notes ? `${history.notes} staff note${history.notes === 1 ? '' : 's'}` : '',
+    ].filter(Boolean);
+    return [
+        `**History · ${counts.join(' · ')}**`,
+        ...history.cases.map(c => `• **#${c.number} ${c.action}** <t:${Math.floor(c.at / 1000)}:R> · ${clip(String(c.reason), 90)}`),
+        '-# `/mod history` · `/mod notes list`',
+    ];
+}
+/** A member with cases or notes but no roles to give back. Members with roles get one card from rejoin-roles.ts. */
 export function historyOnJoin(store, logs, member) {
     if (member.user.bot)
         return;
-    const cases = store.all('SELECT number,action,reason,at FROM cases WHERE guild_id=? AND user_id=? ORDER BY id DESC LIMIT 3', member.guild.id, member.id);
-    const total = Number(store.get('SELECT COUNT(*) AS n FROM cases WHERE guild_id=? AND user_id=?', member.guild.id, member.id)?.n ?? 0);
-    const notes = Number(store.get('SELECT COUNT(*) AS n FROM member_notes WHERE guild_id=? AND user_id=?', member.guild.id, member.id)?.n ?? 0);
-    if (!total && !notes)
+    const history = historySummary(store, member.guild.id, member.id);
+    if (!history)
         return;
-    const recentCases = cases.map(c => `• **#${c.number} ${c.action}** <t:${Math.floor(c.at / 1000)}:R> · ${clip(String(c.reason), 90)}`).join('\n');
-    logs.push(member.guild.id, embed('Returning member with history', `<@${member.id}> (${member.user.tag}) rejoined.\n**Cases:** ${total} · **Staff notes:** ${notes}${recentCases ? `\n${recentCases}` : ''}\n\nFull history: \`/mod history\` · \`/mod notes list\``, Colors.Yellow));
+    logs.push(member.guild.id, embed('Returning member with history', [`<@${member.id}> (${member.user.tag}) rejoined.`, '', ...historyLines(history)].join('\n'), Colors.Yellow));
 }
 export const WELCOME_DEFAULTS = { enabled: false, channelId: null, message: 'Welcome to **{server}**, {user}! You are member #{count}.', verifyButton: true };
 export const welcomeConfig = (store, guild) => getFeature(store, guild, 'welcome', WELCOME_DEFAULTS);

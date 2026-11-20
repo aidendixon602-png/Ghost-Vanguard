@@ -152,7 +152,7 @@ async function placeInLogCategory(channels, category, reason, pace) {
         await channel.setParent(category.id, { lockPermissions: false, reason });
     }
 }
-/** Rename the old Veil category so it is clearly archived; never delete its channels or messages. */
+/** Rename the old log category (whichever bot made it) so it is clearly archived; never delete its channels or messages. */
 async function archiveLegacyLogCategories(guild, reason, pace) {
     const legacyNames = new Set(LEGACY_CATEGORIES.logs.map(normalizedCategoryName));
     const archived = [];
@@ -378,7 +378,7 @@ export function describeRouteSetup(result) {
 }
 // ------------------------------------------------------------ merging scattered log channels
 /**
- * Where Vanguard's log channels are allowed to be taken from: its own category and the old Veil ones it
+ * Where Vanguard's log channels are allowed to be taken from: its own category and the older log categories it
  * inherited. A channel outside this area is never claimed on a name match alone — another bot's
  * `join-logs`, `modlogs` or `veil-utilities-logging` must keep working exactly as it does now.
  */
@@ -431,7 +431,7 @@ function inLogArea(guild, parentId) {
  * Work out what a merge would change, without changing anything.
  *
  * Vanguard's own channels are the ones it is configured to post in (ban logs, server logs, the security
- * log, saved route channels) plus the recognized Veil log channels inside an old log category. Everything
+ * log, saved route channels) plus the recognized log channels inside an old log category. Everything
  * else — including look-alike names another bot may be using — is listed and left exactly as it is.
  */
 export function planLogMerge(store, guild) {
@@ -478,7 +478,7 @@ export function planLogMerge(store, guild) {
             continue;
         }
         moves.push({ channelId: channel.id, name: channel.name, from: describeParent(channel.parentId),
-            why: why ?? 'old Veil log channel' });
+            why: why ?? 'an older log channel' });
     }
     // A second channel for the same log type (two #vanguard-security channels, or #midtown-vanguard-logging
     // next to #ghost-vanguard-logging) is never deleted or moved by Vanguard: it is reported so a human can

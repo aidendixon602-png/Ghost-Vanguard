@@ -9,6 +9,7 @@
 | Manual backup | `/recovery backup create` captures supported layout and settings; `/recovery backup restore` uses the common confirmed flow. |
 | Synced backups | A recent backup of the roles and channels is saved as the server changes: checked every 5 minutes, at least 15 minutes apart, newest 5 kept, and never while a raid, lockdown or incident is going on. See [recovery.md](recovery.md#synced-backups). |
 | Automatic restore | After anti-nuke contains someone who deleted channels or roles, exactly those are re-created from the newest backup saved before the first deletion. Everything else is left alone. See [recovery.md](recovery.md#automatic-restore). |
+| Rejoining members | One card in the log covers a member who comes back: how long they were away, the roles they had, their past cases and staff notes, and a **↩️ Restore roles** button. Every role goes through the same checks as `/role add`, so the button (and `/role restore`) gives back only what the person pressing it may give; what is left, and why, stays on the card for someone with more access. |
 | New-account guard | A role with Administrator, Manage Roles and similar permissions comes straight back off accounts under 7 days old and members who joined under 24 hours ago, whoever gave it. See [security-controls.md](security-controls.md#new-accounts-and-powerful-roles). |
 | Cross-server copy | `/recovery copylayout destination_id:` copies from the current server. Both must be authorized and ready, and you need Vanguard security access in both. |
 | Idempotent recovery | Stored source-to-destination mappings win, then exact IDs, then cautious unique matching. Ambiguous objects are skipped, and repeated restores reuse objects, even after a restart. See [recovery.md](recovery.md). |
@@ -134,6 +135,7 @@ The script checks the metadata, checksum and integrity, refuses to run while the
 | `ROVER_API_KEY`, `BLOXLINK_API_KEY` | empty | Optional Roblox providers. Without them, existing verification roles are preserved. |
 | `AI_ENABLED`, `OPENAI_API_KEY`, `OPENAI_MODEL` | `AI_ENABLED=false` | Optional `/ask` assistant. Enabling it requires `OPENAI_API_KEY` and an explicit `OPENAI_MODEL`; there is no built-in model name. |
 | `LOG_FORMAT`, `LOG_LEVEL` | `pretty`, `info` | `json` is available for log ingestion. |
+| `TRUSTED_BOTS` | empty | Bots Vanguard never acts against, in every server, as `id:name` pairs separated by commas or semicolons (`TRUSTED_BOTS=123456789012345678:Partner Bot`). Nothing is built in. Only list bots you run yourself: a leaked token would be exempt from anti-nuke everywhere. |
 | `BOT_OWNER_ID`, `BOT_OWNER_USERNAME` | empty | The bot owner and the default `TRUSTED_DM_IDS`. Nothing is built in: leave it empty and no account holds the owner rank or receives the daily database backup. |
 
 <!-- coderabbit-ai-generated:v1 -->

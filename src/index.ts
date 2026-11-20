@@ -375,8 +375,11 @@ client.on(Events.GuildMemberAdd, member => {
             await handleNewAccountJoin(store, logs, member, trusted);
     });
     protectedTask('rejoin quarantine', member.guild.id, () => security.reconcile(member));
-    protectedTask('history on join', member.guild.id, async () => historyOnJoin(store, logs, member));
-    protectedTask('rejoin roles', member.guild.id, async () => onRejoin(store, logs, member));
+    // One card for a returning member: their history and the roles they had, with the Restore roles
+    // button. historyOnJoin only speaks when there are no saved roles to put in that card.
+    protectedTask('rejoin card', member.guild.id, async () => {
+        if (!onRejoin(store, logs, member)) historyOnJoin(store, logs, member);
+    });
     protectedTask('alt check', member.guild.id, () => checkAltAccount(store, logs, roblox, member, id => security.trusted(member.guild, id)));
     protectedTask('welcome', member.guild.id, () => sendWelcome(store, member));
     if (member.user.bot) protectedTask('bot quarantine', member.guild.id, () => quarantineNewBot(store, logs, member));

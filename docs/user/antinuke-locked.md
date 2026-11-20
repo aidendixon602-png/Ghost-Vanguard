@@ -48,7 +48,7 @@ First-hit warnings apply to human actors; bots get the normal response without a
 
 At startup and after authorization, a new or unconfigured server loads its default rules in **observe** mode. It records incidents but does not strip people or automatically revert changes. Run `/setup logs setup`, then `/antinuke check`; readiness requires the bot permissions and an accessible security-log channel. When ready, `/antinuke enable` opens a confirmation that describes enforcement consequences, the baseline snapshot, and any roles at or above Vanguard. Confirming rechecks the security log, permissions, and hierarchy before enabling enforcement. A hierarchy warning does not block the choice, but Vanguard cannot contain members whose roles are above it.
 
-An enforced server retains its per-rule settings across restarts. If permissions or the security-log destination are missing, startup switches it to observe mode and reports the blockers; fixing readiness alone never silently resumes enforcement. A staff `/antinuke disable` opt-out stays off across restarts. The server owner, configured developers, Vanguard itself and the network's trusted bots are never punished.
+An enforced server retains its per-rule settings across restarts. If permissions or the security-log destination are missing, startup switches it to observe mode and reports the blockers; fixing readiness alone never silently resumes enforcement. A staff `/antinuke disable` opt-out stays off across restarts. The server owner, configured developers, Vanguard itself and the bots listed in `TRUSTED_BOTS` (none are built in) are never punished.
 
 
 <!-- /coderabbit-ai-generated:v1 -->

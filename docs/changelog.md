@@ -1,3 +1,14 @@
+## Unreleased: one card per returning member
+
+- **A rejoin is one message, not three.** The history card and the "Member Rejoined" card are now one card: when they were last here, the roles they had, their past cases and notes, and the **↩️ Restore roles** button. Pressing it rewrites that same card with who gave what back, what is left and why, instead of posting a second "Roles Restored" card and leaving a lone disabled button behind. One event leaves one message in the log.
+- **Role lists are counted once.** Discord lets two roles share a name, and both were saved and listed, so a card could say "3 role(s)" and show two. The saved list now keeps one role per name, and the count matches what is shown.
+- **`/role restore` works.** The subcommand was in the command menu but had no handler, so it fell through to `/role remove` and failed. It now gives back the saved roles, says what it could not give and why, and writes the same log card.
+- **New-account guard cards are shorter.** The permission list sits on its own line, the outcome is one sentence, and the override hint is a single subtext line instead of three.
+
+## Unreleased: no bot is trusted by default
+
+- **Veil Utilities is no longer built into the trusted-bot list.** Nothing is hardcoded any more: Vanguard trusts only the bots you name in `.env`, so an old bot with a live token, or an ID nobody checked, is an ordinary bot again and anti-nuke watches it like anyone else. List your own with `TRUSTED_BOTS=123456789012345678:Partner Bot` (comma- or semicolon-separated `id:name` pairs), and restart. Startup still names each one and flags an ID that is not a bot or cannot be fetched.
+
 ## Unreleased: tidier command menu
 
 - **Developer tools now live under `/dev`.** `/genreban`, `/ungenreban`, `/hardban`, `/unhardban`, `/netexception` and `/restart` are now `/dev genreban`, `/dev ungenreban`, `/dev hardban`, `/dev unhardban`, `/dev netexception` and `/dev restart`. Who may use them is unchanged.
