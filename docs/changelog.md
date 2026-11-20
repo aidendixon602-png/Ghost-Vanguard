@@ -1,3 +1,10 @@
+## Unreleased: clearer startup console
+
+- **The startup banner now shows what matters.** It adds how long startup took, how many of the connected servers are authorized (a connected server that is not authorized gets no protection, and is flagged), how many members sit in the authorized servers, the database size and path, the backup schedule, the dashboard address with its token status, and the runtime (Node version, memory, Discord API latency). Rover, Bloxlink and the heartbeat join AI moderation in the integrations line, and the dashboard address moved into the banner instead of printing on its own mid-startup.
+- **"Trusted bots" no longer prints an empty heading.** With no bots in `TRUSTED_BOTS` it now says `none`.
+- **Roles above the bot are readable.** Role names are quoted (so a role called `$` or `.` reads as a name, not punctuation), counted, and capped, with the fix written once in the heading.
+- **The access list now names whitelisted people.** They are immune to all moderation, so they belong in the "people you trust" audit.
+
 ## Unreleased: one card per returning member
 
 - **A rejoin is one message, not three.** The history card and the "Member Rejoined" card are now one card: when they were last here, the roles they had, their past cases and notes, and the **↩️ Restore roles** button. Pressing it rewrites that same card with who gave what back, what is left and why, instead of posting a second "Roles Restored" card and leaving a lone disabled button behind. One event leaves one message in the log.

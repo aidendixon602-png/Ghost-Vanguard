@@ -51,17 +51,29 @@ const SPECIAL_LINES = {
         const lines = [];
         if (!attentionHeader) {
             attentionHeader = true;
-            lines.push('', `  ${style.yellow('⚠ Roles above the bot')}  ${style.dim('unprotected roles are out of reach; bypassed roles are exempt · check /antinuke check')}`);
+            lines.push('', `  ${style.yellow('⚠ Roles above the bot')}  ${style.dim('Vanguard cannot manage these roles · move its role above them or protect them · /antinuke check')}`);
         }
-        const above = Array.isArray(e.rolesAboveBot) && e.rolesAboveBot.length ? e.rolesAboveBot.join(', ') : '';
-        const bypassed = Array.isArray(e.bypassedRolesAboveBot) && e.bypassedRolesAboveBot.length ? style.dim(`bypassed/exempt: ${e.bypassedRolesAboveBot.join(', ')}`) : '';
-        const missing = Array.isArray(e.missingPermissions) && e.missingPermissions.length ? style.yellow(`bot is missing ${e.missingPermissions.join(', ')}`) : '';
-        lines.push(`    ${style.yellow('•')} ${style.bold(String(e.server ?? '?'))} ${style.dim('—')} ${[above, bypassed, missing].filter(Boolean).join(' · ')}`);
+        // Role names are quoted: a role called "$" or "." reads as a name, not punctuation. Long lists are capped.
+        const quoted = (names) => Array.isArray(names) ? names.map(name => `"${String(name)}"`) : [];
+        const shown = (names) => names.length > 4 ? `${names.slice(0, 4).join(', ')} (+${names.length - 4} more)` : names.join(', ');
+        const above = quoted(e.rolesAboveBot);
+        const bypassed = quoted(e.bypassedRolesAboveBot);
+        const missing = Array.isArray(e.missingPermissions) && e.missingPermissions.length ? e.missingPermissions.join(', ') : '';
+        const parts = [
+            above.length ? `${above.length} role${above.length === 1 ? '' : 's'}: ${shown(above)}` : '',
+            bypassed.length ? `exempt (trusted role): ${shown(bypassed)}` : '',
+            missing ? `missing: ${missing}` : '',
+        ].filter(Boolean).join(' · ');
+        lines.push(`    ${style.yellow('•')} ${style.bold(String(e.server ?? '?'))} ${style.dim('—')} ${parts}`);
         return lines;
     },
     database_backup_verified: e => [`  ${style.green('✔')} Database backup saved ${style.dim(`· ${e.kind ?? 'backup'} · ${typeof e.size === 'number' ? readableSize(e.size) : '?'}`)}`],
     quarantine_member_absent: e => [`  ${style.dim('Quarantine retained')} · server ${e.guildId} · member ${e.userId} · ${e.reason}`],
-    trusted_bots: e => Array.isArray(e.lines) ? [`  ${style.bold('Trusted bots')}`, ...e.lines.map(line => `    ${String(line).replace(/\*\*/g, '')}`)] : null,
+    trusted_bots: e => {
+        const lines = Array.isArray(e.lines) ? e.lines.map(line => String(line).replace(/\*\*/g, '')) : [];
+        // An empty list still gets a line: a bare "Trusted bots" heading looks like the report failed.
+        return lines.length ? [`  ${style.bold('Trusted bots')}`, ...lines.map(line => `    ${line}`)] : [`  ${style.bold('Trusted bots')}  ${style.dim('none')}`];
+    },
 };
 export function logEvent(event, fields = {}) {
     const sanitized = sanitize({ timestamp: new Date().toISOString(), event, ...fields });

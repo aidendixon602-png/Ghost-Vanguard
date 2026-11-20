@@ -1,4 +1,4 @@
-import { startup } from './startup.js';
+import { startedAt, startup } from './startup.js';
 import { announceStopped, announceStopping, drained } from './startup-progress.js';
 import { accessSummary } from './bot/access-summary.js';
 import { dmTrusted } from './bot/trusted-dm.js';
@@ -15,7 +15,9 @@ import { processStaffMention } from './security/antiping.js';
 import { rejectRecoveryWait, recoveryApiWait } from './recovery/recovery-api.js';
 import { ActivityType, Client, Colors, Events, Partials, GatewayIntentBits, MessageFlags } from 'discord.js';
 import { randomUUID } from 'node:crypto';
+import { statSync } from 'node:fs';
 import { createServer } from 'node:http';
+import { relative } from 'node:path';
 import { cleanLegacyGuildCommands, syncCommands } from './bot/command-sync.js';
 import { registerComponents } from './ui/components.js';
 import { config, validateConfig, VERSION } from './config.js';
@@ -23,7 +25,7 @@ import { presenceLines, ProtectionStats } from './security/protection-stats.js';
 import { DatabaseBackups } from './database/database-backups.js';
 import { Store } from './database/db.js';
 import { AppError, endStartupSummary, failure, logEvent } from './errors.js';
-import { closingRule, startupSummary, style } from './console-ui.js';
+import { closingRule, readableSize, startupSummary, style } from './console-ui.js';
 import { Interactions } from './bot/interactions.js';
 import { printStartupInvite } from './bot/invite.js';
 import { GuildLifecycle } from './bot/lifecycle.js';
@@ -71,6 +73,15 @@ if (errors.length) {
     process.exit(1);
 }
 const healthUrl = `http://${config.host}:${config.port}/healthz`;
+/** The database file's size, or null when there is no file to measure (in-memory tests). */
+function databaseSize(path) {
+    try {
+        return readableSize(statSync(path).size);
+    }
+    catch {
+        return null;
+    }
+}
 startup.step('Opening the database');
 const store = new Store(config.dbPath);
 const owner = randomUUID();
@@ -218,10 +229,25 @@ client.once(Events.ClientReady, async (c) => {
         startup.done();
         logEvent('ready', { bot: c.user.tag, version: VERSION, commands: registry.commands.size, servers: client.guilds.cache.size, health: healthUrl });
         logEvent('integrations', { rover: config.roverKey ? 'configured' : 'disabled', bloxlink: config.bloxlinkKey ? 'configured' : 'disabled', ai: config.aiEnabled ? 'configured' : 'disabled' });
-        if (config.logFormat !== 'json')
-            for (const line of startupSummary({ version: VERSION, tag: c.user.tag, servers: client.guilds.cache.size, commands: registry.commands.size, commandsUpdated,
-                verification: 'Roblox profile code', integrations: { 'AI moderation': !!config.aiEnabled }, health: healthUrl }))
+        if (config.logFormat !== 'json') {
+            const guilds = [...client.guilds.cache.values()];
+            const authorizedGuilds = guilds.filter(g => store.isAuthorized(g.id));
+            const dbSize = databaseSize(config.dbPath);
+            for (const line of startupSummary({ version: VERSION, tag: c.user.tag, servers: guilds.length, authorized: authorizedGuilds.length,
+                members: authorizedGuilds.reduce((n, g) => n + g.memberCount, 0),
+                commands: registry.commands.size, commandsUpdated,
+                verification: 'Roblox profile code',
+                integrations: { 'AI moderation': !!config.aiEnabled, Rover: !!config.roverKey, Bloxlink: !!config.bloxlinkKey, Heartbeat: !!config.heartbeatUrl },
+                database: dbSize ? `${dbSize}  ·  ${relative(process.cwd(), config.dbPath)}` : undefined,
+                backups: `every ${config.databaseBackupMinutes} min  ·  ${relative(process.cwd(), config.databaseBackupDirectory)}`,
+                dashboard: config.dashboardEnabled
+                    ? `http://${config.host}:${config.port}/  ·  ${config.dashboardToken ? 'token required' : style.yellow('no token set — do not expose')}`
+                    : 'disabled (health check only)',
+                health: healthUrl,
+                runtime: [`Node ${process.version}`, readableSize(process.memoryUsage().rss), client.ws.ping >= 0 ? `API ${client.ws.ping} ms` : null].filter(Boolean).join('  ·  '),
+                startedInMs: Date.now() - startedAt }))
                 console.log(line);
+        }
         printStartupInvite(client.guilds.cache.size);
         if (config.logFormat !== 'json') {
             console.log('');
@@ -462,12 +488,6 @@ server.listen(config.port, config.host, () => {
         dashboard: config.dashboardEnabled ? `http://${config.host}:${config.port}/` : 'disabled',
         ...(config.dashboardEnabled ? { token: config.dashboardToken ? 'required' : 'none' } : {}),
     });
-    if (config.logFormat !== 'json') {
-        if (config.dashboardEnabled)
-            console.log(`  ${style.dim('Dashboard:')} ${config.host}:${config.port}/  ${config.dashboardToken ? style.dim('(DASHBOARD_TOKEN required)') : style.dim('(set DASHBOARD_TOKEN before exposing it)')}`);
-        else
-            console.log(`  ${style.dim('Health check:')} ${config.host}:${config.port}/healthz  ${style.dim('(dashboard disabled)')}`);
-    }
 });
 timers.push(setInterval(() => task('logs', logs.flush()), 2000));
 timers.push(setInterval(() => task('temporary bans', sweepTempbans(store, logs, client, id => lifecycle.isReady(id))), 60000));
